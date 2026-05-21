@@ -240,6 +240,15 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       return;
     }
 
+    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "in") {
+      for (const ast::ExprPtr &arg : call_expr->args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr->args.size()),
+                   call_expr->location);
+      return;
+    }
+
     compile_expr(*call_expr->callee);
     for (const ast::ExprPtr &arg : call_expr->args) {
       compile_expr(*arg);

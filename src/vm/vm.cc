@@ -241,6 +241,26 @@ VmResult Vm::run(const Chunk &chunk) {
       push(Value::null_value());
       break;
     }
+    case OpCode::NativeIn: {
+      const uint32_t argc = static_cast<uint32_t>(instruction.operand);
+      // Consume optional prompt argument from stack
+      for (uint32_t i = 0; i < argc; ++i) {
+        if (stack_.empty()) {
+          return runtime_error("Stack underflow for io::in.");
+        }
+        Value prompt = pop();
+        if (prompt.type == ValueType::String) {
+          std::cout << prompt.string_storage << std::flush;
+        }
+      }
+      std::string line;
+      if (!std::getline(std::cin, line)) {
+        push(Value::null_value());
+      } else {
+        push(Value::string_value(std::move(line)));
+      }
+      break;
+    }
     }
   }
 

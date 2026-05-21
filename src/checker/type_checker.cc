@@ -117,13 +117,12 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
     Type var_type = resolve_type_name(var_decl->type);
     if (var_decl->init) {
       Type init_type = check_expr(*var_decl->init);
-      if (!init_type.is_compatible_with(var_type)) {
+      if (var_decl->type == "auto") {
+        var_type = init_type;
+      } else if (!init_type.is_compatible_with(var_type)) {
         error_at(var_decl->location,
                  "Cannot assign " + type_to_string(init_type) + " to variable of type " +
                      type_to_string(var_type) + ".");
-      }
-      if (var_type.kind == TypeKind::Int && var_decl->type == "auto") {
-        var_type = init_type;
       }
     }
     bool is_mutable = var_decl->storage == "mut";
@@ -284,6 +283,13 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         check_expr(*arg);
       }
       return void_type();
+    }
+
+    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "in") {
+      for (const ast::ExprPtr &arg : call_expr->args) {
+        check_expr(*arg);
+      }
+      return string_type();
     }
 
     Type callee_type = check_expr(*call_expr->callee);
