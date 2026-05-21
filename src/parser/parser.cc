@@ -365,7 +365,12 @@ ast::ExprPtr Parser::primary() {
   }
   if (match(TokenType::STRING_LIT)) {
     const Token &literal = previous();
-    return std::make_unique<ast::StringLiteralExpr>(location_of(literal), token_text(literal));
+    std::string text = token_text(literal);
+    // Strip surrounding quotes
+    if (text.size() >= 2 && text.front() == '"' && text.back() == '"') {
+      text = text.substr(1, text.size() - 2);
+    }
+    return std::make_unique<ast::StringLiteralExpr>(location_of(literal), std::move(text));
   }
   if (match(TokenType::CHAR_LIT)) {
     const Token &literal = previous();

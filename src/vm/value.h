@@ -10,6 +10,7 @@ enum class ValueType {
   Double,
   Bool,
   Null,
+  String,
 };
 
 struct Value {
@@ -17,6 +18,7 @@ struct Value {
   static Value double_value(double value);
   static Value bool_value(bool value);
   static Value null_value();
+  static Value string_value(std::string value);
 
   bool is_number() const;
   double as_double() const;
@@ -25,6 +27,7 @@ struct Value {
   int64_t int_value_storage = 0;
   double double_value_storage = 0.0;
   bool bool_value_storage = false;
+  std::string string_storage;
 };
 
 std::ostream &operator<<(std::ostream &out, const Value &value);

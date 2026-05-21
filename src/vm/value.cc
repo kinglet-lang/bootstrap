@@ -27,6 +27,13 @@ Value Value::null_value() {
   return Value{};
 }
 
+Value Value::string_value(std::string value) {
+  Value result;
+  result.type = ValueType::String;
+  result.string_storage = std::move(value);
+  return result;
+}
+
 bool Value::is_number() const {
   return type == ValueType::Int || type == ValueType::Double;
 }
@@ -51,6 +58,9 @@ std::ostream &operator<<(std::ostream &out, const Value &value) {
     break;
   case ValueType::Null:
     out << "null";
+    break;
+  case ValueType::String:
+    out << value.string_storage;
     break;
   }
   return out;

@@ -33,6 +33,7 @@ enum class OpCode : uint8_t {
   Le,
   Ge,
   NativePrint,
+  NativeOut,
 };
 
 struct Instruction {

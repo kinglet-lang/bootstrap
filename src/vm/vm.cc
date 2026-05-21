@@ -82,6 +82,9 @@ VmResult Vm::run(const Chunk &chunk) {
       case ValueType::Double:
         truthy = value.double_value_storage != 0.0;
         break;
+      case ValueType::String:
+        truthy = !value.string_storage.empty();
+        break;
       }
       push(Value::bool_value(!truthy));
       break;
@@ -157,6 +160,9 @@ VmResult Vm::run(const Chunk &chunk) {
       case ValueType::Double:
         truthy = condition.double_value_storage != 0.0;
         break;
+      case ValueType::String:
+        truthy = !condition.string_storage.empty();
+        break;
       }
       if (!truthy) {
         frame.ip += static_cast<std::size_t>(instruction.operand);
@@ -214,6 +220,19 @@ VmResult Vm::run(const Chunk &chunk) {
       for (uint32_t i = 0; i < arg_count; ++i) {
         if (stack_.empty()) {
           return runtime_error("Stack underflow for print.");
+        }
+        Value value = pop();
+        std::cout << value;
+      }
+      std::cout << std::flush;
+      push(Value::null_value());
+      break;
+    }
+    case OpCode::NativeOut: {
+      const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
+      for (uint32_t i = 0; i < arg_count; ++i) {
+        if (stack_.empty()) {
+          return runtime_error("Stack underflow for io::out.");
         }
         Value value = pop();
         std::cout << value;

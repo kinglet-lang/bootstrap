@@ -132,7 +132,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
   }
 
   if (const auto *string_lit = dynamic_cast<const ast::StringLiteralExpr *>(&expr)) {
-    error_at(string_lit->location, "String literals are not supported by the VM compiler yet.");
+    emit_constant(Value::string_value(string_lit->value), string_lit->location);
     return;
   }
 
@@ -228,6 +228,18 @@ void Compiler::compile_expr(const ast::Expr &expr) {
                    call_expr->location);
       return;
     }
+
+    const auto *ns_callee =
+        dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
+    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "out") {
+      for (const ast::ExprPtr &arg : call_expr->args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr->args.size()),
+                   call_expr->location);
+      return;
+    }
+
     compile_expr(*call_expr->callee);
     for (const ast::ExprPtr &arg : call_expr->args) {
       compile_expr(*arg);
