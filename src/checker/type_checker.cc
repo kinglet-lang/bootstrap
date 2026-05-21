@@ -42,6 +42,9 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   push_scope();
 
   for (const ast::DeclPtr &decl : program.declarations) {
+    if (dynamic_cast<const ast::UsingDecl *>(decl.get())) {
+      continue;
+    }
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
       Type return_type = resolve_type_name(func->return_type);
       std::vector<Type> param_types;
@@ -56,6 +59,9 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   }
 
   for (const ast::DeclPtr &decl : program.declarations) {
+    if (dynamic_cast<const ast::UsingDecl *>(decl.get())) {
+      continue;
+    }
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
       check_function(*func);
     }
@@ -173,6 +179,18 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     return null_type();
   }
 
+  if (const auto *ns_access = dynamic_cast<const ast::NamespaceAccessExpr *>(&expr)) {
+    if (ns_access->namespace_name == "io") {
+      if (ns_access->member_name == "out" || ns_access->member_name == "err") {
+        return void_type();
+      }
+      if (ns_access->member_name == "in") {
+        return string_type();
+      }
+    }
+    return void_type();
+  }
+
   if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
     if (identifier->name == "_") {
       return null_type();
@@ -258,6 +276,16 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
       return void_type();
     }
+
+    const auto *ns_callee =
+        dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
+    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "out") {
+      for (const ast::ExprPtr &arg : call_expr->args) {
+        check_expr(*arg);
+      }
+      return void_type();
+    }
+
     Type callee_type = check_expr(*call_expr->callee);
     if (callee_type.kind != TypeKind::Function) {
       error_at(call_expr->location, "Cannot call non-function type.");
