@@ -2,6 +2,7 @@
 
 ## Next
 
+- [ ] LSP diagnostics: surface compiler warnings (unreachable code, etc.)
 - [ ] Error message improvements (suggest `using io;` when `io::` used without it)
 - [ ] `using io::out;` selective import syntax
 
