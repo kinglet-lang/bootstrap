@@ -159,6 +159,15 @@ ast::StmtPtr Parser::statement() {
   if (match(TokenType::WHILE)) {
     return while_statement();
   }
+  if (match(TokenType::FOR)) {
+    return for_statement();
+  }
+  if (match(TokenType::BREAK)) {
+    return break_statement();
+  }
+  if (match(TokenType::CONTINUE)) {
+    return continue_statement();
+  }
   if (is_declaration_start()) {
     return var_declaration();
   }
@@ -203,6 +212,55 @@ ast::StmtPtr Parser::while_statement() {
   ast::StmtPtr body = statement();
   return std::make_unique<ast::WhileStmt>(location_of(while_token), std::move(condition),
                                           std::move(body));
+}
+
+ast::StmtPtr Parser::for_statement() {
+  const Token &for_token = previous();
+  consume(TokenType::LEFT_PAREN, "Expected '(' after 'for'.");
+
+  // Parse init: either a variable declaration, an expression statement, or empty
+  ast::StmtPtr init;
+  if (is_declaration_start()) {
+    init = var_declaration();
+    // var_declaration already consumes its own trailing semicolon
+  } else if (!check(TokenType::SEMICOLON)) {
+    ast::ExprPtr expr = expression();
+    init = std::make_unique<ast::ExprStmt>(expr->location, std::move(expr));
+    consume(TokenType::SEMICOLON, "Expected ';' after for init.");
+  } else {
+    consume(TokenType::SEMICOLON, "Expected ';' after for init.");
+  }
+
+  // Parse condition
+  ast::ExprPtr condition;
+  if (!check(TokenType::SEMICOLON)) {
+    condition = expression();
+  }
+  consume(TokenType::SEMICOLON, "Expected ';' after for condition.");
+
+  // Parse step: expression without consuming trailing semicolon (the ')' closes the header)
+  ast::StmtPtr step;
+  if (!check(TokenType::RIGHT_PAREN)) {
+    ast::ExprPtr step_expr = expression();
+    step = std::make_unique<ast::ExprStmt>(step_expr->location, std::move(step_expr));
+  }
+  consume(TokenType::RIGHT_PAREN, "Expected ')' after for clauses.");
+
+  ast::StmtPtr body = statement();
+  return std::make_unique<ast::ForStmt>(location_of(for_token), std::move(init),
+                                        std::move(condition), std::move(step), std::move(body));
+}
+
+ast::StmtPtr Parser::break_statement() {
+  const Token &break_token = previous();
+  consume(TokenType::SEMICOLON, "Expected ';' after 'break'.");
+  return std::make_unique<ast::BreakStmt>(location_of(break_token));
+}
+
+ast::StmtPtr Parser::continue_statement() {
+  const Token &continue_token = previous();
+  consume(TokenType::SEMICOLON, "Expected ';' after 'continue'.");
+  return std::make_unique<ast::ContinueStmt>(location_of(continue_token));
 }
 
 ast::StmtPtr Parser::var_declaration() {
@@ -583,6 +641,9 @@ void Parser::synchronize() {
     case TokenType::MUT:
     case TokenType::RETURN:
     case TokenType::IF:
+    case TokenType::FOR:
+    case TokenType::BREAK:
+    case TokenType::CONTINUE:
     case TokenType::WHILE:
     case TokenType::IMPORT:
       return;
