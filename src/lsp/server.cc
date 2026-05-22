@@ -3,6 +3,7 @@
 #include "lsp/protocol.h"
 
 #include <cctype>
+#include <iostream>
 #include <sstream>
 
 namespace kinglet::lsp {
@@ -24,6 +25,7 @@ void Server::handle_message(const json::Value &msg) {
   if (method_it == obj.end()) return;
 
   const std::string &method = method_it->second.as_string();
+  std::cerr << "[LSP] <<< " << method << std::endl;
   json::Value params;
   auto params_it = obj.find("params");
   if (params_it != obj.end()) params = params_it->second;
@@ -34,6 +36,7 @@ void Server::handle_message(const json::Value &msg) {
 
   if (method == "initialize") {
     send_response(id, handle_initialize(params));
+    std::cerr << "[LSP] >>> initialize (capabilities)" << std::endl;
   } else if (method == "textDocument/didOpen") {
     handle_did_open(params);
   } else if (method == "textDocument/didChange") {
@@ -247,23 +250,38 @@ json::Value Server::handle_completion(const json::Value &params) {
   }
 
   // Snippet completions for control flow / declarations
-  struct Snippet { const char *label; const char *body; const char *detail; };
+  struct Snippet { const char *label; const char *body; const char *detail; bool is_decl; };
   Snippet snippets[] = {
-    {"if", "if (${1:condition}) {\n\t$0\n}", "if statement"},
-    {"if else", "if (${1:condition}) {\n\t$2\n} else {\n\t$0\n}", "if-else statement"},
-    {"for", "for (${1:int i = 0}; ${2:i < n}; ${3:i += 1}) {\n\t$0\n}", "for loop"},
-    {"while", "while (${1:condition}) {\n\t$0\n}", "while loop"},
-    {"inspect", "inspect (${1:expr}) {\n\t${2:_} => ${0:result}\n};", "pattern match"},
-    {"fun", "${1:int} ${2:name}(${3:params}) {\n\t$0\n}", "function declaration"},
-    {"struct", "struct ${1:Name} {\n\t$0\n}", "struct definition"},
-    {"enum", "enum ${1:Name} {\n\t$0\n}", "enum definition"},
-    {"using", "using ${1:io};$0", "using declaration"},
-    {"main", "int main() {\n\t$0\n\treturn 0;\n}", "main function"},
-    {"return", "return ${0:expr};", "return statement"},
+    {"if", "if (${1:condition}) {\n\t$0\n}", "if statement", false},
+    {"if else", "if (${1:condition}) {\n\t$2\n} else {\n\t$0\n}", "if-else statement", false},
+    {"for", "for (${1:int i = 0}; ${2:i < n}; ${3:i += 1}) {\n\t$0\n}", "for loop", false},
+    {"while", "while (${1:condition}) {\n\t$0\n}", "while loop", false},
+    {"inspect", "inspect (${1:expr}) {\n\t${2:_} => ${0:result}\n};", "pattern match", false},
+    {"fun", "${1:int} ${2:name}(${3:params}) {\n\t$0\n}", "function declaration", true},
+    {"struct", "struct ${1:Name} {\n\t$0\n}", "struct definition", true},
+    {"enum", "enum ${1:Name} {\n\t$0\n}", "enum definition", true},
+    {"using", "using ${1:io};$0", "using declaration", true},
+    {"main", "int main() {\n\t$0\n\treturn 0;\n}", "main function", true},
+    {"return", "return ${0:expr};", "return statement", false},
   };
+
+  // Find the start of the current statement on this line (skip leading whitespace)
+  int line_start = 0;
+  for (int i = 0; i < static_cast<int>(line_text.size()); ++i) {
+    if (!std::isspace(static_cast<unsigned char>(line_text[static_cast<std::size_t>(i)]))) {
+      line_start = i;
+      break;
+    }
+  }
+
   for (const auto &s : snippets) {
     if (!prefix.empty() && std::string(s.label).find(prefix) == std::string::npos) continue;
-    items.push_back(protocol::completion_item(s.label, 15, s.detail, s.body, 2));
+    if (s.is_decl) {
+      items.push_back(protocol::snippet_item_with_edit(
+          s.label, 15, s.detail, s.body, line, line_start, character));
+    } else {
+      items.push_back(protocol::completion_item(s.label, 15, s.detail, s.body, 2));
+    }
   }
 
   // Type keywords — highest priority
@@ -310,6 +328,7 @@ json::Value Server::handle_completion(const json::Value &params) {
     items.push_back(json::Value(item));
   }
 
+  std::cerr << "[LSP] completion: " << items.size() << " items, prefix='" << prefix << "'" << std::endl;
   return json::Value(items);
 }
 // PLACEHOLDER_DEF_HOVER

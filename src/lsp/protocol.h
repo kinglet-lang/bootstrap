@@ -51,6 +51,22 @@ inline json::Value completion_item(const std::string &label, int kind,
   return json::Value(item);
 }
 
+inline json::Value snippet_item_with_edit(const std::string &label, int kind,
+                                          const std::string &detail,
+                                          const std::string &snippet_body,
+                                          int line, int start_char, int end_char) {
+  json::Object item;
+  item["label"] = json::Value::string(label);
+  item["kind"] = json::Value::number(kind);
+  if (!detail.empty()) item["detail"] = json::Value::string(detail);
+  item["insertTextFormat"] = json::Value::number(2);
+  json::Object text_edit;
+  text_edit["range"] = range(line, start_char, line, end_char);
+  text_edit["newText"] = json::Value::string(snippet_body);
+  item["textEdit"] = json::Value(text_edit);
+  return json::Value(item);
+}
+
 inline json::Value completion_item_with_edit(const std::string &label, int kind,
                                             const std::string &detail,
                                             int line, int start_char, int end_char) {

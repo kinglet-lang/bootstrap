@@ -55,7 +55,8 @@
     ]
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "npx @vscode/vsce package && code --install-extension kinglet-0.1.0.vsix"
   },
   "keywords": [],
   "author": "",

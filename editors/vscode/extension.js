@@ -7,7 +7,7 @@ let client;
 
 function resolveServerPath() {
   const configured = vscode.workspace.getConfiguration('kinglet').get('server.path', '');
-  if (configured) return configured;
+  if (configured && fs.existsSync(configured)) return configured;
 
   const candidates = [
     path.join(process.env.HOME || '', 'bin', 'kinglet-lsp'),
@@ -20,8 +20,10 @@ function resolveServerPath() {
 }
 
 function activate(context) {
+  const serverPath = resolveServerPath();
+
   const serverOptions = {
-    command: resolveServerPath(),
+    command: serverPath,
     transport: TransportKind.stdio,
   };
 
@@ -30,7 +32,17 @@ function activate(context) {
   };
 
   client = new LanguageClient('kinglet', 'Kinglet', serverOptions, clientOptions);
-  client.start();
+
+  client.onDidChangeState(e => {
+    client.outputChannel.appendLine(`[state] ${e.oldState} -> ${e.newState}`);
+  });
+
+  client.start().then(() => {
+    client.outputChannel.appendLine(`[ready] Server path: ${serverPath}`);
+  }).catch(err => {
+    client.outputChannel.appendLine(`[error] ${err.message}`);
+  });
+
   context.subscriptions.push({ dispose: () => client.stop() });
 }
 
