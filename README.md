@@ -44,7 +44,7 @@ while (x < 10) { ... }
 for (int i = 0; i < 10; i += 1) { ... }
 
 // Pattern matching
-inspect (x) { 1 => a, 2 => b, _ => c }
+auto r = inspect (x) { 1 => a, 2 => b, _ => c };
 
 // I/O
 using io;           io::out("{}", x);

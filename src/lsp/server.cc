@@ -238,7 +238,7 @@ json::Value Server::handle_completion(const json::Value &params) {
     {"if else", "if (${1:condition}) {\n\t$2\n} else {\n\t$0\n}", "if-else statement"},
     {"for", "for (${1:int i = 0}; ${2:i < n}; ${3:i += 1}) {\n\t$0\n}", "for loop"},
     {"while", "while (${1:condition}) {\n\t$0\n}", "while loop"},
-    {"inspect", "inspect (${1:expr}) {\n\t${2:_} => ${0:result}\n}", "pattern match"},
+    {"inspect", "inspect (${1:expr}) {\n\t${2:_} => ${0:result}\n};", "pattern match"},
     {"fun", "${1:int} ${2:name}(${3:params}) {\n\t$0\n}", "function declaration"},
     {"struct", "struct ${1:Name} {\n\t$0\n}", "struct definition"},
     {"enum", "enum ${1:Name} {\n\t$0\n}", "enum definition"},
