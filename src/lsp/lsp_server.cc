@@ -245,10 +245,12 @@ json::Value Server::handle_completion(const json::Value &params) {
     if (current_text[i] == '\n') ++cline;
   }
 
-  // Detect namespace:: completion
+  // Detect namespace:: or namespace: completion
   std::string ns_name;
-  if (before.size() >= 2 && before[before.size() - 1] == ':' && before[before.size() - 2] == ':') {
-    std::size_t e = before.size() - 2;
+  if (before.size() >= 2 && before[before.size() - 1] == ':') {
+    // Single ':' — check if preceded by identifier + possibly another ':'
+    std::size_t e = before.size() - 1;
+    if (before.size() >= 3 && before[before.size() - 2] == ':') --e; // skip first ':'
     std::size_t s = e;
     while (s > 0 && std::isalnum(static_cast<unsigned char>(before[s - 1]))) --s;
     ns_name = before.substr(s, e - s);
