@@ -14,7 +14,7 @@ ninja -C out/Debug
 ## Quick Example
 
 ```rust
-using namespace io;
+using io;
 
 int main() {
     for (int i = 0; i < 5; i += 1) {
