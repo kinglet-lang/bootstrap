@@ -1,0 +1,31 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sheet" x1="56" y1="36" x2="192" y2="220" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF8EC"/>
+      <stop offset="1" stop-color="#F2E3BE"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="156" y1="36" x2="206" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFD668"/>
+      <stop offset="1" stop-color="#F0B633"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="84" y1="94" x2="164" y2="186" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#57CBC4"/>
+      <stop offset="1" stop-color="#0B778F"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="95" y1="106" x2="173" y2="173" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A4C63"/>
+      <stop offset="1" stop-color="#053646"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M72 36C63.1634 36 56 43.1634 56 52V204C56 212.837 63.1634 220 72 220H184C192.837 220 200 212.837 200 204V84.6274C200 80.384 198.314 76.3143 195.314 73.3137L162.686 40.6863C159.686 37.6857 155.616 36 151.373 36H72Z" fill="url(#sheet)"/>
+  <path d="M152 36V72C152 80.8366 159.163 88 168 88H200" fill="url(#fold)"/>
+  <path d="M152 36V72C152 80.8366 159.163 88 168 88H200" stroke="#E6A91E" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M72 36C63.1634 36 56 43.1634 56 52V204C56 212.837 63.1634 220 72 220H184C192.837 220 200 212.837 200 204V84.6274C200 80.384 198.314 76.3143 195.314 73.3137L162.686 40.6863C159.686 37.6857 155.616 36 151.373 36H72Z" stroke="#0A4C63" stroke-width="8" stroke-linejoin="round"/>
+
+  <rect x="82" y="92" width="92" height="92" rx="30" fill="url(#accent)"/>
+  <path d="M110 110C110 105.582 113.582 102 118 102H138C142.418 102 146 105.582 146 110V118C146 122.418 149.582 126 154 126H162C166.418 126 170 129.582 170 134V158C170 162.418 166.418 166 162 166H118C113.582 166 110 162.418 110 158V110Z" fill="url(#ink)"/>
+  <rect x="122" y="114" width="12" height="40" rx="6" fill="#FFF8EC"/>
+  <rect x="122" y="142" width="34" height="12" rx="6" fill="#FFF8EC"/>
+  <rect x="86" y="192" width="84" height="10" rx="5" fill="#0A4C63" opacity="0.18"/>
+</svg>
