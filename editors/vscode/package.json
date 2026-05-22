@@ -36,13 +36,6 @@
         "path": "./kinglet.tmLanguage.json"
       }
     ],
-    "iconThemes": [
-      {
-        "id": "kinglet-icons",
-        "label": "Kinglet Icons",
-        "path": "./kinglet-icon-theme.json"
-      }
-    ],
     "configuration": {
       "title": "Kinglet",
       "properties": {

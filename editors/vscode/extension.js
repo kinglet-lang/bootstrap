@@ -1,22 +1,30 @@
 const vscode = require('vscode');
 const { LanguageClient, TransportKind } = require('vscode-languageclient/node');
-const os = require('os');
+const fs = require('fs');
+const path = require('path');
+
+function resolveServerPath() {
+  const config = vscode.workspace.getConfiguration('kinglet');
+  const configured = config.get('server.path', '');
+  if (configured) return configured;
+
+  const candidates = [
+    path.join(vscode.workspace.rootPath || '', 'out', 'Debug', 'kinglet-lsp'),
+    path.join(vscode.workspace.rootPath || '', 'out', 'Release', 'kinglet-lsp'),
+    path.join(vscode.workspace.rootPath || '', 'out', 'Default', 'kinglet-lsp'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return 'kinglet-lsp';
+}
 
 let client;
 
 function activate(context) {
-  const config = vscode.workspace.getConfiguration('kinglet');
-  const serverPath = config.get('server.path', 'kinglet-lsp');
-
-  const env = Object.assign({}, process.env);
-  // Ensure ~/bin is in PATH (macOS GUI apps may not have it)
-  env.PATH = `${os.homedir()}/bin:${env.PATH || ''}`;
-
   const serverOptions = {
-    command: serverPath,
-    args: [],
+    command: resolveServerPath(),
     transport: TransportKind.stdio,
-    options: { env },
   };
 
   const clientOptions = {

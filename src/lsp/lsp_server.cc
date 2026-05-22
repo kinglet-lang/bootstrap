@@ -1,5 +1,6 @@
 #include "lsp/lsp_server.h"
 
+#include "ast/ast.h"
 #include "checker/type_checker.h"
 #include "lexer/scanner.h"
 #include "parser/parser.h"
@@ -72,6 +73,13 @@ void Server::handle_message(const json::Value &msg) {
     handle_did_open(params);
   } else if (method == "textDocument/didChange") {
     handle_did_change(params);
+  } else if (method == "textDocument/completion") {
+    auto result = handle_completion(params);
+    json::Object response;
+    response["jsonrpc"] = json::Value::string("2.0");
+    response["id"] = id;
+    response["result"] = result;
+    write_message(json::Value(response));
   } else if (method == "shutdown") {
     json::Object response;
     response["jsonrpc"] = json::Value::string("2.0");
@@ -105,6 +113,14 @@ json::Value Server::handle_initialize(const json::Value &) {
   diagnostic_provider["interFileDependencies"] = json::Value(false);
   diagnostic_provider["workspaceDiagnostics"] = json::Value(false);
   capabilities["diagnosticProvider"] = json::Value(diagnostic_provider);
+
+  // Completion provider
+  json::Object completion_provider;
+  json::Array trigger_chars;
+  trigger_chars.push_back(json::Value::string("."));
+  trigger_chars.push_back(json::Value::string(":"));
+  completion_provider["triggerCharacters"] = json::Value(trigger_chars);
+  capabilities["completionProvider"] = json::Value(completion_provider);
 
   json::Object server_info;
   server_info["name"] = json::Value::string("kinglet");
@@ -216,6 +232,95 @@ void Server::send_diagnostics(const TextDocument &doc) {
   diag_params["textDocument"] = json::Value(diag_uri);
 
   send_notification("textDocument/publishDiagnostics", json::Value(diag_params));
+}
+
+json::Value Server::handle_completion(const json::Value &params) {
+  json::Array items;
+
+  // Find the document text
+  if (!params.is_object()) return json::Value(items);
+  const auto &p = params.as_object();
+  auto doc_it = p.find("textDocument");
+  auto pos_it = p.find("position");
+  if (doc_it == p.end() || pos_it == p.end()) return json::Value(items);
+
+  const auto &doc = doc_it->second.as_object();
+  auto uri_it = doc.find("uri");
+  if (uri_it == doc.end()) return json::Value(items);
+
+  // Get current text
+  std::string current_text;
+  for (const auto &td : documents_) {
+    if (td.uri == uri_it->second.as_string()) {
+      current_text = td.text;
+      break;
+    }
+  }
+
+  // Parse the document to get scope info
+  Scanner scanner(current_text);
+  auto tokens = scanner.scan_tokens();
+  bool has_error = false;
+  for (const auto &t : tokens) {
+    if (t.type == TokenType::ERROR) { has_error = true; break; }
+  }
+
+  // Always provide keyword + type completions
+  const char *keywords[] = {
+    "if", "else", "for", "while", "break", "continue", "return",
+    "inspect", "using", "namespace", "const", "import", "export",
+    "struct", "enum", "trait", "spawn", "select",
+    "int", "float", "double", "bool", "string", "void", "byte", "auto",
+    "true", "false", "null",
+    "io"
+  };
+
+  for (const char *kw : keywords) {
+    json::Object item;
+    item["label"] = json::Value::string(kw);
+    item["kind"] = json::Value::number(14); // Keyword
+    item["insertText"] = json::Value::string(kw);
+    items.push_back(json::Value(item));
+  }
+
+  // Add snippet completions
+  struct Snippet { const char *label; const char *text; };
+  const Snippet snippets[] = {
+    {"inspect", "inspect (${1:expr}) {\n\t${2:_} => ${0:result}\n}"},
+    {"for", "for (${1:int i = 0}; $1 < ${2:n}; $1 += ${3:1}) {\n\t${0}\n}"},
+    {"if", "if (${1:cond}) {\n\t${0}\n}"},
+    {"while", "while (${1:cond}) {\n\t${0}\n}"},
+    {"fun", "int ${1:name}(${2:params}) {\n\t${0}\n}"},
+    {"using namespace", "using namespace ${1:io};"},
+  };
+
+  for (const auto &s : snippets) {
+    json::Object item;
+    item["label"] = json::Value::string(s.label);
+    item["kind"] = json::Value::number(15); // Snippet
+    item["insertText"] = json::Value::string(s.text);
+    item["insertTextFormat"] = json::Value::number(2); // Snippet format
+    items.push_back(json::Value(item));
+  }
+
+  // Add variable scoping completions if we can parse the document
+  if (!has_error) {
+    Parser parser(tokens);
+    auto result = parser.parse();
+    if (result.errors.empty() && result.program) {
+      // Collect declared names
+      for (const auto &decl : result.program->declarations) {
+        if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
+          json::Object item;
+          item["label"] = json::Value::string(func->name);
+          item["kind"] = json::Value::number(3); // Function
+          items.push_back(json::Value(item));
+        }
+      }
+    }
+  }
+
+  return json::Value(items);
 }
 
 } // namespace kinglet::lsp

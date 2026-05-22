@@ -33,6 +33,7 @@ private:
   json::Value handle_initialize(const json::Value &params);
   void handle_did_open(const json::Value &params);
   void handle_did_change(const json::Value &params);
+  json::Value handle_completion(const json::Value &params);
 
   std::vector<TextDocument> documents_;
 };
