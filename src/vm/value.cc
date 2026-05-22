@@ -34,6 +34,13 @@ Value Value::string_value(std::string value) {
   return result;
 }
 
+Value Value::function_value(int index) {
+  Value result;
+  result.type = ValueType::Function;
+  result.function_index_storage = index;
+  return result;
+}
+
 bool Value::is_number() const {
   return type == ValueType::Int || type == ValueType::Double;
 }
@@ -61,6 +68,9 @@ std::ostream &operator<<(std::ostream &out, const Value &value) {
     break;
   case ValueType::String:
     out << value.string_storage;
+    break;
+  case ValueType::Function:
+    out << "<function:" << value.function_index_storage << ">";
     break;
   }
   return out;

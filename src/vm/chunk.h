@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <ostream>
+#include <string>
 #include <vector>
 
 namespace kinglet {
@@ -44,12 +45,21 @@ struct Instruction {
   int column = 0;
 };
 
+struct FunctionInfo {
+  std::string name;
+  std::size_t entry = 0;
+  int param_count = 0;
+};
+
 class Chunk {
 public:
   uint32_t add_constant(Value value);
   void write(OpCode op, int line, int column);
   void write_operand(OpCode op, uint32_t operand, int line, int column);
   void write_constant(Value value, int line, int column);
+
+  int add_function(FunctionInfo info);
+  const std::vector<FunctionInfo> &functions() const;
 
   const std::vector<Value> &constants() const;
   const std::vector<Instruction> &instructions() const;
@@ -58,6 +68,7 @@ public:
 private:
   std::vector<Value> constants_;
   std::vector<Instruction> instructions_;
+  std::vector<FunctionInfo> functions_;
 };
 
 const char *opcode_name(OpCode op);

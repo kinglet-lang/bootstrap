@@ -85,6 +85,9 @@ VmResult Vm::run(const Chunk &chunk) {
       case ValueType::String:
         truthy = !value.string_storage.empty();
         break;
+      case ValueType::Function:
+        truthy = true;
+        break;
       }
       push(Value::bool_value(!truthy));
       break;
@@ -162,6 +165,9 @@ VmResult Vm::run(const Chunk &chunk) {
         break;
       case ValueType::String:
         truthy = !condition.string_storage.empty();
+        break;
+      case ValueType::Function:
+        truthy = true;
         break;
       }
       if (!truthy) {

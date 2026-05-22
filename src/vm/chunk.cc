@@ -1,6 +1,7 @@
 #include "vm/chunk.h"
 
 #include <ostream>
+#include <utility>
 
 namespace kinglet {
 
@@ -43,6 +44,16 @@ const std::vector<Value> &Chunk::constants() const {
 
 const std::vector<Instruction> &Chunk::instructions() const {
   return instructions_;
+}
+
+int Chunk::add_function(FunctionInfo info) {
+  int index = static_cast<int>(functions_.size());
+  functions_.push_back(std::move(info));
+  return index;
+}
+
+const std::vector<FunctionInfo> &Chunk::functions() const {
+  return functions_;
 }
 
 void Chunk::disassemble(std::ostream &out) const {
