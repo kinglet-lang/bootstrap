@@ -209,7 +209,41 @@ void Compiler::compile_expr(const ast::Expr &expr) {
   }
 
   if (const auto *string_lit = dynamic_cast<const ast::StringLiteralExpr *>(&expr)) {
-    emit_constant(Value::string_value(string_lit->value), string_lit->location);
+    // Unescape: \n -> newline, \t -> tab, etc.
+    std::string unescaped;
+    unescaped.reserve(string_lit->value.size());
+    for (std::size_t i = 0; i < string_lit->value.size(); ++i) {
+      if (string_lit->value[i] == '\\' && i + 1 < string_lit->value.size()) {
+        switch (string_lit->value[i + 1]) {
+        case 'n':
+          unescaped += '\n';
+          ++i;
+          break;
+        case 't':
+          unescaped += '\t';
+          ++i;
+          break;
+        case 'r':
+          unescaped += '\r';
+          ++i;
+          break;
+        case '\\':
+          unescaped += '\\';
+          ++i;
+          break;
+        case '"':
+          unescaped += '"';
+          ++i;
+          break;
+        default:
+          unescaped += string_lit->value[i];
+          break;
+        }
+      } else {
+        unescaped += string_lit->value[i];
+      }
+    }
+    emit_constant(Value::string_value(unescaped), string_lit->location);
     return;
   }
 
