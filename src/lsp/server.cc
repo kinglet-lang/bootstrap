@@ -220,7 +220,7 @@ json::Value Server::handle_completion(const json::Value &params) {
     items.push_back(protocol::completion_item(sym->name, kind, detail));
   }
 
-  // Bare io members when 'using namespace io;' is active
+  // Bare io members when 'using namespace io;' is active — insert as-is
   if (doc->analysis.opened_namespaces.count("io")) {
     for (const auto &[name, detail] : std::vector<std::pair<std::string, std::string>>{
              {"out", "io::out — stdout output"},
@@ -228,6 +228,21 @@ json::Value Server::handle_completion(const json::Value &params) {
              {"in", "io::in — stdin input"}}) {
       if (!prefix.empty() && name.find(prefix) == std::string::npos) continue;
       items.push_back(protocol::completion_item(name, 3, detail));
+    }
+  } else if (doc->analysis.used_namespaces.count("io")) {
+    // 'using io;' — insert qualified form io::name
+    for (const auto &[name, qualified, detail] : std::vector<std::tuple<std::string, std::string, std::string>>{
+             {"out", "io::out", "io::out — stdout output"},
+             {"err", "io::err", "io::err — stderr output"},
+             {"in", "io::in", "io::in — stdin input"}}) {
+      if (!prefix.empty() && name.find(prefix) == std::string::npos) continue;
+      json::Object item;
+      item["label"] = json::Value::string(name);
+      item["kind"] = json::Value::number(3);
+      item["detail"] = json::Value::string(detail);
+      item["insertText"] = json::Value::string(qualified);
+      item["filterText"] = json::Value::string(name);
+      items.push_back(json::Value(item));
     }
   }
 

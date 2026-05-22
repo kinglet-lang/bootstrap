@@ -142,6 +142,7 @@ AnalysisResult analyze(const std::string &source) {
 
   for (const auto &decl : parse_result.program->declarations) {
     if (const auto *u = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
+      result.used_namespaces.insert(u->namespace_name);
       if (u->is_namespace) {
         result.opened_namespaces.insert(u->namespace_name);
       }

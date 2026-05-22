@@ -35,6 +35,7 @@ struct AnalysisResult {
   std::vector<std::string> type_errors;
   std::vector<std::tuple<int, int, std::string>> diagnostics;
   SymbolTable symbols;
+  std::set<std::string> used_namespaces;
   std::set<std::string> opened_namespaces;
   bool valid = false;
 };
