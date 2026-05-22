@@ -5,6 +5,8 @@ const os = require('os');
 let client;
 
 function activate(context) {
+  vscode.window.showInformationMessage('Kinglet LSP activated');
+
   const serverOptions = {
     command: 'kinglet-lsp',
     transport: TransportKind.stdio,
