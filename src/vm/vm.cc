@@ -123,13 +123,28 @@ VmResult Vm::run(const Chunk &chunk) {
       if (stack_.size() < arg_count + 1) {
         return runtime_error("Stack underflow for function call.");
       }
-      // For now, just pop the arguments and return null
-      // This will be implemented properly when multi-function support is added
-      for (uint32_t i = 0; i < arg_count; ++i) {
-        pop();
+      Value callee = pop();
+      if (callee.type != ValueType::Function) {
+        return runtime_error("Attempted to call a non-function value.");
       }
-      pop(); // pop the callee
-      push(Value::null_value());
+      int func_idx = callee.function_index_storage;
+      const auto &functions = frame.chunk->functions();
+      if (func_idx < 0 || static_cast<std::size_t>(func_idx) >= functions.size()) {
+        return runtime_error("Invalid function index.");
+      }
+      const FunctionInfo &info = functions[static_cast<std::size_t>(func_idx)];
+      if (static_cast<int>(arg_count) != info.param_count) {
+        return runtime_error("Expected " + std::to_string(info.param_count) +
+                             " arguments but got " + std::to_string(arg_count) + ".");
+      }
+      CallFrame new_frame;
+      new_frame.chunk = frame.chunk;
+      new_frame.ip = info.entry;
+      new_frame.locals.resize(arg_count);
+      for (uint32_t i = 0; i < arg_count; ++i) {
+        new_frame.locals[arg_count - 1 - i] = pop();
+      }
+      frames_.push_back(std::move(new_frame));
       break;
     }
     case OpCode::Return: {
