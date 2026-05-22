@@ -155,7 +155,31 @@ int main(int argc, char **argv) {
       std::string wrapped_source;
       if (line.find("int main") == std::string::npos &&
           line.find("fn main") == std::string::npos) {
-        wrapped_source = "int main() => " + line + ";";
+        std::string expr = line;
+        while (!expr.empty() && expr.back() == ';') {
+          expr.pop_back();
+        }
+
+        const char *return_types[] = {"int", "float", "string", "bool", "void"};
+        bool found = false;
+        for (const char *rt : return_types) {
+          wrapped_source =
+              std::string(rt) + " main() => " + expr + ";";
+          kinglet::Scanner test_scanner(wrapped_source);
+          auto test_tokens = test_scanner.scan_tokens();
+          kinglet::Parser test_parser(test_tokens);
+          auto test_result = test_parser.parse();
+          if (!test_result.errors.empty()) continue;
+          kinglet::TypeChecker test_checker;
+          auto test_type = test_checker.check(*test_result.program);
+          if (test_type.errors.empty()) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          wrapped_source = "import io; int main() => " + expr + ";";
+        }
       } else {
         wrapped_source = line;
       }
@@ -211,8 +235,9 @@ int main(int argc, char **argv) {
         continue;
       }
 
-      if (vm_result.value.type != kinglet::ValueType::Int ||
-          vm_result.value.int_value_storage != 0) {
+      if (vm_result.value.type != kinglet::ValueType::Null &&
+          (vm_result.value.type != kinglet::ValueType::Int ||
+           vm_result.value.int_value_storage != 0)) {
         std::cout << vm_result.value << '\n';
       }
     }

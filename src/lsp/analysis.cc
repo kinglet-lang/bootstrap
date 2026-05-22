@@ -139,6 +139,15 @@ AnalysisResult analyze(const std::string &source) {
   SymbolCollector collector;
   collector.collect(*parse_result.program);
   result.symbols = collector.take();
+
+  for (const auto &decl : parse_result.program->declarations) {
+    if (const auto *u = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
+      if (u->is_namespace) {
+        result.opened_namespaces.insert(u->namespace_name);
+      }
+    }
+  }
+
   result.program = std::move(parse_result.program);
   result.valid = true;
 
