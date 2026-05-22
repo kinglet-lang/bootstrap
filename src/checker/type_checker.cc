@@ -339,25 +339,27 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
 
     const auto *ns_callee =
         dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
-    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "out") {
-      for (const ast::ExprPtr &arg : call_expr->args) {
-        check_expr(*arg);
+    if (ns_callee && using_.count(ns_callee->namespace_name) != 0) {
+      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "out") {
+        for (const ast::ExprPtr &arg : call_expr->args) {
+          check_expr(*arg);
+        }
+        return void_type();
       }
-      return void_type();
-    }
 
-    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "err") {
-      for (const ast::ExprPtr &arg : call_expr->args) {
-        check_expr(*arg);
+      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "err") {
+        for (const ast::ExprPtr &arg : call_expr->args) {
+          check_expr(*arg);
+        }
+        return void_type();
       }
-      return void_type();
-    }
 
-    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "in") {
-      for (const ast::ExprPtr &arg : call_expr->args) {
-        check_expr(*arg);
+      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "in") {
+        for (const ast::ExprPtr &arg : call_expr->args) {
+          check_expr(*arg);
+        }
+        return string_type();
       }
-      return string_type();
     }
 
     Type callee_type = check_expr(*call_expr->callee);

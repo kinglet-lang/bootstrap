@@ -377,31 +377,33 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
     const auto *ns_callee =
         dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
-    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "out") {
-      for (const ast::ExprPtr &arg : call_expr->args) {
-        compile_expr(*arg);
+    if (ns_callee && using_.count(ns_callee->namespace_name) != 0) {
+      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "out") {
+        for (const ast::ExprPtr &arg : call_expr->args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr->args.size()),
+                     call_expr->location);
+        return;
       }
-      emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr->args.size()),
-                   call_expr->location);
-      return;
-    }
 
-    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "err") {
-      for (const ast::ExprPtr &arg : call_expr->args) {
-        compile_expr(*arg);
+      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "err") {
+        for (const ast::ExprPtr &arg : call_expr->args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeErr, static_cast<uint32_t>(call_expr->args.size()),
+                     call_expr->location);
+        return;
       }
-      emit_operand(OpCode::NativeErr, static_cast<uint32_t>(call_expr->args.size()),
-                   call_expr->location);
-      return;
-    }
 
-    if (ns_callee && ns_callee->namespace_name == "io" && ns_callee->member_name == "in") {
-      for (const ast::ExprPtr &arg : call_expr->args) {
-        compile_expr(*arg);
+      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "in") {
+        for (const ast::ExprPtr &arg : call_expr->args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr->args.size()),
+                     call_expr->location);
+        return;
       }
-      emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr->args.size()),
-                   call_expr->location);
-      return;
     }
 
     compile_expr(*call_expr->callee);
