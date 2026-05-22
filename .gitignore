@@ -1,4 +1,6 @@
 out/
 .gn
-# VSCode workspace settings (personal)
-.vscode/settings.json
+.obsidian/
+.opencode/
+.vscode/
+test.kl
