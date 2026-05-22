@@ -258,7 +258,6 @@ json::Value Server::handle_completion(const json::Value &params) {
     {"struct", "struct ${1:Name} {\n\t$0\n}", "struct definition"},
     {"enum", "enum ${1:Name} {\n\t$0\n}", "enum definition"},
     {"using", "using ${1:io};$0", "using declaration"},
-    {"using", "using ", "using keyword"},
     {"return", "return ${0:expr};", "return statement"},
   };
   for (const auto &s : snippets) {
@@ -279,7 +278,7 @@ json::Value Server::handle_completion(const json::Value &params) {
 
   // Control flow keywords
   const char *kw_with_space[] = {"if", "else", "for", "while", "return",
-                                  "inspect", "const", "export",
+                                  "inspect", "const", "export", "using",
                                   "struct", "enum", "trait", "spawn", "select"};
   const char *kw_standalone[] = {"break", "continue", "true", "false", "null"};
   for (const char *kw : kw_with_space) {
