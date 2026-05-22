@@ -1,0 +1,27 @@
+{
+  "name": "tree-sitter-kinglet",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for the Kinglet programming language",
+  "main": "bindings/node",
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test",
+    "parse": "tree-sitter parse"
+  },
+  "author": "Kinglet",
+  "license": "MIT",
+  "dependencies": {
+    "nan": "^2.18.0"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.24.0"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.kinglet",
+      "file-types": ["kl"],
+      "highlights": "queries/highlights.scm",
+      "injection-regex": "^kinglet$"
+    }
+  ]
+}
