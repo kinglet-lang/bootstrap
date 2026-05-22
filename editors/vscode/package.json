@@ -42,7 +42,17 @@
         "label": "Kinglet Icons",
         "path": "./kinglet-icon-theme.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Kinglet",
+      "properties": {
+        "kinglet.server.path": {
+          "type": "string",
+          "default": "kinglet-lsp",
+          "description": "Path to the kinglet-lsp executable"
+        }
+      }
+    }
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -1,23 +1,45 @@
-const { LanguageClient, ServerOptions, TransportKind } = require('vscode-languageclient/node');
+const vscode = require('vscode');
+const { LanguageClient, TransportKind } = require('vscode-languageclient/node');
+const os = require('os');
 
 let client;
 
 function activate(context) {
+  const config = vscode.workspace.getConfiguration('kinglet');
+  const serverPath = config.get('server.path', 'kinglet-lsp');
+
+  const env = Object.assign({}, process.env);
+  // Ensure ~/bin is in PATH (macOS GUI apps may not have it)
+  env.PATH = `${os.homedir()}/bin:${env.PATH || ''}`;
+
   const serverOptions = {
-    command: 'kinglet-lsp',
+    command: serverPath,
+    args: [],
     transport: TransportKind.stdio,
+    options: { env },
   };
 
   const clientOptions = {
-    documentSelector: [{ language: 'kinglet' }],
+    documentSelector: [{ scheme: 'file', language: 'kinglet' }],
+    synchronize: {
+      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.kl')
+    }
   };
 
-  client = new LanguageClient('kinglet', 'Kinglet Language Server', serverOptions, clientOptions);
-  client.start();
+  client = new LanguageClient(
+    'kinglet',
+    'Kinglet Language Server',
+    serverOptions,
+    clientOptions
+  );
+
+  context.subscriptions.push(client.start());
 }
 
 function deactivate() {
-  if (client) return client.stop();
+  if (client) {
+    return client.stop();
+  }
 }
 
 module.exports = { activate, deactivate };
