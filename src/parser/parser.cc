@@ -270,7 +270,7 @@ ast::StmtPtr Parser::continue_statement() {
 ast::StmtPtr Parser::var_declaration() {
   const Token &start_token = peek();
   std::string storage;
-  if (match(TokenType::CONST) || match(TokenType::MUT)) {
+  if (match(TokenType::CONST)) {
     storage = token_text(previous());
   }
 
@@ -604,7 +604,7 @@ bool Parser::is_type_start(TokenType type) const {
 }
 
 bool Parser::is_declaration_start() const {
-  if (check(TokenType::CONST) || check(TokenType::MUT)) {
+  if (check(TokenType::CONST)) {
     return true;
   }
   return is_type_start(peek().type) && check_next(TokenType::IDENTIFIER);
@@ -642,7 +642,6 @@ void Parser::synchronize() {
     }
     switch (peek().type) {
     case TokenType::CONST:
-    case TokenType::MUT:
     case TokenType::RETURN:
     case TokenType::IF:
     case TokenType::FOR:

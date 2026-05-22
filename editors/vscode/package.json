@@ -26,6 +26,13 @@
         "scopeName": "source.kinglet",
         "path": "./kinglet.tmLanguage.json"
       }
+    ],
+    "iconThemes": [
+      {
+        "id": "kinglet-icons",
+        "label": "Kinglet Icons",
+        "path": "./kinglet-icon-theme.json"
+      }
     ]
   }
 }

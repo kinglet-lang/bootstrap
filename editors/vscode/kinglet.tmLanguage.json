@@ -106,7 +106,7 @@
         },
         {
           "name": "keyword.declaration.kinglet",
-          "match": "\\b(const|mut|import|export|namespace|using|struct|enum|trait|alias)\\b"
+          "match": "\\b(const|import|export|namespace|using|struct|enum|trait|alias)\\b"
         },
         {
           "name": "keyword.operator.word.kinglet",

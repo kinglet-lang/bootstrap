@@ -70,7 +70,7 @@ module.exports = grammar({
 
     // ── Variables ──
     variable_declaration: $ => seq(
-      optional(choice('const', 'mut')),
+      optional('const'),
       field('type', $.type),
       field('name', $.identifier),
       optional(seq('=', $._expression)),

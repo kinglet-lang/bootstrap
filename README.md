@@ -36,7 +36,7 @@ int main() {
 
 ```rust
 // Types
-int x = 42;          mut x = 42;          const x = 42;
+int x = 42;          auto x = 42;         const x = 42;
 
 // Control flow
 if (x > 0) { ... } else { ... }

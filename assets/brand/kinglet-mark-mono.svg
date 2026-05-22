@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Kinglet monochrome mark</title>
+  <desc id="desc">Single-color rounded Kinglet K mark.</desc>
+  <rect x="20" y="20" width="216" height="216" rx="58" fill="#101418"/>
+  <rect x="44" y="44" width="168" height="168" rx="42" fill="none" stroke="#F5F1E8" stroke-opacity="0.2" stroke-width="4"/>
+  <g stroke="#F5F1E8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M82 76 V180" stroke-width="28"/>
+    <path d="M162 78 L108 128 L162 178" fill="none" stroke-width="28"/>
+    <path d="M62 102 L44 128 L62 154" fill="none" stroke-width="12"/>
+    <path d="M194 102 L212 128 L194 154" fill="none" stroke-width="12"/>
+  </g>
+  <g fill="#101418">
+    <rect x="112" y="83" width="38" height="12" rx="6"/>
+    <rect x="112" y="122" width="30" height="12" rx="6"/>
+    <rect x="112" y="161" width="38" height="12" rx="6"/>
+  </g>
+  <path d="M86 66 L102 48 L118 66 H86 Z M120 66 L136 48 L152 66 H120 Z M154 66 L170 48 L186 66 H154 Z" fill="#F5F1E8"/>
+</svg>

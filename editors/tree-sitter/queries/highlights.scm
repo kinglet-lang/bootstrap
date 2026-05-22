@@ -20,7 +20,6 @@
 
 ; ── Storage modifiers ──
 "const" @keyword.storage
-"mut" @keyword.storage
 "import" @keyword.import
 "export" @keyword.import
 

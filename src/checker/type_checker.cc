@@ -131,7 +131,7 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
                      type_to_string(var_type) + ".");
       }
     }
-    bool is_mutable = var_decl->storage == "mut";
+    bool is_mutable = var_decl->storage != "const";
     declare_var(var_decl->name, var_type, is_mutable);
     return;
   }

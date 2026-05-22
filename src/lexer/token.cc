@@ -22,8 +22,6 @@ const char *token_type_name(TokenType type) {
     return "BYTE";
   case TokenType::CONST:
     return "CONST";
-  case TokenType::MUT:
-    return "MUT";
   case TokenType::RETURN:
     return "RETURN";
   case TokenType::IF:

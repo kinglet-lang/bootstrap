@@ -358,7 +358,6 @@ TokenType Scanner::identifier_type() const {
       {"void", TokenType::VOID},
       {"byte", TokenType::BYTE},
       {"const", TokenType::CONST},
-      {"mut", TokenType::MUT},
       {"return", TokenType::RETURN},
       {"if", TokenType::IF},
       {"else", TokenType::ELSE},

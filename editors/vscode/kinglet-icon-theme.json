@@ -1,0 +1,13 @@
+{
+  "iconDefinitions": {
+    "_kinglet_file": {
+      "iconPath": "./icons/kinglet-file.svg"
+    }
+  },
+  "fileExtensions": {
+    "kl": "_kinglet_file"
+  },
+  "languageIds": {
+    "kinglet": "_kinglet_file"
+  }
+}
