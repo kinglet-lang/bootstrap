@@ -26,7 +26,6 @@
 
 ## Known Gaps
 
-- [ ] Multi-function calls (hoist `main()`-only limitation)
 - [ ] Closures / lambda
 - [ ] Array/Map literals
 - [ ] Generics `<T>`
@@ -35,6 +34,7 @@
 
 ## Done
 
+- [x] Multi-function support (forward references, parameters, recursion)
 - [x] LSP: diagnostics, scope-aware completion, go-to-definition, hover
 - [x] LSP: snippet completions (if/for/while/inspect/main/using)
 - [x] LSP: `using io;` triggers `out/err/in` → `io::out` completion
