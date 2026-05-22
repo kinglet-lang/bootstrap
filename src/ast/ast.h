@@ -205,6 +205,26 @@ struct WhileStmt final : Stmt {
   StmtPtr body;
 };
 
+struct ForStmt final : Stmt {
+  ForStmt(SourceLocation location, StmtPtr init, ExprPtr condition, StmtPtr step, StmtPtr body);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  StmtPtr init;
+  ExprPtr condition;
+  StmtPtr step;
+  StmtPtr body;
+};
+
+struct BreakStmt final : Stmt {
+  explicit BreakStmt(SourceLocation location);
+  void print(std::ostream &out, int indent = 0) const override;
+};
+
+struct ContinueStmt final : Stmt {
+  explicit ContinueStmt(SourceLocation location);
+  void print(std::ostream &out, int indent = 0) const override;
+};
+
 struct Parameter {
   std::string type;
   std::string name;

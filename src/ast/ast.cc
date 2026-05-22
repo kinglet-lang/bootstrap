@@ -275,6 +275,50 @@ void WhileStmt::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+ForStmt::ForStmt(SourceLocation location, StmtPtr init, ExprPtr condition, StmtPtr step,
+                 StmtPtr body)
+    : Stmt(location), init(std::move(init)), condition(std::move(condition)),
+      step(std::move(step)), body(std::move(body)) {}
+
+void ForStmt::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(for";
+  if (init) {
+    print_child(out, *init, indent);
+  } else {
+    write_indent(out, indent + 1);
+    out << "(null-init)";
+  }
+  if (condition) {
+    print_child(out, *condition, indent);
+  } else {
+    write_indent(out, indent + 1);
+    out << "(null-cond)";
+  }
+  if (step) {
+    print_child(out, *step, indent);
+  } else {
+    write_indent(out, indent + 1);
+    out << "(null-step)";
+  }
+  print_child(out, *body, indent);
+  out << ")";
+}
+
+BreakStmt::BreakStmt(SourceLocation location) : Stmt(location) {}
+
+void BreakStmt::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(break)";
+}
+
+ContinueStmt::ContinueStmt(SourceLocation location) : Stmt(location) {}
+
+void ContinueStmt::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(continue)";
+}
+
 FunctionDecl::FunctionDecl(SourceLocation location, std::string return_type, std::string name,
                            std::vector<Parameter> params, StmtPtr body)
     : Decl(location), return_type(std::move(return_type)), name(std::move(name)),
