@@ -61,8 +61,6 @@ void Chunk::disassemble(std::ostream &out) const {
     } else if (instruction.op == OpCode::Jmp ||
                instruction.op == OpCode::JmpFalse) {
       out << " +" << instruction.operand;
-    } else if (instruction.op == OpCode::NativePrint) {
-      out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::NativeOut) {
       out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::NativeErr) {
@@ -122,8 +120,6 @@ const char *opcode_name(OpCode op) {
     return "Le";
   case OpCode::Ge:
     return "Ge";
-  case OpCode::NativePrint:
-    return "NativePrint";
   case OpCode::NativeOut:
     return "NativeOut";
   case OpCode::NativeErr:

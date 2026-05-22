@@ -342,15 +342,6 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
   if (const auto *call_expr = dynamic_cast<const ast::CallExpr *>(&expr)) {
     const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr->callee.get());
-    if (callee_id && callee_id->name == "print") {
-      for (const ast::ExprPtr &arg : call_expr->args) {
-        compile_expr(*arg);
-      }
-      emit_operand(OpCode::NativePrint, static_cast<uint32_t>(call_expr->args.size()),
-                   call_expr->location);
-      return;
-    }
-
     // Handle bare io:: members when 'using namespace io;' is in effect
     if (callee_id && opened_.count("io") != 0) {
       if (callee_id->name == "out") {
@@ -381,8 +372,8 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
     const auto *ns_callee =
         dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
-    if (ns_callee && used_.count(ns_callee->namespace_name) != 0) {
-      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "out") {
+    if (ns_callee && ns_callee->namespace_name == "io") {
+      if (ns_callee->member_name == "out") {
         for (const ast::ExprPtr &arg : call_expr->args) {
           compile_expr(*arg);
         }
@@ -391,7 +382,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
         return;
       }
 
-      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "err") {
+      if (ns_callee->member_name == "err") {
         for (const ast::ExprPtr &arg : call_expr->args) {
           compile_expr(*arg);
         }
@@ -400,7 +391,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
         return;
       }
 
-      if (ns_callee->namespace_name == "io" && ns_callee->member_name == "in") {
+      if (ns_callee->member_name == "in") {
         for (const ast::ExprPtr &arg : call_expr->args) {
           compile_expr(*arg);
         }

@@ -215,19 +215,6 @@ VmResult Vm::run(const Chunk &chunk) {
       push(Value::bool_value(result));
       break;
     }
-    case OpCode::NativePrint: {
-      const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
-      for (uint32_t i = 0; i < arg_count; ++i) {
-        if (stack_.empty()) {
-          return runtime_error("Stack underflow for print.");
-        }
-        Value value = pop();
-        std::cout << value;
-      }
-      std::cout << std::flush;
-      push(Value::null_value());
-      break;
-    }
     case OpCode::NativeOut: {
       const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
       if (stack_.size() < arg_count) {

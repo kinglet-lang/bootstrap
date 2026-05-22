@@ -32,7 +32,6 @@ enum class OpCode : uint8_t {
   Gt,
   Le,
   Ge,
-  NativePrint,
   NativeOut,
   NativeErr,
   NativeIn,
