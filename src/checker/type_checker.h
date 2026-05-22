@@ -43,7 +43,8 @@ private:
 
   std::vector<std::unordered_map<std::string, VarInfo>> scopes_;
   std::vector<TypeError> errors_;
-  std::unordered_set<std::string> using_;
+  std::unordered_set<std::string> used_;    // using io;
+  std::unordered_set<std::string> opened_;  // using namespace io;
   int loop_depth_ = 0;
 };
 

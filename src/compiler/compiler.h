@@ -57,7 +57,8 @@ private:
   std::vector<std::size_t> scope_stack_;
   std::vector<CompileError> errors_;
   std::vector<LoopInfo> loop_stack_;
-  std::unordered_set<std::string> using_;
+  std::unordered_set<std::string> used_;    // using io;       -> io::out() works
+  std::unordered_set<std::string> opened_;  // using namespace io; -> out() works
 };
 
 } // namespace kinglet

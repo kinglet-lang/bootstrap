@@ -1,4 +1,4 @@
-using io;
+using namespace io;
 
 int main() {
 

@@ -129,9 +129,13 @@ ast::DeclPtr Parser::import_declaration() {
 
 ast::DeclPtr Parser::using_declaration() {
   const Token &using_token = previous();
+  bool is_namespace = false;
+  if (match(TokenType::NAMESPACE)) {
+    is_namespace = true;
+  }
   const Token &name = consume(TokenType::IDENTIFIER, "Expected namespace name after 'using'.");
   consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
-  return std::make_unique<ast::UsingDecl>(location_of(using_token), token_text(name));
+  return std::make_unique<ast::UsingDecl>(location_of(using_token), token_text(name), is_namespace);
 }
 
 ast::DeclPtr Parser::function_declaration() {

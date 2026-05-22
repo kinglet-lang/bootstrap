@@ -249,10 +249,11 @@ struct ImportDecl final : Decl {
 };
 
 struct UsingDecl final : Decl {
-  UsingDecl(SourceLocation location, std::string namespace_name);
+  UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace);
   void print(std::ostream &out, int indent = 0) const override;
 
   std::string namespace_name;
+  bool is_namespace;
 };
 
 struct NamespaceAccessExpr final : Expr {

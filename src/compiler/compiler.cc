@@ -14,11 +14,15 @@ CompileResult Compiler::compile(const ast::Program &program) {
   chunk_ = Chunk();
   locals_.clear();
   errors_.clear();
-  using_.clear();
+  used_.clear();
+  opened_.clear();
 
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
-      using_.insert(using_decl->namespace_name);
+      used_.insert(using_decl->namespace_name);
+      if (using_decl->is_namespace) {
+        opened_.insert(using_decl->namespace_name);
+      }
     }
   }
 
@@ -347,8 +351,8 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       return;
     }
 
-    // Handle bare io:: members when 'using io;' is in effect
-    if (callee_id && using_.count("io") != 0) {
+    // Handle bare io:: members when 'using namespace io;' is in effect
+    if (callee_id && opened_.count("io") != 0) {
       if (callee_id->name == "out") {
         for (const ast::ExprPtr &arg : call_expr->args) {
           compile_expr(*arg);
@@ -377,7 +381,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
     const auto *ns_callee =
         dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
-    if (ns_callee && using_.count(ns_callee->namespace_name) != 0) {
+    if (ns_callee && used_.count(ns_callee->namespace_name) != 0) {
       if (ns_callee->namespace_name == "io" && ns_callee->member_name == "out") {
         for (const ast::ExprPtr &arg : call_expr->args) {
           compile_expr(*arg);

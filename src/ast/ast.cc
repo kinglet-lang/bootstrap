@@ -343,12 +343,16 @@ void ImportDecl::print(std::ostream &out, int indent) const {
   out << "(import " << module << ")";
 }
 
-UsingDecl::UsingDecl(SourceLocation location, std::string namespace_name)
-    : Decl(location), namespace_name(std::move(namespace_name)) {}
+UsingDecl::UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace)
+    : Decl(location), namespace_name(std::move(namespace_name)), is_namespace(is_namespace) {}
 
 void UsingDecl::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
-  out << "(using " << namespace_name << ")";
+  if (is_namespace) {
+    out << "(using-namespace " << namespace_name << ")";
+  } else {
+    out << "(using " << namespace_name << ")";
+  }
 }
 
 NamespaceAccessExpr::NamespaceAccessExpr(SourceLocation location, std::string namespace_name,
