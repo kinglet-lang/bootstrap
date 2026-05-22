@@ -230,10 +230,19 @@ json::Value Server::handle_completion(const json::Value &params) {
     items.push_back(protocol::completion_item(kw, 14));
   }
 
-  // Namespace completions — insert with trailing '::'
+  // Namespace completions — insert with trailing '::' and re-trigger
   for (const char *ns : {"io"}) {
     if (!prefix.empty() && std::string(ns).find(prefix) == std::string::npos) continue;
-    items.push_back(protocol::completion_item(ns, 9, "namespace", std::string(ns) + "::"));
+    json::Object item;
+    item["label"] = json::Value::string(ns);
+    item["kind"] = json::Value::number(9);
+    item["detail"] = json::Value::string("namespace");
+    item["insertText"] = json::Value::string(std::string(ns) + "::");
+    json::Object cmd;
+    cmd["title"] = json::Value::string("");
+    cmd["command"] = json::Value::string("editor.action.triggerSuggest");
+    item["command"] = json::Value(cmd);
+    items.push_back(json::Value(item));
   }
 
   return json::Value(items);
