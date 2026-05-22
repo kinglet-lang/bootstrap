@@ -99,10 +99,6 @@ ParseResult Parser::parse() {
 }
 
 ast::DeclPtr Parser::declaration() {
-  if (match(TokenType::IMPORT)) {
-    return import_declaration();
-  }
-
   if (match(TokenType::USING)) {
     return using_declaration();
   }
@@ -120,12 +116,6 @@ ast::DeclPtr Parser::declaration() {
   return std::make_unique<ast::TopLevelStmtDecl>(location, std::move(stmt));
 }
 
-ast::DeclPtr Parser::import_declaration() {
-  const Token &import_token = previous();
-  const Token &name = consume(TokenType::IDENTIFIER, "Expected module name after import.");
-  consume(TokenType::SEMICOLON, "Expected ';' after import.");
-  return std::make_unique<ast::ImportDecl>(location_of(import_token), token_text(name));
-}
 
 ast::DeclPtr Parser::using_declaration() {
   const Token &using_token = previous();
@@ -648,7 +638,6 @@ void Parser::synchronize() {
     case TokenType::BREAK:
     case TokenType::CONTINUE:
     case TokenType::WHILE:
-    case TokenType::IMPORT:
       return;
     default:
       break;

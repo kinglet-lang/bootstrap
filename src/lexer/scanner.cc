@@ -367,7 +367,6 @@ TokenType Scanner::identifier_type() const {
       {"continue", TokenType::CONTINUE},
       {"inspect", TokenType::INSPECT},
       {"when", TokenType::WHEN},
-      {"import", TokenType::IMPORT},
       {"export", TokenType::EXPORT},
       {"namespace", TokenType::NAMESPACE},
       {"using", TokenType::USING},

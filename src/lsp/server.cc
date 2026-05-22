@@ -220,6 +220,17 @@ json::Value Server::handle_completion(const json::Value &params) {
     items.push_back(protocol::completion_item(sym->name, kind, detail));
   }
 
+  // Bare io members when 'using namespace io;' is active
+  if (doc->analysis.opened_namespaces.count("io")) {
+    for (const auto &[name, detail] : std::vector<std::pair<std::string, std::string>>{
+             {"out", "io::out — stdout output"},
+             {"err", "io::err — stderr output"},
+             {"in", "io::in — stdin input"}}) {
+      if (!prefix.empty() && name.find(prefix) == std::string::npos) continue;
+      items.push_back(protocol::completion_item(name, 3, detail));
+    }
+  }
+
   // Snippet completions for control flow / declarations
   struct Snippet { const char *label; const char *body; const char *detail; };
   Snippet snippets[] = {
@@ -241,7 +252,7 @@ json::Value Server::handle_completion(const json::Value &params) {
 
   // Plain keywords
   for (const char *kw : {"if", "else", "for", "while", "break", "continue", "return",
-                          "inspect", "using", "namespace", "const", "import", "export",
+                          "inspect", "using", "namespace", "const", "export",
                           "struct", "enum", "trait", "spawn", "select",
                           "int", "float", "double", "bool", "string", "void", "byte", "auto",
                           "true", "false", "null"}) {
