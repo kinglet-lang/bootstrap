@@ -207,10 +207,8 @@ void Server::send_diagnostics(const TextDocument &doc) {
     items.push_back(json::Value(item));
   }
   json::Object diag_params;
-  json::Object diag_uri;
-  diag_uri["uri"] = json::Value::string(doc.uri);
-  diag_uri["diagnostics"] = json::Value(items);
-  diag_params["textDocument"] = json::Value(diag_uri);
+  diag_params["uri"] = json::Value::string(doc.uri);
+  diag_params["diagnostics"] = json::Value(items);
   send_notification("textDocument/publishDiagnostics", json::Value(diag_params));
 }
 
@@ -254,6 +252,8 @@ json::Value Server::handle_completion(const json::Value &params) {
     std::size_t s = e;
     while (s > 0 && std::isalnum(static_cast<unsigned char>(before[s - 1]))) --s;
     ns_name = before.substr(s, e - s);
+    std::cerr << "[kinglet-lsp] ns completion: before='" << before
+              << "' ns='" << ns_name << "' line=" << line << " ch=" << character << std::endl;
   }
 
   if (!ns_name.empty()) {
