@@ -164,7 +164,7 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
       }
     }
     bool is_mutable = var_decl->storage != "const";
-    declare_var(var_decl->name, var_type, is_mutable);
+    declare_var(var_decl->name, var_type, is_mutable, var_decl->location);
     return;
   }
 
@@ -494,26 +494,32 @@ void TypeChecker::push_scope() {
 
 void TypeChecker::pop_scope() {
   if (!scopes_.empty()) {
+    for (const auto &[name, info] : scopes_.back()) {
+      if (!info.used && name != "_" && info.location.line > 0) {
+        warn_at(info.location, "Unused variable '" + name + "'.");
+      }
+    }
     scopes_.pop_back();
   }
 }
 
-void TypeChecker::declare_var(const std::string &name, const Type &type, bool is_mutable) {
+void TypeChecker::declare_var(const std::string &name, const Type &type, bool is_mutable, ast::SourceLocation loc) {
   if (scopes_.empty()) {
     return;
   }
   auto &scope = scopes_.back();
   if (scope.find(name) != scope.end()) {
-    error_at(ast::SourceLocation{}, "Variable '" + name + "' already declared.");
+    error_at(loc, "Variable '" + name + "' already declared.");
     return;
   }
-  scope.insert_or_assign(name, VarInfo{.type = type, .is_mutable = is_mutable});
+  scope.insert_or_assign(name, VarInfo{.type = type, .is_mutable = is_mutable, .used = false, .location = loc});
 }
 
-std::optional<Type> TypeChecker::lookup_var(const std::string &name) const {
+std::optional<Type> TypeChecker::lookup_var(const std::string &name) {
   for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
     auto found = it->find(name);
     if (found != it->end()) {
+      found->second.used = true;
       return found->second.type;
     }
   }
@@ -529,7 +535,11 @@ std::optional<Type> TypeChecker::lookup_type(const std::string &name) const {
 }
 
 void TypeChecker::error_at(ast::SourceLocation location, std::string message) {
-  errors_.push_back(TypeError{.location = location, .message = std::move(message)});
+  errors_.push_back(TypeError{.location = location, .message = std::move(message), .severity = DiagnosticSeverity::Error});
+}
+
+void TypeChecker::warn_at(ast::SourceLocation location, std::string message) {
+  errors_.push_back(TypeError{.location = location, .message = std::move(message), .severity = DiagnosticSeverity::Warning});
 }
 
 } // namespace kinglet

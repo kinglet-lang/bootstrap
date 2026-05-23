@@ -156,8 +156,8 @@ void Server::ensure_analyzed(Document &doc) {
 void Server::publish_diagnostics(Document &doc) {
   ensure_analyzed(doc);
   json::Array items;
-  for (const auto &[line, col, message] : doc.analysis.diagnostics) {
-    items.push_back(protocol::diagnostic(line, col, message));
+  for (const auto &diag : doc.analysis.diagnostics) {
+    items.push_back(protocol::diagnostic(diag.line, diag.col, diag.message, diag.severity));
   }
   json::Object diag_params;
   diag_params["uri"] = json::Value::string(doc.uri);

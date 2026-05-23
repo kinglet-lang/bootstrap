@@ -12,9 +12,12 @@
 
 namespace kinglet {
 
+enum class DiagnosticSeverity { Error = 1, Warning = 2, Info = 3, Hint = 4 };
+
 struct TypeError {
   ast::SourceLocation location;
   std::string message;
+  DiagnosticSeverity severity = DiagnosticSeverity::Error;
 };
 
 struct TypeCheckResult {
@@ -32,15 +35,18 @@ private:
 
   void push_scope();
   void pop_scope();
-  void declare_var(const std::string &name, const Type &type, bool is_mutable);
-  std::optional<Type> lookup_var(const std::string &name) const;
+  void declare_var(const std::string &name, const Type &type, bool is_mutable, ast::SourceLocation loc = {});
+  std::optional<Type> lookup_var(const std::string &name);
   std::optional<Type> lookup_type(const std::string &name) const;
   Type resolve_type_name(const std::string &name) const;
   void error_at(ast::SourceLocation location, std::string message);
+  void warn_at(ast::SourceLocation location, std::string message);
 
   struct VarInfo {
     Type type;
     bool is_mutable;
+    bool used = false;
+    ast::SourceLocation location;
   };
 
   std::vector<std::unordered_map<std::string, VarInfo>> scopes_;

@@ -211,11 +211,14 @@ int main(int argc, char **argv) {
 
       kinglet::TypeChecker checker;
       kinglet::TypeCheckResult type_result = checker.check(*result.program);
+      bool has_type_errors = false;
       for (const kinglet::TypeError &error : type_result.errors) {
+        const char *label = error.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
         std::cerr << error.location.line << ':' << error.location.column
-                  << ": type error: " << error.message << '\n';
+                  << ": " << label << ": " << error.message << '\n';
+        if (error.severity == kinglet::DiagnosticSeverity::Error) has_type_errors = true;
       }
-      if (!type_result.errors.empty()) {
+      if (has_type_errors) {
         continue;
       }
 
@@ -289,12 +292,15 @@ int main(int argc, char **argv) {
 
   kinglet::TypeChecker checker;
   kinglet::TypeCheckResult type_result = checker.check(*result.program);
+  bool has_type_errors = false;
   for (const kinglet::TypeError &error : type_result.errors) {
+    const char *label = error.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
     std::cerr << error.location.line << ':' << error.location.column
-              << ": type error: " << error.message << '\n';
+              << ": " << label << ": " << error.message << '\n';
+    if (error.severity == kinglet::DiagnosticSeverity::Error) has_type_errors = true;
   }
 
-  if (!type_result.errors.empty()) {
+  if (has_type_errors) {
     return 65;
   }
 

@@ -36,11 +36,18 @@ struct SymbolTable {
   const Symbol *find_definition(const std::string &name, int line) const;
 };
 
+struct Diagnostic {
+  int line;
+  int col;
+  std::string message;
+  int severity; // 1=Error, 2=Warning, 3=Info, 4=Hint
+};
+
 struct AnalysisResult {
   std::unique_ptr<ast::Program> program;
   std::vector<ParseError> errors;
   std::vector<std::string> type_errors;
-  std::vector<std::tuple<int, int, std::string>> diagnostics;
+  std::vector<Diagnostic> diagnostics;
   SymbolTable symbols;
   std::set<std::string> used_namespaces;
   std::set<std::string> opened_namespaces;
