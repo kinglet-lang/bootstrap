@@ -11,6 +11,33 @@
 > [!NOTE]
 > Familiar semantics. Curated features from WG21 proposals that were deferred or rejected. A VM small enough to embed anywhere.
 
+## Install
+
+Download the latest release for your platform from [Releases](https://github.com/sentomk/kinglet/releases):
+
+| Platform | Archive |
+|----------|---------|
+| Windows x64 | `kinglet-windows-x64.tar.gz` |
+| Linux x64 | `kinglet-linux-x64.tar.gz` |
+| macOS ARM64 | `kinglet-macos-arm64.tar.gz` |
+
+Extract and add the directory to your `PATH`:
+
+```bash
+tar xzf kinglet-<platform>.tar.gz
+# Move kinglet and kinglet-lsp to a directory on your PATH
+```
+
+### VSCode Extension
+
+Install the `.vsix` from the same release page:
+
+```bash
+code --install-extension kinglet-0.0.1.vsix
+```
+
+Or build from source — see below.
+
 ## Build
 
 ```bash
@@ -21,7 +48,7 @@ ninja -C out/Release
 
 ## Quick Example
 
-```kinglet
+```cpp
 using io;
 
 struct Point {
@@ -54,7 +81,7 @@ int main() {
 
 ## Syntax
 
-```kinglet
+```cpp
 // Types
 int x = 42;          auto x = 42;         const x = 42;
 
