@@ -45,6 +45,28 @@ private:
       if (func->body) {
         visit_stmt(*func->body, func->location.line);
       }
+    } else if (const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(&decl)) {
+      Symbol sym;
+      sym.name = struct_decl->name;
+      sym.kind = SymbolKind::Struct;
+      sym.type_name = "struct";
+      sym.location = struct_decl->location;
+      sym.scope_start_line = 0;
+      sym.scope_end_line = 999999;
+      for (const auto &field : struct_decl->fields) {
+        sym.fields.push_back(FieldSymbol{field.name, field.type});
+      }
+      table_.symbols.push_back(std::move(sym));
+    } else if (const auto *enum_decl = dynamic_cast<const ast::EnumDecl *>(&decl)) {
+      Symbol sym;
+      sym.name = enum_decl->name;
+      sym.kind = SymbolKind::Enum;
+      sym.type_name = "enum";
+      sym.location = enum_decl->location;
+      sym.scope_start_line = 0;
+      sym.scope_end_line = 999999;
+      sym.variants = enum_decl->variants;
+      table_.symbols.push_back(std::move(sym));
     } else if (const auto *top = dynamic_cast<const ast::TopLevelStmtDecl *>(&decl)) {
       visit_stmt(*top->stmt, 0);
     }

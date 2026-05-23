@@ -9,7 +9,12 @@
 
 namespace kinglet::lsp {
 
-enum class SymbolKind { Variable, Function, Parameter, Namespace };
+enum class SymbolKind { Variable, Function, Parameter, Namespace, Struct, Enum };
+
+struct FieldSymbol {
+  std::string name;
+  std::string type_name;
+};
 
 struct Symbol {
   std::string name;
@@ -20,6 +25,8 @@ struct Symbol {
   int scope_end_line = 999999;
   std::vector<ast::Parameter> params;
   std::string return_type;
+  std::vector<FieldSymbol> fields;
+  std::vector<std::string> variants;
 };
 
 struct SymbolTable {

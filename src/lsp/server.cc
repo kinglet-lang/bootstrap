@@ -206,11 +206,55 @@ json::Value Server::handle_completion(const json::Value &params) {
     return json::Value(items);
   }
 
+  if (!ns_name.empty()) {
+    auto visible = doc->analysis.symbols.visible_at(line + 1);
+    for (const auto *sym : visible) {
+      if (sym->kind == SymbolKind::Enum && sym->name == ns_name) {
+        for (const auto &variant : sym->variants) {
+          items.push_back(protocol::completion_item_with_edit(variant, 20, ns_name + " variant", line, character, character));
+        }
+        return json::Value(items);
+      }
+    }
+  }
+
+  // Check for . (dot) completion — offer struct fields
+  if (character >= 1) {
+    int dot_pos = character - 1;
+    if (dot_pos < static_cast<int>(line_text.size()) &&
+        line_text[static_cast<std::size_t>(dot_pos)] == '.') {
+      int end = dot_pos;
+      int start = end;
+      while (start > 0 && (std::isalnum(static_cast<unsigned char>(line_text[static_cast<std::size_t>(start - 1)])) ||
+             line_text[static_cast<std::size_t>(start - 1)] == '_'))
+        --start;
+      if (start < end) {
+        std::string var_name = line_text.substr(static_cast<std::size_t>(start), static_cast<std::size_t>(end - start));
+        auto visible_syms = doc->analysis.symbols.visible_at(line + 1);
+        for (const auto *sym : visible_syms) {
+          if (sym->name == var_name && !sym->type_name.empty()) {
+            for (const auto *type_sym : visible_syms) {
+              if (type_sym->kind == SymbolKind::Struct && type_sym->name == sym->type_name) {
+                for (const auto &field : type_sym->fields) {
+                  items.push_back(protocol::completion_item(field.name, 5, field.type_name + " " + field.name));
+                }
+                return json::Value(items);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Scope-aware symbols
   auto visible = doc->analysis.symbols.visible_at(line + 1);
   for (const auto *sym : visible) {
     if (!prefix.empty() && sym->name.find(prefix) == std::string::npos) continue;
-    int kind = sym->kind == SymbolKind::Function ? 3 : 6;
+    int kind = 6;
+    if (sym->kind == SymbolKind::Function) kind = 3;
+    else if (sym->kind == SymbolKind::Struct) kind = 22;
+    else if (sym->kind == SymbolKind::Enum) kind = 13;
     std::string detail = sym->type_name;
     if (sym->kind == SymbolKind::Function) {
       detail = sym->return_type + " " + sym->name + "(";
@@ -392,6 +436,20 @@ json::Value Server::handle_hover(const json::Value &params) {
       content += sym->params[i].type + " " + sym->params[i].name;
     }
     content += ")";
+  } else if (sym->kind == SymbolKind::Struct) {
+    content = "struct " + sym->name + " {\n";
+    for (const auto &field : sym->fields) {
+      content += "  " + field.type_name + " " + field.name + ";\n";
+    }
+    content += "}";
+  } else if (sym->kind == SymbolKind::Enum) {
+    content = "enum " + sym->name + " {\n";
+    for (std::size_t i = 0; i < sym->variants.size(); ++i) {
+      content += "  " + sym->variants[i];
+      if (i + 1 < sym->variants.size()) content += ",";
+      content += "\n";
+    }
+    content += "}";
   } else {
     content = sym->type_name + " " + sym->name;
   }
