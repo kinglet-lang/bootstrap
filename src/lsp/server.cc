@@ -219,8 +219,17 @@ json::Value Server::handle_completion(const json::Value &params) {
         detail += sym->params[i].type + " " + sym->params[i].name;
       }
       detail += ")";
+      // Build snippet: name(${1:param1}, ${2:param2})
+      std::string snippet = sym->name + "(";
+      for (std::size_t i = 0; i < sym->params.size(); ++i) {
+        if (i > 0) snippet += ", ";
+        snippet += "${" + std::to_string(i + 1) + ":" + sym->params[i].name + "}";
+      }
+      snippet += ")";
+      items.push_back(protocol::completion_item(sym->name, kind, detail, snippet, 2));
+    } else {
+      items.push_back(protocol::completion_item(sym->name, kind, detail));
     }
-    items.push_back(protocol::completion_item(sym->name, kind, detail));
   }
 
   // Bare io members when 'using namespace io;' is active — insert as-is
@@ -284,14 +293,13 @@ json::Value Server::handle_completion(const json::Value &params) {
     }
   }
 
-  // Type keywords — highest priority
+  // Type keywords
   for (const char *kw : {"int", "float", "double", "bool", "string", "void", "byte", "auto"}) {
     if (!prefix.empty() && std::string(kw).find(prefix) == std::string::npos) continue;
     json::Object item;
     item["label"] = json::Value::string(kw);
     item["kind"] = json::Value::number(14);
     item["insertText"] = json::Value::string(std::string(kw) + " ");
-    item["sortText"] = json::Value::string("0" + std::string(kw));
     items.push_back(json::Value(item));
   }
 
@@ -314,19 +322,31 @@ json::Value Server::handle_completion(const json::Value &params) {
   }
 
   // Namespace completions — only when 'using io;' is present
+  // But if we're in a 'using' statement context, insert plain name (not io::)
+  bool in_using_context = false;
+  {
+    std::size_t first_non_space = line_text.find_first_not_of(" \t");
+    if (first_non_space != std::string::npos && line_text.substr(first_non_space, 6) == "using ") {
+      in_using_context = true;
+    }
+  }
   if (doc->analysis.used_namespaces.count("io") || doc->analysis.opened_namespaces.count("io")) {
     for (const char *ns : {"io"}) {
       if (!prefix.empty() && std::string(ns).find(prefix) == std::string::npos) continue;
-      json::Object item;
-      item["label"] = json::Value::string(ns);
-      item["kind"] = json::Value::number(9);
-      item["detail"] = json::Value::string("namespace");
-      item["insertText"] = json::Value::string(std::string(ns) + "::");
-      json::Object cmd;
-      cmd["title"] = json::Value::string("");
-      cmd["command"] = json::Value::string("editor.action.triggerSuggest");
-      item["command"] = json::Value(cmd);
-      items.push_back(json::Value(item));
+      if (in_using_context) {
+        items.push_back(protocol::completion_item(ns, 9, "namespace"));
+      } else {
+        json::Object item;
+        item["label"] = json::Value::string(ns);
+        item["kind"] = json::Value::number(9);
+        item["detail"] = json::Value::string("namespace");
+        item["insertText"] = json::Value::string(std::string(ns) + "::");
+        json::Object cmd;
+        cmd["title"] = json::Value::string("");
+        cmd["command"] = json::Value::string("editor.action.triggerSuggest");
+        item["command"] = json::Value(cmd);
+        items.push_back(json::Value(item));
+      }
     }
   }
 

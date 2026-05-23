@@ -142,6 +142,11 @@ AnalysisResult analyze(const std::string &source) {
   }
 
   if (!parse_result.errors.empty() || !parse_result.program) {
+    if (parse_result.program) {
+      SymbolCollector collector;
+      collector.collect(*parse_result.program);
+      result.symbols = collector.take();
+    }
     return result;
   }
 
