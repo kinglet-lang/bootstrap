@@ -103,6 +103,14 @@ ast::DeclPtr Parser::declaration() {
     return using_declaration();
   }
 
+  if (match(TokenType::STRUCT)) {
+    return struct_declaration();
+  }
+
+  if (match(TokenType::ENUM)) {
+    return enum_declaration();
+  }
+
   if (is_function_declaration_start()) {
     return function_declaration();
   }
@@ -126,6 +134,43 @@ ast::DeclPtr Parser::using_declaration() {
   const Token &name = consume(TokenType::IDENTIFIER, "Expected namespace name after 'using'.");
   consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
   return std::make_unique<ast::UsingDecl>(location_of(using_token), token_text(name), is_namespace);
+}
+
+ast::DeclPtr Parser::struct_declaration() {
+  const Token &struct_token = previous();
+  const Token &name = consume(TokenType::IDENTIFIER, "Expected struct name.");
+  consume(TokenType::LEFT_BRACE, "Expected '{' after struct name.");
+
+  std::vector<ast::FieldDef> fields;
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+    std::string type = parse_type_name();
+    const Token &field_name = consume(TokenType::IDENTIFIER, "Expected field name.");
+    consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
+    fields.push_back(ast::FieldDef{std::move(type), token_text(field_name)});
+  }
+  consume(TokenType::RIGHT_BRACE, "Expected '}' after struct body.");
+
+  return std::make_unique<ast::StructDecl>(location_of(struct_token), token_text(name),
+                                           std::move(fields));
+}
+
+ast::DeclPtr Parser::enum_declaration() {
+  const Token &enum_token = previous();
+  const Token &name = consume(TokenType::IDENTIFIER, "Expected enum name.");
+  consume(TokenType::LEFT_BRACE, "Expected '{' after enum name.");
+
+  std::vector<std::string> variants;
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+    const Token &variant = consume(TokenType::IDENTIFIER, "Expected variant name.");
+    variants.push_back(token_text(variant));
+    if (!check(TokenType::RIGHT_BRACE)) {
+      consume(TokenType::COMMA, "Expected ',' between enum variants.");
+    }
+  }
+  consume(TokenType::RIGHT_BRACE, "Expected '}' after enum body.");
+
+  return std::make_unique<ast::EnumDecl>(location_of(enum_token), token_text(name),
+                                         std::move(variants));
 }
 
 ast::DeclPtr Parser::function_declaration() {
@@ -299,13 +344,19 @@ ast::ExprPtr Parser::assignment() {
     const Token &op = advance();
     ast::ExprPtr value = assignment();
     auto *identifier = dynamic_cast<ast::IdentifierExpr *>(expr.get());
-    if (identifier == nullptr) {
-      error_at(op, "Invalid assignment target.");
-      return value;
+    if (identifier != nullptr) {
+      const ast::SourceLocation location = expr->location;
+      return std::make_unique<ast::AssignExpr>(location, identifier->name,
+                                               token_to_assign_op(op.type), std::move(value));
     }
-    const ast::SourceLocation location = expr->location;
-    return std::make_unique<ast::AssignExpr>(location, identifier->name,
-                                             token_to_assign_op(op.type), std::move(value));
+    auto *field_access = dynamic_cast<ast::FieldAccessExpr *>(expr.get());
+    if (field_access != nullptr) {
+      const ast::SourceLocation location = expr->location;
+      return std::make_unique<ast::FieldAssignExpr>(location, std::move(field_access->object),
+                                                    field_access->field_name, std::move(value));
+    }
+    error_at(op, "Invalid assignment target.");
+    return value;
   }
   return expr;
 }
@@ -389,16 +440,24 @@ ast::ExprPtr Parser::unary() {
 
 ast::ExprPtr Parser::call() {
   ast::ExprPtr expr = primary();
-  while (match(TokenType::LEFT_PAREN)) {
-    std::vector<ast::ExprPtr> args;
-    if (!check(TokenType::RIGHT_PAREN)) {
-      do {
-        args.push_back(expression());
-      } while (match(TokenType::COMMA));
+  while (true) {
+    if (match(TokenType::LEFT_PAREN)) {
+      std::vector<ast::ExprPtr> args;
+      if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+          args.push_back(expression());
+        } while (match(TokenType::COMMA));
+      }
+      consume(TokenType::RIGHT_PAREN, "Expected ')' after arguments.");
+      const ast::SourceLocation location = expr->location;
+      expr = std::make_unique<ast::CallExpr>(location, std::move(expr), std::move(args));
+    } else if (match(TokenType::DOT)) {
+      const Token &field = consume(TokenType::IDENTIFIER, "Expected field name after '.'.");
+      const ast::SourceLocation location = expr->location;
+      expr = std::make_unique<ast::FieldAccessExpr>(location, std::move(expr), token_text(field));
+    } else {
+      break;
     }
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after arguments.");
-    const ast::SourceLocation location = expr->location;
-    expr = std::make_unique<ast::CallExpr>(location, std::move(expr), std::move(args));
   }
   return expr;
 }
@@ -447,6 +506,25 @@ ast::ExprPtr Parser::primary() {
           consume(TokenType::IDENTIFIER, "Expected member name after '::'.");
       return std::make_unique<ast::NamespaceAccessExpr>(
           location_of(identifier), token_text(identifier), token_text(member));
+    }
+    if (check(TokenType::LEFT_BRACE) && current_ + 1 < tokens_.size() &&
+        tokens_[current_ + 1].type == TokenType::IDENTIFIER &&
+        current_ + 2 < tokens_.size() &&
+        tokens_[current_ + 2].type == TokenType::COLON) {
+      advance(); // consume '{'
+      std::vector<ast::StructLiteralExpr::FieldInit> fields;
+      while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+        const Token &field_name = consume(TokenType::IDENTIFIER, "Expected field name.");
+        consume(TokenType::COLON, "Expected ':' after field name.");
+        ast::ExprPtr value = expression();
+        fields.push_back(ast::StructLiteralExpr::FieldInit{token_text(field_name), std::move(value)});
+        if (!check(TokenType::RIGHT_BRACE)) {
+          consume(TokenType::COMMA, "Expected ',' between struct fields.");
+        }
+      }
+      consume(TokenType::RIGHT_BRACE, "Expected '}' after struct literal.");
+      return std::make_unique<ast::StructLiteralExpr>(location_of(identifier),
+                                                      token_text(identifier), std::move(fields));
     }
     return std::make_unique<ast::IdentifierExpr>(location_of(identifier), token_text(identifier));
   }

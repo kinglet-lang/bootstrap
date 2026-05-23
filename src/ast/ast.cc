@@ -365,6 +365,74 @@ void NamespaceAccessExpr::print(std::ostream &out, int indent) const {
   out << "(namespace-access " << namespace_name << "::" << member_name << ")";
 }
 
+FieldAccessExpr::FieldAccessExpr(SourceLocation location, ExprPtr object, std::string field_name)
+    : Expr(location), object(std::move(object)), field_name(std::move(field_name)) {}
+
+void FieldAccessExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(field-access ." << field_name;
+  print_child(out, *object, indent);
+  out << ")";
+}
+
+FieldAssignExpr::FieldAssignExpr(SourceLocation location, ExprPtr object, std::string field_name,
+                                 ExprPtr value)
+    : Expr(location), object(std::move(object)), field_name(std::move(field_name)),
+      value(std::move(value)) {}
+
+void FieldAssignExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(field-assign ." << field_name;
+  print_child(out, *object, indent);
+  print_child(out, *value, indent);
+  out << ")";
+}
+
+StructLiteralExpr::StructLiteralExpr(SourceLocation location, std::string struct_name,
+                                     std::vector<FieldInit> fields)
+    : Expr(location), struct_name(std::move(struct_name)), fields(std::move(fields)) {}
+
+void StructLiteralExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(struct-literal " << struct_name;
+  for (const FieldInit &f : fields) {
+    out << '\n';
+    write_indent(out, indent + 1);
+    out << "(field " << f.name;
+    print_child(out, *f.value, indent + 1);
+    out << ")";
+  }
+  out << ")";
+}
+
+StructDecl::StructDecl(SourceLocation location, std::string name, std::vector<FieldDef> fields)
+    : Decl(location), name(std::move(name)), fields(std::move(fields)) {}
+
+void StructDecl::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(struct " << name;
+  for (const FieldDef &f : fields) {
+    out << '\n';
+    write_indent(out, indent + 1);
+    out << "(" << f.type << ' ' << f.name << ")";
+  }
+  out << ")";
+}
+
+EnumDecl::EnumDecl(SourceLocation location, std::string name, std::vector<std::string> variants)
+    : Decl(location), name(std::move(name)), variants(std::move(variants)) {}
+
+void EnumDecl::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(enum " << name;
+  for (const std::string &v : variants) {
+    out << '\n';
+    write_indent(out, indent + 1);
+    out << v;
+  }
+  out << ")";
+}
+
 TopLevelStmtDecl::TopLevelStmtDecl(SourceLocation location, StmtPtr stmt)
     : Decl(location), stmt(std::move(stmt)) {}
 

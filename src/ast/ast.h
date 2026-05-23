@@ -265,6 +265,57 @@ struct NamespaceAccessExpr final : Expr {
   std::string member_name;
 };
 
+struct FieldAccessExpr final : Expr {
+  FieldAccessExpr(SourceLocation location, ExprPtr object, std::string field_name);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr object;
+  std::string field_name;
+};
+
+struct FieldAssignExpr final : Expr {
+  FieldAssignExpr(SourceLocation location, ExprPtr object, std::string field_name, ExprPtr value);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr object;
+  std::string field_name;
+  ExprPtr value;
+};
+
+struct FieldDef {
+  std::string type;
+  std::string name;
+};
+
+struct StructLiteralExpr final : Expr {
+  struct FieldInit {
+    std::string name;
+    ExprPtr value;
+  };
+  StructLiteralExpr(SourceLocation location, std::string struct_name,
+                    std::vector<FieldInit> fields);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string struct_name;
+  std::vector<FieldInit> fields;
+};
+
+struct StructDecl final : Decl {
+  StructDecl(SourceLocation location, std::string name, std::vector<FieldDef> fields);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string name;
+  std::vector<FieldDef> fields;
+};
+
+struct EnumDecl final : Decl {
+  EnumDecl(SourceLocation location, std::string name, std::vector<std::string> variants);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string name;
+  std::vector<std::string> variants;
+};
+
 struct TopLevelStmtDecl final : Decl {
   TopLevelStmtDecl(SourceLocation location, StmtPtr stmt);
   void print(std::ostream &out, int indent = 0) const override;
