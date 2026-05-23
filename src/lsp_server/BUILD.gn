@@ -4,7 +4,14 @@ executable("lsp_server") {
   ]
 
   deps = [
+    "//src/ast",
+    "//src/checker",
+    "//src/compiler",
+    "//src/lexer",
     "//src/lsp",
+    "//src/parser",
+    "//src/types",
+    "//src/vm",
   ]
 
   include_dirs = [
