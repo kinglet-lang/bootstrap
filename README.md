@@ -6,7 +6,7 @@
   </picture>
 </p>
 
-<p align="center">A C++-flavored language compiled to a lightweight bytecode VM, selectively implementing the proposals that deserved to ship.</p>
+<p align="center">A bytecode-compiled language implementing the C++ proposals that deserved to ship.</p>
 
 > [!NOTE]
 > Familiar semantics. Curated features from WG21 proposals that were deferred or rejected. A VM small enough to embed anywhere.
