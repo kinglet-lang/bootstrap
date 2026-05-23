@@ -332,8 +332,26 @@ ast::StmtPtr Parser::var_declaration() {
 
   ast::TypeExpr type;
   Token name = peek();
-  if (is_type_start(peek().type) && check_next(TokenType::IDENTIFIER)) {
+  bool has_type = false;
+  if (is_type_start(peek().type)) {
+    size_t pos = current_ + 1;
+    if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
+      int depth = 1;
+      ++pos;
+      while (pos < tokens_.size() && depth > 0) {
+        if (tokens_[pos].type == TokenType::LESS) ++depth;
+        else if (tokens_[pos].type == TokenType::GREATER) --depth;
+        else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
+        ++pos;
+      }
+      has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
+    } else {
+      has_type = check_next(TokenType::IDENTIFIER);
+    }
+  }
+  if (has_type) {
     type = parse_type_expr();
+    if (pending_greater_) pending_greater_ = false;
     name = consume(TokenType::IDENTIFIER, "Expected variable name.");
   } else {
     name = consume(TokenType::IDENTIFIER, "Expected variable name.");
@@ -475,6 +493,47 @@ ast::ExprPtr Parser::unary() {
 ast::ExprPtr Parser::call() {
   ast::ExprPtr expr = primary();
   while (true) {
+    if (check(TokenType::LESS) && dynamic_cast<const ast::IdentifierExpr *>(expr.get())) {
+      size_t saved = current_;
+      size_t pos = current_ + 1;
+      int depth = 1;
+      bool valid = false;
+      while (pos < tokens_.size() && depth > 0) {
+        if (tokens_[pos].type == TokenType::LESS) ++depth;
+        else if (tokens_[pos].type == TokenType::GREATER) --depth;
+        else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
+        else if (tokens_[pos].type == TokenType::SEMICOLON || tokens_[pos].type == TokenType::END_OF_FILE) break;
+        ++pos;
+      }
+      if (depth == 0 && pos < tokens_.size() && tokens_[pos].type == TokenType::LEFT_PAREN) {
+        advance();
+        std::vector<ast::TypeExpr> type_args;
+        do {
+          type_args.push_back(parse_type_expr());
+        } while (match(TokenType::COMMA));
+        if (pending_greater_) {
+          pending_greater_ = false;
+        } else {
+          consume(TokenType::GREATER, "Expected '>' after type arguments.");
+        }
+        consume(TokenType::LEFT_PAREN, "Expected '(' after type arguments.");
+        std::vector<ast::ExprPtr> args;
+        if (!check(TokenType::RIGHT_PAREN)) {
+          do {
+            args.push_back(expression());
+          } while (match(TokenType::COMMA));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after arguments.");
+        const ast::SourceLocation location = expr->location;
+        expr = std::make_unique<ast::CallExpr>(location, std::move(expr),
+                                               std::move(type_args), std::move(args));
+        valid = true;
+      }
+      if (!valid) {
+        current_ = saved;
+      }
+      if (valid) continue;
+    }
     if (match(TokenType::LEFT_PAREN)) {
       std::vector<ast::ExprPtr> args;
       if (!check(TokenType::RIGHT_PAREN)) {

@@ -33,6 +33,10 @@ CompileResult Compiler::compile(const ast::Program &program) {
   // Pass 1: register all structs, enums, and functions
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(declaration.get())) {
+      if (!struct_decl->type_params.empty()) {
+        generic_struct_decls_[struct_decl->name] = struct_decl;
+        continue;
+      }
       StructMeta meta;
       meta.name = struct_decl->name;
       for (const auto &field : struct_decl->fields) {
@@ -54,6 +58,10 @@ CompileResult Compiler::compile(const ast::Program &program) {
   int main_index = -1;
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *function = dynamic_cast<const ast::FunctionDecl *>(declaration.get())) {
+      if (!function->type_params.empty()) {
+        generic_func_decls_[function->name] = function;
+        continue;
+      }
       int idx = chunk_.add_function(FunctionInfo{
           .name = function->name,
           .entry = 0,
@@ -85,6 +93,16 @@ CompileResult Compiler::compile(const ast::Program &program) {
     if (!errors_.empty()) break;
   }
 
+  // Pass 3: compile deferred generic function instantiations
+  while (!pending_generic_funcs_.empty() && errors_.empty()) {
+    auto pending = std::move(pending_generic_funcs_);
+    pending_generic_funcs_.clear();
+    for (const auto &[name, decl] : pending) {
+      compile_function(*decl, name);
+      if (!errors_.empty()) break;
+    }
+  }
+
   return CompileResult{.chunk = std::move(chunk_), .errors = std::move(errors_), .warnings = std::move(warnings_)};
 }
 
@@ -101,12 +119,13 @@ void Compiler::pop_scope() {
   }
 }
 
-void Compiler::compile_function(const ast::FunctionDecl &function) {
+void Compiler::compile_function(const ast::FunctionDecl &function, const std::string &lookup_name) {
   locals_.clear();
   scope_stack_.clear();
 
   // Look up this function's index and patch its entry point
-  auto it = function_indices_.find(function.name);
+  const std::string &name = lookup_name.empty() ? function.name : lookup_name;
+  auto it = function_indices_.find(name);
   int const_idx = it->second;
   int func_idx = chunk_.constants()[static_cast<std::size_t>(const_idx)].function_index_storage;
   const_cast<FunctionInfo &>(chunk_.functions()[static_cast<std::size_t>(func_idx)]).entry =
@@ -468,6 +487,40 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       }
     }
 
+    // Generic function call
+    if (callee_id && !call_expr->type_args.empty()) {
+      std::string mangled = callee_id->name;
+      for (const auto &arg : call_expr->type_args) {
+        mangled += "__" + arg.to_string();
+      }
+      auto func_it = function_indices_.find(mangled);
+      if (func_it == function_indices_.end()) {
+        auto gen_it = generic_func_decls_.find(callee_id->name);
+        if (gen_it != generic_func_decls_.end()) {
+          const ast::FunctionDecl *decl = gen_it->second;
+          int idx = chunk_.add_function(FunctionInfo{
+              .name = mangled,
+              .entry = 0,
+              .param_count = static_cast<int>(decl->params.size()),
+          });
+          uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
+          function_indices_[mangled] = static_cast<int>(const_idx);
+          pending_generic_funcs_.push_back({mangled, decl});
+        }
+      }
+      func_it = function_indices_.find(mangled);
+      if (func_it != function_indices_.end()) {
+        for (const ast::ExprPtr &arg : call_expr->args) {
+          compile_expr(*arg);
+        }
+        emit_constant(Value::function_value(
+            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_index_storage),
+            call_expr->location);
+        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
+        return;
+      }
+    }
+
     // User-defined function call
     if (callee_id) {
       auto func_it = function_indices_.find(callee_id->name);
@@ -559,13 +612,13 @@ void Compiler::compile_expr(const ast::Expr &expr) {
   }
 
   if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(&expr)) {
-    std::string type_name = struct_lit->struct_type.to_string();
-    auto struct_it = struct_indices_.find(type_name);
-    if (struct_it == struct_indices_.end()) {
+    int struct_idx = resolve_struct(struct_lit->struct_type);
+    if (struct_idx < 0) {
+      std::string type_name = struct_lit->struct_type.to_string();
       error_at(struct_lit->location, "Unknown struct type '" + type_name + "'.");
       return;
     }
-    int type_idx = struct_it->second;
+    int type_idx = struct_idx;
     const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(type_idx)];
     for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
       if (i < struct_lit->fields.size()) {
@@ -683,6 +736,31 @@ bool Compiler::declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot) {
   });
   *slot = static_cast<uint32_t>(locals_.size() - 1);
   return true;
+}
+
+int Compiler::resolve_struct(const ast::TypeExpr &type) {
+  if (type.type_args.empty()) {
+    auto it = struct_indices_.find(type.name);
+    if (it != struct_indices_.end()) return it->second;
+    return -1;
+  }
+  std::string mangled = type.name;
+  for (const auto &arg : type.type_args) {
+    mangled += "__" + arg.to_string();
+  }
+  auto it = struct_indices_.find(mangled);
+  if (it != struct_indices_.end()) return it->second;
+  auto gen_it = generic_struct_decls_.find(type.name);
+  if (gen_it == generic_struct_decls_.end()) return -1;
+  const ast::StructDecl *decl = gen_it->second;
+  StructMeta meta;
+  meta.name = mangled;
+  for (const auto &field : decl->fields) {
+    meta.field_names.push_back(field.name);
+  }
+  int idx = chunk_.add_struct_meta(std::move(meta));
+  struct_indices_[mangled] = idx;
+  return idx;
 }
 
 void Compiler::error_at(ast::SourceLocation location, std::string message) {

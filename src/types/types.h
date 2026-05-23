@@ -22,6 +22,7 @@ enum class TypeKind {
 struct FieldInfo {
   std::string name;
   TypeKind type_kind;
+  std::string type_name;
 };
 
 struct Type {

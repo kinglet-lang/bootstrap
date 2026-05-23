@@ -42,8 +42,62 @@ Type TypeChecker::resolve_type_name(const std::string &name) const {
   return int_type();
 }
 
-Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr) const {
-  return resolve_type_name(expr.to_string());
+Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr) {
+  if (expr.type_args.empty()) {
+    return resolve_type_name(expr.name);
+  }
+  std::string mangled = mangle_name(expr.name, expr.type_args);
+  auto it = type_registry_.find(mangled);
+  if (it != type_registry_.end()) {
+    return it->second;
+  }
+  auto gen_it = generic_structs_.find(expr.name);
+  if (gen_it != generic_structs_.end()) {
+    instantiate_generic_struct(gen_it->second, expr.type_args);
+    auto inst_it = type_registry_.find(mangled);
+    if (inst_it != type_registry_.end()) {
+      return inst_it->second;
+    }
+  }
+  return int_type();
+}
+
+std::string TypeChecker::mangle_name(const std::string &base, const std::vector<ast::TypeExpr> &args) const {
+  std::string result = base;
+  for (const auto &arg : args) {
+    result += "__" + arg.to_string();
+  }
+  return result;
+}
+
+void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl, const std::vector<ast::TypeExpr> &args) {
+  std::string mangled = mangle_name(decl->name, args);
+  if (instantiated_.count(mangled)) return;
+  instantiated_.insert(mangled);
+
+  if (args.size() != decl->type_params.size()) {
+    errors_.push_back(TypeError{.location = decl->location,
+                                .message = "Wrong number of type arguments for '" + decl->name + "'."});
+    return;
+  }
+
+  std::unordered_map<std::string, ast::TypeExpr> subst;
+  for (size_t i = 0; i < decl->type_params.size(); ++i) {
+    subst[decl->type_params[i]] = args[i];
+  }
+
+  Type struct_type(TypeKind::Struct);
+  struct_type.name = mangled;
+  for (const auto &field : decl->fields) {
+    ast::TypeExpr resolved_field_type = field.type;
+    auto sub_it = subst.find(field.type.name);
+    if (sub_it != subst.end() && field.type.type_args.empty()) {
+      resolved_field_type = sub_it->second;
+    }
+    Type ft = resolve_type_expr(resolved_field_type);
+    struct_type.fields.push_back(FieldInfo{field.name, ft.kind, ft.name});
+  }
+  type_registry_.insert_or_assign(mangled, struct_type);
 }
 
 TypeCheckResult TypeChecker::check(const ast::Program &program) {
@@ -65,12 +119,17 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       continue;
     }
     if (const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(decl.get())) {
-      Type struct_type(TypeKind::Struct);
-      struct_type.name = struct_decl->name;
-      for (const auto &field : struct_decl->fields) {
-        struct_type.fields.push_back(FieldInfo{field.name, resolve_type_expr(field.type).kind});
+      if (!struct_decl->type_params.empty()) {
+        generic_structs_[struct_decl->name] = struct_decl;
+      } else {
+        Type struct_type(TypeKind::Struct);
+        struct_type.name = struct_decl->name;
+        for (const auto &field : struct_decl->fields) {
+          Type ft = resolve_type_expr(field.type);
+          struct_type.fields.push_back(FieldInfo{field.name, ft.kind, ft.name});
+        }
+        type_registry_.insert_or_assign(struct_decl->name, struct_type);
       }
-      type_registry_.insert_or_assign(struct_decl->name, struct_type);
       continue;
     }
     if (const auto *enum_decl = dynamic_cast<const ast::EnumDecl *>(decl.get())) {
@@ -81,6 +140,10 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       continue;
     }
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
+      if (!func->type_params.empty()) {
+        generic_functions_[func->name] = func;
+        continue;
+      }
       Type return_type = resolve_type_expr(func->return_type);
       std::vector<Type> param_types;
       for (const auto &param : func->params) {
@@ -400,6 +463,51 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
+    if (!call_expr->type_args.empty()) {
+      const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr->callee.get());
+      if (callee_id) {
+        auto gen_it = generic_functions_.find(callee_id->name);
+        if (gen_it != generic_functions_.end()) {
+          const ast::FunctionDecl *decl = gen_it->second;
+          if (call_expr->type_args.size() != decl->type_params.size()) {
+            error_at(call_expr->location, "Wrong number of type arguments for '" + callee_id->name + "'.");
+            return int_type();
+          }
+          std::unordered_map<std::string, ast::TypeExpr> subst;
+          for (size_t i = 0; i < decl->type_params.size(); ++i) {
+            subst[decl->type_params[i]] = call_expr->type_args[i];
+          }
+          auto substitute = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
+            if (te.type_args.empty()) {
+              auto s_it = subst.find(te.name);
+              if (s_it != subst.end()) return s_it->second;
+            }
+            return te;
+          };
+          Type ret = resolve_type_expr(substitute(decl->return_type));
+          std::vector<Type> param_types;
+          for (const auto &param : decl->params) {
+            param_types.push_back(resolve_type_expr(substitute(param.type)));
+          }
+          if (call_expr->args.size() != param_types.size()) {
+            error_at(call_expr->location,
+                     "Expected " + std::to_string(param_types.size()) + " arguments, got " +
+                         std::to_string(call_expr->args.size()) + ".");
+            return ret;
+          }
+          for (size_t i = 0; i < call_expr->args.size(); ++i) {
+            Type arg_type = check_expr(*call_expr->args[i]);
+            if (!arg_type.is_compatible_with(param_types[i])) {
+              error_at(call_expr->args[i]->location,
+                       "Expected " + type_to_string(param_types[i]) + ", got " +
+                           type_to_string(arg_type) + ".");
+            }
+          }
+          return ret;
+        }
+      }
+    }
+
     Type callee_type = check_expr(*call_expr->callee);
     if (callee_type.kind != TypeKind::Function) {
       error_at(call_expr->location, "Cannot call non-function type.");
@@ -441,8 +549,9 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
   }
 
   if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(&expr)) {
+    Type resolved = resolve_type_expr(struct_lit->struct_type);
     std::string type_name = struct_lit->struct_type.to_string();
-    auto type_opt = lookup_type(type_name);
+    auto type_opt = lookup_type(resolved.name);
     if (!type_opt.has_value()) {
       error_at(struct_lit->location, "Unknown struct type '" + type_name + "'.");
       return int_type();
@@ -465,6 +574,10 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     }
     for (const auto &f : obj_type.fields) {
       if (f.name == field_access->field_name) {
+        if (f.type_kind == TypeKind::Struct && !f.type_name.empty()) {
+          auto reg_it = type_registry_.find(f.type_name);
+          if (reg_it != type_registry_.end()) return reg_it->second;
+        }
         return Type(f.type_kind);
       }
     }

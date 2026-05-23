@@ -39,7 +39,9 @@ private:
   std::optional<Type> lookup_var(const std::string &name);
   std::optional<Type> lookup_type(const std::string &name) const;
   Type resolve_type_name(const std::string &name) const;
-  Type resolve_type_expr(const ast::TypeExpr &expr) const;
+  Type resolve_type_expr(const ast::TypeExpr &expr);
+  std::string mangle_name(const std::string &base, const std::vector<ast::TypeExpr> &args) const;
+  void instantiate_generic_struct(const ast::StructDecl *decl, const std::vector<ast::TypeExpr> &args);
   void error_at(ast::SourceLocation location, std::string message);
   void warn_at(ast::SourceLocation location, std::string message);
 
@@ -52,6 +54,9 @@ private:
 
   std::vector<std::unordered_map<std::string, VarInfo>> scopes_;
   std::unordered_map<std::string, Type> type_registry_;
+  std::unordered_map<std::string, const ast::StructDecl *> generic_structs_;
+  std::unordered_map<std::string, const ast::FunctionDecl *> generic_functions_;
+  std::unordered_set<std::string> instantiated_;
   std::vector<TypeError> errors_;
   std::unordered_set<std::string> used_;    // using io;
   std::unordered_set<std::string> opened_;  // using namespace io;

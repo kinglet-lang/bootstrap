@@ -44,7 +44,7 @@ private:
   void push_scope();
   void pop_scope();
 
-  void compile_function(const ast::FunctionDecl &function);
+  void compile_function(const ast::FunctionDecl &function, const std::string &lookup_name = "");
   void compile_stmt(const ast::Stmt &stmt);
   void compile_expr(const ast::Expr &expr);
   void compile_assignment(const ast::AssignExpr &assign);
@@ -57,6 +57,7 @@ private:
   void patch_jump_to(std::size_t offset, std::size_t target);
   int resolve_local(const std::string &name) const;
   bool declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot);
+  int resolve_struct(const ast::TypeExpr &type);
   void error_at(ast::SourceLocation location, std::string message);
 
   Chunk chunk_;
@@ -70,6 +71,9 @@ private:
   std::unordered_map<std::string, int> function_indices_;
   std::unordered_map<std::string, int> struct_indices_;
   std::unordered_map<std::string, int> enum_indices_;
+  std::unordered_map<std::string, const ast::StructDecl *> generic_struct_decls_;
+  std::unordered_map<std::string, const ast::FunctionDecl *> generic_func_decls_;
+  std::vector<std::pair<std::string, const ast::FunctionDecl *>> pending_generic_funcs_;
 };
 
 } // namespace kinglet
