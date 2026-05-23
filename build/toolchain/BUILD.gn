@@ -91,7 +91,11 @@ if (host_os == "win") {
 
     tool("link") {
       rspfile = "{{output}}.rsp"
-      command = "$_cxx {{ldflags}} -o {{output}} @$rspfile {{libs}}"
+      if (host_os == "mac") {
+        command = "$_cxx {{ldflags}} -o {{output}} @$rspfile {{libs}}"
+      } else {
+        command = "$_cxx {{ldflags}} -o {{output}} -Wl,--start-group @$rspfile -Wl,--end-group {{libs}}"
+      }
       description = "LINK {{target_output_name}}{{output_extension}}"
       rspfile_content = "{{inputs}}"
       outputs = [
