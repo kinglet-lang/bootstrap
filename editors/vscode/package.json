@@ -1,6 +1,6 @@
 {
   "name": "kinglet",
-  "displayName": "Kinglet",
+  "displayName": "Kinglet Language Support",
   "description": "Kinglet language support — syntax highlighting, diagnostics, LSP",
   "version": "0.0.1",
   "publisher": "kinglet",
@@ -9,6 +9,7 @@
     "url": "https://github.com/sentomk/kinglet"
   },
   "license": "MIT",
+  "icon": "icons/logo.png",
   "main": "./extension.js",
   "engines": {
     "vscode": "^1.60.0"
