@@ -49,9 +49,11 @@ jobs:
         uses: seanmiddleditch/gha-setup-ninja@v5
 
       - name: Generate build files
+        shell: bash
         run: gn gen out/Release --args='is_debug=false'
 
       - name: Build
+        shell: bash
         run: ninja -C out/Release
 
       - name: Package binaries
