@@ -11,7 +11,6 @@
 
 ## P2: Types & Patterns
 
-- [ ] Dynamic arrays: `T[]`, array literals, indexing, assignment, and bounds checks
 - [ ] Align pattern matching syntax with WG21 P2688R5's `match` expression model
 - [ ] Decide whether `inspect` remains as an alias or migrates fully to `match`
 - [ ] Pattern guards using `if (...)`
@@ -41,6 +40,7 @@
 
 - [x] Struct definitions
 - [x] Enum definitions
+- [x] Dynamic arrays: `T[]`, array literals, indexing, assignment, and bounds checks
 - [x] Operators: `%` (modulo), `&&`/`||` (short-circuit), `~` (bitwise NOT)
 - [x] Generics `<T>` (monomorphization: structs + functions)
 - [x] TypeChecker: report unknown type names (no longer silently treated as `int`)

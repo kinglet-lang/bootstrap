@@ -102,6 +102,11 @@ double pi = 3.14;
 string name = "kinglet";
 bool flag = true;
 
+// Dynamic arrays
+int[] xs = [1, 2, 3];
+xs[1] = 20;
+int first = xs[0];
+
 // Structs & Enums
 struct Vec2 { int x; int y; }
 enum Color { Red, Green, Blue, }
