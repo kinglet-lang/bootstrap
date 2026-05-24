@@ -144,7 +144,9 @@ Token Scanner::scan_token() {
   case '&':
     return make_token(match('&') ? TokenType::AMP_AMP : TokenType::AMP);
   case '|':
-    return make_token(match('|') ? TokenType::PIPE_PIPE : TokenType::PIPE);
+    if (match('|')) return make_token(TokenType::PIPE_PIPE);
+    if (match('>')) return make_token(TokenType::PIPE_GREATER);
+    return make_token(TokenType::PIPE);
   case '^':
     return make_token(TokenType::CARET);
   case '~':

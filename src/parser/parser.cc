@@ -399,7 +399,7 @@ ast::ExprPtr Parser::expression() {
 }
 
 ast::ExprPtr Parser::assignment() {
-  ast::ExprPtr expr = logical_or();
+  ast::ExprPtr expr = pipeline();
   if (is_assignment_operator(peek().type)) {
     const Token &op = advance();
     ast::ExprPtr value = assignment();
@@ -428,6 +428,19 @@ ast::ExprPtr Parser::assignment() {
     }
     error_at(op, "Invalid assignment target.");
     return value;
+  }
+  return expr;
+}
+
+ast::ExprPtr Parser::pipeline() {
+  ast::ExprPtr expr = logical_or();
+  while (match(TokenType::PIPE_GREATER)) {
+    auto loc = location_of(previous());
+    ast::ExprPtr func = logical_or();
+    std::vector<ast::ExprPtr> args;
+    args.push_back(std::move(expr));
+    std::vector<ast::TypeExpr> type_args;
+    expr = std::make_unique<ast::CallExpr>(loc, std::move(func), std::move(type_args), std::move(args));
   }
   return expr;
 }

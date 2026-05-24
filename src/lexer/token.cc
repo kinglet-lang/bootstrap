@@ -106,6 +106,8 @@ const char *token_type_name(TokenType type) {
     return "LESS_LESS";
   case TokenType::GREATER_GREATER:
     return "GREATER_GREATER";
+  case TokenType::PIPE_GREATER:
+    return "PIPE_GREATER";
   case TokenType::ARROW:
     return "ARROW";
   case TokenType::FAT_ARROW:

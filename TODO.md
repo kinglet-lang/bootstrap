@@ -13,7 +13,7 @@
 
 - [ ] Array methods: `len()`, `push()`, `pop()`, `remove()`, `contains()`, `clear()`
 - [x] Chained comparisons (P0893): `1 <= x <= 10` → parser desugars to `&&`
-- [ ] Pipeline operator (P2011): `data |> filter |> map |> sum`
+- [x] Pipeline operator (P2011): `data |> filter |> map |> sum`
 - [ ] Implicit return (P0927): last expression in block is the return value
 - [ ] Multi-dimensional subscript (P2169): `matrix[i, j]`
 - [ ] Structured unpacking (P1858): `let [a, b, ...rest] = arr;`

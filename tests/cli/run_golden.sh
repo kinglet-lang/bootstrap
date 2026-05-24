@@ -121,6 +121,9 @@ run_case "array_methods" "run" 0 $'len: 5\nafter push: len = 6\npopped: 6\nremov
 # --- Chained Comparisons ---
 run_case "chained_comparisons" "run" 0 $'in rangenot smalledge' ""
 
+# --- Pipeline Operator ---
+run_case "pipeline" "run" 0 $'5 |> twice |> add_one = 11\n3 |> add_one |> twice |> negate = -8\n' ""
+
 if [[ "$FAILURES" -ne 0 ]]; then
   echo "$FAILURES CLI golden test(s) failed." >&2
   exit 1
