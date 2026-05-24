@@ -109,6 +109,9 @@ run_case "control_flow" "run" 0 $'10\n3\n2\n1\nyes\n' ""
 # --- Functions ---
 run_case "functions_recursion" "run" 0 $'720\n55\n' ""
 
+# --- IO Methods ---
+run_case "io_methods" "run" 0 $'hello world\n1 + 2 = 3\nno newline here\ndone\n' ""
+
 if [[ "$FAILURES" -ne 0 ]]; then
   echo "$FAILURES CLI golden test(s) failed." >&2
   exit 1
