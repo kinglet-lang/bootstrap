@@ -6,6 +6,9 @@
 namespace kinglet::ast {
 
 std::string TypeExpr::to_string() const {
+  if (name == "Array" && type_args.size() == 1) {
+    return type_args[0].to_string() + "[]";
+  }
   if (type_args.empty()) return name;
   std::string result = name + "<";
   for (size_t i = 0; i < type_args.size(); ++i) {
@@ -131,6 +134,18 @@ NullLiteralExpr::NullLiteralExpr(SourceLocation location)
 void NullLiteralExpr::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
   out << "(null-literal)";
+}
+
+ArrayLiteralExpr::ArrayLiteralExpr(SourceLocation location, std::vector<ExprPtr> elements)
+    : Expr(location), elements(std::move(elements)) {}
+
+void ArrayLiteralExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(array-literal";
+  for (const ExprPtr &element : elements) {
+    print_child(out, *element, indent);
+  }
+  out << ")";
 }
 
 IdentifierExpr::IdentifierExpr(SourceLocation location, std::string name)
@@ -398,6 +413,31 @@ void FieldAssignExpr::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
   out << "(field-assign ." << field_name;
   print_child(out, *object, indent);
+  print_child(out, *value, indent);
+  out << ")";
+}
+
+IndexExpr::IndexExpr(SourceLocation location, ExprPtr object, ExprPtr index)
+    : Expr(location), object(std::move(object)), index(std::move(index)) {}
+
+void IndexExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(index";
+  print_child(out, *object, indent);
+  print_child(out, *index, indent);
+  out << ")";
+}
+
+IndexAssignExpr::IndexAssignExpr(SourceLocation location, ExprPtr object, ExprPtr index,
+                                 ExprPtr value)
+    : Expr(location), object(std::move(object)), index(std::move(index)),
+      value(std::move(value)) {}
+
+void IndexAssignExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(index-assign";
+  print_child(out, *object, indent);
+  print_child(out, *index, indent);
   print_child(out, *value, indent);
   out << ")";
 }

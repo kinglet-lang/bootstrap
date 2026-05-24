@@ -17,6 +17,7 @@ enum class TypeKind {
   Function,
   Struct,
   Enum,
+  Array,
 };
 
 struct FieldInfo {
@@ -38,6 +39,7 @@ struct Type {
   std::string name;
   std::vector<Type> param_types;
   std::shared_ptr<Type> return_type;
+  std::shared_ptr<Type> element_type;
   std::vector<FieldInfo> fields;
   std::vector<std::string> variants;
 };
@@ -48,6 +50,7 @@ const Type &bool_type();
 const Type &string_type();
 const Type &void_type();
 const Type &null_type();
+Type array_type(Type element_type);
 
 std::ostream &operator<<(std::ostream &out, const Type &type);
 std::ostream &operator<<(std::ostream &out, TypeKind kind);

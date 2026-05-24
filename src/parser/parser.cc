@@ -344,9 +344,17 @@ ast::StmtPtr Parser::var_declaration() {
         else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
         ++pos;
       }
+      while (pos + 1 < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
+             tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
+        pos += 2;
+      }
       has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
     } else {
-      has_type = check_next(TokenType::IDENTIFIER);
+      while (pos + 1 < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
+             tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
+        pos += 2;
+      }
+      has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
     }
   }
   if (has_type) {
@@ -400,6 +408,17 @@ ast::ExprPtr Parser::assignment() {
       const ast::SourceLocation location = expr->location;
       return std::make_unique<ast::AssignExpr>(location, identifier->name,
                                                token_to_assign_op(op.type), std::move(value));
+    }
+    auto *index_expr = dynamic_cast<ast::IndexExpr *>(expr.get());
+    if (index_expr != nullptr) {
+      if (op.type != TokenType::EQUAL) {
+        error_at(op, "Compound assignment to indexed values is not supported.");
+        return value;
+      }
+      const ast::SourceLocation location = expr->location;
+      return std::make_unique<ast::IndexAssignExpr>(location, std::move(index_expr->object),
+                                                    std::move(index_expr->index),
+                                                    std::move(value));
     }
     auto *field_access = dynamic_cast<ast::FieldAccessExpr *>(expr.get());
     if (field_access != nullptr) {
@@ -549,6 +568,11 @@ ast::ExprPtr Parser::call() {
       const Token &field = consume(TokenType::IDENTIFIER, "Expected field name after '.'.");
       const ast::SourceLocation location = expr->location;
       expr = std::make_unique<ast::FieldAccessExpr>(location, std::move(expr), token_text(field));
+    } else if (match(TokenType::LEFT_BRACKET)) {
+      ast::ExprPtr index = expression();
+      consume(TokenType::RIGHT_BRACKET, "Expected ']' after index.");
+      const ast::SourceLocation location = expr->location;
+      expr = std::make_unique<ast::IndexExpr>(location, std::move(expr), std::move(index));
     } else {
       break;
     }
@@ -592,6 +616,18 @@ ast::ExprPtr Parser::primary() {
   if (match(TokenType::NULL_)) {
     const Token &literal = previous();
     return std::make_unique<ast::NullLiteralExpr>(location_of(literal));
+  }
+  if (match(TokenType::LEFT_BRACKET)) {
+    const Token &left_bracket = previous();
+    std::vector<ast::ExprPtr> elements;
+    if (!check(TokenType::RIGHT_BRACKET)) {
+      do {
+        elements.push_back(expression());
+      } while (match(TokenType::COMMA));
+    }
+    consume(TokenType::RIGHT_BRACKET, "Expected ']' after array literal.");
+    return std::make_unique<ast::ArrayLiteralExpr>(location_of(left_bracket),
+                                                   std::move(elements));
   }
   if (match(TokenType::IDENTIFIER)) {
     const Token &identifier = previous();
@@ -789,6 +825,10 @@ bool Parser::is_declaration_start() const {
       ++pos;
     }
   }
+  while (pos + 1 < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
+         tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
+    pos += 2;
+  }
   return pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
 }
 
@@ -805,6 +845,10 @@ bool Parser::is_function_declaration_start() const {
       else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
       ++pos;
     }
+  }
+  while (pos + 1 < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
+         tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
+    pos += 2;
   }
   if (pos >= tokens_.size() || tokens_[pos].type != TokenType::IDENTIFIER) return false;
   ++pos; // skip function name
@@ -853,6 +897,13 @@ ast::TypeExpr Parser::parse_type_expr() {
         error_at(peek(), "Expected '>' after type arguments.");
       }
     }
+  }
+  while (match(TokenType::LEFT_BRACKET)) {
+    consume(TokenType::RIGHT_BRACKET, "Expected ']' after array type suffix.");
+    std::vector<ast::TypeExpr> array_arg;
+    array_arg.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
+    name = "Array";
+    type_args = std::move(array_arg);
   }
   return ast::TypeExpr{std::move(name), std::move(type_args)};
 }

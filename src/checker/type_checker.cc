@@ -12,6 +12,9 @@ std::string type_to_string(const Type &type) {
   if (type.kind == TypeKind::Struct || type.kind == TypeKind::Enum) {
     return type.name;
   }
+  if (type.kind == TypeKind::Array && type.element_type) {
+    return type_to_string(*type.element_type) + "[]";
+  }
   std::ostringstream oss;
   oss << type.kind;
   return oss.str();
@@ -45,6 +48,15 @@ Type TypeChecker::resolve_type_name(const std::string &name) const {
 }
 
 Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocation loc) {
+  if (expr.name == "Array") {
+    if (expr.type_args.size() != 1) {
+      if (loc.line > 0) {
+        error_at(loc, "Array type requires one element type.");
+      }
+      return array_type(int_type());
+    }
+    return array_type(resolve_type_expr(expr.type_args[0], loc));
+  }
   if (expr.type_args.empty()) {
     Type t = resolve_type_name(expr.name);
     if (t.name.find("<unknown:") == 0 && loc.line > 0) {
@@ -658,6 +670,59 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     error_at(field_assign->location, "Struct '" + obj_type.name + "' has no field '" +
                                          field_assign->field_name + "'.");
     return int_type();
+  }
+
+  if (const auto *array_lit = dynamic_cast<const ast::ArrayLiteralExpr *>(&expr)) {
+    Type element_type = null_type();
+    bool has_element_type = false;
+    for (const ast::ExprPtr &element : array_lit->elements) {
+      Type current = check_expr(*element);
+      if (!has_element_type || element_type.kind == TypeKind::Null) {
+        element_type = current;
+        has_element_type = true;
+        continue;
+      }
+      if (!current.is_compatible_with(element_type)) {
+        error_at(element->location, "Array elements must have compatible types.");
+        continue;
+      }
+      if (current.is_numeric() && element_type.is_numeric()) {
+        element_type = Type::promote(element_type, current);
+      }
+    }
+    return array_type(has_element_type ? element_type : null_type());
+  }
+
+  if (const auto *index_expr = dynamic_cast<const ast::IndexExpr *>(&expr)) {
+    Type object_type = check_expr(*index_expr->object);
+    Type index_type = check_expr(*index_expr->index);
+    if (index_type.kind != TypeKind::Int) {
+      error_at(index_expr->index->location, "Array index must be an Int.");
+    }
+    if (object_type.kind != TypeKind::Array || !object_type.element_type) {
+      error_at(index_expr->location, "Cannot index non-array type.");
+      return int_type();
+    }
+    return *object_type.element_type;
+  }
+
+  if (const auto *index_assign = dynamic_cast<const ast::IndexAssignExpr *>(&expr)) {
+    Type object_type = check_expr(*index_assign->object);
+    Type index_type = check_expr(*index_assign->index);
+    Type value_type = check_expr(*index_assign->value);
+    if (index_type.kind != TypeKind::Int) {
+      error_at(index_assign->index->location, "Array index must be an Int.");
+    }
+    if (object_type.kind != TypeKind::Array || !object_type.element_type) {
+      error_at(index_assign->location, "Cannot assign indexed value on non-array type.");
+      return value_type;
+    }
+    if (!value_type.is_compatible_with(*object_type.element_type)) {
+      error_at(index_assign->value->location,
+               "Cannot assign " + type_to_string(value_type) + " to array element of type " +
+                   type_to_string(*object_type.element_type) + ".");
+    }
+    return *object_type.element_type;
   }
 
   return int_type();

@@ -108,6 +108,13 @@ struct NullLiteralExpr final : Expr {
   void print(std::ostream &out, int indent = 0) const override;
 };
 
+struct ArrayLiteralExpr final : Expr {
+  ArrayLiteralExpr(SourceLocation location, std::vector<ExprPtr> elements);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::vector<ExprPtr> elements;
+};
+
 struct IdentifierExpr final : Expr {
   IdentifierExpr(SourceLocation location, std::string name);
   void print(std::ostream &out, int indent = 0) const override;
@@ -288,6 +295,23 @@ struct FieldAssignExpr final : Expr {
 
   ExprPtr object;
   std::string field_name;
+  ExprPtr value;
+};
+
+struct IndexExpr final : Expr {
+  IndexExpr(SourceLocation location, ExprPtr object, ExprPtr index);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr object;
+  ExprPtr index;
+};
+
+struct IndexAssignExpr final : Expr {
+  IndexAssignExpr(SourceLocation location, ExprPtr object, ExprPtr index, ExprPtr value);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr object;
+  ExprPtr index;
   ExprPtr value;
 };
 
