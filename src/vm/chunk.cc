@@ -94,9 +94,15 @@ void Chunk::disassemble(std::ostream &out) const {
       out << " +" << instruction.operand;
     } else if (instruction.op == OpCode::NativeOut) {
       out << " argc=" << instruction.operand;
+    } else if (instruction.op == OpCode::NativeOutLn) {
+      out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::NativeErr) {
       out << " argc=" << instruction.operand;
+    } else if (instruction.op == OpCode::NativeErrLn) {
+      out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::NativeIn) {
+      out << " argc=" << instruction.operand;
+    } else if (instruction.op == OpCode::NativeInSecret) {
       out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::ArrayNew) {
       out << " count=" << instruction.operand;
@@ -159,10 +165,16 @@ const char *opcode_name(OpCode op) {
     return "Ge";
   case OpCode::NativeOut:
     return "NativeOut";
+  case OpCode::NativeOutLn:
+    return "NativeOutLn";
   case OpCode::NativeErr:
     return "NativeErr";
+  case OpCode::NativeErrLn:
+    return "NativeErrLn";
   case OpCode::NativeIn:
     return "NativeIn";
+  case OpCode::NativeInSecret:
+    return "NativeInSecret";
   case OpCode::StructNew:
     return "StructNew";
   case OpCode::FieldGet:

@@ -507,6 +507,40 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       }
     }
 
+    // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
+    const auto *field_callee =
+        dynamic_cast<const ast::FieldAccessExpr *>(call_expr->callee.get());
+    if (field_callee) {
+      const auto *ns_obj =
+          dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
+      if (ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
+        if (ns_obj->member_name == "out" && field_callee->field_name == "line") {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr->args.size()),
+                       call_expr->location);
+          return;
+        }
+        if (ns_obj->member_name == "err" && field_callee->field_name == "line") {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr->args.size()),
+                       call_expr->location);
+          return;
+        }
+        if (ns_obj->member_name == "in" && field_callee->field_name == "secret") {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr->args.size()),
+                       call_expr->location);
+          return;
+        }
+      }
+    }
+
     // Generic function call
     if (callee_id && !call_expr->type_args.empty()) {
       std::string mangled = callee_id->name;

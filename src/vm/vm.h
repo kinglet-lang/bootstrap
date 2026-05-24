@@ -29,6 +29,8 @@ private:
   Value pop();
   VmResult runtime_error(std::string message) const;
   bool binary_numeric(OpCode op, std::string *error);
+  void disable_echo();
+  void restore_echo();
 
   std::vector<Value> stack_;
   std::vector<CallFrame> frames_;

@@ -5,6 +5,12 @@
 #include <string>
 #include <utility>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <termios.h>
+#include <unistd.h>
+#endif
 namespace kinglet {
 
 VmResult Vm::run(const Chunk &chunk) {
@@ -273,19 +279,18 @@ VmResult Vm::run(const Chunk &chunk) {
       push(Value::bool_value(result));
       break;
     }
-    case OpCode::NativeOut: {
+    case OpCode::NativeOut:
+    case OpCode::NativeOutLn: {
       const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
       if (stack_.size() < arg_count) {
         return runtime_error("Stack underflow for io::out.");
       }
 
-      // Pop all args (they're in reverse order on stack)
       std::vector<Value> args(arg_count);
       for (uint32_t i = 0; i < arg_count; ++i) {
         args[arg_count - 1 - i] = pop();
       }
 
-      // First arg is format string, rest are values
       if (!args.empty() && args[0].type == ValueType::String) {
         const std::string &fmt = args[0].string_storage;
         std::size_t val_idx = 1;
@@ -297,22 +302,25 @@ VmResult Vm::run(const Chunk &chunk) {
             } else {
               std::cout << "{}";
             }
-            ++pos; // skip closing }
+            ++pos;
           } else {
             std::cout << fmt[pos];
           }
         }
       } else {
-        // No format string, just print all args
         for (const Value &arg : args) {
           std::cout << arg;
         }
+      }
+      if (instruction.op == OpCode::NativeOutLn) {
+        std::cout << '\n';
       }
       std::cout << std::flush;
       push(Value::null_value());
       break;
     }
-    case OpCode::NativeErr: {
+    case OpCode::NativeErr:
+    case OpCode::NativeErrLn: {
       const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
       if (stack_.size() < arg_count) {
         return runtime_error("Stack underflow for io::err.");
@@ -342,13 +350,16 @@ VmResult Vm::run(const Chunk &chunk) {
           std::cerr << arg;
         }
       }
+      if (instruction.op == OpCode::NativeErrLn) {
+        std::cerr << '\n';
+      }
       std::cerr << std::flush;
       push(Value::null_value());
       break;
     }
-    case OpCode::NativeIn: {
+    case OpCode::NativeIn:
+    case OpCode::NativeInSecret: {
       const uint32_t argc = static_cast<uint32_t>(instruction.operand);
-      // Consume optional prompt argument from stack
       for (uint32_t i = 0; i < argc; ++i) {
         if (stack_.empty()) {
           return runtime_error("Stack underflow for io::in.");
@@ -358,11 +369,18 @@ VmResult Vm::run(const Chunk &chunk) {
           std::cout << prompt.string_storage << std::flush;
         }
       }
+      if (instruction.op == OpCode::NativeInSecret) {
+        disable_echo();
+      }
       std::string line;
       if (!std::getline(std::cin, line)) {
         push(Value::null_value());
       } else {
         push(Value::string_value(std::move(line)));
+      }
+      if (instruction.op == OpCode::NativeInSecret) {
+        restore_echo();
+        std::cout << '\n';
       }
       break;
     }
@@ -578,6 +596,34 @@ bool Vm::binary_numeric(OpCode op, std::string *error) {
     *error = "Invalid numeric opcode.";
     return false;
   }
+}
+
+void Vm::disable_echo() {
+#ifdef _WIN32
+  HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+  DWORD mode;
+  GetConsoleMode(h, &mode);
+  SetConsoleMode(h, mode & ~static_cast<DWORD>(ENABLE_ECHO_INPUT));
+#else
+  struct termios t;
+  tcgetattr(STDIN_FILENO, &t);
+  t.c_lflag &= ~ECHO;
+  tcsetattr(STDIN_FILENO, TCSANOW, &t);
+#endif
+}
+
+void Vm::restore_echo() {
+#ifdef _WIN32
+  HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+  DWORD mode;
+  GetConsoleMode(h, &mode);
+  SetConsoleMode(h, mode | ENABLE_ECHO_INPUT);
+#else
+  struct termios t;
+  tcgetattr(STDIN_FILENO, &t);
+  t.c_lflag |= ECHO;
+  tcsetattr(STDIN_FILENO, TCSANOW, &t);
+#endif
 }
 
 } // namespace kinglet
