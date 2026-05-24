@@ -8,7 +8,21 @@
 - [x] LSP diagnostics: wider underlines, document symbols, signature help
 - [x] LSP diagnostics: surface compiler warnings (unreachable code, unused vars, constant conditions)
 - [ ] Error message improvements (suggest `using io;` when `io::` used without it)
+
+## P1: Syntax & Expressiveness (WG21-inspired)
+
+- [ ] Array methods: `len()`, `push()`, `pop()`, `remove()`, `contains()`, `clear()`
+- [ ] Chained comparisons (P0893): `1 <= x <= 10` → parser desugars to `&&`
+- [ ] Pipeline operator (P2011): `data |> filter |> map |> sum`
+- [ ] Implicit return (P0927): last expression in block is the return value
+- [ ] Multi-dimensional subscript (P2169): `matrix[i, j]`
+- [ ] Structured unpacking (P1858): `let [a, b, ...rest] = arr;`
 - [ ] `using io::out;` selective import syntax
+- [ ] `guard` early-exit: `guard x > 0 else { return -1; }` — compiler enforces else must terminate
+- [ ] `once` lazy init block: memoize first evaluation, zero-cost on subsequent calls
+- [ ] `retry N { ... }` loop: built-in retry semantics with optional delay
+- [ ] Inline tests: `test "name" { ... }` blocks, compiled out in release, run with `kinglet test`
+- [ ] `scope` resource management: auto-call `.close()` on scope exit without RAII classes
 
 ## P2: Types & Patterns
 
@@ -18,23 +32,29 @@
 - [ ] Explicit binding with `let`
 - [ ] Structured binding patterns for structs, tuples, and arrays
 - [ ] Exhaustiveness and usefulness checking for pattern matching
-- [ ] NaN-boxing migration (optional)
+- [ ] Error propagation `?` operator (P2561): requires Result/Optional type
+- [ ] Zero-overhead optional (P2723): `int? x = null;` with niche optimization
+- [ ] `[[nodiscard]]` for functions (P1029): warn on unused return values
 
 ## P3: Stdlib & Toolchain
 
 - [ ] Trait system
 - [ ] Standard library
 - [ ] Module system / package manager
+- [ ] Closures / lambda
+- [ ] Map literals
 
 ## P4: Concurrency
 
+- [ ] Structured concurrency (P2504): `scope { spawn f(); spawn g(); }`
 - [ ] spawn / channel / select
 - [ ] Work-stealing scheduler
 
-## Known Gaps
+## P5: Performance & Safety
 
-- [ ] Closures / lambda
-- [ ] Map literals
+- [ ] NaN-boxing migration
+- [ ] Trivial relocatability (P1144 / P2786): move as memcpy
+- [ ] Lifetime safety profiles (P1179): partial borrow checking without full borrow checker
 - [ ] Consider visitor pattern for `dynamic_cast` dispatch
 
 ## Done

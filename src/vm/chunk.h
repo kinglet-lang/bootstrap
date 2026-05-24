@@ -48,6 +48,12 @@ enum class OpCode : uint8_t {
   ArrayNew,
   IndexGet,
   IndexSet,
+  ArrayLen,
+  ArrayPush,
+  ArrayPop,
+  ArrayRemove,
+  ArrayContains,
+  ArrayClear,
 };
 
 struct Instruction {

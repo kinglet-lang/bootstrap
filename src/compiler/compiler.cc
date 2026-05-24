@@ -541,6 +541,42 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       }
     }
 
+    // Handle array method calls: arr.len(), arr.push(x), etc.
+    if (field_callee) {
+      const std::string &method = field_callee->field_name;
+      if (method == "len" || method == "push" || method == "pop" ||
+          method == "remove" || method == "contains" || method == "clear") {
+        compile_expr(*field_callee->object);
+        if (method == "len") {
+          emit(OpCode::ArrayLen, call_expr->location);
+          return;
+        }
+        if (method == "push") {
+          compile_expr(*call_expr->args[0]);
+          emit(OpCode::ArrayPush, call_expr->location);
+          return;
+        }
+        if (method == "pop") {
+          emit(OpCode::ArrayPop, call_expr->location);
+          return;
+        }
+        if (method == "remove") {
+          compile_expr(*call_expr->args[0]);
+          emit(OpCode::ArrayRemove, call_expr->location);
+          return;
+        }
+        if (method == "contains") {
+          compile_expr(*call_expr->args[0]);
+          emit(OpCode::ArrayContains, call_expr->location);
+          return;
+        }
+        if (method == "clear") {
+          emit(OpCode::ArrayClear, call_expr->location);
+          return;
+        }
+      }
+    }
+
     // Generic function call
     if (callee_id && !call_expr->type_args.empty()) {
       std::string mangled = callee_id->name;

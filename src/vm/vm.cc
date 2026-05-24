@@ -509,6 +509,91 @@ VmResult Vm::run(const Chunk &chunk) {
       push(value);
       break;
     }
+    case OpCode::ArrayLen: {
+      Value array = pop();
+      if (array.type != ValueType::Array || !array.array_storage) {
+        return runtime_error("Cannot call len() on non-array value.");
+      }
+      push(Value::int_value(static_cast<int64_t>(array.array_storage->elements.size())));
+      break;
+    }
+    case OpCode::ArrayPush: {
+      Value value = pop();
+      Value array = pop();
+      if (array.type != ValueType::Array || !array.array_storage) {
+        return runtime_error("Cannot call push() on non-array value.");
+      }
+      array.array_storage->elements.push_back(value);
+      push(Value::null_value());
+      break;
+    }
+    case OpCode::ArrayPop: {
+      Value array = pop();
+      if (array.type != ValueType::Array || !array.array_storage) {
+        return runtime_error("Cannot call pop() on non-array value.");
+      }
+      if (array.array_storage->elements.empty()) {
+        return runtime_error("Cannot pop from empty array.");
+      }
+      Value last = array.array_storage->elements.back();
+      array.array_storage->elements.pop_back();
+      push(last);
+      break;
+    }
+    case OpCode::ArrayRemove: {
+      Value index = pop();
+      Value array = pop();
+      if (array.type != ValueType::Array || !array.array_storage) {
+        return runtime_error("Cannot call remove() on non-array value.");
+      }
+      if (index.type != ValueType::Int) {
+        return runtime_error("remove() index must be an integer.");
+      }
+      auto idx = index.int_value_storage;
+      if (idx < 0 || static_cast<std::size_t>(idx) >= array.array_storage->elements.size()) {
+        return runtime_error("remove() index out of bounds.");
+      }
+      Value removed = array.array_storage->elements[static_cast<std::size_t>(idx)];
+      array.array_storage->elements.erase(
+          array.array_storage->elements.begin() + idx);
+      push(removed);
+      break;
+    }
+    case OpCode::ArrayContains: {
+      Value needle = pop();
+      Value array = pop();
+      if (array.type != ValueType::Array || !array.array_storage) {
+        return runtime_error("Cannot call contains() on non-array value.");
+      }
+      bool found = false;
+      for (const auto &elem : array.array_storage->elements) {
+        if (elem.type == needle.type) {
+          if (elem.type == ValueType::Int && elem.int_value_storage == needle.int_value_storage) {
+            found = true; break;
+          }
+          if (elem.type == ValueType::String && elem.string_storage == needle.string_storage) {
+            found = true; break;
+          }
+          if (elem.type == ValueType::Bool && elem.bool_value_storage == needle.bool_value_storage) {
+            found = true; break;
+          }
+          if (elem.type == ValueType::Double && elem.double_value_storage == needle.double_value_storage) {
+            found = true; break;
+          }
+        }
+      }
+      push(Value::bool_value(found));
+      break;
+    }
+    case OpCode::ArrayClear: {
+      Value array = pop();
+      if (array.type != ValueType::Array || !array.array_storage) {
+        return runtime_error("Cannot call clear() on non-array value.");
+      }
+      array.array_storage->elements.clear();
+      push(Value::null_value());
+      break;
+    }
     }
   }
 

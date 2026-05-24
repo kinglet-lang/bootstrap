@@ -115,6 +115,9 @@ run_case "io_methods" "run" 0 $'hello world\n1 + 2 = 3\nno newline here\ndone\n'
 # --- Warnings ---
 run_case "warnings" "run" 0 "" $'4:6: warning: Condition is always true.\n8:9: warning: Condition is always false; loop body never executes.\n9:5: warning: Unused variable \'x\'.\n13:3: warning: Unreachable code.\n2:3: warning: Unused variable \'unused\'.\n'
 
+# --- Array Methods ---
+run_case "array_methods" "run" 0 $'len: 5\nafter push: len = 6\npopped: 6\nremoved at 0: 1\ncontains 3: true\ncontains 99: false\nafter clear: len = 0\n' ""
+
 if [[ "$FAILURES" -ne 0 ]]; then
   echo "$FAILURES CLI golden test(s) failed." >&2
   exit 1

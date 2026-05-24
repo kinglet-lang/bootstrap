@@ -189,6 +189,18 @@ const char *opcode_name(OpCode op) {
     return "IndexGet";
   case OpCode::IndexSet:
     return "IndexSet";
+  case OpCode::ArrayLen:
+    return "ArrayLen";
+  case OpCode::ArrayPush:
+    return "ArrayPush";
+  case OpCode::ArrayPop:
+    return "ArrayPop";
+  case OpCode::ArrayRemove:
+    return "ArrayRemove";
+  case OpCode::ArrayContains:
+    return "ArrayContains";
+  case OpCode::ArrayClear:
+    return "ArrayClear";
   }
   return "Unknown";
 }

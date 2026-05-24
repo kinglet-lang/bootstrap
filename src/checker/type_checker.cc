@@ -535,6 +535,68 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
+    // Handle array method calls: arr.len(), arr.push(x), etc.
+    if (field_callee) {
+      Type obj_type = check_expr(*field_callee->object);
+      if (obj_type.kind == TypeKind::Array) {
+        const std::string &method = field_callee->field_name;
+        if (method == "len") {
+          if (!call_expr->args.empty()) {
+            error_at(call_expr->location, "len() takes no arguments.");
+          }
+          return int_type();
+        }
+        if (method == "push") {
+          if (call_expr->args.size() != 1) {
+            error_at(call_expr->location, "push() takes exactly 1 argument.");
+          } else if (obj_type.element_type) {
+            Type arg_type = check_expr(*call_expr->args[0]);
+            if (!arg_type.is_compatible_with(*obj_type.element_type)) {
+              error_at(call_expr->args[0]->location,
+                       "push() expects " + type_to_string(*obj_type.element_type) +
+                           ", got " + type_to_string(arg_type) + ".");
+            }
+          }
+          return void_type();
+        }
+        if (method == "pop") {
+          if (!call_expr->args.empty()) {
+            error_at(call_expr->location, "pop() takes no arguments.");
+          }
+          if (obj_type.element_type) return *obj_type.element_type;
+          return int_type();
+        }
+        if (method == "remove") {
+          if (call_expr->args.size() != 1) {
+            error_at(call_expr->location, "remove() takes exactly 1 argument.");
+          } else {
+            Type arg_type = check_expr(*call_expr->args[0]);
+            if (arg_type.kind != TypeKind::Int) {
+              error_at(call_expr->args[0]->location, "remove() index must be Int.");
+            }
+          }
+          if (obj_type.element_type) return *obj_type.element_type;
+          return int_type();
+        }
+        if (method == "contains") {
+          if (call_expr->args.size() != 1) {
+            error_at(call_expr->location, "contains() takes exactly 1 argument.");
+          } else {
+            check_expr(*call_expr->args[0]);
+          }
+          return bool_type();
+        }
+        if (method == "clear") {
+          if (!call_expr->args.empty()) {
+            error_at(call_expr->location, "clear() takes no arguments.");
+          }
+          return void_type();
+        }
+        error_at(call_expr->location, "Array has no method '" + method + "'.");
+        return int_type();
+      }
+    }
+
     if (!call_expr->type_args.empty()) {
       const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr->callee.get());
       if (callee_id) {
@@ -672,6 +734,15 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     }
 
     Type obj_type = check_expr(*field_access->object);
+    if (obj_type.kind == TypeKind::Array) {
+      const std::string &method = field_access->field_name;
+      if (method == "len" || method == "push" || method == "pop" ||
+          method == "remove" || method == "contains" || method == "clear") {
+        return void_type();
+      }
+      error_at(field_access->location, "Array has no method '" + method + "'.");
+      return int_type();
+    }
     if (obj_type.kind != TypeKind::Struct) {
       error_at(field_access->location, "Cannot access field on non-struct type.");
       return int_type();

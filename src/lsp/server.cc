@@ -256,12 +256,28 @@ json::Value Server::handle_completion(const json::Value &params) {
         return json::Value(items);
       }
 
-      // Regular struct field completion
+      // Regular struct field completion or array method completion
       if (start < end) {
         std::string var_name = line_text.substr(static_cast<std::size_t>(start), static_cast<std::size_t>(end - start));
         auto visible_syms = doc->analysis.symbols.visible_at(line + 1);
         for (const auto *sym : visible_syms) {
           if (sym->name == var_name && !sym->type_name.empty()) {
+            if (sym->type_name.size() >= 2 &&
+                sym->type_name.substr(sym->type_name.size() - 2) == "[]") {
+              items.push_back(protocol::snippet_item_with_edit("len", 2, "int — array length",
+                  "len()", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("push", 2, "void — append element",
+                  "push($1)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("pop", 2, "T — remove last element",
+                  "pop()", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("remove", 2, "T — remove at index",
+                  "remove($1)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("contains", 2, "bool — check membership",
+                  "contains($1)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("clear", 2, "void — remove all elements",
+                  "clear()", line, character, character));
+              return json::Value(items);
+            }
             for (const auto *type_sym : visible_syms) {
               if (type_sym->kind == SymbolKind::Struct && type_sym->name == sym->type_name) {
                 for (const auto &field : type_sym->fields) {
