@@ -166,8 +166,8 @@ Token Scanner::make_token(TokenType type) const {
       .lexeme = std::string_view(source_).substr(start_, current_ - start_),
       .line = token_line_,
       .column = token_column_,
+      .int_value = 0,
   };
-  token.int_value = 0;
   return token;
 }
 
@@ -177,8 +177,8 @@ Token Scanner::make_error(std::string_view message) const {
       .lexeme = message,
       .line = token_line_,
       .column = token_column_,
+      .int_value = 0,
   };
-  token.int_value = 0;
   return token;
 }
 

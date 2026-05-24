@@ -17,7 +17,7 @@ namespace kinglet {
 VmResult Vm::run(const Chunk &chunk) {
   stack_.clear();
   frames_.clear();
-  frames_.push_back(CallFrame{.chunk = &chunk, .ip = 0});
+  frames_.push_back(CallFrame{.chunk = &chunk, .ip = 0, .locals = {}});
 
   while (!frames_.empty()) {
     CallFrame &frame = frames_.back();
@@ -772,7 +772,7 @@ void Vm::disable_echo() {
 #else
   struct termios t;
   tcgetattr(STDIN_FILENO, &t);
-  t.c_lflag &= ~ECHO;
+  t.c_lflag &= ~static_cast<tcflag_t>(ECHO);
   tcsetattr(STDIN_FILENO, TCSANOW, &t);
 #endif
 }
