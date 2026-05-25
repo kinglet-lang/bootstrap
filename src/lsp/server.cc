@@ -226,18 +226,9 @@ json::Value Server::handle_completion(const json::Value &params) {
   }
 
   if (ns_name == "io" && (doc->analysis.used_namespaces.count("io") || doc->analysis.opened_namespaces.count("io"))) {
-    if (in_pipeline) {
-      items.push_back(protocol::completion_item_with_edit("out", 3, "stdout output, no newline", line, character, character));
-      items.push_back(protocol::completion_item_with_edit("err", 3, "stderr output", line, character, character));
-      items.push_back(protocol::completion_item_with_edit("in", 3, "stdin input", line, character, character));
-    } else {
-      items.push_back(protocol::snippet_item_with_edit("out", 3, "stdout output, no newline",
-          "out($1)", line, character, character));
-      items.push_back(protocol::snippet_item_with_edit("err", 3, "stderr output",
-          "err($1)", line, character, character));
-      items.push_back(protocol::snippet_item_with_edit("in", 3, "stdin input",
-          "in($1)", line, character, character));
-    }
+    items.push_back(protocol::completion_item_with_edit("out", 3, "stdout output", line, character, character));
+    items.push_back(protocol::completion_item_with_edit("err", 3, "stderr output", line, character, character));
+    items.push_back(protocol::completion_item_with_edit("in", 3, "stdin input", line, character, character));
     return json::Value(items);
   }
 
@@ -315,6 +306,31 @@ json::Value Server::handle_completion(const json::Value &params) {
                   "slice($1, $2)", line, character, character));
               items.push_back(protocol::snippet_item_with_edit("reverse", 2, "void — reverse in place",
                   "reverse()", line, character, character));
+              return json::Value(items);
+            }
+            if (sym->type_name == "string") {
+              items.push_back(protocol::snippet_item_with_edit("len", 2, "int — string length",
+                  "len()", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("contains", 2, "bool — check substring",
+                  "contains($1)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("starts_with", 2, "bool — check prefix",
+                  "starts_with($1)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("ends_with", 2, "bool — check suffix",
+                  "ends_with($1)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("index_of", 2, "int — find substring (-1 if not found)",
+                  "index_of($1)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("slice", 2, "string — substring from start to end",
+                  "slice($1, $2)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("replace", 2, "string — replace all occurrences",
+                  "replace($1, $2)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("split", 2, "string[] — split by delimiter",
+                  "split($1)", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("trim", 2, "string — remove leading/trailing whitespace",
+                  "trim()", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("to_upper", 2, "string — convert to uppercase",
+                  "to_upper()", line, character, character));
+              items.push_back(protocol::snippet_item_with_edit("to_lower", 2, "string — convert to lowercase",
+                  "to_lower()", line, character, character));
               return json::Value(items);
             }
             for (const auto *type_sym : visible_syms) {
