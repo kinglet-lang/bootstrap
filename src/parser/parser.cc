@@ -764,10 +764,22 @@ ast::ExprPtr Parser::match_expression(ast::ExprPtr value) {
 
   std::vector<ast::MatchArm> arms;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
-    ast::ExprPtr pattern = expression();
+    ast::ExprPtr pattern;
+    if (match(TokenType::LET)) {
+      const Token &name_token = consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
+      pattern = std::make_unique<ast::BindingPattern>(location_of(name_token), std::string(name_token.lexeme));
+    } else {
+      pattern = expression();
+    }
+    ast::ExprPtr guard;
+    if (match(TokenType::IF)) {
+      consume(TokenType::LEFT_PAREN, "Expected '(' after 'if' in guard.");
+      guard = expression();
+      consume(TokenType::RIGHT_PAREN, "Expected ')' after guard condition.");
+    }
     consume(TokenType::FAT_ARROW, "Expected '=>' after match pattern.");
     ast::ExprPtr body = expression();
-    arms.push_back(ast::MatchArm{std::move(pattern), std::move(body)});
+    arms.push_back(ast::MatchArm{std::move(pattern), std::move(guard), std::move(body)});
     if (!check(TokenType::RIGHT_BRACE)) {
       consume(TokenType::COMMA, "Expected ',' after match arm.");
     }

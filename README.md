@@ -124,21 +124,13 @@ if x > 0 { ... } else { ... }
 while count > 0 { ... }
 for (int i = 0; i < 10; i = i + 1) { ... }
 
-// Pattern matching (currently literal patterns plus wildcard)
-string r = inspect value {
+// Pattern matching (P2688R5-style postfix match)
+string r = value match {
   0 => "zero",
   1 => "one",
+  let x if x > 50 => "big",
   _ => "other",
 };
-
-// Direction: align with WG21 P2688R5's match expression model.
-// Planned shape:
-// string q = point match {
-//   Point(.x, .y) if (x == y) => "diagonal";
-//   Point(.x, 0) => "on x-axis";
-//   Point(0, .y) => "on y-axis";
-//   _ => "somewhere else";
-// };
 
 // I/O
 using io;

@@ -159,8 +159,16 @@ struct CallExpr final : Expr {
   std::vector<ExprPtr> args;
 };
 
+struct BindingPattern final : Expr {
+  BindingPattern(SourceLocation location, std::string name);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string name;
+};
+
 struct MatchArm {
   ExprPtr pattern;
+  ExprPtr guard;
   ExprPtr body;
 };
 

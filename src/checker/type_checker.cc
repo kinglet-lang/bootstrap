@@ -885,17 +885,38 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     return callee_type.return_type ? *callee_type.return_type : int_type();
   }
 
+  if (const auto *binding = dynamic_cast<const ast::BindingPattern *>(&expr)) {
+    (void)binding;
+    return null_type();
+  }
+
   if (const auto *match_expr = dynamic_cast<const ast::MatchExpr *>(&expr)) {
     Type value_type = check_expr(*match_expr->value);
     Type result_type = null_type();
     for (const ast::MatchArm &arm : match_expr->arms) {
-      Type pattern_type = check_expr(*arm.pattern);
-      if (pattern_type.kind != TypeKind::Null && !pattern_type.is_compatible_with(value_type)) {
-        error_at(arm.pattern->location, "Pattern type " + type_to_string(pattern_type) +
-                                            " does not match value type " +
-                                            type_to_string(value_type) + ".");
+      const auto *binding = dynamic_cast<const ast::BindingPattern *>(arm.pattern.get());
+      if (binding) {
+        push_scope();
+        declare_var(binding->name, value_type, false, binding->location);
+      }
+      if (!binding) {
+        Type pattern_type = check_expr(*arm.pattern);
+        if (pattern_type.kind != TypeKind::Null && !pattern_type.is_compatible_with(value_type)) {
+          error_at(arm.pattern->location, "Pattern type " + type_to_string(pattern_type) +
+                                              " does not match value type " +
+                                              type_to_string(value_type) + ".");
+        }
+      }
+      if (arm.guard) {
+        Type guard_type = check_expr(*arm.guard);
+        if (guard_type.kind != TypeKind::Bool) {
+          error_at(arm.guard->location, "Guard expression must be bool.");
+        }
       }
       Type body_type = check_expr(*arm.body);
+      if (binding) {
+        pop_scope();
+      }
       if (result_type.kind == TypeKind::Null) {
         result_type = body_type;
       }

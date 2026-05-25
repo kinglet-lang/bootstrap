@@ -204,6 +204,14 @@ void CallExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+BindingPattern::BindingPattern(SourceLocation location, std::string name)
+    : Expr(location), name(std::move(name)) {}
+
+void BindingPattern::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(let " << name << ")";
+}
+
 MatchExpr::MatchExpr(SourceLocation location, ExprPtr value, std::vector<MatchArm> arms)
     : Expr(location), value(std::move(value)), arms(std::move(arms)) {}
 

@@ -757,18 +757,58 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     std::vector<std::size_t> end_jumps;
     for (const ast::MatchArm &arm : match_expr->arms) {
       const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(arm.pattern.get());
+      const auto *binding = dynamic_cast<const ast::BindingPattern *>(arm.pattern.get());
+
       if (identifier && identifier->name == "_") {
+        if (arm.guard) {
+          compile_expr(*arm.guard);
+          const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
+          emit(OpCode::Pop, match_expr->location);
+          compile_expr(*arm.body);
+          end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
+          patch_jump(next_arm);
+        } else {
+          emit(OpCode::Pop, match_expr->location);
+          compile_expr(*arm.body);
+        }
+      } else if (binding) {
+        const uint32_t bind_slot = static_cast<uint32_t>(locals_.size());
+        locals_.push_back(Local{.name = binding->name, .is_mutable = false});
+        emit_operand(OpCode::LoadLocal, temp_slot, match_expr->location);
+        emit_operand(OpCode::StoreLocal, bind_slot, match_expr->location);
         emit(OpCode::Pop, match_expr->location);
-        compile_expr(*arm.body);
+        if (arm.guard) {
+          compile_expr(*arm.guard);
+          const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
+          emit(OpCode::Pop, match_expr->location);
+          compile_expr(*arm.body);
+          end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
+          patch_jump(next_arm);
+        } else {
+          compile_expr(*arm.body);
+        }
+        locals_.pop_back();
       } else {
         emit_operand(OpCode::LoadLocal, temp_slot, match_expr->location);
         compile_expr(*arm.pattern);
         emit(OpCode::Eq, match_expr->location);
-        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
-        emit(OpCode::Pop, match_expr->location);
-        compile_expr(*arm.body);
-        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
-        patch_jump(next_arm);
+        if (arm.guard) {
+          const std::size_t skip_guard = emit_jump(OpCode::JmpFalse, match_expr->location);
+          emit(OpCode::Pop, match_expr->location);
+          compile_expr(*arm.guard);
+          const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
+          emit(OpCode::Pop, match_expr->location);
+          compile_expr(*arm.body);
+          end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
+          patch_jump(next_arm);
+          patch_jump(skip_guard);
+        } else {
+          const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
+          emit(OpCode::Pop, match_expr->location);
+          compile_expr(*arm.body);
+          end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
+          patch_jump(next_arm);
+        }
       }
     }
 
