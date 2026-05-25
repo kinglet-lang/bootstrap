@@ -15,7 +15,6 @@
 - [x] Chained comparisons (P0893): `1 <= x <= 10` → parser desugars to `&&`
 - [x] Pipeline operator (P2011): `data |> filter |> map |> sum`
 - [x] Implicit return (P0927): last expression in block is the return value
-- [ ] Multi-dimensional subscript (P2169): `matrix[i, j]`
 - [x] Structured unpacking (P1858): `let [a, b, ...rest] = arr;`
 - [x] `guard` early-exit: `guard x > 0 else { return -1; }` — compiler enforces else must terminate
 - [ ] `once` lazy init block: memoize first evaluation, zero-cost on subsequent calls
