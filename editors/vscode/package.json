@@ -2,7 +2,7 @@
   "name": "kinglet",
   "displayName": "Kinglet Language Support",
   "description": "Kinglet language support — syntax highlighting, diagnostics, LSP",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "publisher": "kinglet",
   "repository": {
     "type": "git",
