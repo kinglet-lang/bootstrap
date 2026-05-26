@@ -2,6 +2,7 @@
 
 #include "lexer/scanner.h"
 #include "lsp/protocol.h"
+#include "module/module_loader.h"
 
 #include <cctype>
 #include <filesystem>
@@ -252,6 +253,84 @@ json::Value Server::handle_completion(const json::Value &params) {
                 static_cast<int>(quote_pos) + 1, character));
           }
           if (!items.empty()) return json::Value(items);
+        }
+      }
+    }
+  }
+
+  // Selective import completion: import "file.kl" { ... }
+  {
+    // Scan full text before cursor for import pattern
+    std::string text_before;
+    {
+      std::istringstream s2(doc->text);
+      std::string ln;
+      int cur = 0;
+      while (std::getline(s2, ln)) {
+        if (cur < line) {
+          text_before += ln + "\n";
+        } else if (cur == line) {
+          text_before += ln.substr(0, static_cast<std::size_t>(character));
+          break;
+        }
+        ++cur;
+      }
+    }
+
+    // Find the last "import" before an unclosed "{"
+    auto import_pos = text_before.rfind("import");
+    if (import_pos != std::string::npos) {
+      auto quote_open = text_before.find('"', import_pos);
+      if (quote_open != std::string::npos) {
+        auto quote_close = text_before.find('"', quote_open + 1);
+        if (quote_close != std::string::npos) {
+          std::string import_path = text_before.substr(quote_open + 1, quote_close - quote_open - 1);
+          auto brace_pos = text_before.find('{', quote_close);
+          if (brace_pos != std::string::npos) {
+            auto close_brace = text_before.find('}', brace_pos);
+            if (close_brace == std::string::npos) {
+              // We're inside import { ... } — suggest public symbols
+              std::filesystem::path current_path = uri_to_path(uri);
+              std::string base_dir = current_path.parent_path().string();
+              ModuleLoader loader(base_dir);
+              auto load_result = loader.load(import_path);
+              if (load_result.module) {
+                // Collect already-listed symbols
+                std::set<std::string> already;
+                std::string after_brace = text_before.substr(brace_pos + 1);
+                std::size_t p = 0;
+                while (p < after_brace.size()) {
+                  while (p < after_brace.size() && !std::isalnum(static_cast<unsigned char>(after_brace[p])) && after_brace[p] != '_') ++p;
+                  std::size_t start = p;
+                  while (p < after_brace.size() && (std::isalnum(static_cast<unsigned char>(after_brace[p])) || after_brace[p] == '_')) ++p;
+                  if (start < p) already.insert(after_brace.substr(start, p - start));
+                }
+
+                for (const auto *fn : load_result.module->public_functions) {
+                  if (already.count(fn->name)) continue;
+                  if (!prefix.empty() && fn->name.find(prefix) == std::string::npos) continue;
+                  std::string detail = fn->return_type.to_string() + " " + fn->name + "(";
+                  for (std::size_t i = 0; i < fn->params.size(); ++i) {
+                    if (i > 0) detail += ", ";
+                    detail += fn->params[i].type.to_string() + " " + fn->params[i].name;
+                  }
+                  detail += ")";
+                  items.push_back(protocol::completion_item(fn->name, 3, detail));
+                }
+                for (const auto *sd : load_result.module->public_structs) {
+                  if (already.count(sd->name)) continue;
+                  if (!prefix.empty() && sd->name.find(prefix) == std::string::npos) continue;
+                  items.push_back(protocol::completion_item(sd->name, 22, "struct " + sd->name));
+                }
+                for (const auto *ed : load_result.module->public_enums) {
+                  if (already.count(ed->name)) continue;
+                  if (!prefix.empty() && ed->name.find(prefix) == std::string::npos) continue;
+                  items.push_back(protocol::completion_item(ed->name, 13, "enum " + ed->name));
+                }
+                if (!items.empty()) return json::Value(items);
+              }
+            }
+          }
         }
       }
     }
