@@ -66,6 +66,8 @@ private:
   std::vector<TypeError> errors_;
   std::unordered_set<std::string> used_;    // using io;
   std::unordered_set<std::string> opened_;  // using namespace io;
+  std::unordered_set<std::string> imported_namespaces_;
+  std::unordered_set<std::string> imported_bare_names_;  // for selective imports
   int loop_depth_ = 0;
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
   ModuleLoader *module_loader_ = nullptr;

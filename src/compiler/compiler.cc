@@ -325,12 +325,6 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     if (expr_stmt == implicit_return_stmt_) {
       emit(OpCode::Return, expr_stmt->location);
     } else {
-      if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr_stmt->expr.get())) {
-        const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get());
-        if (ns && imported_namespaces_.count(ns->namespace_name)) {
-          warning_at(expr_stmt->location, "Return value of function call is discarded.");
-        }
-      }
       emit(OpCode::Pop, expr_stmt->location);
     }
     return;

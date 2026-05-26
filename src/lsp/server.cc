@@ -191,7 +191,14 @@ static std::string uri_to_path(const std::string &uri) {
 
 void Server::ensure_analyzed(Document &doc) {
   if (!doc.dirty) return;
-  doc.analysis = analyze(doc.text, uri_to_path(doc.uri));
+  auto new_analysis = analyze(doc.text, uri_to_path(doc.uri));
+  // If re-analysis lost import information (e.g. due to parse errors),
+  // preserve it from the previous analysis so completion still works.
+  if (new_analysis.imported_namespaces.empty() && !doc.analysis.imported_namespaces.empty()) {
+    new_analysis.imported_namespaces = std::move(doc.analysis.imported_namespaces);
+    new_analysis.imported_symbols = std::move(doc.analysis.imported_symbols);
+  }
+  doc.analysis = std::move(new_analysis);
   doc.dirty = false;
 }
 
@@ -353,15 +360,21 @@ json::Value Server::handle_completion(const json::Value &params) {
   }
 
   std::string ns_name;
-  if (character >= 2) {
-    int pos = character - 1;
-    if (pos < static_cast<int>(line_text.size()) && line_text[static_cast<std::size_t>(pos)] == ':') {
-      int end = pos;
-      if (end >= 1 && line_text[static_cast<std::size_t>(end - 1)] == ':') --end;
-      int start = end;
-      while (start > 0 && std::isalnum(static_cast<unsigned char>(line_text[static_cast<std::size_t>(start - 1)])))
+  bool is_double_colon = false;
+  int ns_start_char = 0;
+  {
+    std::string before_cursor = line_text.substr(0, static_cast<std::size_t>(character));
+    auto colons = before_cursor.rfind("::");
+    if (colons != std::string::npos) {
+      is_double_colon = true;
+      // Extract identifier before ::
+      int start = static_cast<int>(colons) - 1;
+      while (start >= 0 && std::isalnum(static_cast<unsigned char>(line_text[static_cast<std::size_t>(start)])))
         --start;
-      if (start < end) ns_name = line_text.substr(static_cast<std::size_t>(start), static_cast<std::size_t>(end - start));
+      ++start;
+      ns_start_char = start;
+      if (start < static_cast<int>(colons))
+        ns_name = line_text.substr(static_cast<std::size_t>(start), static_cast<std::size_t>(colons) - static_cast<std::size_t>(start));
     }
   }
 
@@ -372,7 +385,7 @@ json::Value Server::handle_completion(const json::Value &params) {
     return json::Value(items);
   }
 
-  if (doc->analysis.imported_namespaces.count(ns_name)) {
+  if (is_double_colon && doc->analysis.imported_namespaces.count(ns_name)) {
     auto it = doc->analysis.imported_symbols.find(ns_name);
     if (it != doc->analysis.imported_symbols.end()) {
       for (const auto &sym : it->second) {
@@ -380,26 +393,59 @@ json::Value Server::handle_completion(const json::Value &params) {
         if (sym.kind == SymbolKind::Function) kind = 3;
         else if (sym.kind == SymbolKind::Struct) kind = 22;
         else if (sym.kind == SymbolKind::Enum) kind = 13;
-        std::string detail = sym.type_name;
+        std::string qualified = ns_name + "::" + sym.name;
+        json::Object item;
+        item["label"] = json::Value::string(sym.name);
+        item["kind"] = json::Value::number(kind);
+        item["filterText"] = json::Value::string(qualified);
         if (sym.kind == SymbolKind::Function) {
-          detail = sym.return_type + " " + sym.name + "(";
+          std::string detail = sym.return_type + " " + sym.name + "(";
           for (std::size_t i = 0; i < sym.params.size(); ++i) {
             if (i > 0) detail += ", ";
             detail += sym.params[i].type.to_string() + " " + sym.params[i].name;
           }
           detail += ")";
-          std::string snippet = sym.name + "(";
+          item["detail"] = json::Value::string(detail);
+          std::string snippet = qualified + "(";
           for (std::size_t i = 0; i < sym.params.size(); ++i) {
             if (i > 0) snippet += ", ";
             snippet += "${" + std::to_string(i + 1) + ":" + sym.params[i].name + "}";
           }
           snippet += ")";
-          items.push_back(protocol::completion_item(sym.name, kind, detail, snippet, 2));
+          item["insertTextFormat"] = json::Value::number(2);
+          json::Object text_edit;
+          text_edit["range"] = protocol::range(line, ns_start_char, line, character);
+          text_edit["newText"] = json::Value::string(snippet);
+          item["textEdit"] = json::Value(text_edit);
         } else {
-          items.push_back(protocol::completion_item(sym.name, kind, detail));
+          item["detail"] = json::Value::string(sym.type_name);
+          json::Object text_edit;
+          text_edit["range"] = protocol::range(line, ns_start_char, line, character);
+          text_edit["newText"] = json::Value::string(qualified);
+          item["textEdit"] = json::Value(text_edit);
         }
+        items.push_back(json::Value(item));
       }
       return json::Value(items);
+    }
+  }
+
+  // When prefix matches an imported namespace, show the namespace as a module
+  // item that inserts "ns::" and re-triggers completion for the second stage.
+  if (!is_double_colon) {
+    for (const auto &ns : doc->analysis.imported_namespaces) {
+      if (!prefix.empty() && ns.find(prefix) == 0) {
+        json::Object item;
+        item["label"] = json::Value::string(ns);
+        item["kind"] = json::Value::number(9);
+        item["detail"] = json::Value::string("module " + ns);
+        item["insertText"] = json::Value::string(ns + "::");
+        json::Object cmd;
+        cmd["title"] = json::Value::string("");
+        cmd["command"] = json::Value::string("editor.action.triggerSuggest");
+        item["command"] = json::Value(cmd);
+        items.push_back(json::Value(item));
+      }
     }
   }
 
@@ -692,6 +738,12 @@ json::Value Server::handle_completion(const json::Value &params) {
   auto visible = doc->analysis.symbols.visible_at(line + 1);
   for (const auto *sym : visible) {
     if (!prefix.empty() && sym->name.find(prefix) == std::string::npos) continue;
+    // When user has typed :: on this line, only show qualified (::) symbols.
+    // When :: is not on the line, hide qualified symbols to avoid clutter.
+    bool has_colons = is_double_colon ||
+        line_text.substr(0, static_cast<std::size_t>(character)).find("::") != std::string::npos;
+    bool sym_is_qualified = sym->name.find("::") != std::string::npos;
+    if (sym_is_qualified != has_colons) continue;
     int kind = 6;
     if (sym->kind == SymbolKind::Function) kind = 3;
     else if (sym->kind == SymbolKind::Struct) kind = 22;

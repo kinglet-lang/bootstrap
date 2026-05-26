@@ -1,8 +1,1 @@
-using io;
-
-int main() {
-  string s = "hello" + "world";
-  s.index_of("ello");
-  "password" |> io::in.secret |> io::out.line;
-  return 0;
-}
+import "math.kl" { add, sub, add }

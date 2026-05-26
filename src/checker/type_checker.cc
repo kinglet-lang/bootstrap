@@ -192,6 +192,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         if (result.module) {
           const auto &mod = *result.module;
           std::string ns = import_decl->alias.empty() ? mod.namespace_name : import_decl->alias;
+          imported_namespaces_.insert(ns);
           for (const auto *fn : mod.public_functions) {
             if (!import_decl->selected_symbols.empty()) {
               bool found = false;
@@ -214,6 +215,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               ft2.param_types = func_type.param_types;
               ft2.return_type = std::make_unique<Type>(*func_type.return_type);
               declare_var(fn->name, ft2, false);
+              imported_bare_names_.insert(fn->name);
             }
           }
         }
@@ -345,6 +347,19 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
       bool suppress = false;
       if (expr_stmt == implicit_return_stmt_)
         suppress = true;
+      // Don't suppress for imported function calls — the semicolon
+      // suggests intentional discard, even when auto-returned.
+      if (suppress) {
+        if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr_stmt->expr.get())) {
+          if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get())) {
+            if (imported_namespaces_.count(ns->namespace_name))
+              suppress = false;
+          } else if (const auto *var = dynamic_cast<const ast::IdentifierExpr *>(call->callee.get())) {
+            if (imported_bare_names_.count(var->name))
+              suppress = false;
+          }
+        }
+      }
       if (dynamic_cast<const ast::AssignExpr *>(expr_stmt->expr.get()))
         suppress = true;
       if (dynamic_cast<const ast::FieldAssignExpr *>(expr_stmt->expr.get()))
@@ -491,6 +506,10 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         return fn;
       }
     }
+    // Check for imported function (e.g. math::add)
+    auto imported = lookup_var(ns_access->namespace_name + "::" + ns_access->member_name);
+    if (imported.has_value()) return *imported;
+
     auto enum_type = lookup_type(ns_access->namespace_name);
     if (enum_type.has_value() && enum_type->kind == TypeKind::Enum) {
       bool found = false;

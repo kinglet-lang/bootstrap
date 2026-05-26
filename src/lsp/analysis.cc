@@ -176,16 +176,8 @@ AnalysisResult analyze(const std::string &source, const std::string &file_path) 
     }
   }
 
-  if (!parse_result.errors.empty() || !parse_result.program) {
-    if (parse_result.program) {
-      SymbolCollector collector;
-      collector.collect(*parse_result.program);
-      result.symbols = collector.take();
-    }
-    return result;
-  }
-
-  // Set up ModuleLoader for import resolution
+  // Set up ModuleLoader for import resolution (before parse error check so
+  // imported_symbols are available even when the file has parse errors)
   std::unique_ptr<ModuleLoader> module_loader;
   if (!file_path.empty()) {
     std::filesystem::path p(file_path);
@@ -194,15 +186,8 @@ AnalysisResult analyze(const std::string &source, const std::string &file_path) 
     module_loader->register_source_file(file_path);
   }
 
-  TypeChecker checker;
-  if (module_loader) checker.set_module_loader(module_loader.get());
-  auto type_result = checker.check(*parse_result.program);
-  for (const auto &err : type_result.errors) {
-    result.diagnostics.push_back({err.location.line, err.location.column, err.location.length, err.message, static_cast<int>(err.severity)});
-  }
-
-  // Collect symbols from imported modules (cached by ModuleLoader)
-  if (module_loader) {
+  // Collect symbols from imported modules (always, even with parse errors)
+  if (module_loader && parse_result.program) {
     for (const auto &decl : parse_result.program->declarations) {
       const auto *imp = dynamic_cast<const ast::ImportDecl *>(decl.get());
       if (!imp) continue;
@@ -210,7 +195,7 @@ AnalysisResult analyze(const std::string &source, const std::string &file_path) 
       if (!load_result.module) {
         result.diagnostics.push_back({
             imp->location.line, imp->location.column,
-            1, load_result.error, 1  // severity=Error
+            1, load_result.error, 1
         });
         continue;
       }
@@ -263,35 +248,58 @@ AnalysisResult analyze(const std::string &source, const std::string &file_path) 
     }
   }
 
+  auto register_imported_symbols = [&result] {
+    // Register imported symbols with qualified names for hover / definition
+    for (const auto &[ns, syms] : result.imported_symbols) {
+      for (auto sym : syms) {
+        sym.name = ns + "::" + sym.name;
+        sym.scope_start_line = 0;
+        sym.scope_end_line = 999999;
+        result.symbols.symbols.push_back(std::move(sym));
+      }
+    }
+  };
+
+  auto register_selective_bare_names = [&result](const ast::Program &program) {
+    for (const auto &decl : program.declarations) {
+      const auto *imp = dynamic_cast<const ast::ImportDecl *>(decl.get());
+      if (!imp || imp->selected_symbols.empty()) continue;
+      std::string ns = imp->alias.empty()
+          ? std::filesystem::path(imp->path).stem().string()
+          : imp->alias;
+      auto it = result.imported_symbols.find(ns);
+      if (it == result.imported_symbols.end()) continue;
+      for (auto sym : it->second) {
+        sym.scope_start_line = 0;
+        sym.scope_end_line = 999999;
+        result.symbols.symbols.push_back(std::move(sym));
+      }
+    }
+  };
+
+  if (!parse_result.errors.empty() || !parse_result.program) {
+    if (parse_result.program) {
+      SymbolCollector collector;
+      collector.collect(*parse_result.program);
+      result.symbols = collector.take();
+      register_imported_symbols();
+      register_selective_bare_names(*parse_result.program);
+    }
+    return result;
+  }
+
+  TypeChecker checker;
+  if (module_loader) checker.set_module_loader(module_loader.get());
+  auto type_result = checker.check(*parse_result.program);
+  for (const auto &err : type_result.errors) {
+    result.diagnostics.push_back({err.location.line, err.location.column, err.location.length, err.message, static_cast<int>(err.severity)});
+  }
+
   SymbolCollector collector;
   collector.collect(*parse_result.program);
   result.symbols = collector.take();
-
-  // Register imported symbols with qualified names for hover / definition
-  for (const auto &[ns, syms] : result.imported_symbols) {
-    for (auto sym : syms) {
-      sym.name = ns + "::" + sym.name;
-      sym.scope_start_line = 0;
-      sym.scope_end_line = 999999;
-      result.symbols.symbols.push_back(std::move(sym));
-    }
-  }
-
-  // For selective imports, also register bare names (import "x.kl" { add })
-  for (const auto &decl : parse_result.program->declarations) {
-    const auto *imp = dynamic_cast<const ast::ImportDecl *>(decl.get());
-    if (!imp || imp->selected_symbols.empty()) continue;
-    std::string ns = imp->alias.empty()
-        ? std::filesystem::path(imp->path).stem().string()
-        : imp->alias;
-    auto it = result.imported_symbols.find(ns);
-    if (it == result.imported_symbols.end()) continue;
-    for (auto sym : it->second) {
-      sym.scope_start_line = 0;
-      sym.scope_end_line = 999999;
-      result.symbols.symbols.push_back(std::move(sym));
-    }
-  }
+  register_imported_symbols();
+  register_selective_bare_names(*parse_result.program);
 
   result.program = std::move(parse_result.program);
   result.valid = true;
