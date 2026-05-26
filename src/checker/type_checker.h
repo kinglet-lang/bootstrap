@@ -70,6 +70,9 @@ private:
   };
   std::unordered_map<std::string, MethodInfo> method_registry_;
 
+  std::unordered_map<std::string, const ast::TraitDecl *> trait_registry_;
+  std::unordered_map<std::string, std::vector<std::string>> trait_impls_;
+
   std::vector<TypeError> errors_;
   std::unordered_set<std::string> used_;    // using io;
   std::unordered_set<std::string> opened_;  // using namespace io;
