@@ -161,12 +161,13 @@ run_case "match_exhaustive_ok" "run" 0 $'up\nup\n' ""
 # --- Impl Methods ---
 run_case "impl_basic" "run" 0 $'7\n13 24\n' ""
 
+# --- Trait System ---
+run_case "trait_basic" "run" 0 $'point\n97\n' ""
+run_case "trait_default" "run" 0 $'42\n' ""
+
 if [[ "$FAILURES" -ne 0 ]]; then
   echo "$FAILURES CLI golden test(s) failed." >&2
   exit 1
 fi
 
-run_case \"trait_basic\" \"run\" 0 $'point\\n125\\n' \"\"
-run_case \"trait_default\" \"run\" 0 $'42\\n' \"\"
-
-echo \"All golden tests passed.\"
+echo "CLI golden tests passed."
