@@ -260,6 +260,16 @@ AnalysisResult analyze(const std::string &source, const std::string &file_path) 
   collector.collect(*parse_result.program);
   result.symbols = collector.take();
 
+  // Register imported symbols with qualified names for hover / definition
+  for (const auto &[ns, syms] : result.imported_symbols) {
+    for (auto sym : syms) {
+      sym.name = ns + "::" + sym.name;
+      sym.scope_start_line = 0;
+      sym.scope_end_line = 999999;
+      result.symbols.symbols.push_back(std::move(sym));
+    }
+  }
+
   result.program = std::move(parse_result.program);
   result.valid = true;
 
