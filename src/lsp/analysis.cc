@@ -68,6 +68,7 @@ private:
       sym.variants.clear();
       for (const auto &v : enum_decl->variants) {
         sym.variants.push_back(v.name);
+        sym.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
       }
       table_.symbols.push_back(std::move(sym));
     } else if (const auto *top = dynamic_cast<const ast::TopLevelStmtDecl *>(&decl)) {

@@ -4,6 +4,7 @@
 
 #include <cctype>
 #include <iostream>
+#include <set>
 #include <sstream>
 
 namespace kinglet::lsp {
@@ -240,6 +241,121 @@ json::Value Server::handle_completion(const json::Value &params) {
           items.push_back(protocol::completion_item_with_edit(variant, 20, ns_name + " variant", line, character, character));
         }
         return json::Value(items);
+      }
+    }
+  }
+
+  // Match arm context: suggest uncovered enum variants
+  if (!ns_name.empty()) {
+    // Already handled above
+  } else {
+    // Detect if cursor is inside a match { ... } body
+    // Scan backwards through lines to find "EXPR match {"
+    std::string full_text_before;
+    {
+      std::istringstream s2(doc->text);
+      std::string ln;
+      int cur = 0;
+      while (std::getline(s2, ln)) {
+        if (cur < line) {
+          full_text_before += ln + "\n";
+        } else if (cur == line) {
+          full_text_before += ln.substr(0, static_cast<std::size_t>(character));
+        }
+        ++cur;
+      }
+    }
+
+    // Find the innermost unmatched "match {"
+    int brace_depth = 0;
+    std::size_t match_pos = std::string::npos;
+    for (std::size_t i = full_text_before.size(); i > 0; --i) {
+      char c = full_text_before[i - 1];
+      if (c == '}') ++brace_depth;
+      else if (c == '{') {
+        if (brace_depth > 0) --brace_depth;
+        else {
+          // Check if "match" precedes this brace
+          std::size_t brace_pos = i - 1;
+          std::size_t j = brace_pos;
+          while (j > 0 && std::isspace(static_cast<unsigned char>(full_text_before[j - 1]))) --j;
+          if (j >= 5 && full_text_before.substr(j - 5, 5) == "match") {
+            match_pos = j - 5;
+            break;
+          }
+          // Not a match brace, stop searching
+          break;
+        }
+      }
+    }
+
+    if (match_pos != std::string::npos) {
+      // Find the expression before "match" to determine the type
+      std::size_t expr_end = match_pos;
+      while (expr_end > 0 && std::isspace(static_cast<unsigned char>(full_text_before[expr_end - 1]))) --expr_end;
+      // Extract identifier before "match"
+      std::size_t expr_start = expr_end;
+      while (expr_start > 0 && (std::isalnum(static_cast<unsigned char>(full_text_before[expr_start - 1])) ||
+             full_text_before[expr_start - 1] == '_')) --expr_start;
+      std::string match_var = full_text_before.substr(expr_start, expr_end - expr_start);
+
+      // Look up the variable's type in the symbol table
+      const Symbol *var_sym = nullptr;
+      auto visible_syms = doc->analysis.symbols.visible_at(line + 1);
+      for (const auto *s : visible_syms) {
+        if (s->name == match_var && (s->kind == SymbolKind::Variable || s->kind == SymbolKind::Parameter)) {
+          var_sym = s;
+          break;
+        }
+      }
+
+      if (var_sym) {
+        // Find the enum type
+        const Symbol *enum_sym = nullptr;
+        for (const auto *s : visible_syms) {
+          if (s->kind == SymbolKind::Enum && s->name == var_sym->type_name) {
+            enum_sym = s;
+            break;
+          }
+        }
+
+        if (enum_sym && !enum_sym->variants.empty()) {
+          // Collect already-covered variants from text
+          std::set<std::string> covered;
+          std::string match_body = full_text_before.substr(match_pos);
+          for (const auto &v : enum_sym->variants) {
+            if (match_body.find(enum_sym->name + "::" + v) != std::string::npos) {
+              covered.insert(v);
+            }
+          }
+
+          // Suggest uncovered variants
+          for (std::size_t vi = 0; vi < enum_sym->variants.size(); ++vi) {
+            const auto &v = enum_sym->variants[vi];
+            if (covered.count(v)) continue;
+            if (!prefix.empty() && v.find(prefix) == std::string::npos &&
+                enum_sym->name.find(prefix) == std::string::npos) continue;
+
+            std::string label = enum_sym->name + "::" + v;
+            std::string snippet = label;
+            int param_count = vi < enum_sym->variant_param_counts.size()
+                ? enum_sym->variant_param_counts[vi] : 0;
+            if (param_count > 0) {
+              snippet += "(";
+              for (int pi = 0; pi < param_count; ++pi) {
+                if (pi > 0) snippet += ", ";
+                snippet += "let ${" + std::to_string(pi + 1) + ":v" + std::to_string(pi) + "}";
+              }
+              snippet += ")";
+            }
+            snippet += " => ${0:expr},";
+            items.push_back(protocol::completion_item(label, 20, "enum variant", snippet, 2));
+          }
+
+          if (!items.empty()) {
+            return json::Value(items);
+          }
+        }
       }
     }
   }

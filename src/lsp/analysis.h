@@ -27,6 +27,7 @@ struct Symbol {
   std::string return_type;
   std::vector<FieldSymbol> fields;
   std::vector<std::string> variants;
+  std::vector<int> variant_param_counts;
 };
 
 struct SymbolTable {
