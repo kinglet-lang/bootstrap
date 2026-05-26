@@ -727,6 +727,35 @@ json::Value Server::handle_completion(const json::Value &params) {
                 for (const auto &field : type_sym->fields) {
                   items.push_back(protocol::completion_item(field.name, 5, field.type_name + " " + field.name));
                 }
+                // Also offer impl methods for this type
+                for (const auto *method_sym : visible_syms) {
+                  if (method_sym->kind == SymbolKind::Function) {
+                    std::string method_prefix = sym->type_name + "::";
+                    if (method_sym->name.size() > method_prefix.size() &&
+                        method_sym->name.compare(0, method_prefix.size(), method_prefix) == 0) {
+                      std::string method_name = method_sym->name.substr(method_prefix.size());
+                      std::string detail = method_sym->return_type + " " + method_name + "(";
+                      bool first = true;
+                      for (const auto &p : method_sym->params) {
+                        if (p.name == "self") continue;
+                        if (!first) detail += ", ";
+                        detail += p.type.to_string() + " " + p.name;
+                        first = false;
+                      }
+                      detail += ")";
+                      std::string snippet = method_name + "(";
+                      int idx = 1;
+                      for (const auto &p : method_sym->params) {
+                        if (p.name == "self") continue;
+                        if (idx > 1) snippet += ", ";
+                        snippet += "${" + std::to_string(idx) + ":" + p.name + "}";
+                        ++idx;
+                      }
+                      snippet += ")";
+                      items.push_back(protocol::completion_item(method_name, 2, detail, snippet, 2));
+                    }
+                  }
+                }
                 return json::Value(items);
               }
             }

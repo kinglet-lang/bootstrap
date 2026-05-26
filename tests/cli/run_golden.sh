@@ -158,6 +158,9 @@ run_case "match_enum_destruct" "run" 0 $'42\n-1\n' ""
 run_case "match_exhaustive_warn" "run" 0 $'red\n' $'11:16: warning: Non-exhaustive match. Missing variant(s): Blue.\n'
 run_case "match_exhaustive_ok" "run" 0 $'up\nup\n' ""
 
+# --- Impl Methods ---
+run_case "impl_basic" "run" 0 $'7\n13 24\n' ""
+
 if [[ "$FAILURES" -ne 0 ]]; then
   echo "$FAILURES CLI golden test(s) failed." >&2
   exit 1

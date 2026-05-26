@@ -74,6 +74,19 @@ private:
         sym.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
       }
       table_.symbols.push_back(std::move(sym));
+    } else if (const auto *impl_decl = dynamic_cast<const ast::ImplDecl *>(&decl)) {
+      for (const auto &method : impl_decl->methods) {
+        Symbol sym;
+        sym.name = impl_decl->target_type + "::" + method->name;
+        sym.kind = SymbolKind::Function;
+        sym.type_name = method->return_type.to_string();
+        sym.location = method->location;
+        sym.return_type = method->return_type.to_string();
+        sym.params = method->params;
+        sym.scope_start_line = 0;
+        sym.scope_end_line = 999999;
+        table_.symbols.push_back(std::move(sym));
+      }
     } else if (const auto *top = dynamic_cast<const ast::TopLevelStmtDecl *>(&decl)) {
       visit_stmt(*top->stmt, 0);
     }
