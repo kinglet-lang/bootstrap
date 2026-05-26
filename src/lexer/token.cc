@@ -60,6 +60,10 @@ const char *token_type_name(TokenType type) {
     return "ENUM";
   case TokenType::TRAIT:
     return "TRAIT";
+  case TokenType::IMPL:
+    return "IMPL";
+  case TokenType::SELF:
+    return "SELF";
   case TokenType::SPAWN:
     return "SPAWN";
   case TokenType::SELECT:

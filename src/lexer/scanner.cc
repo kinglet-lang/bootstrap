@@ -382,6 +382,8 @@ TokenType Scanner::identifier_type() const {
       {"struct", TokenType::STRUCT},
       {"enum", TokenType::ENUM},
       {"trait", TokenType::TRAIT},
+      {"impl", TokenType::IMPL},
+      {"self", TokenType::SELF},
       {"spawn", TokenType::SPAWN},
       {"select", TokenType::SELECT},
       {"true", TokenType::TRUE},

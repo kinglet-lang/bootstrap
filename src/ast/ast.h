@@ -406,6 +406,17 @@ struct EnumDecl final : Decl {
   bool is_public = false;
 };
 
+struct ImplDecl final : Decl {
+  ImplDecl(SourceLocation location, std::string target_type, std::string trait_name,
+           std::vector<std::unique_ptr<FunctionDecl>> methods);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string target_type;
+  std::string trait_name;
+  std::vector<std::unique_ptr<FunctionDecl>> methods;
+  bool is_public = false;
+};
+
 struct TopLevelStmtDecl final : Decl {
   TopLevelStmtDecl(SourceLocation location, StmtPtr stmt);
   void print(std::ostream &out, int indent = 0) const override;

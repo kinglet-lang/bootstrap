@@ -127,6 +127,15 @@ ast::DeclPtr Parser::declaration() {
     return decl;
   }
 
+  if (match(TokenType::IMPL)) {
+    auto decl = impl_declaration();
+    if (decl) {
+      auto *id = static_cast<ast::ImplDecl *>(decl.get());
+      id->is_public = is_public;
+    }
+    return decl;
+  }
+
   if (is_function_declaration_start()) {
     auto decl = function_declaration();
     if (decl) {
@@ -137,7 +146,7 @@ ast::DeclPtr Parser::declaration() {
   }
 
   if (is_public) {
-    error_at(peek(), "'pub' can only be used before function, struct, or enum declarations.");
+    error_at(peek(), "'pub' can only be used before function, struct, enum, or impl declarations.");
   }
 
   ast::StmtPtr stmt = statement();
@@ -245,6 +254,49 @@ ast::DeclPtr Parser::enum_declaration() {
 
   return std::make_unique<ast::EnumDecl>(location_of(enum_token), token_text(name),
                                          std::move(variants));
+}
+
+ast::DeclPtr Parser::impl_declaration() {
+  const Token &impl_token = previous();
+  const Token &type_name = consume(TokenType::IDENTIFIER, "Expected type name after 'impl'.");
+  std::string target_type = token_text(type_name);
+
+  std::string trait_name;
+  if (match(TokenType::COLON)) {
+    const Token &trait_tok = consume(TokenType::IDENTIFIER, "Expected trait name after ':'.");
+    trait_name = token_text(trait_tok);
+  }
+
+  consume(TokenType::LEFT_BRACE, "Expected '{' after impl header.");
+
+  std::vector<std::unique_ptr<ast::FunctionDecl>> methods;
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+    ast::TypeExpr return_type = parse_type_expr();
+    const Token &method_name = consume(TokenType::IDENTIFIER, "Expected method name.");
+    consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
+
+    std::vector<ast::Parameter> params;
+    if (match(TokenType::SELF)) {
+      params.push_back(ast::Parameter{ast::TypeExpr{target_type, {}}, "self"});
+      if (check(TokenType::COMMA)) advance();
+    }
+    if (!check(TokenType::RIGHT_PAREN)) {
+      auto rest = parameters();
+      params.insert(params.end(), std::make_move_iterator(rest.begin()),
+                    std::make_move_iterator(rest.end()));
+    }
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after parameter list.");
+
+    ast::StmtPtr body = function_body();
+    auto method = std::make_unique<ast::FunctionDecl>(
+        location_of(method_name), std::move(return_type), token_text(method_name),
+        std::vector<std::string>{}, std::move(params), std::move(body));
+    methods.push_back(std::move(method));
+  }
+  consume(TokenType::RIGHT_BRACE, "Expected '}' after impl body.");
+
+  return std::make_unique<ast::ImplDecl>(location_of(impl_token), std::move(target_type),
+                                         std::move(trait_name), std::move(methods));
 }
 
 ast::DeclPtr Parser::function_declaration() {
@@ -774,6 +826,9 @@ ast::ExprPtr Parser::primary() {
     consume(TokenType::RIGHT_BRACKET, "Expected ']' after array literal.");
     return std::make_unique<ast::ArrayLiteralExpr>(location_of(left_bracket),
                                                    std::move(elements));
+  }
+  if (match(TokenType::SELF)) {
+    return std::make_unique<ast::IdentifierExpr>(location_of(previous()), "self");
   }
   if (match(TokenType::IDENTIFIER)) {
     const Token &identifier = previous();
