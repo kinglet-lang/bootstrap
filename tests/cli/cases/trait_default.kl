@@ -1,0 +1,21 @@
+using io;
+
+trait Default {
+  int default_value(self);
+}
+
+struct Counter {
+  int value;
+}
+
+impl Counter : Default {
+  int default_value(self) {
+    return 42;
+  }
+}
+
+int main() {
+  Counter c { 0 };
+  io::out("{}\n", c.default_value());
+  return 0;
+}

@@ -1,0 +1,28 @@
+using io;
+
+trait Printable {
+  string to_string(self);
+  int hash(self);
+}
+
+struct Point {
+  int x;
+  int y;
+}
+
+impl Point : Printable {
+  string to_string(self) {
+    return "point";
+  }
+
+  int hash(self) {
+    return self.x * 31 + self.y;
+  }
+}
+
+int main() {
+  Point p { 3, 4 };
+  io::out("{}\n", p.to_string());
+  io::out("{}\n", p.hash());
+  return 0;
+}

@@ -166,4 +166,7 @@ if [[ "$FAILURES" -ne 0 ]]; then
   exit 1
 fi
 
-echo "CLI golden tests passed."
+run_case \"trait_basic\" \"run\" 0 $'point\\n125\\n' \"\"
+run_case \"trait_default\" \"run\" 0 $'42\\n' \"\"
+
+echo \"All golden tests passed.\"
