@@ -260,6 +260,10 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         check_function(*func);
       }
     }
+    if (const auto *top = dynamic_cast<const ast::TopLevelStmtDecl *>(decl.get())) {
+      Type void_type(TypeKind::Void);
+      check_stmt(*top->stmt, void_type);
+    }
   }
 
   pop_scope();
