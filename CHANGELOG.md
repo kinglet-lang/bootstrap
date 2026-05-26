@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.5] — 2026-05-26
+
+### Language Features
+
+- **Postfix `match` expression** — `x match { ... }` replaces `inspect`, aligned with WG21 P2688R5
+- **Pattern binding** — `let x` in match arms binds the matched value
+- **Pattern guards** — `if (condition)` after a pattern for conditional matching
+- **Array destructuring** — `[let a, let b, _]` patterns in match arms
+- **Enum payload** — enum variants can carry associated data: `enum Option { Some(int), None }`
+- **Enum destructuring** — `Option::Some(let v) => v` extracts payload in match
+- **Exhaustiveness checking** — warns on non-exhaustive enum match (missing variants)
+
+### LSP
+
+- Context-aware `match` snippet completion (expression vs statement form)
+- Fix: skip empty-name symbols in documentSymbol (prevents VS Code crash mid-edit)
+
 ## [0.0.4] — 2026-05-25
 
 ### Language Features
