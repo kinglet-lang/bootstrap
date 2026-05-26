@@ -154,6 +154,10 @@ run_case "enum_destructure_test" "run" 0 $'3.14\n12\n0\n' ""
 run_case "enum_guard_test" "run" 0 $'big\nnone\n' $'14:22: warning: Unused variable \'x\'.\n20:22: warning: Unused variable \'x\'.\n'
 run_case "match_enum_destruct" "run" 0 $'42\n-1\n' ""
 
+# --- Match Exhaustiveness ---
+run_case "match_exhaustive_warn" "run" 0 $'red\n' $'11:16: warning: Non-exhaustive match. Missing variant(s): Blue.\n'
+run_case "match_exhaustive_ok" "run" 0 $'up\nup\n' ""
+
 if [[ "$FAILURES" -ne 0 ]]; then
   echo "$FAILURES CLI golden test(s) failed." >&2
   exit 1

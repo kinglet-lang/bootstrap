@@ -1,0 +1,27 @@
+using io;
+
+enum Dir {
+  Up,
+  Down,
+  Left,
+  Right,
+}
+
+int main() {
+  Dir d = Dir::Up;
+
+  string r1 = d match {
+    Dir::Up => "up",
+    Dir::Down => "down",
+    Dir::Left => "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r1);
+
+  string r2 = d match {
+    Dir::Up => "up",
+    _ => "other",
+  };
+  io::out.line(r2);
+  return 0;
+}

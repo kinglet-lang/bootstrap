@@ -1004,6 +1004,38 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         result_type = body_type;
       }
     }
+
+    // Exhaustiveness check for enum types
+    if (value_type.kind == TypeKind::Enum && !value_type.variants.empty()) {
+      std::unordered_set<std::string> uncovered(value_type.variants.begin(), value_type.variants.end());
+      for (const ast::MatchArm &arm : match_expr->arms) {
+        if (arm.guard) continue;
+        const auto *id = dynamic_cast<const ast::IdentifierExpr *>(arm.pattern.get());
+        if (id && id->name == "_") {
+          uncovered.clear();
+          break;
+        }
+        if (dynamic_cast<const ast::BindingPattern *>(arm.pattern.get())) {
+          uncovered.clear();
+          break;
+        }
+        const auto *ep = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get());
+        if (ep) {
+          uncovered.erase(ep->variant_name);
+        }
+      }
+      if (!uncovered.empty()) {
+        std::string missing;
+        for (const auto &v : value_type.variants) {
+          if (uncovered.count(v)) {
+            if (!missing.empty()) missing += ", ";
+            missing += v;
+          }
+        }
+        warn_at(match_expr->location, "Non-exhaustive match. Missing variant(s): " + missing + ".");
+      }
+    }
+
     return result_type;
   }
 
