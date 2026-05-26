@@ -526,6 +526,7 @@ json::Value Server::handle_document_symbol(const json::Value &params) {
   ensure_analyzed(*doc);
 
   for (const auto &sym : doc->analysis.symbols.symbols) {
+    if (sym.name.empty()) continue;
     json::Object item;
     item["name"] = json::Value::string(sym.name);
 
