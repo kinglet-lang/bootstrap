@@ -63,6 +63,7 @@ private:
   bool declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot);
   int resolve_struct(const ast::TypeExpr &type);
   void error_at(ast::SourceLocation location, std::string message);
+  void warning_at(ast::SourceLocation location, std::string message);
 
   void process_import(const ast::ImportDecl &import_decl);
 

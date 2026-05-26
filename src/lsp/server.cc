@@ -285,8 +285,10 @@ json::Value Server::handle_completion(const json::Value &params) {
         auto quote_close = text_before.find('"', quote_open + 1);
         if (quote_close != std::string::npos) {
           std::string import_path = text_before.substr(quote_open + 1, quote_close - quote_open - 1);
-          auto brace_pos = text_before.find('{', quote_close);
-          if (brace_pos != std::string::npos) {
+          // { must immediately follow the closing " (only whitespace allowed)
+          std::size_t brace_pos = quote_close + 1;
+          while (brace_pos < text_before.size() && text_before[brace_pos] == ' ') ++brace_pos;
+          if (brace_pos < text_before.size() && text_before[brace_pos] == '{') {
             auto close_brace = text_before.find('}', brace_pos);
             if (close_brace == std::string::npos) {
               // We're inside import { ... } — suggest public symbols
