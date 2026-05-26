@@ -62,9 +62,14 @@ CompileResult Compiler::compile(const ast::Program &program) {
 
   // Pass 1b: register impl methods as functions
   for (const ast::DeclPtr &declaration : program.declarations) {
+    if (const auto *trait_decl = dynamic_cast<const ast::TraitDecl *>(declaration.get())) {
+      trait_registry_[trait_decl->name] = trait_decl;
+    }
     if (const auto *impl_decl = dynamic_cast<const ast::ImplDecl *>(declaration.get())) {
+      std::unordered_set<std::string> overridden;
       for (const auto &method : impl_decl->methods) {
         std::string mangled = impl_decl->target_type + "::" + method->name;
+        overridden.insert(method->name);
         int idx = chunk_.add_function(FunctionInfo{
             .name = mangled,
             .entry = 0,
@@ -72,6 +77,24 @@ CompileResult Compiler::compile(const ast::Program &program) {
         });
         uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
         function_indices_[mangled] = static_cast<int>(const_idx);
+      }
+      if (!impl_decl->trait_name.empty()) {
+        auto trait_it = trait_registry_.find(impl_decl->trait_name);
+        if (trait_it != trait_registry_.end()) {
+          for (const auto &trait_method : trait_it->second->methods) {
+            if (overridden.count(trait_method.name) == 0 && trait_method.default_body) {
+              std::string mangled = impl_decl->target_type + "::" + trait_method.name;
+              int param_count = static_cast<int>(trait_method.params.size());
+              int idx = chunk_.add_function(FunctionInfo{
+                  .name = mangled,
+                  .entry = 0,
+                  .param_count = param_count,
+              });
+              uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
+              function_indices_[mangled] = static_cast<int>(const_idx);
+            }
+          }
+        }
       }
     }
   }
@@ -118,10 +141,54 @@ CompileResult Compiler::compile(const ast::Program &program) {
   // Pass 2a: compile impl method bodies
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *impl_decl = dynamic_cast<const ast::ImplDecl *>(declaration.get())) {
+      std::unordered_set<std::string> overridden;
       for (const auto &method : impl_decl->methods) {
+        overridden.insert(method->name);
         std::string mangled = impl_decl->target_type + "::" + method->name;
         compile_function(*method, mangled);
         if (!errors_.empty()) break;
+      }
+      if (!errors_.empty()) break;
+      if (!impl_decl->trait_name.empty()) {
+        auto trait_it = trait_registry_.find(impl_decl->trait_name);
+        if (trait_it != trait_registry_.end()) {
+          for (const auto &trait_method : trait_it->second->methods) {
+            if (overridden.count(trait_method.name) == 0 && trait_method.default_body) {
+              std::string mangled = impl_decl->target_type + "::" + trait_method.name;
+              locals_.clear();
+              scope_stack_.clear();
+              local_types_.clear();
+              auto fit = function_indices_.find(mangled);
+              int const_idx = fit->second;
+              int func_idx = chunk_.constants()[static_cast<std::size_t>(const_idx)].function_index_storage;
+              const_cast<FunctionInfo &>(chunk_.functions()[static_cast<std::size_t>(func_idx)]).entry =
+                  chunk_.instructions().size();
+              for (const auto &param : trait_method.params) {
+                locals_.push_back(Local{.name = param.name, .is_mutable = true});
+                if (param.name == "self") {
+                  local_types_["self"] = impl_decl->target_type;
+                } else if (!param.type.name.empty()) {
+                  local_types_[param.name] = param.type.name;
+                }
+              }
+              implicit_return_stmt_ = nullptr;
+              const auto *body = dynamic_cast<const ast::BlockStmt *>(trait_method.default_body.get());
+              if (body && !body->statements.empty()) {
+                const auto *last = dynamic_cast<const ast::ExprStmt *>(body->statements.back().get());
+                if (last && trait_method.return_type.name != "void") {
+                  implicit_return_stmt_ = last;
+                }
+              }
+              compile_stmt(*trait_method.default_body);
+              implicit_return_stmt_ = nullptr;
+              if (errors_.empty()) {
+                emit(OpCode::Null, impl_decl->location);
+                emit(OpCode::Return, impl_decl->location);
+              }
+              if (!errors_.empty()) break;
+            }
+          }
+        }
       }
     }
     if (!errors_.empty()) break;

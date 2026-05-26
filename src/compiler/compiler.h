@@ -87,6 +87,7 @@ private:
   std::unordered_set<std::string> imported_namespaces_;
   std::unordered_map<std::string, std::vector<const ast::FunctionDecl *>> imported_function_decls_;
   std::unordered_map<std::string, std::string> local_types_;
+  std::unordered_map<std::string, const ast::TraitDecl *> trait_registry_;
 };
 
 } // namespace kinglet
