@@ -295,13 +295,23 @@ int main(int argc, char **argv) {
   std::string base_dir = ".";
   if (!input_path.empty()) {
     std::filesystem::path p(input_path);
-    if (p.has_parent_path()) {
-      base_dir = p.parent_path().string();
+    if (p.is_absolute()) {
+      if (p.has_parent_path()) {
+        base_dir = p.parent_path().string();
+      }
+    } else {
+      base_dir = std::filesystem::absolute(p).parent_path().string();
+      if (base_dir == ".") base_dir = std::filesystem::current_path().string();
     }
   }
   kinglet::ModuleLoader module_loader(base_dir);
   if (!input_path.empty()) {
-    module_loader.register_source_file(input_path);
+    std::filesystem::path input_p(input_path);
+    if (input_p.is_absolute()) {
+      module_loader.register_source_file(input_path);
+    } else {
+      module_loader.register_source_file((std::filesystem::current_path() / input_path).string());
+    }
   }
 
   kinglet::TypeChecker checker;
