@@ -1223,6 +1223,13 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       emit_constant(Value::native_function_value(fn), ns_access->location);
       return;
     }
+    // Check trait namespaces for fully-qualified calls (Printable::to_string)
+    if (trait_registry_.count(ns_access->namespace_name)) {
+      // Defer to calling context: the callee will resolve the trait method
+      // based on the argument type. For now, emit the member as a name lookup
+      // so the call site can mangle it as Type::method.
+      return;
+    }
     // Check imported module namespaces
     if (imported_namespaces_.count(ns_access->namespace_name)) {
       std::string qualified = ns_access->namespace_name + "::" + ns_access->member_name;

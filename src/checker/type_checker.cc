@@ -625,6 +625,10 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
       return *enum_type;
     }
+    // Check for trait namespace (e.g. Printable::to_string)
+    if (trait_registry_.count(ns_access->namespace_name)) {
+      return void_type();
+    }
     return void_type();
   }
 
