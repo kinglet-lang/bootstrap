@@ -202,6 +202,18 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           const auto &mod = *result.module;
           std::string ns = import_decl->alias.empty() ? mod.namespace_name : import_decl->alias;
           imported_namespaces_.insert(ns);
+          // Validate selected symbols exist as public exports
+          if (!import_decl->selected_symbols.empty()) {
+            std::unordered_set<std::string> pub_names;
+            for (const auto *fn : mod.public_functions) pub_names.insert(fn->name);
+            for (const auto *sd : mod.public_structs) pub_names.insert(sd->name);
+            for (const auto *ed : mod.public_enums) pub_names.insert(ed->name);
+            for (const auto &s : import_decl->selected_symbols) {
+              if (!pub_names.count(s)) {
+                error_at(import_decl->location, "'" + s + "' is not a public symbol in module '" + ns + "'.");
+              }
+            }
+          }
           for (const auto *fn : mod.public_functions) {
             if (!import_decl->selected_symbols.empty()) {
               bool found = false;
