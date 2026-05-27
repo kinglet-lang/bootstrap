@@ -66,6 +66,7 @@ private:
   void warning_at(ast::SourceLocation location, std::string message);
 
   void process_import(const ast::ImportDecl &import_decl);
+  std::string infer_struct_type(const ast::Expr &expr) const;
 
   Chunk chunk_;
   std::vector<Local> locals_;
@@ -88,6 +89,7 @@ private:
   std::unordered_map<std::string, std::vector<const ast::FunctionDecl *>> imported_function_decls_;
   std::unordered_map<std::string, std::string> local_types_;
   std::unordered_map<std::string, const ast::TraitDecl *> trait_registry_;
+  std::unordered_map<std::string, std::string> method_return_types_;
 };
 
 } // namespace kinglet

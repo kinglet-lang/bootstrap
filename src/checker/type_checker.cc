@@ -147,6 +147,10 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       continue;
     }
     if (const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(decl.get())) {
+      if (struct_decl->name == "Self") {
+        error_at(struct_decl->location, "'Self' is a reserved type name.");
+        continue;
+      }
       if (!struct_decl->type_params.empty()) {
         generic_structs_[struct_decl->name] = struct_decl;
       } else {
@@ -161,6 +165,10 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       continue;
     }
     if (const auto *enum_decl = dynamic_cast<const ast::EnumDecl *>(decl.get())) {
+      if (enum_decl->name == "Self") {
+        error_at(enum_decl->location, "'Self' is a reserved type name.");
+        continue;
+      }
       Type enum_type(TypeKind::Enum);
       enum_type.name = enum_decl->name;
       for (const auto &v : enum_decl->variants) {

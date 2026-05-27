@@ -77,6 +77,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
         });
         uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
         function_indices_[mangled] = static_cast<int>(const_idx);
+        method_return_types_[mangled] = method->return_type.name;
       }
       if (!impl_decl->trait_name.empty()) {
         auto trait_it = trait_registry_.find(impl_decl->trait_name);
@@ -114,6 +115,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
       });
       uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
       function_indices_[function->name] = static_cast<int>(const_idx);
+      method_return_types_[function->name] = function->return_type.name;
       functions.push_back(function);
       if (function->name == "main") {
         main_index = idx;
@@ -167,8 +169,10 @@ CompileResult Compiler::compile(const ast::Program &program) {
                 locals_.push_back(Local{.name = param.name, .is_mutable = true});
                 if (param.name == "self") {
                   local_types_["self"] = impl_decl->target_type;
-                } else if (!param.type.name.empty()) {
-                  local_types_[param.name] = param.type.name;
+                } else {
+                  std::string type_name = param.type.name;
+                  if (type_name == "Self") type_name = impl_decl->target_type;
+                  if (!type_name.empty()) local_types_[param.name] = type_name;
                 }
               }
               implicit_return_stmt_ = nullptr;
@@ -302,6 +306,52 @@ void Compiler::pop_scope() {
   while (locals_.size() > target) {
     locals_.pop_back();
   }
+}
+
+std::string Compiler::infer_struct_type(const ast::Expr &expr) const {
+  if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    auto it = local_types_.find(id->name);
+    if (it != local_types_.end()) return it->second;
+    return "";
+  }
+  if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
+    std::string parent_type = infer_struct_type(*field->object);
+    if (parent_type.empty()) return "";
+    auto si = struct_indices_.find(parent_type);
+    if (si == struct_indices_.end()) return "";
+    const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(si->second)];
+    for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
+      if (meta.field_names[i] == field->field_name) {
+        return "";
+      }
+    }
+    std::string method_key = parent_type + "::" + field->field_name;
+    auto fi = function_indices_.find(method_key);
+    if (fi != function_indices_.end()) return parent_type;
+    return "";
+  }
+  if (const auto *call = dynamic_cast<const ast::CallExpr *>(&expr)) {
+    if (const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call->callee.get())) {
+      if (struct_indices_.count(callee_id->name)) return callee_id->name;
+      auto ret_it = method_return_types_.find(callee_id->name);
+      if (ret_it != method_return_types_.end() && struct_indices_.count(ret_it->second))
+        return ret_it->second;
+    }
+    if (const auto *field_callee = dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
+      std::string obj_type = infer_struct_type(*field_callee->object);
+      if (!obj_type.empty()) {
+        std::string method_key = obj_type + "::" + field_callee->field_name;
+        auto ret_it = method_return_types_.find(method_key);
+        if (ret_it != method_return_types_.end() && struct_indices_.count(ret_it->second))
+          return ret_it->second;
+      }
+    }
+    return "";
+  }
+  if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(&expr)) {
+    return struct_lit->struct_type.name;
+  }
+  return "";
 }
 
 void Compiler::compile_function(const ast::FunctionDecl &function, const std::string &lookup_name) {
@@ -921,13 +971,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
     // Handle impl method calls: obj.method(args...)
     if (field_callee) {
-      std::string obj_type;
-      if (const auto *obj_id = dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get())) {
-        auto type_it = local_types_.find(obj_id->name);
-        if (type_it != local_types_.end()) {
-          obj_type = type_it->second;
-        }
-      }
+      std::string obj_type = infer_struct_type(*field_callee->object);
       if (!obj_type.empty()) {
         std::string method_key = obj_type + "::" + field_callee->field_name;
         auto func_it = function_indices_.find(method_key);
