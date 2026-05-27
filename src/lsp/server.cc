@@ -1095,6 +1095,15 @@ json::Value Server::handle_definition(const json::Value &params) {
   if (word.empty()) return json::Value::null();
 
   const auto *sym = doc->analysis.symbols.find_definition(word, line + 1);
+  if (!sym) {
+    for (const auto &s : doc->analysis.symbols.symbols) {
+      auto sep = s.name.find("::");
+      if (sep != std::string::npos && s.name.substr(sep + 2) == word) {
+        sym = &s;
+        break;
+      }
+    }
+  }
   if (!sym) return json::Value::null();
 
   return protocol::location(uri, sym->location.line, sym->location.column);
@@ -1111,6 +1120,15 @@ json::Value Server::handle_hover(const json::Value &params) {
   if (word.empty()) return json::Value::null();
 
   const auto *sym = doc->analysis.symbols.find_definition(word, line + 1);
+  if (!sym) {
+    for (const auto &s : doc->analysis.symbols.symbols) {
+      auto sep = s.name.find("::");
+      if (sep != std::string::npos && s.name.substr(sep + 2) == word) {
+        sym = &s;
+        break;
+      }
+    }
+  }
   if (!sym) return json::Value::null();
 
   std::string content;
