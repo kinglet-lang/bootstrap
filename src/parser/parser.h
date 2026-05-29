@@ -85,6 +85,7 @@ private:
   const Token &consume(TokenType type, std::string_view message);
 
   bool is_type_start(TokenType type) const;
+  bool is_decl_keyword(TokenType type) const;
   bool is_declaration_start() const;
   bool is_function_declaration_start() const;
   ast::SourceLocation location_of(const Token &token) const;

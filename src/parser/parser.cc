@@ -99,6 +99,15 @@ std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
     if (id->name == "self") return current_impl_type_;
     return id->name;
   }
+  // io::out / io::err / io::in are built-in stream objects; expose them under a
+  // synthetic type name the resolver recognises for member completion.
+  if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(expr)) {
+    if (ns->namespace_name == "io" &&
+        (ns->member_name == "out" || ns->member_name == "err"))
+      return "$io_ostream";
+    if (ns->namespace_name == "io" && ns->member_name == "in")
+      return "$io_istream";
+  }
   return {};
 }
 
@@ -119,6 +128,15 @@ ParseResult Parser::parse() {
 
 ast::DeclPtr Parser::declaration() {
   if (at_completion()) {
+    // A member-access operator (`.` or `::`) cannot begin a top-level
+    // declaration. If one immediately precedes the cursor here, the position
+    // is syntactically invalid, so offer no completion rather than flooding
+    // the list with every declaration keyword.
+    if (current_ > 0 && (previous().type == TokenType::DOT ||
+                         previous().type == TokenType::COLON_COLON)) {
+      set_completion({lsp::CompletionPosition::None, {}, {}, {}, {}, {}, {}});
+      return nullptr;
+    }
     set_completion({lsp::CompletionPosition::TopLevelDecl, {}, {}, {}, {}, {}, {}});
     return nullptr;
   }
@@ -316,6 +334,10 @@ ast::DeclPtr Parser::enum_declaration() {
 
 ast::DeclPtr Parser::impl_declaration() {
   const Token &impl_token = previous();
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::ImplTarget, {}, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
   const Token &type_name = consume(TokenType::IDENTIFIER, "Expected type name after 'impl'.");
   std::string target_type = token_text(type_name);
   if (completion_mode_) current_impl_type_ = target_type;
@@ -337,6 +359,16 @@ ast::DeclPtr Parser::impl_declaration() {
     if (at_completion()) {
       set_completion({lsp::CompletionPosition::ImplMethodDecl, target_type, trait_name, {}, {}, {}, {}});
       return nullptr;
+    }
+    // Recover from a missing '}': a top-level declaration keyword cannot begin
+    // an impl-body member, so treat it as the start of the next declaration and
+    // stop here rather than cascading errors through the rest of the file.
+    if (is_decl_keyword(peek().type)) {
+      error_at(peek(), "Expected '}' after impl body.");
+      return std::make_unique<ast::ImplDecl>(location_of(impl_token),
+                                             std::move(target_type),
+                                             std::move(trait_name),
+                                             std::move(methods));
     }
     size_t start_pos = current_;
     ast::TypeExpr return_type = parse_type_expr();
@@ -386,6 +418,12 @@ ast::DeclPtr Parser::trait_declaration() {
     if (at_completion()) {
       set_completion({lsp::CompletionPosition::TraitMethodDecl, token_text(name_token), {}, {}, {}, {}, {}});
       return nullptr;
+    }
+    // Recover from a missing '}' (see impl_declaration for rationale).
+    if (is_decl_keyword(peek().type)) {
+      error_at(peek(), "Expected '}' after trait body.");
+      return std::make_unique<ast::TraitDecl>(location_of(trait_token),
+                                              std::move(name), std::move(methods));
     }
     size_t start_pos = current_;
     ast::TypeExpr return_type = parse_type_expr();
@@ -1126,6 +1164,10 @@ std::vector<ast::Parameter> Parser::parameters() {
   }
 
   do {
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {}, {}});
+      return params;
+    }
     ast::TypeExpr type = parse_type_expr();
     const Token &name = consume(TokenType::IDENTIFIER, "Expected parameter name.");
     params.push_back(ast::Parameter{std::move(type), token_text(name)});
@@ -1229,6 +1271,21 @@ bool Parser::is_type_start(TokenType type) const {
   case TokenType::VOID:
   case TokenType::BYTE:
   case TokenType::IDENTIFIER:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool Parser::is_decl_keyword(TokenType type) const {
+  switch (type) {
+  case TokenType::IMPL:
+  case TokenType::STRUCT:
+  case TokenType::ENUM:
+  case TokenType::TRAIT:
+  case TokenType::USING:
+  case TokenType::IMPORT:
+  case TokenType::PUB:
     return true;
   default:
     return false;

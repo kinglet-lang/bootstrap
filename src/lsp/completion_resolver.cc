@@ -23,6 +23,8 @@ bool CompletionResolver::matches_prefix(const std::string &name) const {
 
 json::Array CompletionResolver::resolve(const CompletionInfo &info) {
   switch (info.position) {
+  case CompletionPosition::None:
+    return json::Array{};
   case CompletionPosition::TopLevelDecl:
     return resolve_top_level();
   case CompletionPosition::Statement:
@@ -30,9 +32,10 @@ json::Array CompletionResolver::resolve(const CompletionInfo &info) {
   case CompletionPosition::ExpressionStart:
     return resolve_expression();
   case CompletionPosition::TypeExpr:
-  case CompletionPosition::ParameterType:
   case CompletionPosition::StructFieldDecl:
     return resolve_type_expr();
+  case CompletionPosition::ParameterType:
+    return resolve_param_type();
   case CompletionPosition::FieldAccess:
     return resolve_field_access(info.receiver_type);
   case CompletionPosition::NamespaceAccess:
@@ -47,6 +50,8 @@ json::Array CompletionResolver::resolve(const CompletionInfo &info) {
     return resolve_type_expr();
   case CompletionPosition::TraitName:
     return resolve_trait_name();
+  case CompletionPosition::ImplTarget:
+    return resolve_impl_target();
   case CompletionPosition::MatchArm:
     return resolve_enum_variant(info.receiver_type);
   case CompletionPosition::StructLiteral:
@@ -115,7 +120,13 @@ void CompletionResolver::add_io_members(json::Array &items) {
 }
 
 void CompletionResolver::add_type_keywords(json::Array &items) {
+  add_type_keywords(items, /*include_void_auto=*/true);
+}
+
+void CompletionResolver::add_type_keywords(json::Array &items, bool include_void_auto) {
   for (const char *kw : {"int", "float", "double", "bool", "string", "void", "byte", "auto"}) {
+    if (!include_void_auto && (std::string(kw) == "void" || std::string(kw) == "auto"))
+      continue;
     if (!matches_prefix(kw)) continue;
     json::Object item;
     item["label"] = json::Value::string(kw);
@@ -247,9 +258,40 @@ json::Array CompletionResolver::resolve_type_expr() {
   return items;
 }
 
+json::Array CompletionResolver::resolve_param_type() {
+  // Parameter types: same as a type expression, but `void` and `auto` are
+  // never valid as a parameter type, so they are excluded.
+  json::Array items;
+  add_type_keywords(items, /*include_void_auto=*/false);
+  auto visible = analysis_.symbols.visible_at(line_ + 1);
+  for (const auto *sym : visible) {
+    if (sym->kind != SymbolKind::Struct && sym->kind != SymbolKind::Enum &&
+        sym->kind != SymbolKind::Trait)
+      continue;
+    if (!matches_prefix(sym->name)) continue;
+    int kind = (sym->kind == SymbolKind::Struct) ? 22 :
+               (sym->kind == SymbolKind::Enum) ? 13 : 8;
+    items.push_back(protocol::completion_item(sym->name, kind, sym->type_name));
+  }
+  return items;
+}
+
 json::Array CompletionResolver::resolve_field_access(const std::string &receiver_type) {
   json::Array items;
   if (receiver_type.empty()) return items;
+
+  // Built-in io stream objects (io::out / io::err / io::in).
+  if (receiver_type == "$io_ostream") {
+    if (matches_prefix("line"))
+      items.push_back(protocol::completion_item("line", 3, "print with newline", "line($1)", 2));
+    return items;
+  }
+  if (receiver_type == "$io_istream") {
+    if (matches_prefix("secret"))
+      items.push_back(protocol::completion_item("secret", 3, "read without echo", "secret($1)", 2));
+    return items;
+  }
+
   auto visible = analysis_.symbols.visible_at(line_ + 1);
 
   // receiver_type may be a type name directly (e.g. "Rect" from self) or a variable name.
@@ -336,31 +378,6 @@ json::Array CompletionResolver::resolve_field_access(const std::string &receiver
         detail += ")";
         snippet += ")";
         items.push_back(protocol::completion_item(method_name, 2, detail, snippet, 2));
-      }
-    }
-    if (sym->kind == SymbolKind::Trait && sym->name == type_name) {
-      for (const auto *fn : visible) {
-        if (fn->kind != SymbolKind::Function) continue;
-        std::string method_prefix = type_name + "::";
-        if (fn->name.size() > method_prefix.size() &&
-            fn->name.compare(0, method_prefix.size(), method_prefix) == 0) {
-          std::string method_name = fn->name.substr(method_prefix.size());
-          if (!matches_prefix(method_name)) continue;
-          std::string detail = fn->return_type + " " + method_name + "(";
-          std::string snippet = method_name + "(";
-          int snippet_idx = 1;
-          bool first = true;
-          for (std::size_t i = 0; i < fn->params.size(); ++i) {
-            if (fn->params[i].name == "self") continue;
-            if (!first) { detail += ", "; snippet += ", "; }
-            first = false;
-            detail += fn->params[i].type.to_string() + " " + fn->params[i].name;
-            snippet += "${" + std::to_string(snippet_idx++) + ":" + fn->params[i].name + "}";
-          }
-          detail += ")";
-          snippet += ")";
-          items.push_back(protocol::completion_item(method_name, 2, detail, snippet, 2));
-        }
       }
     }
   }
@@ -503,6 +520,19 @@ json::Array CompletionResolver::resolve_trait_name() {
     if (sym->kind != SymbolKind::Trait) continue;
     if (!matches_prefix(sym->name)) continue;
     items.push_back(protocol::completion_item(sym->name, 8, "trait " + sym->name));
+  }
+  return items;
+}
+
+json::Array CompletionResolver::resolve_impl_target() {
+  // `impl <Type>` — only structs and enums can be the target of an impl block.
+  json::Array items;
+  auto visible = analysis_.symbols.visible_at(line_ + 1);
+  for (const auto *sym : visible) {
+    if (sym->kind != SymbolKind::Struct && sym->kind != SymbolKind::Enum) continue;
+    if (!matches_prefix(sym->name)) continue;
+    int kind = (sym->kind == SymbolKind::Struct) ? 22 : 13;
+    items.push_back(protocol::completion_item(sym->name, kind, sym->name));
   }
   return items;
 }

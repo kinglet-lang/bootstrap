@@ -5,6 +5,7 @@
 namespace kinglet::lsp {
 
 enum class CompletionPosition {
+  None,
   TopLevelDecl,
   TypeExpr,
   ExpressionStart,
@@ -21,6 +22,7 @@ enum class CompletionPosition {
   StructLiteral,
   ParameterType,
   TraitName,
+  ImplTarget,
 };
 
 struct CompletionInfo {

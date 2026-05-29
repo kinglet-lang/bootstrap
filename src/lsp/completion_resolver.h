@@ -21,6 +21,7 @@ private:
   json::Array resolve_statement();
   json::Array resolve_expression();
   json::Array resolve_type_expr();
+  json::Array resolve_param_type();
   json::Array resolve_field_access(const std::string &receiver_type);
   json::Array resolve_namespace_access(const std::string &ns_name);
   json::Array resolve_import_path();
@@ -28,12 +29,14 @@ private:
   json::Array resolve_impl_method(const std::string &target_type,
                                   const std::string &trait_name);
   json::Array resolve_trait_name();
+  json::Array resolve_impl_target();
   json::Array resolve_struct_literal(const std::string &struct_name);
   json::Array resolve_enum_variant(const std::string &subject_name);
 
   void add_scope_symbols(json::Array &items);
   void add_io_members(json::Array &items);
   void add_type_keywords(json::Array &items);
+  void add_type_keywords(json::Array &items, bool include_void_auto);
   void add_statement_keywords(json::Array &items);
   void add_decl_keywords(json::Array &items);
   void add_namespace_completions(json::Array &items);
