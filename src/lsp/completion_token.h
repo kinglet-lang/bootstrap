@@ -8,6 +8,7 @@
 namespace kinglet::lsp {
 
 struct CompletionTokenResult {
+  std::string source;
   std::vector<Token> tokens;
   std::size_t completion_index;
   std::string prefix;

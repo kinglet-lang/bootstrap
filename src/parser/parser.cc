@@ -94,6 +94,14 @@ void Parser::set_completion(lsp::CompletionInfo info) {
   completion_result_ = std::move(info);
 }
 
+std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
+  if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(expr)) {
+    if (id->name == "self") return current_impl_type_;
+    return id->name;
+  }
+  return {};
+}
+
 ParseResult Parser::parse() {
   std::vector<ast::DeclPtr> declarations;
   while (!is_at_end() && !has_completion()) {
@@ -212,6 +220,10 @@ ast::DeclPtr Parser::import_declaration() {
     alias = token_text(alias_token);
   } else if (match(TokenType::LEFT_BRACE)) {
     do {
+      if (at_completion()) {
+        set_completion({lsp::CompletionPosition::ImportSymbol, {}, {}, {}, {}, path, {}});
+        return nullptr;
+      }
       const Token &sym = consume(TokenType::IDENTIFIER, "Expected symbol name in import list.");
       selected.push_back(std::string(token_text(sym)));
     } while (match(TokenType::COMMA));
@@ -306,6 +318,7 @@ ast::DeclPtr Parser::impl_declaration() {
   const Token &impl_token = previous();
   const Token &type_name = consume(TokenType::IDENTIFIER, "Expected type name after 'impl'.");
   std::string target_type = token_text(type_name);
+  if (completion_mode_) current_impl_type_ = target_type;
 
   std::string trait_name;
   if (match(TokenType::COLON)) {
@@ -344,6 +357,7 @@ ast::DeclPtr Parser::impl_declaration() {
     consume(TokenType::RIGHT_PAREN, "Expected ')' after parameter list.");
 
     ast::StmtPtr body = function_body();
+    if (has_completion()) return nullptr;
     auto method = std::make_unique<ast::FunctionDecl>(
         location_of(method_name), std::move(return_type), token_text(method_name),
         std::vector<std::string>{}, std::move(params), std::move(body));
@@ -363,6 +377,7 @@ ast::DeclPtr Parser::trait_declaration() {
   const Token &trait_token = previous();
   const Token &name_token = consume(TokenType::IDENTIFIER, "Expected trait name after 'trait'.");
   std::string name = token_text(name_token);
+  if (completion_mode_) current_impl_type_ = name;
 
   consume(TokenType::LEFT_BRACE, "Expected '{' after trait name.");
 
@@ -393,6 +408,7 @@ ast::DeclPtr Parser::trait_declaration() {
     ast::StmtPtr default_body;
     if (check(TokenType::LEFT_BRACE) || check(TokenType::FAT_ARROW)) {
       default_body = function_body();
+      if (has_completion()) return nullptr;
     } else {
       consume(TokenType::SEMICOLON, "Expected ';' or '{' after method signature.");
     }
@@ -647,7 +663,12 @@ ast::StmtPtr Parser::var_declaration() {
     advance(); // consume '{'
     std::vector<ast::StructLiteralExpr::FieldInit> fields;
     while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+      if (at_completion()) {
+        set_completion({lsp::CompletionPosition::StructLiteral, {}, {}, {}, {}, {}, type.name});
+        return nullptr;
+      }
       ast::ExprPtr value = expression();
+      if (has_completion()) return nullptr;
       fields.push_back(ast::StructLiteralExpr::FieldInit{"", std::move(value)});
       if (!check(TokenType::RIGHT_BRACE)) {
         consume(TokenType::COMMA, "Expected ',' between struct fields.");
@@ -885,7 +906,8 @@ ast::ExprPtr Parser::call() {
                                              std::vector<ast::TypeExpr>{}, std::move(args));
     } else if (match(TokenType::DOT)) {
       if (at_completion()) {
-        set_completion({lsp::CompletionPosition::FieldAccess, {}, {}, {}, {}, {}, {}});
+        std::string receiver = infer_receiver_type(expr.get());
+        set_completion({lsp::CompletionPosition::FieldAccess, {}, {}, receiver, {}, {}, {}});
         return expr;
       }
       const Token &field = consume(TokenType::IDENTIFIER, "Expected field name after '.'.");
@@ -961,6 +983,10 @@ ast::ExprPtr Parser::primary() {
   if (match(TokenType::IDENTIFIER)) {
     const Token &identifier = previous();
     if (match(TokenType::COLON_COLON)) {
+      if (at_completion()) {
+        set_completion({lsp::CompletionPosition::NamespaceAccess, {}, {}, {}, token_text(identifier), {}, {}});
+        return std::make_unique<ast::IdentifierExpr>(location_of(identifier), token_text(identifier));
+      }
       const Token &member =
           consume(TokenType::IDENTIFIER, "Expected member name after '::'.");
       return std::make_unique<ast::NamespaceAccessExpr>(
@@ -972,7 +998,16 @@ ast::ExprPtr Parser::primary() {
       advance(); // consume '{'
       std::vector<ast::StructLiteralExpr::FieldInit> fields;
       while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+        if (at_completion()) {
+          set_completion({lsp::CompletionPosition::StructLiteral, {}, {}, {}, {}, {},
+                          std::string(token_text(identifier))});
+          return std::make_unique<ast::IdentifierExpr>(location_of(identifier),
+                                                       token_text(identifier));
+        }
         ast::ExprPtr value = expression();
+        if (has_completion())
+          return std::make_unique<ast::IdentifierExpr>(location_of(identifier),
+                                                       token_text(identifier));
         fields.push_back(ast::StructLiteralExpr::FieldInit{"", std::move(value)});
         if (!check(TokenType::RIGHT_BRACE)) {
           consume(TokenType::COMMA, "Expected ',' between struct fields.");
@@ -1029,6 +1064,11 @@ ast::ExprPtr Parser::match_expression(ast::ExprPtr value) {
 
   std::vector<ast::MatchArm> arms;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::MatchArm, {}, {},
+                      infer_receiver_type(value.get()), {}, {}, {}});
+      return value;
+    }
     ast::ExprPtr pattern;
     if (match(TokenType::LET)) {
       const Token &name_token = consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
@@ -1305,9 +1345,17 @@ ast::TypeExpr Parser::parse_type_expr() {
 }
 
 void Parser::synchronize() {
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}, {}});
+    return;
+  }
   advance();
-  while (!is_at_end()) {
+  while (!is_at_end() && !has_completion()) {
     if (previous().type == TokenType::SEMICOLON) {
+      return;
+    }
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}, {}});
       return;
     }
     switch (peek().type) {

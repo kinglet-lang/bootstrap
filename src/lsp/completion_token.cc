@@ -6,13 +6,41 @@ namespace kinglet::lsp {
 
 CompletionTokenResult inject_completion_token(
     const std::string &source, int line, int character) {
+  CompletionTokenResult result;
+  result.source = source;
+
   Scanner scanner(source);
   auto tokens = scanner.scan_tokens();
+
+  // Rebase token string_views from scanner's internal copy to result.source
+  const char *scanner_base = nullptr;
+  if (!tokens.empty()) {
+    for (const auto &tok : tokens) {
+      if (!tok.lexeme.empty()) {
+        std::size_t offset = 0;
+        int cur_line = 1;
+        for (; offset < source.size() && cur_line < tok.line; ++offset) {
+          if (source[offset] == '\n') ++cur_line;
+        }
+        offset += static_cast<std::size_t>(tok.column - 1);
+        scanner_base = tok.lexeme.data() - offset;
+        break;
+      }
+    }
+  }
+
+  if (scanner_base) {
+    for (auto &tok : tokens) {
+      if (!tok.lexeme.empty()) {
+        auto offset = static_cast<std::size_t>(tok.lexeme.data() - scanner_base);
+        tok.lexeme = std::string_view(result.source.data() + offset, tok.lexeme.size());
+      }
+    }
+  }
 
   int cursor_line = line + 1;
   int cursor_col = character + 1;
 
-  CompletionTokenResult result;
   result.completion_index = tokens.size();
 
   Token comp_token;
@@ -25,8 +53,10 @@ CompletionTokenResult inject_completion_token(
     const auto &tok = tokens[i];
 
     if (tok.type == TokenType::END_OF_FILE) {
-      result.completion_index = result.tokens.size();
-      result.tokens.push_back(comp_token);
+      if (result.completion_index == tokens.size()) {
+        result.completion_index = result.tokens.size();
+        result.tokens.push_back(comp_token);
+      }
       result.tokens.push_back(tok);
       break;
     }
@@ -55,7 +85,7 @@ CompletionTokenResult inject_completion_token(
     }
 
     if (tok.line > cursor_line ||
-        (tok.line == cursor_line && tok.column > cursor_col)) {
+        (tok.line == cursor_line && tok.column >= cursor_col)) {
       if (result.completion_index == tokens.size()) {
         result.completion_index = result.tokens.size();
         result.tokens.push_back(comp_token);

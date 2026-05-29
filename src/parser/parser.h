@@ -95,6 +95,7 @@ private:
 
   bool at_completion() const;
   void set_completion(lsp::CompletionInfo info);
+  std::string infer_receiver_type(const ast::Expr *expr) const;
 
   const std::vector<Token> &tokens_;
   std::size_t current_ = 0;
@@ -103,6 +104,7 @@ private:
   bool completion_mode_ = false;
   std::size_t completion_index_ = 0;
   std::optional<lsp::CompletionInfo> completion_result_;
+  std::string current_impl_type_;
 };
 
 } // namespace kinglet
