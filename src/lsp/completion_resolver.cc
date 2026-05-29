@@ -3,6 +3,7 @@
 #include "lsp/protocol.h"
 #include "module/module_loader.h"
 
+#include <cctype>
 #include <filesystem>
 #include <set>
 #include <sstream>
@@ -66,6 +67,11 @@ void CompletionResolver::add_scope_symbols(json::Array &items) {
   auto visible = analysis_.symbols.visible_at(line_ + 1);
   for (const auto *sym : visible) {
     if (!matches_prefix(sym->name)) continue;
+    // Skip names that are not valid identifiers (e.g. stray punctuation a
+    // recovering parser may have registered from an incomplete expression).
+    if (sym->name.empty() ||
+        !(std::isalpha(static_cast<unsigned char>(sym->name[0])) || sym->name[0] == '_'))
+      continue;
     bool sym_is_qualified = sym->name.find("::") != std::string::npos;
     if (sym_is_qualified) continue;
     int kind = 6;
@@ -276,17 +282,96 @@ json::Array CompletionResolver::resolve_param_type() {
   return items;
 }
 
+// Resolve a single member (field or method) of `type_name` to the type it
+// yields. `is_call` selects a method's return type; otherwise a struct field's
+// type. Returns empty if unresolved.
+std::string CompletionResolver::member_type(const std::string &type_name,
+                                            const std::string &member,
+                                            bool is_call) {
+  auto visible = analysis_.symbols.visible_at(line_ + 1);
+  if (is_call) {
+    std::string qualified = type_name + "::" + member;
+    for (const auto *sym : visible) {
+      if (sym->kind == SymbolKind::Function && sym->name == qualified)
+        return sym->return_type;
+    }
+    return {};
+  }
+  for (const auto *sym : visible) {
+    if (sym->kind == SymbolKind::Struct && sym->name == type_name) {
+      for (const auto &field : sym->fields) {
+        if (field.name == member) return field.type_name;
+      }
+    }
+  }
+  return {};
+}
+
+// Walk a parser-encoded access chain ("base\x1fseg\x1fseg()") to a concrete
+// type name. The base resolves through a variable's declared type; each later
+// segment resolves through a field type or method return type.
+std::string CompletionResolver::walk_access_chain(const std::string &chain) {
+  std::vector<std::string> segments;
+  std::size_t start = 0;
+  while (true) {
+    std::size_t sep = chain.find('\x1f', start);
+    segments.push_back(chain.substr(start, sep - start));
+    if (sep == std::string::npos) break;
+    start = sep + 1;
+  }
+  if (segments.empty()) return {};
+
+  // Resolve the base segment (a variable or type name) to a type.
+  std::string base = segments[0];
+  std::string cur_type = base;
+  auto visible = analysis_.symbols.visible_at(line_ + 1);
+  bool is_type = false;
+  for (const auto *sym : visible) {
+    if ((sym->kind == SymbolKind::Struct || sym->kind == SymbolKind::Trait) &&
+        sym->name == base) { is_type = true; break; }
+  }
+  if (!is_type) {
+    for (const auto *sym : visible) {
+      if (sym->name == base && !sym->type_name.empty()) {
+        cur_type = sym->type_name;
+        break;
+      }
+    }
+  }
+
+  // Walk the remaining segments.
+  for (std::size_t i = 1; i < segments.size(); ++i) {
+    std::string seg = segments[i];
+    bool is_call = false;
+    if (seg.size() >= 2 && seg.compare(seg.size() - 2, 2, "()") == 0) {
+      is_call = true;
+      seg = seg.substr(0, seg.size() - 2);
+    }
+    cur_type = member_type(cur_type, seg, is_call);
+    if (cur_type.empty()) return {};
+  }
+  return cur_type;
+}
+
 json::Array CompletionResolver::resolve_field_access(const std::string &receiver_type) {
   json::Array items;
   if (receiver_type.empty()) return items;
 
+  // A receiver may be an access chain (e.g. "r\x1fscale()") encoded by the
+  // parser; walk it to a concrete type before resolving members.
+  std::string rt = receiver_type;
+  if (receiver_type.find('\x1f') != std::string::npos) {
+    rt = walk_access_chain(receiver_type);
+    if (rt.empty()) return items;
+  }
+
   // Built-in io stream objects (io::out / io::err / io::in).
-  if (receiver_type == "$io_ostream") {
+  if (rt == "$io_ostream") {
     if (matches_prefix("line"))
       items.push_back(protocol::completion_item("line", 3, "print with newline", "line($1)", 2));
     return items;
   }
-  if (receiver_type == "$io_istream") {
+  if (rt == "$io_istream") {
     if (matches_prefix("secret"))
       items.push_back(protocol::completion_item("secret", 3, "read without echo", "secret($1)", 2));
     return items;
@@ -294,20 +379,20 @@ json::Array CompletionResolver::resolve_field_access(const std::string &receiver
 
   auto visible = analysis_.symbols.visible_at(line_ + 1);
 
-  // receiver_type may be a type name directly (e.g. "Rect" from self) or a variable name.
+  // rt may be a type name directly (e.g. "Rect" from self) or a variable name.
   // Resolve variable name to its type if needed.
-  std::string type_name = receiver_type;
+  std::string type_name = rt;
   bool found_as_type = false;
   for (const auto *sym : visible) {
     if ((sym->kind == SymbolKind::Struct || sym->kind == SymbolKind::Trait) &&
-        sym->name == receiver_type) {
+        sym->name == rt) {
       found_as_type = true;
       break;
     }
   }
   if (!found_as_type) {
     for (const auto *sym : visible) {
-      if (sym->name == receiver_type && !sym->type_name.empty()) {
+      if (sym->name == rt && !sym->type_name.empty()) {
         type_name = sym->type_name;
         break;
       }
@@ -465,6 +550,18 @@ json::Array CompletionResolver::resolve_impl_method(const std::string &target_ty
                                                     const std::string &trait_name) {
   json::Array items;
   add_type_keywords(items);
+  // A method's return type may be a user-defined type, so offer struct / enum /
+  // trait names alongside the built-in type keywords.
+  auto type_scope = analysis_.symbols.visible_at(line_ + 1);
+  for (const auto *sym : type_scope) {
+    if (sym->kind != SymbolKind::Struct && sym->kind != SymbolKind::Enum &&
+        sym->kind != SymbolKind::Trait)
+      continue;
+    if (!matches_prefix(sym->name)) continue;
+    int kind = (sym->kind == SymbolKind::Struct) ? 22 :
+               (sym->kind == SymbolKind::Enum) ? 13 : 8;
+    items.push_back(protocol::completion_item(sym->name, kind, sym->name));
+  }
   if (trait_name.empty()) return items;
 
   auto visible = analysis_.symbols.visible_at(line_ + 1);
@@ -540,16 +637,19 @@ json::Array CompletionResolver::resolve_impl_target() {
 json::Array CompletionResolver::resolve_struct_literal(const std::string &struct_name) {
   json::Array items;
   auto visible = analysis_.symbols.visible_at(line_ + 1);
+  // Field names act as hints for what each positional slot expects.
   for (const auto *sym : visible) {
     if (sym->kind == SymbolKind::Struct && sym->name == struct_name) {
       for (const auto &field : sym->fields) {
         if (!matches_prefix(field.name)) continue;
-        std::string snippet = field.name + ": ${1:" + field.type_name + "}";
-        items.push_back(protocol::completion_item(field.name, 5, field.type_name, snippet, 2));
+        items.push_back(protocol::completion_item(field.name, 5,
+                                                  "field — " + field.type_name));
       }
       break;
     }
   }
+  // Slots are positional value expressions, so offer self / locals / types too.
+  add_scope_symbols(items);
   return items;
 }
 

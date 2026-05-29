@@ -108,6 +108,22 @@ std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
     if (ns->namespace_name == "io" && ns->member_name == "in")
       return "$io_istream";
   }
+  // Encode an access chain so the resolver (which owns the symbol table) can
+  // walk it to a concrete type. Segments are separated by '\x1f'; a method-call
+  // segment is suffixed with "()". E.g. `r.scale(2).` -> "r\x1fscale()".
+  if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(expr)) {
+    std::string base = infer_receiver_type(field->object.get());
+    if (base.empty()) return {};
+    return base + "\x1f" + field->field_name;
+  }
+  if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr)) {
+    if (const auto *callee =
+            dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
+      std::string base = infer_receiver_type(callee->object.get());
+      if (base.empty()) return {};
+      return base + "\x1f" + callee->field_name + "()";
+    }
+  }
   return {};
 }
 

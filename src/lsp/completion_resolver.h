@@ -23,6 +23,9 @@ private:
   json::Array resolve_type_expr();
   json::Array resolve_param_type();
   json::Array resolve_field_access(const std::string &receiver_type);
+  std::string walk_access_chain(const std::string &chain);
+  std::string member_type(const std::string &type_name, const std::string &member,
+                          bool is_call);
   json::Array resolve_namespace_access(const std::string &ns_name);
   json::Array resolve_import_path();
   json::Array resolve_import_symbol(const std::string &import_path);
