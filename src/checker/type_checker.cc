@@ -79,6 +79,19 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
     }
     return array_type(resolve_type_expr(expr.type_args[0], loc));
   }
+  if (expr.name == "Map") {
+    if (expr.type_args.size() != 2) {
+      if (loc.line > 0) {
+        error_at(loc, "Map type requires a key and a value type.");
+      }
+      return map_type(string_type(), int_type());
+    }
+    Type key = resolve_type_expr(expr.type_args[0], loc);
+    if (key.kind != TypeKind::String && key.kind != TypeKind::Int && loc.line > 0) {
+      error_at(loc, "Map key type must be string or int.");
+    }
+    return map_type(key, resolve_type_expr(expr.type_args[1], loc));
+  }
   if (expr.type_args.empty()) {
     Type t = resolve_type_name(expr.name);
     if (t.name.find("<unknown:") == 0 && loc.line > 0) {
@@ -952,6 +965,36 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     // Handle array method calls: arr.len(), arr.push(x), etc.
     if (field_callee) {
       Type obj_type = check_expr(*field_callee->object);
+      if (obj_type.kind == TypeKind::Map) {
+        const std::string &method = field_callee->field_name;
+        if (method == "len") {
+          if (!call_expr->args.empty()) {
+            error_at(call_expr->location, "len() takes no arguments.");
+          }
+          return int_type();
+        }
+        if (method == "has" || method == "remove") {
+          if (call_expr->args.size() != 1) {
+            error_at(call_expr->location, method + "() takes exactly 1 argument (key).");
+          } else {
+            Type k = check_expr(*call_expr->args[0]);
+            if (obj_type.key_type && !k.is_compatible_with(*obj_type.key_type)) {
+              error_at(call_expr->args[0]->location,
+                       method + "() key must be " + type_to_string(*obj_type.key_type) +
+                           ", got " + type_to_string(k) + ".");
+            }
+          }
+          return method == "has" ? bool_type() : void_type();
+        }
+        if (method == "keys") {
+          if (!call_expr->args.empty()) {
+            error_at(call_expr->location, "keys() takes no arguments.");
+          }
+          return array_type(obj_type.key_type ? *obj_type.key_type : string_type());
+        }
+        error_at(call_expr->location, "Map has no method '" + method + "'.");
+        return int_type();
+      }
       if (obj_type.kind == TypeKind::Array) {
         const std::string &method = field_callee->field_name;
         if (method == "len") {
@@ -1402,6 +1445,14 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     }
 
     Type obj_type = check_expr(*field_access->object);
+    if (obj_type.kind == TypeKind::Map) {
+      const std::string &method = field_access->field_name;
+      if (method == "len" || method == "has" || method == "remove" || method == "keys") {
+        return void_type();
+      }
+      error_at(field_access->location, "Map has no method '" + method + "'.");
+      return int_type();
+    }
     if (obj_type.kind == TypeKind::Array) {
       const std::string &method = field_access->field_name;
       if (method == "len" || method == "push" || method == "pop" ||
@@ -1539,9 +1590,45 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     return array_type(has_element_type ? element_type : null_type());
   }
 
+  if (const auto *map_lit = dynamic_cast<const ast::MapLiteralExpr *>(&expr)) {
+    Type key_type = null_type();
+    Type val_type = null_type();
+    bool has_kv = false;
+    for (std::size_t i = 0; i < map_lit->keys.size(); ++i) {
+      Type k = check_expr(*map_lit->keys[i]);
+      Type v = check_expr(*map_lit->values[i]);
+      if (k.kind != TypeKind::String && k.kind != TypeKind::Int) {
+        error_at(map_lit->keys[i]->location, "Map key must be a string or int.");
+      }
+      if (!has_kv) {
+        key_type = k;
+        val_type = v;
+        has_kv = true;
+      } else {
+        if (!k.is_compatible_with(key_type)) {
+          error_at(map_lit->keys[i]->location, "Map keys must have compatible types.");
+        }
+        if (!v.is_compatible_with(val_type)) {
+          error_at(map_lit->values[i]->location, "Map values must have compatible types.");
+        }
+      }
+    }
+    return map_type(has_kv ? key_type : null_type(), has_kv ? val_type : null_type());
+  }
+
   if (const auto *index_expr = dynamic_cast<const ast::IndexExpr *>(&expr)) {
     Type object_type = check_expr(*index_expr->object);
     Type index_type = check_expr(*index_expr->index);
+    // Map subscript: key type must match; value returned (null on missing key
+    // at runtime, so the static type is the declared value type).
+    if (object_type.kind == TypeKind::Map) {
+      if (object_type.key_type && !index_type.is_compatible_with(*object_type.key_type)) {
+        error_at(index_expr->index->location,
+                 "Map key must be " + type_to_string(*object_type.key_type) + ", got " +
+                     type_to_string(index_type) + ".");
+      }
+      return object_type.element_type ? *object_type.element_type : null_type();
+    }
     if (index_type.kind != TypeKind::Int) {
       error_at(index_expr->index->location, "Array index must be an Int.");
     }
@@ -1559,6 +1646,20 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     Type object_type = check_expr(*index_assign->object);
     Type index_type = check_expr(*index_assign->index);
     Type value_type = check_expr(*index_assign->value);
+    // Map insert/update: key must match key type, value must match value type.
+    if (object_type.kind == TypeKind::Map) {
+      if (object_type.key_type && !index_type.is_compatible_with(*object_type.key_type)) {
+        error_at(index_assign->index->location,
+                 "Map key must be " + type_to_string(*object_type.key_type) + ", got " +
+                     type_to_string(index_type) + ".");
+      }
+      if (object_type.element_type && !value_type.is_compatible_with(*object_type.element_type)) {
+        error_at(index_assign->value->location,
+                 "Cannot assign " + type_to_string(value_type) + " to map value of type " +
+                     type_to_string(*object_type.element_type) + ".");
+      }
+      return object_type.element_type ? *object_type.element_type : value_type;
+    }
     if (index_type.kind != TypeKind::Int) {
       error_at(index_assign->index->location, "Array index must be an Int.");
     }

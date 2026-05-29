@@ -79,6 +79,13 @@ Value Value::array_value(std::vector<Value> elements) {
   return result;
 }
 
+Value Value::map_value() {
+  Value result;
+  result.type = ValueType::Map;
+  result.map_storage = std::make_shared<MapData>();
+  return result;
+}
+
 bool Value::is_number() const {
   return type == ValueType::Int || type == ValueType::Double;
 }
@@ -127,6 +134,19 @@ std::ostream &operator<<(std::ostream &out, const Value &value) {
       }
     }
     out << "]";
+    break;
+  case ValueType::Map:
+    out << "{";
+    if (value.map_storage) {
+      for (std::size_t i = 0; i < value.map_storage->order.size(); ++i) {
+        if (i > 0) {
+          out << ", ";
+        }
+        const MapEntry &entry = value.map_storage->entries.at(value.map_storage->order[i]);
+        out << entry.key << ": " << entry.value;
+      }
+    }
+    out << "}";
     break;
   case ValueType::NativeFunction:
     out << "<native-fn>";

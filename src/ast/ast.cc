@@ -158,6 +158,20 @@ void ArrayLiteralExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+MapLiteralExpr::MapLiteralExpr(SourceLocation location, std::vector<ExprPtr> keys,
+                               std::vector<ExprPtr> values)
+    : Expr(location), keys(std::move(keys)), values(std::move(values)) {}
+
+void MapLiteralExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(map-literal";
+  for (std::size_t i = 0; i < keys.size(); ++i) {
+    print_child(out, *keys[i], indent);
+    print_child(out, *values[i], indent);
+  }
+  out << ")";
+}
+
 IdentifierExpr::IdentifierExpr(SourceLocation location, std::string name)
     : Expr(location), name(std::move(name)) {}
 

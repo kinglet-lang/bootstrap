@@ -121,6 +121,16 @@ struct ArrayLiteralExpr final : Expr {
   std::vector<ExprPtr> elements;
 };
 
+// A map literal: `{}` (empty) or `{k1: v1, k2: v2}`. Parallel key/value lists.
+struct MapLiteralExpr final : Expr {
+  MapLiteralExpr(SourceLocation location, std::vector<ExprPtr> keys,
+                 std::vector<ExprPtr> values);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::vector<ExprPtr> keys;
+  std::vector<ExprPtr> values;
+};
+
 struct IdentifierExpr final : Expr {
   IdentifierExpr(SourceLocation location, std::string name);
   void print(std::ostream &out, int indent = 0) const override;

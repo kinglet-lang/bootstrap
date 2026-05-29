@@ -18,6 +18,7 @@ enum class TypeKind {
   Struct,
   Enum,
   Array,
+  Map,
 };
 
 struct Type;
@@ -46,6 +47,8 @@ struct Type {
   std::vector<Type> param_types;
   std::shared_ptr<Type> return_type;
   std::shared_ptr<Type> element_type;
+  // For Map: key_type holds K, element_type holds V.
+  std::shared_ptr<Type> key_type;
   std::vector<FieldInfo> fields;
   std::vector<std::string> variants;
   std::vector<std::vector<Type>> variant_param_types;
@@ -58,6 +61,7 @@ const Type &string_type();
 const Type &void_type();
 const Type &null_type();
 Type array_type(Type element_type);
+Type map_type(Type key, Type value);
 
 std::ostream &operator<<(std::ostream &out, const Type &type);
 std::ostream &operator<<(std::ostream &out, TypeKind kind);

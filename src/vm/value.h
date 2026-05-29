@@ -4,6 +4,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace kinglet {
@@ -18,6 +19,7 @@ enum class ValueType {
   Struct,
   Enum,
   Array,
+  Map,
   NativeFunction,
 };
 
@@ -44,6 +46,9 @@ struct ArrayData {
   std::vector<Value> elements;
 };
 
+// MapEntry / MapData hold Value by value, so they are defined after Value below.
+struct MapData;
+
 struct Value {
   static Value int_value(int64_t value);
   static Value double_value(double value);
@@ -56,6 +61,7 @@ struct Value {
   static Value enum_value(int type_index, int variant_index);
   static Value enum_value_with_payload(int type_index, int variant_index, std::vector<Value> payload);
   static Value array_value(std::vector<Value> elements);
+  static Value map_value();
 
   bool is_number() const;
   double as_double() const;
@@ -72,6 +78,23 @@ struct Value {
   int enum_variant_index = -1;
   std::vector<Value> enum_payload;
   std::shared_ptr<ArrayData> array_storage;
+  std::shared_ptr<MapData> map_storage;
+};
+
+// A key/value pair retaining the original key Value (so keys() can return it)
+// alongside the stored value.
+struct MapEntry {
+  Value key;
+  Value value;
+};
+
+// Native map backing store. `order` holds encoded keys in insertion order so
+// keys()/iteration are deterministic; `entries` is the O(1) lookup keyed by the
+// same encoded string (see encode_map_key in vm.cc — "s:" / "i:" prefixed to
+// keep int 65 distinct from string "65").
+struct MapData {
+  std::vector<std::string> order;
+  std::unordered_map<std::string, MapEntry> entries;
 };
 
 std::ostream &operator<<(std::ostream &out, const Value &value);

@@ -929,12 +929,22 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       if (method == "len" || method == "push" || method == "pop" ||
           method == "remove" || method == "contains" || method == "clear" ||
           method == "insert" || method == "index_of" || method == "slice" ||
-          method == "reverse" || method == "resize" || method == "starts_with" ||
+          method == "reverse" || method == "resize" || method == "has" ||
+          method == "keys" || method == "starts_with" ||
           method == "ends_with" || method == "replace" || method == "split" ||
           method == "trim" || method == "to_upper" || method == "to_lower") {
         compile_expr(*field_callee->object);
         if (method == "len") {
           emit(OpCode::ArrayLen, call_expr->location);
+          return;
+        }
+        if (method == "has") {
+          compile_expr(*call_expr->args[0]);
+          emit(OpCode::MapHas, call_expr->location);
+          return;
+        }
+        if (method == "keys") {
+          emit(OpCode::MapKeys, call_expr->location);
           return;
         }
         if (method == "push") {
@@ -1436,6 +1446,16 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     }
     emit_operand(OpCode::ArrayNew, static_cast<uint32_t>(array_lit->elements.size()),
                  array_lit->location);
+    return;
+  }
+
+  if (const auto *map_lit = dynamic_cast<const ast::MapLiteralExpr *>(&expr)) {
+    for (std::size_t i = 0; i < map_lit->keys.size(); ++i) {
+      compile_expr(*map_lit->keys[i]);
+      compile_expr(*map_lit->values[i]);
+    }
+    emit_operand(OpCode::MapNew, static_cast<uint32_t>(map_lit->keys.size()),
+                 map_lit->location);
     return;
   }
 

@@ -76,6 +76,13 @@ enum class OpCode : uint8_t {
   StringToLower,
   EnumVariantPayload,
   EnumPayloadGet,
+  MapNew,
+  MapGet,
+  MapSet,
+  MapHas,
+  MapRemove,
+  MapKeys,
+  MapLen,
 };
 
 struct Instruction {

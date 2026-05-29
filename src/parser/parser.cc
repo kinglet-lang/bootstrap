@@ -540,6 +540,12 @@ ast::StmtPtr Parser::statement() {
     set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}, {}});
     return nullptr;
   }
+  // A leading '{' is normally a block, but `{K: V} name = ...` is a map
+  // variable declaration. Disambiguate by lookahead before treating it as a
+  // block (Kinglet has no labelled blocks, so the var-decl shape is unambiguous).
+  if (check(TokenType::LEFT_BRACE) && looks_like_map_var_decl()) {
+    return var_declaration();
+  }
   if (match(TokenType::LEFT_BRACE)) {
     return block_statement();
   }
@@ -711,7 +717,16 @@ ast::StmtPtr Parser::var_declaration() {
   }
   if (is_type_start(peek().type)) {
     size_t pos = current_ + 1;
-    if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
+    if (peek().type == TokenType::LEFT_BRACE) {
+      // Map type {K: V}: scan to the matching '}', then expect an identifier.
+      int depth = 1;
+      while (pos < tokens_.size() && depth > 0) {
+        if (tokens_[pos].type == TokenType::LEFT_BRACE) ++depth;
+        else if (tokens_[pos].type == TokenType::RIGHT_BRACE) --depth;
+        ++pos;
+      }
+      has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
+    } else if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
       int depth = 1;
       ++pos;
       while (pos < tokens_.size() && depth > 0) {
@@ -744,7 +759,8 @@ ast::StmtPtr Parser::var_declaration() {
   ast::ExprPtr init;
   if (match(TokenType::EQUAL)) {
     init = expression();
-  } else if (!type.name.empty() && check(TokenType::LEFT_BRACE)) {
+  } else if (!type.name.empty() && type.name != "Map" && type.name != "Array" &&
+             check(TokenType::LEFT_BRACE)) {
     advance(); // consume '{'
     std::vector<ast::StructLiteralExpr::FieldInit> fields;
     while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
@@ -1106,6 +1122,23 @@ ast::ExprPtr Parser::primary() {
     return std::make_unique<ast::ArrayLiteralExpr>(location_of(left_bracket),
                                                    std::move(elements));
   }
+  // Map literal in expression position: `{}` or `{k: v, ...}`. Blocks never
+  // appear in expression position, so a '{' here is unambiguously a map.
+  if (match(TokenType::LEFT_BRACE)) {
+    const Token &left_brace = previous();
+    std::vector<ast::ExprPtr> keys;
+    std::vector<ast::ExprPtr> values;
+    if (!check(TokenType::RIGHT_BRACE)) {
+      do {
+        keys.push_back(expression());
+        consume(TokenType::COLON, "Expected ':' between map key and value.");
+        values.push_back(expression());
+      } while (match(TokenType::COMMA));
+    }
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after map literal.");
+    return std::make_unique<ast::MapLiteralExpr>(location_of(left_brace),
+                                                 std::move(keys), std::move(values));
+  }
   if (match(TokenType::SELF)) {
     return std::make_unique<ast::IdentifierExpr>(location_of(previous()), "self");
   }
@@ -1362,6 +1395,7 @@ bool Parser::is_type_start(TokenType type) const {
   case TokenType::VOID:
   case TokenType::BYTE:
   case TokenType::IDENTIFIER:
+  case TokenType::LEFT_BRACE: // map type {K: V}
     return true;
   default:
     return false;
@@ -1408,6 +1442,34 @@ bool Parser::is_declaration_start() const {
          tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
     pos += 2;
   }
+  return pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
+}
+
+bool Parser::looks_like_map_var_decl() const {
+  // Expect current token to be '{'. Scan to the matching '}', requiring a
+  // depth-1 ':' (the K:V separator), then an identifier (the variable name)
+  // immediately after. A block body never has that shape.
+  if (!check(TokenType::LEFT_BRACE)) return false;
+  size_t pos = current_ + 1;
+  int depth = 1;
+  bool saw_top_level_colon = false;
+  while (pos < tokens_.size() && depth > 0) {
+    TokenType t = tokens_[pos].type;
+    if (t == TokenType::LEFT_BRACE) {
+      ++depth;
+    } else if (t == TokenType::RIGHT_BRACE) {
+      --depth;
+    } else if (t == TokenType::COLON && depth == 1) {
+      saw_top_level_colon = true;
+    } else if (t == TokenType::SEMICOLON && depth == 1) {
+      // A ';' at brace depth 1 means this is a block of statements, not a type.
+      return false;
+    } else if (t == TokenType::END_OF_FILE) {
+      return false;
+    }
+    ++pos;
+  }
+  if (!saw_top_level_colon) return false;
   return pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
 }
 
@@ -1465,6 +1527,18 @@ ast::TypeExpr Parser::parse_type_expr() {
   if (!is_type_start(peek().type)) {
     error_at(peek(), "Expected type name.");
     return ast::TypeExpr{"<error>", {}};
+  }
+  // Map type: {K: V} — encoded as Map<K, V> (name="Map", type_args=[K, V]).
+  if (check(TokenType::LEFT_BRACE)) {
+    advance(); // consume '{'
+    ast::TypeExpr key = parse_type_expr();
+    consume(TokenType::COLON, "Expected ':' between map key and value types.");
+    ast::TypeExpr value = parse_type_expr();
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after map value type.");
+    std::vector<ast::TypeExpr> map_args;
+    map_args.push_back(std::move(key));
+    map_args.push_back(std::move(value));
+    return ast::TypeExpr{"Map", std::move(map_args)};
   }
   std::string name = token_text(advance());
   std::vector<ast::TypeExpr> type_args;

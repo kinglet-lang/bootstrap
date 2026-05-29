@@ -18,6 +18,24 @@
 #endif
 namespace kinglet {
 
+namespace {
+
+// Encode a map key Value into a lookup string. The "s:"/"i:" prefix keeps the
+// string key "65" distinct from the int key 65. Only string and int keys are
+// supported (enforced by the type checker); other types return empty, treated
+// as a non-match by callers.
+std::string encode_map_key(const Value &key) {
+  if (key.type == ValueType::String) {
+    return "s:" + key.string_storage;
+  }
+  if (key.type == ValueType::Int) {
+    return "i:" + std::to_string(key.int_value_storage);
+  }
+  return std::string();
+}
+
+} // namespace
+
 VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
   stack_.clear();
   frames_.clear();
@@ -773,6 +791,18 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       }
       Value index = pop();
       Value object = pop();
+      if (object.type == ValueType::Map) {
+        if (!object.map_storage) {
+          return runtime_error("Cannot index null map.");
+        }
+        auto it = object.map_storage->entries.find(encode_map_key(index));
+        if (it == object.map_storage->entries.end()) {
+          push(Value::null_value());
+        } else {
+          push(it->second.value);
+        }
+        break;
+      }
       if (object.type == ValueType::String) {
         if (index.type != ValueType::Int) {
           return runtime_error("String index must be an integer.");
@@ -805,6 +835,18 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value value = pop();
       Value index = pop();
       Value array = pop();
+      if (array.type == ValueType::Map) {
+        if (!array.map_storage) {
+          return runtime_error("Cannot assign on null map.");
+        }
+        std::string ek = encode_map_key(index);
+        if (array.map_storage->entries.find(ek) == array.map_storage->entries.end()) {
+          array.map_storage->order.push_back(ek);
+        }
+        array.map_storage->entries[ek] = MapEntry{index, value};
+        push(value);
+        break;
+      }
       if (array.type != ValueType::Array || !array.array_storage) {
         return runtime_error("Cannot assign indexed value on non-array value.");
       }
@@ -823,6 +865,10 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value obj = pop();
       if (obj.type == ValueType::String) {
         push(Value::int_value(static_cast<int64_t>(obj.string_storage.size())));
+        break;
+      }
+      if (obj.type == ValueType::Map && obj.map_storage) {
+        push(Value::int_value(static_cast<int64_t>(obj.map_storage->order.size())));
         break;
       }
       if (obj.type != ValueType::Array || !obj.array_storage) {
@@ -875,6 +921,22 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::ArrayRemove: {
       Value index = pop();
       Value array = pop();
+      if (array.type == ValueType::Map) {
+        // Map remove(key): delete the entry, return null. (Array remove returns
+        // the removed element, but map remove has no positional element.)
+        if (!array.map_storage) {
+          return runtime_error("Cannot call remove() on null map.");
+        }
+        std::string ek = encode_map_key(index);
+        auto it = array.map_storage->entries.find(ek);
+        if (it != array.map_storage->entries.end()) {
+          array.map_storage->entries.erase(it);
+          auto &order = array.map_storage->order;
+          order.erase(std::remove(order.begin(), order.end(), ek), order.end());
+        }
+        push(Value::null_value());
+        break;
+      }
       if (array.type != ValueType::Array || !array.array_storage) {
         return runtime_error("Cannot call remove() on non-array value.");
       }
@@ -1031,6 +1093,106 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       std::reverse(array.array_storage->elements.begin(),
                    array.array_storage->elements.end());
       push(Value::null_value());
+      break;
+    }
+    case OpCode::MapNew: {
+      const uint32_t pair_count = static_cast<uint32_t>(instruction.operand);
+      if (stack_.size() < pair_count * 2) {
+        return runtime_error("Stack underflow for map literal.");
+      }
+      Value map = Value::map_value();
+      // Pairs were pushed key,value left-to-right; pop in reverse and insert so
+      // the original textual order is preserved in `order`.
+      std::vector<std::pair<Value, Value>> pairs(pair_count);
+      for (uint32_t i = 0; i < pair_count; ++i) {
+        Value v = pop();
+        Value k = pop();
+        pairs[pair_count - 1 - i] = {std::move(k), std::move(v)};
+      }
+      for (auto &[k, v] : pairs) {
+        std::string ek = encode_map_key(k);
+        if (map.map_storage->entries.find(ek) == map.map_storage->entries.end()) {
+          map.map_storage->order.push_back(ek);
+        }
+        map.map_storage->entries[ek] = MapEntry{std::move(k), std::move(v)};
+      }
+      push(std::move(map));
+      break;
+    }
+    case OpCode::MapGet: {
+      Value key = pop();
+      Value map = pop();
+      if (map.type != ValueType::Map || !map.map_storage) {
+        return runtime_error("Cannot index non-map value.");
+      }
+      auto it = map.map_storage->entries.find(encode_map_key(key));
+      if (it == map.map_storage->entries.end()) {
+        push(Value::null_value());
+      } else {
+        push(it->second.value);
+      }
+      break;
+    }
+    case OpCode::MapSet: {
+      Value value = pop();
+      Value key = pop();
+      Value map = pop();
+      if (map.type != ValueType::Map || !map.map_storage) {
+        return runtime_error("Cannot assign on non-map value.");
+      }
+      std::string ek = encode_map_key(key);
+      if (map.map_storage->entries.find(ek) == map.map_storage->entries.end()) {
+        map.map_storage->order.push_back(ek);
+      }
+      map.map_storage->entries[ek] = MapEntry{std::move(key), value};
+      push(Value::null_value());
+      break;
+    }
+    case OpCode::MapHas: {
+      Value key = pop();
+      Value map = pop();
+      if (map.type != ValueType::Map || !map.map_storage) {
+        return runtime_error("Cannot call has() on non-map value.");
+      }
+      bool found = map.map_storage->entries.count(encode_map_key(key)) != 0;
+      push(Value::bool_value(found));
+      break;
+    }
+    case OpCode::MapRemove: {
+      Value key = pop();
+      Value map = pop();
+      if (map.type != ValueType::Map || !map.map_storage) {
+        return runtime_error("Cannot call remove() on non-map value.");
+      }
+      std::string ek = encode_map_key(key);
+      auto it = map.map_storage->entries.find(ek);
+      if (it != map.map_storage->entries.end()) {
+        map.map_storage->entries.erase(it);
+        auto &order = map.map_storage->order;
+        order.erase(std::remove(order.begin(), order.end(), ek), order.end());
+      }
+      push(Value::null_value());
+      break;
+    }
+    case OpCode::MapKeys: {
+      Value map = pop();
+      if (map.type != ValueType::Map || !map.map_storage) {
+        return runtime_error("Cannot call keys() on non-map value.");
+      }
+      std::vector<Value> keys;
+      keys.reserve(map.map_storage->order.size());
+      for (const std::string &ek : map.map_storage->order) {
+        keys.push_back(map.map_storage->entries.at(ek).key);
+      }
+      push(Value::array_value(std::move(keys)));
+      break;
+    }
+    case OpCode::MapLen: {
+      Value map = pop();
+      if (map.type != ValueType::Map || !map.map_storage) {
+        return runtime_error("Cannot call len() on non-map value.");
+      }
+      push(Value::int_value(static_cast<int64_t>(map.map_storage->order.size())));
       break;
     }
     case OpCode::StringStartsWith: {

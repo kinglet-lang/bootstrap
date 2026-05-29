@@ -112,6 +112,8 @@ void Chunk::disassemble(std::ostream &out) const {
       out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::ArrayNew) {
       out << " count=" << instruction.operand;
+    } else if (instruction.op == OpCode::MapNew) {
+      out << " pairs=" << instruction.operand;
     }
     out << '\n';
   }
@@ -251,6 +253,20 @@ const char *opcode_name(OpCode op) {
     return "EnumVariantPayload";
   case OpCode::EnumPayloadGet:
     return "EnumPayloadGet";
+  case OpCode::MapNew:
+    return "MapNew";
+  case OpCode::MapGet:
+    return "MapGet";
+  case OpCode::MapSet:
+    return "MapSet";
+  case OpCode::MapHas:
+    return "MapHas";
+  case OpCode::MapRemove:
+    return "MapRemove";
+  case OpCode::MapKeys:
+    return "MapKeys";
+  case OpCode::MapLen:
+    return "MapLen";
   }
   return "Unknown";
 }

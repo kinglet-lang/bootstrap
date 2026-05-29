@@ -217,6 +217,10 @@ run_args_case "sys_args" 0 $'argc: 0\n' ""
 # End-to-end self-hosting I/O smoke test: cat reads its argument file.
 run_args_case "cat" 0 $'hello fs\n' "" "$ROOT/tests/cli/cases/cat_fixture.txt"
 
+# --- Map (native hash map) ---
+run_case "map_basic" "run" 0 $'len=3\na=1\nmissing=null\nhas_b=true\nhas_b_after=false\nlen_after=2\nkeys_len=2\nx=10 y=20\nidx0=zero idx1=one\nhas0=true\n' ""
+run_case "map_symbol_table" "run" 0 $'found: x kind=1\nz not found\ntotal=2\n  x -> kind=1\n  y -> kind=2\n' ""
+
 if [[ "$FAILURES" -ne 0 ]]; then
   echo "$FAILURES CLI golden test(s) failed." >&2
   exit 1

@@ -1,7 +1,7 @@
 using io;
 
 struct Holder<T> { T[] items; }
-struct Map<K, V> { K[] keys; V[] vals; }
+struct PairMap<K, V> { K[] keys; V[] vals; }
 
 int main() {
   Holder<int> h { [] };
@@ -9,7 +9,7 @@ int main() {
   h.items.push(20);
   io::out.line("{} {}", h.items[0], h.items.len());
 
-  Map<string, int> m { [], [] };
+  PairMap<string, int> m { [], [] };
   m.keys.push("one");
   m.vals.push(1);
   io::out.line("{} {}", m.keys[0], m.vals[0]);
