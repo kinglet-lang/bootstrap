@@ -187,6 +187,27 @@ CASES = [
      "using io;\nint main() {\n  io::in.|\n}\n",
      ["secret"],
      []),
+
+    # Method-call chains: r.scale(2). resolves through the return type.
+    ("method_chain_dot",
+     "struct Rect { int w; int h; }\n"
+     "impl Rect {\n  Rect scale(self, int f) => self;\n  int area(self) => self.w;\n}\n"
+     "int main() {\n  Rect r { 3, 4 };\n  r.scale(2).|\n}\n",
+     ["area", "scale", "w", "h"],
+     []),
+
+    # impl-body return-type position offers user-defined type names.
+    ("impl_return_user_type",
+     "struct Rect { int w; int h; }\nimpl Rect {\n  R|\n}\n",
+     ["Rect"],
+     []),
+
+    # Positional struct-literal slots are value expressions: offer self/locals.
+    ("struct_literal_self",
+     "struct Rect { int w; int h; }\n"
+     "impl Rect {\n  Rect scale(self, int f) => Rect { sel| };\n}\n",
+     ["self"],
+     [";", "{"]),
 ]
 
 
