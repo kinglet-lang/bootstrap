@@ -26,6 +26,8 @@ json::Array CompletionResolver::resolve(const CompletionInfo &info) {
   switch (info.position) {
   case CompletionPosition::None:
     return json::Array{};
+  case CompletionPosition::UsingNamespace:
+    return resolve_using_namespace();
   case CompletionPosition::TopLevelDecl:
     return resolve_top_level();
   case CompletionPosition::Statement:
@@ -630,6 +632,26 @@ json::Array CompletionResolver::resolve_impl_target() {
     if (!matches_prefix(sym->name)) continue;
     int kind = (sym->kind == SymbolKind::Struct) ? 22 : 13;
     items.push_back(protocol::completion_item(sym->name, kind, sym->name));
+  }
+  return items;
+}
+
+json::Array CompletionResolver::resolve_using_namespace() {
+  // `using <namespace>` — offer the built-in io namespace plus any namespaces
+  // brought in via imports.
+  json::Array items;
+  std::set<std::string> names;
+  names.insert("io");
+  // Namespaces made available through imports. used_namespaces is intentionally
+  // excluded: it is populated by `using` statements themselves (including the
+  // partially-typed one being completed), which would echo back as noise.
+  for (const auto &ns : analysis_.imported_namespaces) names.insert(ns);
+  for (const auto &name : names) {
+    if (name.empty() ||
+        !(std::isalpha(static_cast<unsigned char>(name[0])) || name[0] == '_'))
+      continue;
+    if (!matches_prefix(name)) continue;
+    items.push_back(protocol::completion_item(name, 9, "namespace"));
   }
   return items;
 }

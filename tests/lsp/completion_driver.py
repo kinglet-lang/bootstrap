@@ -222,6 +222,18 @@ CASES = [
      "impl Rect {\n  Rect scale(self, int f) => Rect { sel| };\n}\n",
      ["self"],
      [";", "{"]),
+
+    # `using <ns>` offers namespaces only, never declaration keywords, and the
+    # partial input must not echo back as a candidate.
+    ("using_namespace",
+     "using i|\n",
+     ["io"],
+     ["import", "impl", "using", "i"]),
+
+    ("using_namespace_empty",
+     "using |\n",
+     ["io"],
+     ["import", "struct", "fun", ""]),
 ]
 
 

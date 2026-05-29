@@ -23,6 +23,7 @@ enum class CompletionPosition {
   ParameterType,
   TraitName,
   ImplTarget,
+  UsingNamespace,
 };
 
 struct CompletionInfo {

@@ -232,6 +232,10 @@ ast::DeclPtr Parser::using_declaration() {
   if (match(TokenType::NAMESPACE)) {
     is_namespace = true;
   }
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::UsingNamespace, {}, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
   const Token &name = consume(TokenType::IDENTIFIER, "Expected namespace name after 'using'.");
   consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
   return std::make_unique<ast::UsingDecl>(location_of(using_token), token_text(name), is_namespace);

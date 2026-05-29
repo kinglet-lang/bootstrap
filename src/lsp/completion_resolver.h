@@ -33,6 +33,7 @@ private:
                                   const std::string &trait_name);
   json::Array resolve_trait_name();
   json::Array resolve_impl_target();
+  json::Array resolve_using_namespace();
   json::Array resolve_struct_literal(const std::string &struct_name);
   json::Array resolve_enum_variant(const std::string &subject_name);
 
