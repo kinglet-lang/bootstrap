@@ -133,6 +133,60 @@ CASES = [
      "fn describe(Color c) {\n  c match {\n    |\n  };\n}\n",
      ["Color::Red", "Color::Green", "Color::Blue"],
      []),
+
+    # self. inside a trait default body must not duplicate methods.
+    ("trait_self_dot_dedup",
+     "trait Shape {\n"
+     "  string name(self);\n"
+     "  int area(self);\n"
+     "  string describe(self) => self.|;\n"
+     "}\n",
+     ["name", "area", "describe"],
+     []),
+
+    # impl <Type> must complete struct/enum names.
+    ("impl_target",
+     "struct Rect { int w; int h; }\n"
+     "impl R|\n",
+     ["Rect"],
+     ["int", "void", "if"]),
+
+    # Parameter type position must not offer void/auto.
+    ("param_type_no_void_auto",
+     "struct Rect { int w; int h; }\n"
+     "impl Rect {\n  Rect scale(self, | factor) => self.w;\n}\n",
+     ["int", "string", "Rect"],
+     ["void", "auto"]),
+
+    # Return type position keeps void/auto (they are valid there).
+    ("return_type_keeps_void",
+     "struct Rect { int w; int h; }\n"
+     "impl Rect {\n  | scale(self) => self.w;\n}\n",
+     ["int", "void", "auto"],
+     []),
+
+    # A member-access operator at top level is invalid: offer nothing rather
+    # than flooding every declaration keyword.
+    ("toplevel_dot_empty",
+     "struct Rect { int w; }\n.|\n",
+     [],
+     ["struct", "impl", "import", "fun"]),
+
+    ("toplevel_colon_empty",
+     "struct Rect { int w; }\n::|\n",
+     [],
+     ["struct", "impl", "import", "fun"]),
+
+    # io::out / io::err expose `line`; io::in exposes `secret`.
+    ("io_out_dot_line",
+     "using io;\nint main() {\n  io::out.|\n}\n",
+     ["line"],
+     []),
+
+    ("io_in_dot_secret",
+     "using io;\nint main() {\n  io::in.|\n}\n",
+     ["secret"],
+     []),
 ]
 
 
