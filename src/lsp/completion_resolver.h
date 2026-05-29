@@ -29,13 +29,13 @@ private:
                                   const std::string &trait_name);
   json::Array resolve_trait_name();
   json::Array resolve_struct_literal(const std::string &struct_name);
-  json::Array resolve_enum_variant();
+  json::Array resolve_enum_variant(const std::string &subject_name);
 
   void add_scope_symbols(json::Array &items);
   void add_io_members(json::Array &items);
   void add_type_keywords(json::Array &items);
-  void add_control_keywords(json::Array &items);
-  void add_snippets(json::Array &items);
+  void add_statement_keywords(json::Array &items);
+  void add_decl_keywords(json::Array &items);
   void add_namespace_completions(json::Array &items);
 
   bool matches_prefix(const std::string &name) const;
