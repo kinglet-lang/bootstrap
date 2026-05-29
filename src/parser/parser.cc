@@ -90,6 +90,18 @@ bool Parser::at_completion() const {
   return completion_mode_ && current_ == completion_index_;
 }
 
+bool Parser::completion_after_dangling_access() const {
+  if (current_ == 0) return false;
+  switch (previous().type) {
+  case TokenType::DOT:
+  case TokenType::COLON_COLON:
+  case TokenType::COLON:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void Parser::set_completion(lsp::CompletionInfo info) {
   completion_result_ = std::move(info);
 }
@@ -144,12 +156,11 @@ ParseResult Parser::parse() {
 
 ast::DeclPtr Parser::declaration() {
   if (at_completion()) {
-    // A member-access operator (`.` or `::`) cannot begin a top-level
-    // declaration. If one immediately precedes the cursor here, the position
-    // is syntactically invalid, so offer no completion rather than flooding
-    // the list with every declaration keyword.
-    if (current_ > 0 && (previous().type == TokenType::DOT ||
-                         previous().type == TokenType::COLON_COLON)) {
+    // A member-access or type-separator operator (`.`, `::`, or a lone `:`)
+    // cannot begin a top-level declaration. If one immediately precedes the
+    // cursor here, the position is syntactically invalid, so offer no
+    // completion rather than flooding the list with every declaration keyword.
+    if (completion_after_dangling_access()) {
       set_completion({lsp::CompletionPosition::None, {}, {}, {}, {}, {}, {}});
       return nullptr;
     }
@@ -510,6 +521,12 @@ ast::DeclPtr Parser::function_declaration() {
 
 ast::StmtPtr Parser::statement() {
   if (at_completion()) {
+    // As in declaration(): a dangling `.`, `::`, or `:` cannot begin a
+    // statement, so suppress completion rather than offering every keyword.
+    if (completion_after_dangling_access()) {
+      set_completion({lsp::CompletionPosition::None, {}, {}, {}, {}, {}, {}});
+      return nullptr;
+    }
     set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}, {}});
     return nullptr;
   }

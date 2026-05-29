@@ -95,6 +95,11 @@ private:
   void error_at(const Token &token, std::string_view message);
 
   bool at_completion() const;
+  // True when the cursor sits immediately after a dangling member-access or
+  // type-separator operator (`.`, `::`, or a lone `:`). None of these can begin
+  // a top-level declaration or a statement, so completion there should offer
+  // nothing rather than flooding the list with every keyword.
+  bool completion_after_dangling_access() const;
   void set_completion(lsp::CompletionInfo info);
   std::string infer_receiver_type(const ast::Expr *expr) const;
 

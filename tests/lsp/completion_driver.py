@@ -165,6 +165,15 @@ CASES = [
      ["Rect"],
      ["int", "void", "if"]),
 
+    # The single colon in `impl Type : Trait` is a legal separator: completion
+    # there must still offer trait names (guards against over-suppressing `:`).
+    ("impl_trait_name_after_colon",
+     "trait Drawable { string name(self); }\n"
+     "struct Rect { int w; }\n"
+     "impl Rect : |\n",
+     ["Drawable"],
+     ["struct", "impl", "int"]),
+
     # Parameter type position must not offer void/auto.
     ("param_type_no_void_auto",
      "struct Rect { int w; int h; }\n"
@@ -190,6 +199,29 @@ CASES = [
      "struct Rect { int w; }\n::|\n",
      [],
      ["struct", "impl", "import", "fun"]),
+
+    # A lone `:` is also an invalid declaration start: it must offer nothing,
+    # not the full keyword list. (Regression: single colon flooded keywords.)
+    ("toplevel_single_colon_empty",
+     "struct Rect { int w; }\n:|\n",
+     [],
+     ["struct", "impl", "import", "fun", "main"]),
+
+    # The same dangling operators in statement position must be suppressed too.
+    ("stmt_single_colon_empty",
+     "int main() {\n  :|\n}\n",
+     [],
+     ["if", "for", "while", "return", "let", "match"]),
+
+    ("stmt_dot_empty",
+     "int main() {\n  .|\n}\n",
+     [],
+     ["if", "for", "while", "return", "let", "match"]),
+
+    ("stmt_coloncolon_empty",
+     "int main() {\n  ::|\n}\n",
+     [],
+     ["if", "for", "while", "return", "let", "match"]),
 
     # io::out / io::err expose `line`; io::in exposes `secret`.
     ("io_out_dot_line",
