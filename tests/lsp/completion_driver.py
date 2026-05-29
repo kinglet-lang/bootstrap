@@ -15,7 +15,21 @@ import sys
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-LSP_BIN = os.path.join(ROOT, "out", "Debug", "kinglet-lsp")
+
+
+def _find_lsp_bin():
+    """Locate the built kinglet-lsp binary across platforms and build dirs."""
+    names = ["kinglet-lsp.exe", "kinglet-lsp"] if os.name == "nt" else ["kinglet-lsp"]
+    for build_dir in ("Debug", "Default", "Release"):
+        for name in names:
+            cand = os.path.join(ROOT, "out", build_dir, name)
+            if os.path.exists(cand):
+                return cand
+    # Fall back to the conventional path for a clear error message.
+    return os.path.join(ROOT, "out", "Debug", names[0])
+
+
+LSP_BIN = _find_lsp_bin()
 
 
 def frame(msg: dict) -> bytes:
