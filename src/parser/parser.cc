@@ -797,7 +797,7 @@ ast::ExprPtr Parser::expression() {
 }
 
 ast::ExprPtr Parser::assignment() {
-  ast::ExprPtr expr = pipeline();
+  ast::ExprPtr expr = coalesce();
   if (has_completion()) return expr;
   if (is_assignment_operator(peek().type)) {
     const Token &op = advance();
@@ -840,6 +840,18 @@ ast::ExprPtr Parser::pipeline() {
     args.push_back(std::move(expr));
     std::vector<ast::TypeExpr> type_args;
     expr = std::make_unique<ast::CallExpr>(loc, std::move(func), std::move(type_args), std::move(args));
+  }
+  return expr;
+}
+
+ast::ExprPtr Parser::coalesce() {
+  ast::ExprPtr expr = pipeline();
+  if (match(TokenType::QUESTION_COLON)) {
+    auto loc = location_of(previous());
+    std::string err_binding;
+    ast::ExprPtr rhs = coalesce();
+    expr = std::make_unique<ast::CoalesceExpr>(loc, std::move(expr), std::move(err_binding),
+                                               std::move(rhs));
   }
   return expr;
 }
