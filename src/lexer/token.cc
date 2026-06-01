@@ -124,6 +124,8 @@ const char *token_type_name(TokenType type) {
     return "FAT_ARROW";
   case TokenType::QUESTION:
     return "QUESTION";
+  case TokenType::QUESTION_COLON:
+    return "QUESTION_COLON";
   case TokenType::COLON_COLON:
     return "COLON_COLON";
   case TokenType::DOT:
