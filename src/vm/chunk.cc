@@ -251,10 +251,6 @@ const char *opcode_name(OpCode op) {
     return "StringToUpper";
   case OpCode::StringToLower:
     return "StringToLower";
-  case OpCode::StringToInt:
-    return "StringToInt";
-  case OpCode::StringToFloat:
-    return "StringToFloat";
   case OpCode::StringCode:
     return "StringCode";
   case OpCode::StringCodeAt:

@@ -1284,16 +1284,6 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             error_at(call_expr->location, method + "() takes no arguments.");
           return string_type();
         }
-        if (method == "to_int") {
-          if (!call_expr->args.empty())
-            error_at(call_expr->location, "to_int() takes no arguments.");
-          return int_type();
-        }
-        if (method == "to_float") {
-          if (!call_expr->args.empty())
-            error_at(call_expr->location, "to_float() takes no arguments.");
-          return float_type();
-        }
         if (method == "code") {
           if (!call_expr->args.empty())
             error_at(call_expr->location, "code() takes no arguments.");
@@ -1600,7 +1590,6 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           method == "ends_with" || method == "index_of" || method == "slice" ||
           method == "replace" || method == "split" || method == "trim" ||
           method == "to_upper" || method == "to_lower" ||
-          method == "to_int" || method == "to_float" ||
           method == "code" || method == "code_at") {
         return void_type();
       }

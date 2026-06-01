@@ -934,7 +934,6 @@ void Compiler::compile_expr(const ast::Expr &expr) {
           method == "keys" || method == "starts_with" ||
           method == "ends_with" || method == "replace" || method == "split" ||
           method == "trim" || method == "to_upper" || method == "to_lower" ||
-          method == "to_int" || method == "to_float" ||
           method == "code" || method == "code_at") {
         compile_expr(*field_callee->object);
         if (method == "len") {
@@ -1031,14 +1030,6 @@ void Compiler::compile_expr(const ast::Expr &expr) {
         }
         if (method == "to_lower") {
           emit(OpCode::StringToLower, call_expr->location);
-          return;
-        }
-        if (method == "to_int") {
-          emit(OpCode::StringToInt, call_expr->location);
-          return;
-        }
-        if (method == "to_float") {
-          emit(OpCode::StringToFloat, call_expr->location);
           return;
         }
         if (method == "code") {

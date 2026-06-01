@@ -75,8 +75,6 @@ enum class OpCode : uint8_t {
   StringTrim,
   StringToUpper,
   StringToLower,
-  StringToInt,
-  StringToFloat,
   StringCode,
   StringCodeAt,
   EnumVariantPayload,
