@@ -614,6 +614,67 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     return;
   }
 
+  if (const auto *try_catch = dynamic_cast<const ast::TryCatchStmt *>(&stmt)) {
+    // Emit: PushHandler <catch_pc>
+    //       <try body>
+    //       PopHandler
+    //       Jmp END
+    // catch_pc:
+    //       Pop (error value from stack)
+    //       <for each catch arm>
+    //         Dup + EnumVariantTag comparison → match arm
+    //       END:
+    //
+    // Simplified single-catch model: one catch landing pad that stores the
+    // error value into the binding slot and runs the catch body.
+
+    // Placeholder PushHandler — patch operand after we know catch_pc.
+    const std::size_t handler_idx = chunk_.instructions().size();
+    emit_operand(OpCode::PushHandler, 0, stmt.location);
+
+    // Compile try body — `?` inside will generate JmpIfErr whose target
+    // is the catch stub (see PropagateExpr).
+    const bool prev_in_try = in_try_;
+    const std::size_t prev_catch_pc = try_catch_pc_;
+    in_try_ = true;
+    // try_catch_pc_ will be set below once we know catch_pc.
+    compile_stmt(*try_catch->body);
+    in_try_ = prev_in_try;
+    try_catch_pc_ = prev_catch_pc;
+
+    emit(OpCode::PopHandler, stmt.location);
+    const std::size_t end_jump = emit_jump(OpCode::Jmp, stmt.location);
+
+    // --- catch landing pad ---
+    const std::size_t catch_pc = chunk_.instructions().size();
+    // Patch the PushHandler operand to be the relative offset.
+    const int32_t handler_offset = static_cast<int32_t>(catch_pc - (handler_idx + 1));
+    chunk_.patch_operand(handler_idx, handler_offset);
+
+    // The error value is on the stack (left by `?` stub: Pop + Null + Return
+    // in function-level mode; inside try the `?` stub will instead Jmp here
+    // with the error value still on stack after Pop of original operand).
+    // For the try-body success path, no error value lands here.
+    // For the `?` error path, the stub pops the error value already before
+    // jumping — so the landing pad only needs to handle the binding.
+
+    // Single catch arm: bind error value, execute body.
+    if (!try_catch->catches.empty()) {
+      const ast::CatchArm &arm = try_catch->catches[0];
+      const uint32_t err_slot = static_cast<uint32_t>(locals_.size());
+      locals_.push_back(Local{.name = arm.binding_name, .is_mutable = false});
+      emit_operand(OpCode::StoreLocal, err_slot, stmt.location);
+      compile_stmt(*arm.body);
+      locals_.pop_back();
+    }
+
+    // If multiple catch arms, they'd chain here with enum-variant checks.
+    // For now only the first arm is compiled (design doc: single-catch simplification).
+
+    patch_jump(end_jump);
+    return;
+  }
+
   error_at(stmt.location, "Unsupported statement in VM compiler.");
 }
 
@@ -1546,13 +1607,20 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
   if (const auto *prop = dynamic_cast<const ast::PropagateExpr *>(&expr)) {
     compile_expr(*prop->value);
-    const std::size_t err_jump = emit_jump(OpCode::JmpIfErr, prop->location);
-    const std::size_t end_jump = emit_jump(OpCode::Jmp, prop->location);
-    patch_jump(err_jump);
-    emit(OpCode::Pop, prop->location);
-    emit(OpCode::Null, prop->location);
-    emit(OpCode::Return, prop->location);
-    patch_jump(end_jump);
+    if (in_try_) {
+      // Inside a try block: use PropagateErr which peeks the stack and
+      // either no-ops (success) or pops + jumps to catch via handler_stack_.
+      emit(OpCode::PropagateErr, prop->location);
+    } else {
+      // Function-level: JmpIfErr → Pop + Null + Return.
+      const std::size_t err_jump = emit_jump(OpCode::JmpIfErr, prop->location);
+      const std::size_t end_jump = emit_jump(OpCode::Jmp, prop->location);
+      patch_jump(err_jump);
+      emit(OpCode::Pop, prop->location);
+      emit(OpCode::Null, prop->location);
+      emit(OpCode::Return, prop->location);
+      patch_jump(end_jump);
+    }
     return;
   }
 

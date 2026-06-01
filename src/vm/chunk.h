@@ -90,6 +90,7 @@ enum class OpCode : uint8_t {
   MapLen,
   PushHandler,
   PopHandler,
+  PropagateErr,
 };
 
 struct Instruction {
@@ -133,6 +134,7 @@ public:
   const std::vector<Value> &constants() const;
   const std::vector<Instruction> &instructions() const;
   void disassemble(std::ostream &out) const;
+  void patch_operand(std::size_t index, int32_t operand);
 
 private:
   std::vector<Value> constants_;

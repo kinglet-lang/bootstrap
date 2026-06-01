@@ -564,6 +564,9 @@ ast::StmtPtr Parser::statement() {
   if (match(TokenType::FOR)) {
     return for_statement();
   }
+  if (match(TokenType::TRY)) {
+    return try_catch_statement();
+  }
   if (match(TokenType::BREAK)) {
     return break_statement();
   }

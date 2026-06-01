@@ -1314,6 +1314,28 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       handler_stack_.pop_back();
       break;
     }
+    case OpCode::PropagateErr: {
+      // `?` inside try: if top-of-stack is an error (null or CastError),
+      // jump to the current handler's catch PC. The error value remains on
+      // the stack for the catch landing pad to consume (StoreLocal into the
+      // binding slot). Otherwise no-op (success path).
+      if (stack_.empty()) {
+        return runtime_error("Stack underflow.");
+      }
+      const Value &top = stack_.back();
+      bool is_err = top.type == ValueType::Null ||
+                    (top.type == ValueType::Enum && top.enum_type_index == 0);
+      if (is_err) {
+        if (handler_stack_.empty()) {
+          // No handler — function-level early return.
+          pop();
+          push(Value::null_value());
+          return VmResult{.ok = true, .value = Value::null_value(), .error = ""};
+        }
+        frame.ip = handler_stack_.back();
+      }
+      break;
+    }
     case OpCode::StringStartsWith: {
       Value prefix = pop();
       Value str = pop();

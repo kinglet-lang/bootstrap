@@ -90,6 +90,8 @@ private:
   std::unordered_map<std::string, std::string> local_types_;
   std::unordered_map<std::string, const ast::TraitDecl *> trait_registry_;
   std::unordered_map<std::string, std::string> method_return_types_;
+  bool in_try_ = false;
+  std::size_t try_catch_pc_ = 0; // catch landing pad PC for current try block
 };
 
 } // namespace kinglet

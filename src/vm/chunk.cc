@@ -94,6 +94,8 @@ void Chunk::disassemble(std::ostream &out) const {
       out << " +" << instruction.operand;
     } else if (instruction.op == OpCode::JmpIfErr) {
       out << " +" << instruction.operand;
+    } else if (instruction.op == OpCode::PushHandler) {
+      out << " catch_pc+" << instruction.operand;
     } else if (instruction.op == OpCode::NativeOut) {
       out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::NativeOutLn) {
@@ -119,6 +121,10 @@ void Chunk::disassemble(std::ostream &out) const {
     }
     out << '\n';
   }
+}
+
+void Chunk::patch_operand(std::size_t index, int32_t operand) {
+  instructions_[index].operand = operand;
 }
 
 const char *opcode_name(OpCode op) {
@@ -283,6 +289,8 @@ const char *opcode_name(OpCode op) {
     return "PushHandler";
   case OpCode::PopHandler:
     return "PopHandler";
+  case OpCode::PropagateErr:
+    return "PropagateErr";
   }
   return "Unknown";
 }
