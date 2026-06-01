@@ -30,6 +30,7 @@ enum class OpCode : uint8_t {
   LoadLocal,
   StoreLocal,
   Pop,
+  CastTo,
   Call,
   Return,
   Jmp,

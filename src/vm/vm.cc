@@ -214,6 +214,66 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       }
       pop();
       break;
+    case OpCode::CastTo: {
+      Value src = pop();
+      const int kind = instruction.operand;
+      if (kind == 0) { // int
+        if (src.type == ValueType::Int) {
+          push(src);
+        } else if (src.type == ValueType::Double) {
+          push(Value::int_value(static_cast<int64_t>(src.double_value_storage)));
+        } else if (src.type == ValueType::String) {
+          const std::string &s = src.string_storage;
+          if (s.empty()) {
+            push(Value::null_value());
+          } else {
+            char *end = nullptr;
+            long long v = std::strtoll(s.c_str(), &end, 10);
+            if (end == s.c_str() || *end != '\0') {
+              push(Value::null_value());
+            } else {
+              push(Value::int_value(static_cast<int64_t>(v)));
+            }
+          }
+        } else {
+          return runtime_error("Cast to int requires int, float, or string operand.");
+        }
+      } else if (kind == 1) { // float
+        if (src.type == ValueType::Double) {
+          push(src);
+        } else if (src.type == ValueType::Int) {
+          push(Value::double_value(static_cast<double>(src.int_value_storage)));
+        } else if (src.type == ValueType::String) {
+          const std::string &s = src.string_storage;
+          if (s.empty()) {
+            push(Value::null_value());
+          } else {
+            char *end = nullptr;
+            double v = std::strtod(s.c_str(), &end);
+            if (end == s.c_str() || *end != '\0') {
+              push(Value::null_value());
+            } else {
+              push(Value::double_value(v));
+            }
+          }
+        } else {
+          return runtime_error("Cast to float requires int, float, or string operand.");
+        }
+      } else if (kind == 2) { // string
+        if (src.type == ValueType::String) {
+          push(src);
+        } else if (src.type == ValueType::Int || src.type == ValueType::Double) {
+          std::ostringstream oss;
+          oss << src;
+          push(Value::string_value(oss.str()));
+        } else {
+          return runtime_error("Cast to string requires int, float, or string operand.");
+        }
+      } else {
+        return runtime_error("Unknown CastTo target kind.");
+      }
+      break;
+    }
     case OpCode::Call: {
       const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
       if (stack_.size() < arg_count + 1) {

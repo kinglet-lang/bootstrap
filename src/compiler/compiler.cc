@@ -1494,6 +1494,21 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     return;
   }
 
+  if (const auto *cast = dynamic_cast<const ast::CastExpr *>(&expr)) {
+    compile_expr(*cast->value);
+    int target_kind = -1;
+    const std::string &t = cast->target_type.name;
+    if (t == "int") target_kind = 0;
+    else if (t == "float") target_kind = 1;
+    else if (t == "string") target_kind = 2;
+    if (target_kind < 0) {
+      error_at(cast->location, "Cast target '" + t + "' is not supported in VM compiler.");
+      return;
+    }
+    emit_operand(OpCode::CastTo, static_cast<uint32_t>(target_kind), cast->location);
+    return;
+  }
+
   error_at(expr.location, "Unsupported expression in VM compiler.");
 }
 

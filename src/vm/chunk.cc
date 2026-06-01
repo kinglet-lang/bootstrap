@@ -161,6 +161,8 @@ const char *opcode_name(OpCode op) {
     return "StoreLocal";
   case OpCode::Pop:
     return "Pop";
+  case OpCode::CastTo:
+    return "CastTo";
   case OpCode::Call:
     return "Call";
   case OpCode::Return:
