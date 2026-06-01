@@ -1832,6 +1832,11 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     return left_type;
   }
 
+  if (const auto *prop = dynamic_cast<const ast::PropagateExpr *>(&expr)) {
+    Type inner = check_expr(*prop->value);
+    return inner;
+  }
+
   if (const auto *index_assign = dynamic_cast<const ast::IndexAssignExpr *>(&expr)) {
     Type object_type = check_expr(*index_assign->object);
     Type index_type = check_expr(*index_assign->index);

@@ -1544,6 +1544,18 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     return;
   }
 
+  if (const auto *prop = dynamic_cast<const ast::PropagateExpr *>(&expr)) {
+    compile_expr(*prop->value);
+    const std::size_t err_jump = emit_jump(OpCode::JmpIfErr, prop->location);
+    const std::size_t end_jump = emit_jump(OpCode::Jmp, prop->location);
+    patch_jump(err_jump);
+    emit(OpCode::Pop, prop->location);
+    emit(OpCode::Null, prop->location);
+    emit(OpCode::Return, prop->location);
+    patch_jump(end_jump);
+    return;
+  }
+
   error_at(expr.location, "Unsupported expression in VM compiler.");
 }
 
