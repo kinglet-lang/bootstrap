@@ -1151,7 +1151,8 @@ ast::ExprPtr Parser::primary() {
   }
   if (match(TokenType::CHAR_LIT)) {
     const Token &literal = previous();
-    return std::make_unique<ast::IntLiteralExpr>(location_of(literal), literal.int_value);
+    return std::make_unique<ast::CharLiteralExpr>(location_of(literal),
+                                                  static_cast<int8_t>(literal.int_value));
   }
   if (match(TokenType::TRUE)) {
     const Token &literal = previous();
@@ -1199,7 +1200,8 @@ ast::ExprPtr Parser::primary() {
     return std::make_unique<ast::IdentifierExpr>(location_of(previous()), "self");
   }
   if (check(TokenType::INT) || check(TokenType::FLOAT) || check(TokenType::STRING) ||
-      check(TokenType::BOOL) || check(TokenType::BYTE) || check(TokenType::DOUBLE)) {
+      check(TokenType::BOOL) || check(TokenType::BYTE) || check(TokenType::DOUBLE) ||
+      check(TokenType::CHAR)) {
     if (current_ + 1 < tokens_.size() &&
         tokens_[current_ + 1].type == TokenType::LEFT_PAREN) {
       const Token &type_tok = advance();
@@ -1463,6 +1465,7 @@ bool Parser::is_type_start(TokenType type) const {
   case TokenType::STRING:
   case TokenType::VOID:
   case TokenType::BYTE:
+  case TokenType::CHAR:
   case TokenType::IDENTIFIER:
   case TokenType::LEFT_BRACE: // map type {K: V}
     return true;
