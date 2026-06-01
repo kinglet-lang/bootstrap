@@ -214,6 +214,12 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       }
       pop();
       break;
+    case OpCode::Dup:
+      if (stack_.empty()) {
+        return runtime_error("Stack underflow.");
+      }
+      stack_.push_back(stack_.back());
+      break;
     case OpCode::CastTo: {
       Value src = pop();
       const int kind = instruction.operand;

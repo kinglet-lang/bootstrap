@@ -1500,6 +1500,18 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     return;
   }
 
+  if (const auto *coalesce = dynamic_cast<const ast::CoalesceExpr *>(&expr)) {
+    compile_expr(*coalesce->left);
+    emit(OpCode::Dup, coalesce->location);
+    const std::size_t fallback_jump = emit_jump(OpCode::JmpFalse, coalesce->location);
+    const std::size_t end_jump = emit_jump(OpCode::Jmp, coalesce->location);
+    patch_jump(fallback_jump);
+    emit(OpCode::Pop, coalesce->location);
+    compile_expr(*coalesce->right);
+    patch_jump(end_jump);
+    return;
+  }
+
   error_at(expr.location, "Unsupported expression in VM compiler.");
 }
 
