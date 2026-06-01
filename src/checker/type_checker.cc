@@ -1774,6 +1774,33 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     return *object_type.element_type;
   }
 
+  if (const auto *cast = dynamic_cast<const ast::CastExpr *>(&expr)) {
+    Type src = check_expr(*cast->value);
+    const std::string &target = cast->target_type.name;
+    TypeKind src_k = src.kind;
+    auto src_is = [&](TypeKind k) { return src_k == k; };
+    if (target == "int") {
+      if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
+        return int_type();
+      }
+    } else if (target == "float") {
+      if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
+        return float_type();
+      }
+    } else if (target == "string") {
+      if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
+        return string_type();
+      }
+    } else {
+      error_at(cast->location,
+               "Cast target '" + target + "' is not supported. Use int, float, or string.");
+      return null_type();
+    }
+    error_at(cast->location,
+             "Cannot cast " + type_to_string(src) + " to " + target + ".");
+    return null_type();
+  }
+
   if (const auto *index_assign = dynamic_cast<const ast::IndexAssignExpr *>(&expr)) {
     Type object_type = check_expr(*index_assign->object);
     Type index_type = check_expr(*index_assign->index);
