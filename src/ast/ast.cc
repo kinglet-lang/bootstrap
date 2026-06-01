@@ -238,6 +238,22 @@ void CastExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+CoalesceExpr::CoalesceExpr(SourceLocation location, ExprPtr left, std::string err_binding,
+                           ExprPtr right)
+    : Expr(location), left(std::move(left)), err_binding(std::move(err_binding)),
+      right(std::move(right)) {}
+
+void CoalesceExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(coalesce";
+  if (!err_binding.empty()) {
+    out << " err=" << err_binding;
+  }
+  print_child(out, *left, indent);
+  print_child(out, *right, indent);
+  out << ")";
+}
+
 BindingPattern::BindingPattern(SourceLocation location, std::string name)
     : Expr(location), name(std::move(name)) {}
 

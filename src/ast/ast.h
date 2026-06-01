@@ -182,6 +182,17 @@ struct CastExpr final : Expr {
   ExprPtr value;
 };
 
+// `e ?: f` (bare) or `e ?: let err => f` (with payload binding).
+// `err_binding` is empty when the bare form is used.
+struct CoalesceExpr final : Expr {
+  CoalesceExpr(SourceLocation location, ExprPtr left, std::string err_binding, ExprPtr right);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr left;
+  std::string err_binding;
+  ExprPtr right;
+};
+
 struct BindingPattern final : Expr {
   BindingPattern(SourceLocation location, std::string name);
   void print(std::ostream &out, int indent = 0) const override;
