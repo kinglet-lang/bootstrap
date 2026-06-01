@@ -174,6 +174,14 @@ struct CallExpr final : Expr {
   std::vector<ExprPtr> args;
 };
 
+struct CastExpr final : Expr {
+  CastExpr(SourceLocation location, TypeExpr target_type, ExprPtr value);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  TypeExpr target_type;
+  ExprPtr value;
+};
+
 struct BindingPattern final : Expr {
   BindingPattern(SourceLocation location, std::string name);
   void print(std::ostream &out, int indent = 0) const override;

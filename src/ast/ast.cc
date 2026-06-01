@@ -228,6 +228,16 @@ void CallExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+CastExpr::CastExpr(SourceLocation location, TypeExpr target_type, ExprPtr value)
+    : Expr(location), target_type(std::move(target_type)), value(std::move(value)) {}
+
+void CastExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(cast " << target_type.to_string();
+  print_child(out, *value, indent);
+  out << ")";
+}
+
 BindingPattern::BindingPattern(SourceLocation location, std::string name)
     : Expr(location), name(std::move(name)) {}
 
