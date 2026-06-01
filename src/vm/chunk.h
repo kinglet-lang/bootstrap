@@ -134,6 +134,10 @@ public:
   void disassemble(std::ostream &out) const;
   void patch_operand(std::size_t index, int32_t operand);
 
+  // Bytecode serialization (.kbc format)
+  bool serialize(const std::string &path) const;
+  static Chunk deserialize(const std::string &path, std::string *error);
+
 private:
   std::vector<Value> constants_;
   std::vector<Instruction> instructions_;
