@@ -167,6 +167,16 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
   push_scope();
 
+  // Pre-register the built-in CastError enum: every program sees it without
+  // an explicit declaration. Variants align with VM CastTo failure mode.
+  {
+    Type cast_err(TypeKind::Enum);
+    cast_err.name = "CastError";
+    cast_err.variants = {"Empty", "NotANumber", "Overflow"};
+    cast_err.variant_param_types = {{}, {string_type()}, {string_type()}};
+    type_registry_.insert_or_assign(cast_err.name, cast_err);
+  }
+
   // First pass: register types, using declarations, and function signatures
   for (const ast::DeclPtr &decl : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(decl.get())) {

@@ -22,6 +22,17 @@ CompileResult Compiler::compile(const ast::Program &program) {
   struct_indices_.clear();
   enum_indices_.clear();
 
+  // Pre-register the built-in CastError enum at chunk index 0 so the VM
+  // can build CastError variants on Cast failure without an enum lookup.
+  {
+    EnumMeta meta;
+    meta.name = "CastError";
+    meta.variants = {"Empty", "NotANumber", "Overflow"};
+    meta.variant_param_counts = {0, 1, 1};
+    int idx = chunk_.add_enum_meta(std::move(meta));
+    enum_indices_["CastError"] = idx;
+  }
+
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
       used_.insert(using_decl->namespace_name);
@@ -233,6 +244,16 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   function_indices_.clear();
   struct_indices_.clear();
   enum_indices_.clear();
+
+  // Pre-register the built-in CastError enum at chunk index 0; see compile().
+  {
+    EnumMeta meta;
+    meta.name = "CastError";
+    meta.variants = {"Empty", "NotANumber", "Overflow"};
+    meta.variant_param_counts = {0, 1, 1};
+    int idx = chunk_.add_enum_meta(std::move(meta));
+    enum_indices_["CastError"] = idx;
+  }
 
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
