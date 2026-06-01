@@ -254,6 +254,16 @@ void CoalesceExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+PropagateExpr::PropagateExpr(SourceLocation location, ExprPtr value)
+    : Expr(location), value(std::move(value)) {}
+
+void PropagateExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(propagate";
+  print_child(out, *value, indent);
+  out << ")";
+}
+
 BindingPattern::BindingPattern(SourceLocation location, std::string name)
     : Expr(location), name(std::move(name)) {}
 

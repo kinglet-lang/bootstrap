@@ -193,6 +193,16 @@ struct CoalesceExpr final : Expr {
   ExprPtr right;
 };
 
+// Postfix `?` propagation: in a `T?`-returning function, returns null on
+// failure of the operand; inside a `try` block, transfers control to the
+// matching `catch`.
+struct PropagateExpr final : Expr {
+  PropagateExpr(SourceLocation location, ExprPtr value);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr value;
+};
+
 struct BindingPattern final : Expr {
   BindingPattern(SourceLocation location, std::string name);
   void print(std::ostream &out, int indent = 0) const override;
