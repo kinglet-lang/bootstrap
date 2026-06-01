@@ -369,11 +369,44 @@ bool Chunk::serialize(const std::string &path) const {
     case ValueType::String:
       write_str(out, c.string_storage);
       break;
+    case ValueType::Function:
+      // Function constant: just the index into the function table.
+      write_i32(out, c.function_index_storage);
+      break;
+    case ValueType::Enum:
+      // Enum constant: type_index + variant_index + payload count + payload values.
+      write_i32(out, static_cast<int32_t>(c.enum_type_index));
+      write_i32(out, static_cast<int32_t>(c.enum_variant_index));
+      write_u32(out, static_cast<uint32_t>(c.enum_payload.size()));
+      for (const auto &p : c.enum_payload) {
+        // Recurse — payload values should be simple types only.
+        write_u8(out, static_cast<uint8_t>(p.type));
+        switch (p.type) {
+        case ValueType::Int:
+          write_i64(out, p.int_value_storage);
+          break;
+        case ValueType::Double:
+          write_f64(out, p.double_value_storage);
+          break;
+        case ValueType::Bool:
+          write_u8(out, p.bool_value_storage ? 1 : 0);
+          break;
+        case ValueType::Char:
+          write_i8(out, static_cast<int8_t>(p.int_value_storage));
+          break;
+        case ValueType::Null:
+          break;
+        case ValueType::String:
+          write_str(out, p.string_storage);
+          break;
+        default:
+          break; // skip unsupported payload types
+        }
+      }
+      break;
     default:
-      // Runtime-only types (Function, Struct, Enum, Array, Map,
-      // NativeFunction) should not appear in the constant pool.
-      // Write as Null as a safe fallback.
-      write_u8(out, static_cast<uint8_t>(ValueType::Null));
+      // Runtime-only types (Struct, Array, Map, NativeFunction)
+      // should not appear in the constant pool.
       break;
     }
   }
@@ -510,6 +543,91 @@ Chunk Chunk::deserialize(const std::string &path, std::string *error) {
         return chunk;
       }
       chunk.add_constant(Value::string_value(std::move(v)));
+      break;
+    }
+    case ValueType::Function: {
+      int32_t idx = -1;
+      if (!read_i32(in, idx)) {
+        if (error) *error = "Truncated function constant";
+        return chunk;
+      }
+      chunk.add_constant(Value::function_value(idx));
+      break;
+    }
+    case ValueType::Enum: {
+      int32_t type_idx = -1, var_idx = -1;
+      uint32_t payload_count = 0;
+      if (!read_i32(in, type_idx) || !read_i32(in, var_idx) || !read_u32(in, payload_count)) {
+        if (error) *error = "Truncated enum constant";
+        return chunk;
+      }
+      if (payload_count == 0) {
+        chunk.add_constant(Value::enum_value(type_idx, var_idx));
+      } else {
+        std::vector<Value> payload;
+        for (uint32_t j = 0; j < payload_count; ++j) {
+          uint8_t pt = 0;
+          if (!read_u8(in, pt)) {
+            if (error) *error = "Truncated enum payload type";
+            return chunk;
+          }
+          auto pvt = static_cast<ValueType>(pt);
+          switch (pvt) {
+          case ValueType::Int: {
+            int64_t v = 0;
+            if (!read_i64(in, v)) {
+              if (error) *error = "Truncated enum payload int";
+              return chunk;
+            }
+            payload.push_back(Value::int_value(v));
+            break;
+          }
+          case ValueType::Double: {
+            double v = 0.0;
+            if (!read_f64(in, v)) {
+              if (error) *error = "Truncated enum payload double";
+              return chunk;
+            }
+            payload.push_back(Value::double_value(v));
+            break;
+          }
+          case ValueType::Bool: {
+            uint8_t v = 0;
+            if (!read_u8(in, v)) {
+              if (error) *error = "Truncated enum payload bool";
+              return chunk;
+            }
+            payload.push_back(Value::bool_value(v != 0));
+            break;
+          }
+          case ValueType::Char: {
+            int8_t v = 0;
+            if (!read_i8(in, v)) {
+              if (error) *error = "Truncated enum payload char";
+              return chunk;
+            }
+            payload.push_back(Value::char_value(v));
+            break;
+          }
+          case ValueType::Null:
+            payload.push_back(Value::null_value());
+            break;
+          case ValueType::String: {
+            std::string v;
+            if (!read_str(in, v)) {
+              if (error) *error = "Truncated enum payload string";
+              return chunk;
+            }
+            payload.push_back(Value::string_value(std::move(v)));
+            break;
+          }
+          default:
+            if (error) *error = "Unsupported enum payload type in .kbc";
+            return chunk;
+          }
+        }
+        chunk.add_constant(Value::enum_value_with_payload(type_idx, var_idx, std::move(payload)));
+      }
       break;
     }
     default:
