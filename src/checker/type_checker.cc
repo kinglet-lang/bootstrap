@@ -727,6 +727,23 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
     }
     return;
   }
+
+  if (const auto *try_catch = dynamic_cast<const ast::TryCatchStmt *>(&stmt)) {
+    check_stmt(*try_catch->body, expected_return);
+    for (const ast::CatchArm &arm : try_catch->catches) {
+      push_scope();
+      auto err_it = type_registry_.find(arm.error_type.name);
+      if (err_it == type_registry_.end()) {
+        error_at(stmt.location,
+                 "Unknown error type '" + arm.error_type.name + "' in catch.");
+      } else {
+        declare_var(arm.binding_name, err_it->second, false, stmt.location);
+      }
+      check_stmt(*arm.body, expected_return);
+      pop_scope();
+    }
+    return;
+  }
 }
 
 Type TypeChecker::check_expr(const ast::Expr &expr) {
