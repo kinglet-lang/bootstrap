@@ -1523,8 +1523,10 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
   if (const auto *coalesce = dynamic_cast<const ast::CoalesceExpr *>(&expr)) {
     compile_expr(*coalesce->left);
-    emit(OpCode::Dup, coalesce->location);
-    const std::size_t fallback_jump = emit_jump(OpCode::JmpFalse, coalesce->location);
+    // Peek-and-branch on null / CastError variant. Stack is unchanged on
+    // both arms: success arm keeps the original LHS; fallback arm sees the
+    // error value, which we Pop before evaluating the right-hand side.
+    const std::size_t fallback_jump = emit_jump(OpCode::JmpIfErr, coalesce->location);
     const std::size_t end_jump = emit_jump(OpCode::Jmp, coalesce->location);
     patch_jump(fallback_jump);
     emit(OpCode::Pop, coalesce->location);

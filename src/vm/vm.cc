@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -223,6 +224,18 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::CastTo: {
       Value src = pop();
       const int kind = instruction.operand;
+      // CastError lives at chunk enum-meta index 0 (pre-registered by the
+      // compiler). Variant order matches the EnumMeta:
+      // 0 = Empty, 1 = NotANumber(string), 2 = Overflow(string).
+      const int kCastErrorIdx = 0;
+      auto cast_err_empty = [&]() {
+        return Value::enum_value(kCastErrorIdx, 0);
+      };
+      auto cast_err_with = [&](int variant, const std::string &payload) {
+        std::vector<Value> p;
+        p.push_back(Value::string_value(payload));
+        return Value::enum_value_with_payload(kCastErrorIdx, variant, std::move(p));
+      };
       if (kind == 0) { // int
         if (src.type == ValueType::Int) {
           push(src);
@@ -231,12 +244,15 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         } else if (src.type == ValueType::String) {
           const std::string &s = src.string_storage;
           if (s.empty()) {
-            push(Value::null_value());
+            push(cast_err_empty());
           } else {
             char *end = nullptr;
+            errno = 0;
             long long v = std::strtoll(s.c_str(), &end, 10);
             if (end == s.c_str() || *end != '\0') {
-              push(Value::null_value());
+              push(cast_err_with(1, s));
+            } else if (errno == ERANGE) {
+              push(cast_err_with(2, s));
             } else {
               push(Value::int_value(static_cast<int64_t>(v)));
             }
@@ -252,12 +268,15 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         } else if (src.type == ValueType::String) {
           const std::string &s = src.string_storage;
           if (s.empty()) {
-            push(Value::null_value());
+            push(cast_err_empty());
           } else {
             char *end = nullptr;
+            errno = 0;
             double v = std::strtod(s.c_str(), &end);
             if (end == s.c_str() || *end != '\0') {
-              push(Value::null_value());
+              push(cast_err_with(1, s));
+            } else if (errno == ERANGE) {
+              push(cast_err_with(2, s));
             } else {
               push(Value::double_value(v));
             }
@@ -450,6 +469,23 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::Jmp:
       frame.ip += static_cast<std::size_t>(instruction.operand);
       break;
+    case OpCode::JmpIfErr: {
+      // Peek the top of the stack: if it is the "fallible" sentinel — null
+      // or a CastError variant — branch to the fallback. Leaves the stack
+      // unchanged so the success arm gets the original LHS, and the
+      // fallback arm sees the error value (typically Pop'd, or bound to a
+      // let-name in the bound form).
+      if (stack_.empty()) {
+        return runtime_error("Stack underflow.");
+      }
+      const Value &top = stack_.back();
+      bool is_err = top.type == ValueType::Null ||
+                    (top.type == ValueType::Enum && top.enum_type_index == 0);
+      if (is_err) {
+        frame.ip += static_cast<std::size_t>(instruction.operand);
+      }
+      break;
+    }
     case OpCode::JmpFalse: {
       if (stack_.empty()) {
         return runtime_error("Stack underflow.");

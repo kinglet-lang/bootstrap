@@ -36,6 +36,7 @@ enum class OpCode : uint8_t {
   Return,
   Jmp,
   JmpFalse,
+  JmpIfErr,
   Eq,
   Neq,
   Lt,
