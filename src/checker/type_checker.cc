@@ -1788,7 +1788,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       error_at(index_expr->index->location, "Array index must be an Int.");
     }
     if (object_type.kind == TypeKind::String) {
-      return string_type();
+      return char_type();
     }
     if (object_type.kind != TypeKind::Array || !object_type.element_type) {
       error_at(index_expr->location, "Cannot index non-array type.");

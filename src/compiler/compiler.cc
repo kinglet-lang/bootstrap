@@ -684,6 +684,11 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     return;
   }
 
+  if (const auto *char_lit = dynamic_cast<const ast::CharLiteralExpr *>(&expr)) {
+    emit_constant(Value::char_value(char_lit->value), char_lit->location);
+    return;
+  }
+
   if (const auto *float_lit = dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) {
     emit_constant(Value::double_value(float_lit->value), float_lit->location);
     return;
@@ -1574,6 +1579,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     if (t == "int") target_kind = 0;
     else if (t == "float") target_kind = 1;
     else if (t == "string") target_kind = 2;
+    else if (t == "char") target_kind = 3;
     if (target_kind < 0) {
       error_at(cast->location, "Cast target '" + t + "' is not supported in VM compiler.");
       return;

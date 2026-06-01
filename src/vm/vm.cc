@@ -178,10 +178,12 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       case ValueType::String:
         truthy = !value.string_storage.empty();
         break;
+      case ValueType::Char:
       case ValueType::Function:
       case ValueType::Struct:
       case ValueType::Enum:
       case ValueType::Array:
+      case ValueType::Map:
       case ValueType::NativeFunction:
         truthy = true;
         break;
@@ -241,6 +243,8 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
           push(src);
         } else if (src.type == ValueType::Double) {
           push(Value::int_value(static_cast<int64_t>(src.double_value_storage)));
+        } else if (src.type == ValueType::Char) {
+          push(Value::int_value(src.int_value_storage));
         } else if (src.type == ValueType::String) {
           const std::string &s = src.string_storage;
           if (s.empty()) {
@@ -258,12 +262,14 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
             }
           }
         } else {
-          return runtime_error("Cast to int requires int, float, or string operand.");
+          return runtime_error("Cast to int requires int, float, char, or string operand.");
         }
       } else if (kind == 1) { // float
         if (src.type == ValueType::Double) {
           push(src);
         } else if (src.type == ValueType::Int) {
+          push(Value::double_value(static_cast<double>(src.int_value_storage)));
+        } else if (src.type == ValueType::Char) {
           push(Value::double_value(static_cast<double>(src.int_value_storage)));
         } else if (src.type == ValueType::String) {
           const std::string &s = src.string_storage;
@@ -291,8 +297,25 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
           std::ostringstream oss;
           oss << src;
           push(Value::string_value(oss.str()));
+        } else if (src.type == ValueType::Char) {
+          push(Value::string_value(std::string(1, static_cast<char>(src.int_value_storage))));
         } else {
-          return runtime_error("Cast to string requires int, float, or string operand.");
+          return runtime_error("Cast to string requires int, float, char, or string operand.");
+        }
+      } else if (kind == 3) { // char
+        if (src.type == ValueType::Char) {
+          push(src);
+        } else if (src.type == ValueType::Int) {
+          push(Value::char_value(static_cast<int8_t>(src.int_value_storage & 0xFF)));
+        } else if (src.type == ValueType::String) {
+          const std::string &s = src.string_storage;
+          if (s.empty()) {
+            push(cast_err_empty());
+          } else {
+            push(Value::char_value(static_cast<int8_t>(static_cast<unsigned char>(s[0]))));
+          }
+        } else {
+          return runtime_error("Cast to char requires int, char, or string operand.");
         }
       } else {
         return runtime_error("Unknown CastTo target kind.");
@@ -512,10 +535,12 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       case ValueType::String:
         truthy = !condition.string_storage.empty();
         break;
+      case ValueType::Char:
       case ValueType::Function:
       case ValueType::Struct:
       case ValueType::Enum:
       case ValueType::Array:
+      case ValueType::Map:
       case ValueType::NativeFunction:
         truthy = true;
         break;
@@ -917,8 +942,9 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
             static_cast<std::size_t>(index.int_value_storage) >= object.string_storage.size()) {
           return runtime_error("String index out of bounds.");
         }
-        push(Value::string_value(
-            std::string(1, object.string_storage[static_cast<std::size_t>(index.int_value_storage)])));
+        push(Value::char_value(static_cast<int8_t>(
+            static_cast<unsigned char>(
+                object.string_storage[static_cast<std::size_t>(index.int_value_storage)]))));
         break;
       }
       if (object.type != ValueType::Array || !object.array_storage) {
