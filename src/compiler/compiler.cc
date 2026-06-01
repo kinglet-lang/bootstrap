@@ -1525,12 +1525,21 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     compile_expr(*coalesce->left);
     // Peek-and-branch on null / CastError variant. Stack is unchanged on
     // both arms: success arm keeps the original LHS; fallback arm sees the
-    // error value, which we Pop before evaluating the right-hand side.
+    // error value, which we either Pop (bare form) or StoreLocal into the
+    // user's `let err` binding (bound form).
     const std::size_t fallback_jump = emit_jump(OpCode::JmpIfErr, coalesce->location);
     const std::size_t end_jump = emit_jump(OpCode::Jmp, coalesce->location);
     patch_jump(fallback_jump);
-    emit(OpCode::Pop, coalesce->location);
-    compile_expr(*coalesce->right);
+    if (coalesce->err_binding.empty()) {
+      emit(OpCode::Pop, coalesce->location);
+      compile_expr(*coalesce->right);
+    } else {
+      const uint32_t err_slot = static_cast<uint32_t>(locals_.size());
+      locals_.push_back(Local{.name = coalesce->err_binding, .is_mutable = false});
+      emit_operand(OpCode::StoreLocal, err_slot, coalesce->location);
+      compile_expr(*coalesce->right);
+      locals_.pop_back();
+    }
     patch_jump(end_jump);
     return;
   }
