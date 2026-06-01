@@ -1143,6 +1143,19 @@ ast::ExprPtr Parser::primary() {
   if (match(TokenType::SELF)) {
     return std::make_unique<ast::IdentifierExpr>(location_of(previous()), "self");
   }
+  if (check(TokenType::INT) || check(TokenType::FLOAT) || check(TokenType::STRING) ||
+      check(TokenType::BOOL) || check(TokenType::BYTE) || check(TokenType::DOUBLE)) {
+    if (current_ + 1 < tokens_.size() &&
+        tokens_[current_ + 1].type == TokenType::LEFT_PAREN) {
+      const Token &type_tok = advance();
+      ast::TypeExpr target{std::string(token_text(type_tok)), {}};
+      consume(TokenType::LEFT_PAREN, "Expected '(' after type name.");
+      ast::ExprPtr value = expression();
+      consume(TokenType::RIGHT_PAREN, "Expected ')' after cast operand.");
+      return std::make_unique<ast::CastExpr>(location_of(type_tok), std::move(target),
+                                             std::move(value));
+    }
+  }
   if (match(TokenType::IDENTIFIER)) {
     const Token &identifier = previous();
     if (match(TokenType::COLON_COLON)) {
