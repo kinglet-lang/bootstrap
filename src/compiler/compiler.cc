@@ -1020,8 +1020,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
           method == "reverse" || method == "resize" || method == "has" ||
           method == "keys" || method == "starts_with" ||
           method == "ends_with" || method == "replace" || method == "split" ||
-          method == "trim" || method == "to_upper" || method == "to_lower" ||
-          method == "code" || method == "code_at") {
+          method == "trim" || method == "to_upper" || method == "to_lower") {
         compile_expr(*field_callee->object);
         if (method == "len") {
           emit(OpCode::ArrayLen, call_expr->location);
@@ -1117,15 +1116,6 @@ void Compiler::compile_expr(const ast::Expr &expr) {
         }
         if (method == "to_lower") {
           emit(OpCode::StringToLower, call_expr->location);
-          return;
-        }
-        if (method == "code") {
-          emit(OpCode::StringCode, call_expr->location);
-          return;
-        }
-        if (method == "code_at") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::StringCodeAt, call_expr->location);
           return;
         }
       }

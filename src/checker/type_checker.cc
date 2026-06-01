@@ -1318,21 +1318,6 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             error_at(call_expr->location, method + "() takes no arguments.");
           return string_type();
         }
-        if (method == "code") {
-          if (!call_expr->args.empty())
-            error_at(call_expr->location, "code() takes no arguments.");
-          return int_type();
-        }
-        if (method == "code_at") {
-          if (call_expr->args.size() != 1)
-            error_at(call_expr->location, "code_at() takes exactly 1 argument.");
-          else {
-            Type idx = check_expr(*call_expr->args[0]);
-            if (idx.kind != TypeKind::Int)
-              error_at(call_expr->args[0]->location, "code_at() index must be an Int.");
-          }
-          return int_type();
-        }
         error_at(call_expr->location, "String has no method '" + method + "'.");
         return int_type();
       }
@@ -1623,8 +1608,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       if (method == "len" || method == "contains" || method == "starts_with" ||
           method == "ends_with" || method == "index_of" || method == "slice" ||
           method == "replace" || method == "split" || method == "trim" ||
-          method == "to_upper" || method == "to_lower" ||
-          method == "code" || method == "code_at") {
+          method == "to_upper" || method == "to_lower") {
         return void_type();
       }
       error_at(field_access->location, "String has no method '" + method + "'.");

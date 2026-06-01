@@ -263,10 +263,6 @@ const char *opcode_name(OpCode op) {
     return "StringToUpper";
   case OpCode::StringToLower:
     return "StringToLower";
-  case OpCode::StringCode:
-    return "StringCode";
-  case OpCode::StringCodeAt:
-    return "StringCodeAt";
   case OpCode::EnumVariantPayload:
     return "EnumVariantPayload";
   case OpCode::EnumPayloadGet:
