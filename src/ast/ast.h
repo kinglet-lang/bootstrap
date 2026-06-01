@@ -233,6 +233,12 @@ struct MatchArm {
   ExprPtr body;
 };
 
+struct CatchArm {
+  TypeExpr error_type;
+  std::string binding_name;
+  StmtPtr body;
+};
+
 struct MatchExpr final : Expr {
   MatchExpr(SourceLocation location, ExprPtr value, std::vector<MatchArm> arms);
   void print(std::ostream &out, int indent = 0) const override;
@@ -246,6 +252,14 @@ struct ExprStmt final : Stmt {
   void print(std::ostream &out, int indent = 0) const override;
 
   ExprPtr expr;
+};
+
+struct TryCatchStmt final : Stmt {
+  TryCatchStmt(SourceLocation location, StmtPtr body, std::vector<CatchArm> catches);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  StmtPtr body;
+  std::vector<CatchArm> catches;
 };
 
 struct ReturnStmt final : Stmt {

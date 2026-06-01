@@ -327,6 +327,23 @@ void ExprStmt::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+TryCatchStmt::TryCatchStmt(SourceLocation location, StmtPtr body, std::vector<CatchArm> catches)
+    : Stmt(location), body(std::move(body)), catches(std::move(catches)) {}
+
+void TryCatchStmt::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(try";
+  print_child(out, *body, indent);
+  for (const CatchArm &arm : catches) {
+    out << '\n';
+    write_indent(out, indent + 1);
+    out << "(catch " << arm.error_type.to_string() << " " << arm.binding_name;
+    print_child(out, *arm.body, indent + 1);
+    out << ")";
+  }
+  out << ")";
+}
+
 ReturnStmt::ReturnStmt(SourceLocation location, ExprPtr value)
     : Stmt(location), value(std::move(value)) {}
 
