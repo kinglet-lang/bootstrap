@@ -664,6 +664,34 @@ ast::StmtPtr Parser::for_statement() {
                                         std::move(condition), std::move(step), std::move(body));
 }
 
+ast::StmtPtr Parser::try_catch_statement() {
+  const Token &try_token = previous();
+  consume(TokenType::LEFT_BRACE, "Expected '{' after 'try'.");
+  ast::StmtPtr body = block_statement();
+
+  std::vector<ast::CatchArm> catches;
+  while (match(TokenType::CATCH)) {
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'catch'.");
+    consume(TokenType::LET, "Expected 'let' in catch pattern.");
+    const Token &name_tok = consume(TokenType::IDENTIFIER, "Expected binding name.");
+    consume(TokenType::COLON, "Expected ':' after catch binding name.");
+    ast::TypeExpr err_type = parse_type_expr();
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after catch type.");
+    consume(TokenType::LEFT_BRACE, "Expected '{' after catch pattern.");
+    ast::StmtPtr catch_body = block_statement();
+    catches.push_back(ast::CatchArm{
+        .error_type = std::move(err_type),
+        .binding_name = token_text(name_tok),
+        .body = std::move(catch_body),
+    });
+  }
+  if (catches.empty()) {
+    error_at(try_token, "Expected at least one 'catch' clause after 'try'.");
+  }
+  return std::make_unique<ast::TryCatchStmt>(location_of(try_token), std::move(body),
+                                             std::move(catches));
+}
+
 ast::StmtPtr Parser::break_statement() {
   const Token &break_token = previous();
   consume(TokenType::SEMICOLON, "Expected ';' after 'break'.");

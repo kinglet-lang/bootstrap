@@ -51,6 +51,7 @@ private:
   ast::StmtPtr for_statement();
   ast::StmtPtr break_statement();
   ast::StmtPtr continue_statement();
+  ast::StmtPtr try_catch_statement();
   ast::StmtPtr var_declaration();
   ast::StmtPtr expression_statement();
 

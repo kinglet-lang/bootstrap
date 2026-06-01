@@ -374,6 +374,8 @@ TokenType Scanner::identifier_type() const {
       {"match", TokenType::MATCH},
       {"let", TokenType::LET},
       {"when", TokenType::WHEN},
+      {"try", TokenType::TRY},
+      {"catch", TokenType::CATCH},
       {"export", TokenType::EXPORT},
       {"import", TokenType::IMPORT},
       {"pub", TokenType::PUB},

@@ -44,6 +44,10 @@ const char *token_type_name(TokenType type) {
     return "LET";
   case TokenType::WHEN:
     return "WHEN";
+  case TokenType::TRY:
+    return "TRY";
+  case TokenType::CATCH:
+    return "CATCH";
   case TokenType::PUB:
     return "PUB";
   case TokenType::IMPORT:
