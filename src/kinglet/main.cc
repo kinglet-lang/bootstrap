@@ -22,11 +22,12 @@ enum class Mode {
   Tokens,
   Ast,
   Bytecode,
+  SaveBytecode,
   Repl,
 };
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --bytecode | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --bytecode | --save-bytecode <out.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles and runs main().\n";
@@ -98,6 +99,7 @@ void print_token(const kinglet::Token &token) {
 
 int main(int argc, char **argv) {
   std::string input_path;
+  std::string save_bytecode_path;
   Mode mode = Mode::Run;
   std::vector<std::string> program_args;
 
@@ -124,6 +126,18 @@ int main(int argc, char **argv) {
     }
     if (arg == "--bytecode") {
       mode = Mode::Bytecode;
+      continue;
+    }
+    if (arg == "--save-bytecode") {
+      mode = Mode::SaveBytecode;
+      // Next argument is the output path
+      if (i + 1 < argc) {
+        ++i;
+        save_bytecode_path = argv[i];
+      } else {
+        std::cerr << "kinglet: --save-bytecode requires an output path\n";
+        return 64;
+      }
       continue;
     }
     if (arg == "--repl") {
@@ -351,6 +365,14 @@ int main(int argc, char **argv) {
 
   if (mode == Mode::Bytecode) {
     compile_result.chunk.disassemble(std::cout);
+    return 0;
+  }
+
+  if (mode == Mode::SaveBytecode) {
+    if (!compile_result.chunk.serialize(save_bytecode_path)) {
+      std::cerr << "kinglet: failed to write '" << save_bytecode_path << "'\n";
+      return 74;
+    }
     return 0;
   }
 
