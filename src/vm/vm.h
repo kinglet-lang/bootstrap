@@ -35,6 +35,8 @@ private:
   std::vector<Value> stack_;
   std::vector<CallFrame> frames_;
   std::vector<std::string> program_args_;
+  // try/catch handler stack: each entry is the PC of the catch landing pad.
+  std::vector<std::size_t> handler_stack_;
 };
 
 } // namespace kinglet

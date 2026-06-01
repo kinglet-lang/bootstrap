@@ -88,6 +88,8 @@ enum class OpCode : uint8_t {
   MapRemove,
   MapKeys,
   MapLen,
+  PushHandler,
+  PopHandler,
 };
 
 struct Instruction {

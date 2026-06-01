@@ -279,6 +279,10 @@ const char *opcode_name(OpCode op) {
     return "MapKeys";
   case OpCode::MapLen:
     return "MapLen";
+  case OpCode::PushHandler:
+    return "PushHandler";
+  case OpCode::PopHandler:
+    return "PopHandler";
   }
   return "Unknown";
 }

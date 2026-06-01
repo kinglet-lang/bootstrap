@@ -475,6 +475,10 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       // unchanged so the success arm gets the original LHS, and the
       // fallback arm sees the error value (typically Pop'd, or bound to a
       // let-name in the bound form).
+      //
+      // When a handler is active (inside try), the `?` operator uses this
+      // same opcode but the operand encodes the relative jump to a tiny
+      // stub that pops the error value and jumps to the catch landing pad.
       if (stack_.empty()) {
         return runtime_error("Stack underflow.");
       }
@@ -1295,6 +1299,19 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         return runtime_error("Cannot call len() on non-map value.");
       }
       push(Value::int_value(static_cast<int64_t>(map.map_storage->order.size())));
+      break;
+    }
+    case OpCode::PushHandler: {
+      // Operand is the catch landing-pad PC offset from the *next* instruction.
+      std::size_t catch_pc = frame.ip + static_cast<std::size_t>(instruction.operand);
+      handler_stack_.push_back(catch_pc);
+      break;
+    }
+    case OpCode::PopHandler: {
+      if (handler_stack_.empty()) {
+        return runtime_error("PopHandler with empty handler stack.");
+      }
+      handler_stack_.pop_back();
       break;
     }
     case OpCode::StringStartsWith: {
