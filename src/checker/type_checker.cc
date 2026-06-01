@@ -57,6 +57,9 @@ Type TypeChecker::resolve_type_name(const std::string &name) const {
   if (name == "string") {
     return string_type();
   }
+  if (name == "char") {
+    return char_type();
+  }
   if (name == "void") {
     return void_type();
   }
@@ -749,6 +752,10 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
 Type TypeChecker::check_expr(const ast::Expr &expr) {
   if (dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
     return int_type();
+  }
+
+  if (dynamic_cast<const ast::CharLiteralExpr *>(&expr)) {
+    return char_type();
   }
 
   if (dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) {
@@ -1796,7 +1803,8 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     TypeKind src_k = src.kind;
     auto src_is = [&](TypeKind k) { return src_k == k; };
     if (target == "int") {
-      if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
+      if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
+          src_is(TypeKind::Char)) {
         return int_type();
       }
     } else if (target == "float") {
@@ -1804,8 +1812,14 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         return float_type();
       }
     } else if (target == "string") {
-      if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
+      if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
+          src_is(TypeKind::Char)) {
         return string_type();
+      }
+    } else if (target == "char") {
+      // char ↔ int: infallible; string → char: fallible (empty → CastError)
+      if (src_is(TypeKind::Int) || src_is(TypeKind::Char) || src_is(TypeKind::String)) {
+        return char_type();
       }
     } else {
       error_at(cast->location,
