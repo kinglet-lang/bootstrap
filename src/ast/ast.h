@@ -88,6 +88,13 @@ struct IntLiteralExpr final : Expr {
   int64_t value;
 };
 
+struct CharLiteralExpr final : Expr {
+  CharLiteralExpr(SourceLocation location, int8_t value);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  int8_t value;
+};
+
 struct FloatLiteralExpr final : Expr {
   FloatLiteralExpr(SourceLocation location, double value);
   void print(std::ostream &out, int indent = 0) const override;

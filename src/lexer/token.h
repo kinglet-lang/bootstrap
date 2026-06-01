@@ -10,7 +10,7 @@ enum class TokenType {
   /* clang-format off */
   
   // Keywords
-  AUTO, INT, FLOAT, DOUBLE, BOOL, STRING, VOID, BYTE, 
+  AUTO, INT, FLOAT, DOUBLE, BOOL, STRING, VOID, BYTE, CHAR, 
   CONST,
   RETURN, IF, ELSE, FOR, WHILE, BREAK, CONTINUE, GUARD,
   MATCH, LET, WHEN,

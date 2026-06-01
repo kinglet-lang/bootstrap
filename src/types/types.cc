@@ -82,6 +82,7 @@ Type Type::promote(const Type &a, const Type &b) {
 static const Type INT_INSTANCE{TypeKind::Int};
 static const Type FLOAT_INSTANCE{TypeKind::Float};
 static const Type BOOL_INSTANCE{TypeKind::Bool};
+static const Type CHAR_INSTANCE{TypeKind::Char};
 static const Type STRING_INSTANCE{TypeKind::String};
 static const Type VOID_INSTANCE{TypeKind::Void};
 static const Type NULL_INSTANCE{TypeKind::Null};
@@ -96,6 +97,10 @@ const Type &float_type() {
 
 const Type &bool_type() {
   return BOOL_INSTANCE;
+}
+
+const Type &char_type() {
+  return CHAR_INSTANCE;
 }
 
 const Type &string_type() {
@@ -141,6 +146,8 @@ std::ostream &operator<<(std::ostream &out, TypeKind kind) {
     return out << "Float";
   case TypeKind::Bool:
     return out << "Bool";
+  case TypeKind::Char:
+    return out << "Char";
   case TypeKind::String:
     return out << "String";
   case TypeKind::Void:

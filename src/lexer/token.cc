@@ -20,6 +20,8 @@ const char *token_type_name(TokenType type) {
     return "VOID";
   case TokenType::BYTE:
     return "BYTE";
+  case TokenType::CHAR:
+    return "CHAR";
   case TokenType::CONST:
     return "CONST";
   case TokenType::RETURN:

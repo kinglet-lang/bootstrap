@@ -114,6 +114,14 @@ void IntLiteralExpr::print(std::ostream &out, int indent) const {
   out << "(int-literal " << value << ")";
 }
 
+CharLiteralExpr::CharLiteralExpr(SourceLocation location, int8_t value)
+    : Expr(location), value(value) {}
+
+void CharLiteralExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(char-literal '" << static_cast<char>(value) << "')";
+}
+
 FloatLiteralExpr::FloatLiteralExpr(SourceLocation location, double value)
     : Expr(location), value(value) {}
 

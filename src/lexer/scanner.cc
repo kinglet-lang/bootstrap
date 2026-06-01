@@ -362,6 +362,7 @@ TokenType Scanner::identifier_type() const {
       {"string", TokenType::STRING},
       {"void", TokenType::VOID},
       {"byte", TokenType::BYTE},
+      {"char", TokenType::CHAR},
       {"const", TokenType::CONST},
       {"return", TokenType::RETURN},
       {"if", TokenType::IF},

@@ -11,6 +11,7 @@ enum class TypeKind {
   Int,
   Float,
   Bool,
+  Char,
   String,
   Void,
   Null,
@@ -57,6 +58,7 @@ struct Type {
 const Type &int_type();
 const Type &float_type();
 const Type &bool_type();
+const Type &char_type();
 const Type &string_type();
 const Type &void_type();
 const Type &null_type();

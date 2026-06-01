@@ -23,6 +23,13 @@ Value Value::bool_value(bool value) {
   return result;
 }
 
+Value Value::char_value(int8_t value) {
+  Value result;
+  result.type = ValueType::Char;
+  result.int_value_storage = static_cast<int64_t>(value);
+  return result;
+}
+
 Value Value::null_value() {
   return Value{};
 }
@@ -107,6 +114,9 @@ std::ostream &operator<<(std::ostream &out, const Value &value) {
     break;
   case ValueType::Bool:
     out << (value.bool_value_storage ? "true" : "false");
+    break;
+  case ValueType::Char:
+    out << static_cast<char>(value.int_value_storage);
     break;
   case ValueType::Null:
     out << "null";

@@ -13,6 +13,7 @@ enum class ValueType {
   Int,
   Double,
   Bool,
+  Char,
   Null,
   String,
   Function,
@@ -53,6 +54,7 @@ struct Value {
   static Value int_value(int64_t value);
   static Value double_value(double value);
   static Value bool_value(bool value);
+  static Value char_value(int8_t value);
   static Value null_value();
   static Value string_value(std::string value);
   static Value function_value(int index);
