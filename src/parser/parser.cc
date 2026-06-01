@@ -1086,6 +1086,9 @@ ast::ExprPtr Parser::call() {
       expr = std::make_unique<ast::IndexExpr>(location, std::move(expr), std::move(index));
     } else if (match(TokenType::MATCH)) {
       expr = match_expression(std::move(expr));
+    } else if (match(TokenType::QUESTION)) {
+      const ast::SourceLocation location = location_of(previous());
+      expr = std::make_unique<ast::PropagateExpr>(location, std::move(expr));
     } else {
       break;
     }
@@ -1526,6 +1529,10 @@ bool Parser::is_function_declaration_start() const {
          tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
     pos += 2;
   }
+  // Optional nullable suffix `T?` in function return types.
+  if (pos < tokens_.size() && tokens_[pos].type == TokenType::QUESTION) {
+    ++pos;
+  }
   if (pos >= tokens_.size() || tokens_[pos].type != TokenType::IDENTIFIER) return false;
   ++pos; // skip function name
   // Function may have type params: name<T>(...)
@@ -1597,6 +1604,12 @@ ast::TypeExpr Parser::parse_type_expr() {
     array_arg.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
     name = "Array";
     type_args = std::move(array_arg);
+  }
+  // Optional nullable suffix `T?`. The bs type system has no dedicated
+  // nullable bit yet — we accept the syntax (per the error-handling design)
+  // but drop it; nullability is tracked at the value layer for now.
+  if (check(TokenType::QUESTION)) {
+    advance();
   }
   return ast::TypeExpr{std::move(name), std::move(type_args)};
 }
