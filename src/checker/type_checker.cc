@@ -1005,6 +1005,19 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
 
     const auto *ns_callee =
         dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
+    // Type-qualified methods: int::bits(float) -> int
+    if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
+      if (call_expr->args.size() != 1) {
+        error_at(call_expr->location, "int::bits() expects exactly 1 argument.");
+        return int_type();
+      }
+      Type arg_type = check_expr(*call_expr->args[0]);
+      if (arg_type.kind != TypeKind::Float) {
+        error_at(call_expr->location,
+                 "int::bits() expects a float argument, got " + type_to_string(arg_type) + ".");
+      }
+      return int_type();
+    }
     if (ns_callee && ns_callee->namespace_name == "io") {
       if (used_.count("io") == 0) {
         error_at(ns_callee->location,

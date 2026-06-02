@@ -222,6 +222,8 @@ const char *opcode_name(OpCode op) {
     return "Dup";
   case OpCode::CastTo:
     return "CastTo";
+  case OpCode::FloatToBits:
+    return "FloatToBits";
   case OpCode::Call:
     return "Call";
   case OpCode::Return:

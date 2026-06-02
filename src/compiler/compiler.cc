@@ -888,6 +888,12 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
     const auto *ns_callee =
         dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
+    // Type-qualified methods: int::bits(float)
+    if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
+      compile_expr(*call_expr->args[0]);
+      emit(OpCode::FloatToBits, call_expr->location);
+      return;
+    }
     if (ns_callee && used_.count(ns_callee->namespace_name) != 0 &&
         ns_callee->namespace_name == "io") {
       if (ns_callee->member_name == "out") {

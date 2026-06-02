@@ -31,7 +31,7 @@ enum class OpCode : uint8_t {
   StoreLocal,
   Pop,
   Dup,
-  CastTo,
+  CastTo, FloatToBits,
   Call,
   Return,
   Jmp,

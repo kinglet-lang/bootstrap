@@ -332,6 +332,16 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       }
       break;
     }
+    case OpCode::FloatToBits: {
+      const Value &src = pop();
+      if (src.type != ValueType::Double) {
+        return runtime_error("FloatToBits requires a float operand.");
+      }
+      int64_t bits;
+      std::memcpy(&bits, &src.double_value_storage, sizeof(bits));
+      push(Value::int_value(bits));
+      break;
+    }
     case OpCode::Call: {
       const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
       if (stack_.size() < arg_count + 1) {

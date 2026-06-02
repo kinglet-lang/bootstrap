@@ -1238,6 +1238,31 @@ ast::ExprPtr Parser::primary() {
   if (check(TokenType::INT) || check(TokenType::FLOAT) || check(TokenType::STRING) ||
       check(TokenType::BOOL) || check(TokenType::BYTE) || check(TokenType::DOUBLE) ||
       check(TokenType::CHAR)) {
+    // Type-qualified method call: int::bits(expr)
+    if (current_ + 2 < tokens_.size() &&
+        tokens_[current_ + 1].type == TokenType::COLON_COLON &&
+        tokens_[current_ + 2].type == TokenType::IDENTIFIER) {
+      const Token &type_tok = advance(); // consume type keyword
+      advance(); // consume ::
+      const Token &method = advance(); // consume method name
+      if (check(TokenType::LEFT_PAREN)) {
+        consume(TokenType::LEFT_PAREN, "Expected '(' after type-qualified method.");
+        std::vector<ast::ExprPtr> args;
+        if (!check(TokenType::RIGHT_PAREN)) {
+          do {
+            args.push_back(expression());
+          } while (match(TokenType::COMMA));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after type-qualified method arguments.");
+        auto callee = std::make_unique<ast::NamespaceAccessExpr>(
+            location_of(type_tok), token_text(type_tok), token_text(method));
+        return std::make_unique<ast::CallExpr>(location_of(type_tok), std::move(callee),
+                                               std::vector<ast::TypeExpr>{}, std::move(args));
+      }
+      // Not a call — treat as namespace access (unlikely but safe fallback)
+      return std::make_unique<ast::NamespaceAccessExpr>(
+          location_of(type_tok), token_text(type_tok), token_text(method));
+    }
     if (current_ + 1 < tokens_.size() &&
         tokens_[current_ + 1].type == TokenType::LEFT_PAREN) {
       const Token &type_tok = advance();
