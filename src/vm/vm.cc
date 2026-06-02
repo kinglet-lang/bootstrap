@@ -253,6 +253,8 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
           push(Value::int_value(static_cast<int64_t>(src.double_value_storage)));
         } else if (src.type == ValueType::Char) {
           push(Value::int_value(src.int_value_storage));
+        } else if (src.type == ValueType::Enum) {
+          push(Value::int_value(static_cast<int64_t>(src.enum_variant_index)));
         } else if (src.type == ValueType::String) {
           const std::string &s = src.string_storage;
           if (s.empty()) {
