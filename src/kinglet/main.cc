@@ -22,13 +22,14 @@ enum class Mode {
   RunBytecode,
   Tokens,
   Ast,
+  Check,
   Bytecode,
   SaveBytecode,
   Repl,
 };
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --bytecode | --save-bytecode <out.kbc> | --run <program.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --bytecode | --save-bytecode <out.kbc> | --run <program.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles and runs main().\n"
@@ -129,6 +130,10 @@ int main(int argc, char **argv) {
     }
     if (arg == "--bytecode") {
       mode = Mode::Bytecode;
+      continue;
+    }
+    if (arg == "--check") {
+      mode = Mode::Check;
       continue;
     }
     if (arg == "--save-bytecode") {
@@ -389,6 +394,7 @@ int main(int argc, char **argv) {
   }
 
   if (has_type_errors) {
+    if (mode == Mode::Check) { return 65; }
     // Only abort on type errors for interactive modes (Run, Bytecode).
     // For --save-bytecode, type errors are shown but do not prevent
     // bytecode generation since the compiler does not depend on the
@@ -397,6 +403,8 @@ int main(int argc, char **argv) {
       return 65;
     }
   }
+
+  if (mode == Mode::Check) { return 0; }
 
   kinglet::Compiler compiler;
   compiler.set_module_loader(&module_loader);
