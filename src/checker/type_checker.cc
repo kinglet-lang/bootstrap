@@ -3,6 +3,7 @@
 #include "module/module_loader.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <sstream>
 #include <utility>
 
@@ -340,10 +341,13 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           // Recursively process any imports declared inside the loaded module
           // so that types it depends on (e.g. Token in scanner.kl) are
           // registered before we try to resolve its function signatures.
+          // Resolve transitive imports relative to the loaded module's
+          // directory, not the main program's base directory.
           if (mod.program) {
+            std::string mod_dir = std::filesystem::path(mod.resolved_path).parent_path().string();
             for (const auto &inner_decl : mod.program->declarations) {
               if (const auto *inner_import = dynamic_cast<const ast::ImportDecl *>(inner_decl.get())) {
-                auto inner_result = module_loader_->load(inner_import->path);
+                auto inner_result = module_loader_->load_from(inner_import->path, mod_dir);
                 if (inner_result.module) {
                   const auto &inner_mod = *inner_result.module;
                   for (const auto *sd : inner_mod.public_structs) {

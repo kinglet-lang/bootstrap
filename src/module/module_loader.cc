@@ -94,6 +94,7 @@ ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
 
   ParsedModule mod;
   mod.namespace_name = derive_namespace(path);
+  mod.resolved_path = resolved;
 
   for (const auto &decl : parse_result.program->declarations) {
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
@@ -111,6 +112,8 @@ ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
     } else if (const auto *ed = dynamic_cast<const ast::EnumDecl *>(decl.get())) {
       if (ed->is_public) {
         mod.public_enums.push_back(ed);
+      } else {
+        mod.private_enums.push_back(ed);
       }
     }
   }
@@ -170,6 +173,7 @@ ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const 
 
   ParsedModule mod;
   mod.namespace_name = derive_namespace(path);
+  mod.resolved_path = resolved;
 
   for (const auto &decl : parse_result.program->declarations) {
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
@@ -187,6 +191,8 @@ ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const 
     } else if (const auto *ed = dynamic_cast<const ast::EnumDecl *>(decl.get())) {
       if (ed->is_public) {
         mod.public_enums.push_back(ed);
+      } else {
+        mod.private_enums.push_back(ed);
       }
     }
   }
