@@ -877,7 +877,7 @@ ast::ExprPtr Parser::pipeline() {
 
 ast::ExprPtr Parser::coalesce() {
   ast::ExprPtr expr = pipeline();
-  if (match(TokenType::QUESTION_COLON)) {
+  if (match(TokenType::QUESTION_QUESTION)) {
     auto loc = location_of(previous());
     std::string err_binding;
     if (check(TokenType::LET) && current_ + 1 < tokens_.size() &&

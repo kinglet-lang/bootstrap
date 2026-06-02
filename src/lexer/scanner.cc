@@ -112,7 +112,9 @@ Token Scanner::scan_token() {
   case ':':
     return make_token(match(':') ? TokenType::COLON_COLON : TokenType::COLON);
   case '?':
-    return make_token(match(':') ? TokenType::QUESTION_COLON : TokenType::QUESTION);
+    return make_token(match('?') ? TokenType::QUESTION_QUESTION
+                                 : match(':') ? TokenType::QUESTION_COLON
+                                              : TokenType::QUESTION);
   case '.':
     if (match('.')) {
       return make_token(match('.') ? TokenType::DOT_DOT_DOT : TokenType::DOT_DOT);
