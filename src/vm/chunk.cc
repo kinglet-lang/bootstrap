@@ -8,7 +8,53 @@
 
 namespace kinglet {
 
+// Forward declaration — defined in the anonymous namespace below.
+namespace { bool values_equal(const Value &a, const Value &b); }
+
 uint32_t Chunk::add_constant(Value value) {
+  // Deduplication: if an identical constant already exists, reuse its index.
+  for (uint32_t i = 0; i < static_cast<uint32_t>(constants_.size()); ++i) {
+    const auto &existing = constants_[i];
+    if (existing.type != value.type) continue;
+    switch (value.type) {
+    case ValueType::Int:
+      if (existing.int_value_storage == value.int_value_storage) return i;
+      break;
+    case ValueType::Double:
+      if (existing.double_value_storage == value.double_value_storage) return i;
+      break;
+    case ValueType::Bool:
+      if (existing.bool_value_storage == value.bool_value_storage) return i;
+      break;
+    case ValueType::Char:
+      if (existing.int_value_storage == value.int_value_storage) return i;
+      break;
+    case ValueType::Null:
+      return i;
+    case ValueType::String:
+      if (existing.string_storage == value.string_storage) return i;
+      break;
+    case ValueType::Function:
+      if (existing.function_index_storage == value.function_index_storage) return i;
+      break;
+    case ValueType::Enum:
+      if (existing.enum_type_index == value.enum_type_index &&
+          existing.enum_variant_index == value.enum_variant_index &&
+          existing.enum_payload.size() == value.enum_payload.size()) {
+        bool match = true;
+        for (std::size_t k = 0; k < value.enum_payload.size(); ++k) {
+          if (!values_equal(existing.enum_payload[k], value.enum_payload[k])) {
+            match = false;
+            break;
+          }
+        }
+        if (match) return i;
+      }
+      break;
+    default:
+      break;
+    }
+  }
   constants_.push_back(value);
   return static_cast<uint32_t>(constants_.size() - 1);
 }
@@ -331,20 +377,44 @@ bool read_str(std::istream &in, std::string &s) {
   return in.read(s.data(), static_cast<std::streamsize>(len)).good();
 }
 
+bool values_equal(const Value &a, const Value &b) {
+  if (a.type != b.type) return false;
+  switch (a.type) {
+  case ValueType::Int:
+    return a.int_value_storage == b.int_value_storage;
+  case ValueType::Double:
+    return a.double_value_storage == b.double_value_storage;
+  case ValueType::Bool:
+    return a.bool_value_storage == b.bool_value_storage;
+  case ValueType::Char:
+    return a.int_value_storage == b.int_value_storage;
+  case ValueType::Null:
+    return true;
+  case ValueType::String:
+    return a.string_storage == b.string_storage;
+  case ValueType::Function:
+    return a.function_index_storage == b.function_index_storage;
+  default:
+    return false;
+  }
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
 // Chunk::serialize
 // ---------------------------------------------------------------------------
 
-bool Chunk::serialize(const std::string &path) const {
+bool Chunk::serialize(const std::string &path, bool strip_debug) const {
   std::ofstream out(path, std::ios::binary);
   if (!out) return false;
+
+  const uint32_t flags = strip_debug ? 0 : kFlagHasDebugInfo;
 
   // Header
   write_u32(out, kKbcMagic);
   write_u32(out, kKbcVersion);
-  write_u32(out, kFlagHasDebugInfo);
+  write_u32(out, flags);
   write_u32(out, 0); // reserved
 
   // Constants section
@@ -416,8 +486,10 @@ bool Chunk::serialize(const std::string &path) const {
   for (const auto &inst : instructions_) {
     write_u8(out, static_cast<uint8_t>(inst.op));
     write_i32(out, inst.operand);
-    write_i32(out, inst.line);
-    write_i32(out, inst.column);
+    if (!strip_debug) {
+      write_i32(out, inst.line);
+      write_i32(out, inst.column);
+    }
   }
 
   // Function metadata section
@@ -637,6 +709,7 @@ Chunk Chunk::deserialize(const std::string &path, std::string *error) {
   }
 
   // Instructions section
+  const bool has_debug = (flags & kFlagHasDebugInfo) != 0;
   uint32_t inst_count = 0;
   if (!read_u32(in, inst_count)) {
     if (error) *error = "Truncated instructions count";
@@ -644,17 +717,23 @@ Chunk Chunk::deserialize(const std::string &path, std::string *error) {
   }
   for (uint32_t i = 0; i < inst_count; ++i) {
     uint8_t op = 0;
-    int32_t operand = 0, line = 0, column = 0;
-    if (!read_u8(in, op) || !read_i32(in, operand) ||
-        !read_i32(in, line) || !read_i32(in, column)) {
+    int32_t operand = 0;
+    if (!read_u8(in, op) || !read_i32(in, operand)) {
       if (error) *error = "Truncated instruction";
       return chunk;
+    }
+    int32_t line = 0, column = 0;
+    if (has_debug) {
+      if (!read_i32(in, line) || !read_i32(in, column)) {
+        if (error) *error = "Truncated instruction debug info";
+        return chunk;
+      }
     }
     chunk.instructions_.push_back(Instruction{
         .op = static_cast<OpCode>(op),
         .operand = operand,
-        .line = line,
-        .column = column,
+        .line = static_cast<int>(line),
+        .column = static_cast<int>(column),
     });
   }
 

@@ -135,7 +135,9 @@ public:
   void patch_operand(std::size_t index, int32_t operand);
 
   // Bytecode serialization (.kbc format)
-  bool serialize(const std::string &path) const;
+  // When strip_debug is true, line/column info is omitted from the output,
+  // producing smaller .kbc files suitable for deployment.
+  bool serialize(const std::string &path, bool strip_debug = false) const;
   static Chunk deserialize(const std::string &path, std::string *error);
 
 private:

@@ -29,11 +29,12 @@ enum class Mode {
 };
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --bytecode | --save-bytecode <out.kbc> | --run <program.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles and runs main().\n"
-      << "With --run, loads and executes a pre-compiled .kbc file.\n";
+      << "With --run, loads and executes a pre-compiled .kbc file.\n"
+      << "With --save-bytecode --strip-debug, omits debug info for smaller output.\n";
 }
 
 std::string read_stdin() {
@@ -105,6 +106,7 @@ int main(int argc, char **argv) {
   std::string save_bytecode_path;
   std::string run_bytecode_path;
   Mode mode = Mode::Run;
+  bool strip_debug = false;
   std::vector<std::string> program_args;
 
   for (int i = 1; i < argc; ++i) {
@@ -150,6 +152,10 @@ int main(int argc, char **argv) {
     }
     if (arg == "--repl") {
       mode = Mode::Repl;
+      continue;
+    }
+    if (arg == "--strip-debug") {
+      strip_debug = true;
       continue;
     }
     if (arg == "--run") {
@@ -429,7 +435,7 @@ int main(int argc, char **argv) {
   }
 
   if (mode == Mode::SaveBytecode) {
-    if (!compile_result.chunk.serialize(save_bytecode_path)) {
+    if (!compile_result.chunk.serialize(save_bytecode_path, strip_debug)) {
       std::cerr << "kinglet: failed to write '" << save_bytecode_path << "'\n";
       return 74;
     }
