@@ -171,6 +171,23 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
   push_scope();
 
+  // Pass 0: insert forward-declaration placeholders for every named type so
+  // that types declared later in the source can still be referenced by
+  // struct fields, enum variant payloads, or function signatures that appear
+  // earlier in the file (e.g. enum Expr referencing FieldInit[]).
+  for (const ast::DeclPtr &decl : program.declarations) {
+    if (const auto *sd = dynamic_cast<const ast::StructDecl *>(decl.get())) {
+      if (!sd->type_params.empty()) continue;
+      Type fwd(TypeKind::Struct);
+      fwd.name = sd->name;
+      type_registry_.insert_or_assign(sd->name, fwd);
+    } else if (const auto *ed = dynamic_cast<const ast::EnumDecl *>(decl.get())) {
+      Type fwd(TypeKind::Enum);
+      fwd.name = ed->name;
+      type_registry_.insert_or_assign(ed->name, fwd);
+    }
+  }
+
   // Pre-register the built-in CastError enum: every program sees it without
   // an explicit declaration. Variants align with VM CastTo failure mode.
   {
@@ -202,6 +219,12 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       if (!struct_decl->type_params.empty()) {
         generic_structs_[struct_decl->name] = struct_decl;
       } else {
+        // Insert a forward-declaration placeholder so self-referencing
+        // fields can resolve the struct type by name.
+        Type fwd(TypeKind::Struct);
+        fwd.name = struct_decl->name;
+        type_registry_.insert_or_assign(struct_decl->name, fwd);
+
         Type struct_type(TypeKind::Struct);
         struct_type.name = struct_decl->name;
         for (const auto &field : struct_decl->fields) {
@@ -218,6 +241,13 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         error_at(enum_decl->location, "'Self' is a reserved type name.");
         continue;
       }
+      // Insert a forward-declaration placeholder so self-referencing
+      // variants (e.g. Unary(UnaryOp, Expr, int, int)) can resolve the
+      // enum type by name.
+      Type fwd(TypeKind::Enum);
+      fwd.name = enum_decl->name;
+      type_registry_.insert_or_assign(enum_decl->name, fwd);
+
       Type enum_type(TypeKind::Enum);
       enum_type.name = enum_decl->name;
       for (const auto &v : enum_decl->variants) {
