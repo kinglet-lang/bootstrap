@@ -19,6 +19,7 @@ namespace {
 
 enum class Mode {
   Run,
+  RunBytecode,
   Tokens,
   Ast,
   Bytecode,
@@ -27,10 +28,11 @@ enum class Mode {
 };
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --bytecode | --save-bytecode <out.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --bytecode | --save-bytecode <out.kbc> | --run <program.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
-      << "By default, compiles and runs main().\n";
+      << "By default, compiles and runs main().\n"
+      << "With --run, loads and executes a pre-compiled .kbc file.\n";
 }
 
 std::string read_stdin() {
@@ -100,6 +102,7 @@ void print_token(const kinglet::Token &token) {
 int main(int argc, char **argv) {
   std::string input_path;
   std::string save_bytecode_path;
+  std::string run_bytecode_path;
   Mode mode = Mode::Run;
   std::vector<std::string> program_args;
 
@@ -144,7 +147,50 @@ int main(int argc, char **argv) {
       mode = Mode::Repl;
       continue;
     }
+    if (arg == "--run") {
+      mode = Mode::RunBytecode;
+      if (i + 1 < argc) {
+        ++i;
+        run_bytecode_path = argv[i];
+      } else {
+        std::cerr << "kinglet: --run requires a .kbc file\n";
+        return 64;
+      }
+      continue;
+    }
     input_path = std::string(arg);
+  }
+
+  // --run mode: load and execute a pre-compiled .kbc file.
+  if (mode == Mode::RunBytecode) {
+    program_args.clear();
+    bool past_run_path = false;
+    for (int i = 1; i < argc; ++i) {
+      if (!past_run_path) {
+        if (std::string_view(argv[i]) == "--run") {
+          ++i; // skip the .kbc path too
+          past_run_path = true;
+        }
+        continue;
+      }
+      program_args.emplace_back(argv[i]);
+    }
+
+    std::string error;
+    kinglet::Chunk chunk = kinglet::Chunk::deserialize(run_bytecode_path, &error);
+    if (!error.empty()) {
+      std::cerr << "kinglet: " << error << "\n";
+      return 66;
+    }
+
+    kinglet::Vm vm;
+    kinglet::VmResult result = vm.run(chunk, program_args);
+    if (!result.ok) {
+      std::cerr << "runtime error: " << result.error << "\n";
+      return 70;
+    }
+
+    return 0;
   }
 
   std::string source;
@@ -343,7 +389,13 @@ int main(int argc, char **argv) {
   }
 
   if (has_type_errors) {
-    return 65;
+    // Only abort on type errors for interactive modes (Run, Bytecode).
+    // For --save-bytecode, type errors are shown but do not prevent
+    // bytecode generation since the compiler does not depend on the
+    // type checker output.
+    if (mode != Mode::SaveBytecode) {
+      return 65;
+    }
   }
 
   kinglet::Compiler compiler;
