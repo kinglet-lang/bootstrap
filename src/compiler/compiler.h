@@ -66,6 +66,7 @@ private:
   void warning_at(ast::SourceLocation location, std::string message);
 
   void process_import(const ast::ImportDecl &import_decl);
+  void process_import_from(const ast::ImportDecl &import_decl, const std::string &importing_file_dir);
   std::string infer_struct_type(const ast::Expr &expr) const;
 
   Chunk chunk_;

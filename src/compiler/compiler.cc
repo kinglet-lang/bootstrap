@@ -1756,7 +1756,18 @@ void Compiler::process_import(const ast::ImportDecl &import_decl) {
     return;
   }
 
-  auto result = module_loader_->load(import_decl.path);
+  process_import_from(import_decl, /*importing_file_dir=*/"");
+}
+
+void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std::string &importing_file_dir) {
+  if (!module_loader_) {
+    error_at(import_decl.location, "Import not supported (no module loader configured).");
+    return;
+  }
+
+  auto result = importing_file_dir.empty()
+      ? module_loader_->load(import_decl.path)
+      : module_loader_->load_from(import_decl.path, importing_file_dir);
   if (!result.module) {
     error_at(import_decl.location, result.error);
     return;
@@ -1764,13 +1775,31 @@ void Compiler::process_import(const ast::ImportDecl &import_decl) {
 
   const ParsedModule &mod = *result.module;
 
+  // Determine the directory of the loaded module for resolving its nested
+  // imports. We need the resolved (canonical) path to extract the parent dir.
+  std::string mod_dir;
+  try {
+    std::string resolved;
+    if (importing_file_dir.empty()) {
+      // Top-level import: resolve against module_loader's base_dir
+      std::filesystem::path base(module_loader_->base_dir());
+      resolved = std::filesystem::canonical(base / import_decl.path).string();
+    } else {
+      resolved = std::filesystem::canonical(
+          std::filesystem::path(importing_file_dir) / import_decl.path).string();
+    }
+    mod_dir = std::filesystem::path(resolved).parent_path().string();
+  } catch (...) {
+    mod_dir = importing_file_dir.empty() ? module_loader_->base_dir() : importing_file_dir;
+  }
+
   // Recursively process imports declared inside the loaded module so that
   // types and functions it depends on are registered before we compile calls
   // into it (e.g. scanner.kl imports token.kl for the Token struct).
   if (mod.program) {
     for (const auto &inner_decl : mod.program->declarations) {
       if (const auto *inner_import = dynamic_cast<const ast::ImportDecl *>(inner_decl.get())) {
-        process_import(*inner_import);
+        process_import_from(*inner_import, mod_dir);
       }
     }
   }

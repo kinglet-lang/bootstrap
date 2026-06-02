@@ -24,6 +24,7 @@ struct ParsedModule {
 class ModuleLoader {
 public:
   explicit ModuleLoader(std::string base_dir);
+  const std::string &base_dir() const { return base_dir_; }
 
   struct LoadResult {
     const ParsedModule *module = nullptr;
@@ -32,9 +33,11 @@ public:
 
   void register_source_file(const std::string &path);
   LoadResult load(const std::string &path);
+  LoadResult load_from(const std::string &path, const std::string &importing_file_dir);
 
 private:
   std::string resolve_path(const std::string &relative_path) const;
+  std::string resolve_path_from(const std::string &relative_path, const std::string &base) const;
   std::string derive_namespace(const std::string &path) const;
 
   std::string base_dir_;
