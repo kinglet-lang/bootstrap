@@ -922,7 +922,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
 
     switch (binary->op) {
     case ast::BinaryOp::Add:
-      if (left_type.kind == TypeKind::String && right_type.kind == TypeKind::String) {
+      if (left_type.kind == TypeKind::String || right_type.kind == TypeKind::String) {
         return string_type();
       }
       [[fallthrough]];

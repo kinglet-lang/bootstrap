@@ -78,11 +78,19 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::Divide:
     case OpCode::Modulo: {
       if (instruction.op == OpCode::Add && stack_.size() >= 2 &&
-          stack_[stack_.size() - 1].type == ValueType::String &&
-          stack_[stack_.size() - 2].type == ValueType::String) {
+          (stack_[stack_.size() - 1].type == ValueType::String ||
+           stack_[stack_.size() - 2].type == ValueType::String)) {
         Value right = pop();
         Value left = pop();
-        push(Value::string_value(left.string_storage + right.string_storage));
+        auto to_str = [](const Value &v) -> std::string {
+          if (v.type == ValueType::String) return v.string_storage;
+          if (v.type == ValueType::Int) return std::to_string(v.int_value_storage);
+          if (v.type == ValueType::Double) return std::to_string(v.double_value_storage);
+          if (v.type == ValueType::Bool) return v.bool_value_storage ? "true" : "false";
+          if (v.type == ValueType::Null) return "null";
+          return std::string();
+        };
+        push(Value::string_value(to_str(left) + to_str(right)));
         break;
       }
       std::string error;
