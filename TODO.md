@@ -2,12 +2,10 @@
 
 ## Next
 
-- [x] Add CLI/golden tests for successful runs, diagnostics, bytecode dumps, and regressions
-- [x] I/O API design: make `io::in` an input object with methods like `io::in.line(prompt)` and `io::in.secret(prompt)`
-- [x] I/O API design: decide whether `io::in(prompt)` remains as shorthand for `io::in.line(prompt)`
-- [x] LSP diagnostics: wider underlines, document symbols, signature help
-- [x] LSP diagnostics: surface compiler warnings (unreachable code, unused vars, constant conditions)
-- [x] Error message improvements (suggest `using io;` when `io::` used without it)
+- [ ] KBC P2: self-hosted compiler .kbc serialization
+- [ ] KBC P3: variable-length operand encoding
+- [ ] Remove `self` keyword (see sh decisions/0001)
+- [ ] Redesign trait system (see sh decisions/0002)
 
 ## P1: Syntax & Expressiveness (WG21-inspired)
 
@@ -24,25 +22,27 @@
 
 ## P2: Types & Patterns
 
-- [ ] Align pattern matching syntax with WG21 P2688R5's `match` expression model
-- [ ] Decide whether `inspect` remains as an alias or migrates fully to `match`
-- [ ] Pattern guards using `if (...)`
-- [ ] Explicit binding with `let`
-- [ ] Structured binding patterns for structs, tuples, and arrays
-- [ ] Exhaustiveness and usefulness checking for pattern matching
-- [ ] Error propagation `?` operator (P2561): requires Result/Optional type
+- [x] Pattern matching: `match` expression with enum, binding, array, wildcard, literal, and guard patterns
+- [x] Pattern guards using `if (...)`
+- [x] Explicit binding with `let` in match patterns
+- [x] Structured binding patterns for arrays (`[a, b, ...rest] = arr`)
+- [x] Exhaustiveness checking for enum match (warning on missing variants)
+- [x] Error propagation `try` operator + null coalescing `??` operator
+- [ ] Error propagation `?` postfix operator (requires Result/Optional type)
 - [ ] Zero-overhead optional (P2723): `int? x = null;` with niche optimization
 - [ ] `[[nodiscard]]` for functions (P1029): warn on unused return values
+- [ ] Struct patterns in match
+- [ ] Struct patterns in structured binding
 
 ## P3: Stdlib & Toolchain
 
-- [ ] Trait system
-- [ ] Standard library
+- [x] Map literals and `Map` type
+- [x] Trait system (Rust-style; redesign pending — see sh decisions/0002)
+- [ ] Standard library (collections, result, option, string, math, iter)
 - [ ] Module system / package manager
 - [ ] Closures / lambda
-- [ ] Map literals
 
-## P4: Concurrency
+## P4: Concurrency (deferred)
 
 - [ ] Structured concurrency (P2504): `scope { spawn f(); spawn g(); }`
 - [ ] spawn / channel / select
@@ -52,13 +52,11 @@
 
 - [ ] NaN-boxing migration
 - [ ] Trivial relocatability (P1144 / P2786): move as memcpy
-- [ ] Lifetime safety profiles (P1179): partial borrow checking without full borrow checker
-- [ ] Consider visitor pattern for `dynamic_cast` dispatch
 
 ## Done
 
 - [x] Struct definitions
-- [x] Enum definitions
+- [x] Enum definitions with payload variants
 - [x] Dynamic arrays: `T[]`, array literals, indexing, assignment, and bounds checks
 - [x] Operators: `%` (modulo), `&&`/`||` (short-circuit), `~` (bitwise NOT)
 - [x] Generics `<T>` (monomorphization: structs + functions)
@@ -85,3 +83,9 @@
 - [x] Remove `import` keyword
 - [x] REPL: auto-detect return type, strip trailing `;`, suppress null
 - [x] `io::` requires `using io;` (not unconditional)
+- [x] KBC P0: strip debug mode (`--strip-debug`)
+- [x] KBC P1: constant pool deduplication
+- [x] Self-hosting round-trip verified (byte-identical bytecode)
+- [x] Add CLI/golden tests for successful runs, diagnostics, bytecode dumps, and regressions
+- [x] I/O API: `io::in.line(prompt)` and `io::in.secret(prompt)`
+- [x] Error message improvements (suggest `using io;` when `io::` used without it)
