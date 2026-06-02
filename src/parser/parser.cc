@@ -827,8 +827,21 @@ ast::ExprPtr Parser::expression() {
   return assignment();
 }
 
-ast::ExprPtr Parser::assignment() {
+ast::ExprPtr Parser::ternary() {
   ast::ExprPtr expr = coalesce();
+  if (match(TokenType::QUESTION)) {
+    auto loc = location_of(previous());
+    ast::ExprPtr then_expr = expression();
+    consume(TokenType::COLON, "Expected ':' in ternary expression.");
+    ast::ExprPtr else_expr = ternary(); // right-associative
+    return std::make_unique<ast::TernaryExpr>(loc, std::move(expr), std::move(then_expr),
+                                              std::move(else_expr));
+  }
+  return expr;
+}
+
+ast::ExprPtr Parser::assignment() {
+  ast::ExprPtr expr = ternary();
   if (has_completion()) return expr;
   if (is_assignment_operator(peek().type)) {
     const Token &op = advance();
@@ -1117,9 +1130,32 @@ ast::ExprPtr Parser::call() {
       expr = std::make_unique<ast::IndexExpr>(location, std::move(expr), std::move(index));
     } else if (match(TokenType::MATCH)) {
       expr = match_expression(std::move(expr));
-    } else if (match(TokenType::QUESTION)) {
-      const ast::SourceLocation location = location_of(previous());
-      expr = std::make_unique<ast::PropagateExpr>(location, std::move(expr));
+    } else if (check(TokenType::QUESTION)) {
+      // Disambiguate postfix `?` (propagate) from ternary `? :`.
+      // If the token after `?` can start an expression, leave `?` for the
+      // ternary parser at a higher precedence level; otherwise consume as
+      // postfix propagate.
+      if (current_ + 1 < tokens_.size()) {
+        switch (tokens_[current_ + 1].type) {
+        case TokenType::IDENTIFIER: case TokenType::SELF:
+        case TokenType::INTEGER: case TokenType::FLOAT_LIT:
+        case TokenType::STRING_LIT: case TokenType::CHAR_LIT:
+        case TokenType::TRUE: case TokenType::FALSE: case TokenType::NULL_:
+        case TokenType::LEFT_PAREN: case TokenType::LEFT_BRACKET:
+        case TokenType::LEFT_BRACE:
+        case TokenType::MINUS: case TokenType::BANG: case TokenType::TILDE:
+        case TokenType::INT: case TokenType::FLOAT: case TokenType::DOUBLE:
+        case TokenType::BOOL: case TokenType::STRING: case TokenType::VOID:
+        case TokenType::CHAR: case TokenType::BYTE:
+          break; // ternary — don't consume `?`
+        default:
+          advance(); // consume `?` as propagate
+          const ast::SourceLocation location = location_of(previous());
+          expr = std::make_unique<ast::PropagateExpr>(location, std::move(expr));
+          continue;
+        }
+      }
+      break;
     } else {
       break;
     }

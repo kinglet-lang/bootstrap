@@ -1179,6 +1179,19 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     // User-defined function call
     if (callee_id) {
       auto func_it = function_indices_.find(callee_id->name);
+      // Fallback: try qualified names (ns::func) for intra-module calls
+      // inside non-selectively imported modules where only the qualified
+      // name was registered.
+      if (func_it == function_indices_.end()) {
+        for (const auto &ns : imported_namespaces_) {
+          std::string qualified = ns + "::" + callee_id->name;
+          auto qit = function_indices_.find(qualified);
+          if (qit != function_indices_.end()) {
+            func_it = qit;
+            break;
+          }
+        }
+      }
       if (func_it != function_indices_.end()) {
         for (const ast::ExprPtr &arg : call_expr->args) {
           compile_expr(*arg);
@@ -1569,12 +1582,23 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     if (t == "int") target_kind = 0;
     else if (t == "float") target_kind = 1;
     else if (t == "string") target_kind = 2;
-    else if (t == "char") target_kind = 3;
+    else if (t == "char" || t == "byte") target_kind = 3;
     if (target_kind < 0) {
       error_at(cast->location, "Cast target '" + t + "' is not supported in VM compiler.");
       return;
     }
     emit_operand(OpCode::CastTo, static_cast<uint32_t>(target_kind), cast->location);
+    return;
+  }
+
+  if (const auto *ternary = dynamic_cast<const ast::TernaryExpr *>(&expr)) {
+    compile_expr(*ternary->condition);
+    const std::size_t else_jump = emit_jump(OpCode::JmpFalse, ternary->location);
+    compile_expr(*ternary->then_expr);
+    const std::size_t end_jump = emit_jump(OpCode::Jmp, ternary->location);
+    patch_jump(else_jump);
+    compile_expr(*ternary->else_expr);
+    patch_jump(end_jump);
     return;
   }
 

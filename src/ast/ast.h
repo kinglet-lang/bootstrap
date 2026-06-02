@@ -189,6 +189,16 @@ struct CastExpr final : Expr {
   ExprPtr value;
 };
 
+// Ternary conditional: `cond ? then : else`.
+struct TernaryExpr final : Expr {
+  TernaryExpr(SourceLocation location, ExprPtr condition, ExprPtr then_expr, ExprPtr else_expr);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr condition;
+  ExprPtr then_expr;
+  ExprPtr else_expr;
+};
+
 // `e ?: f` (bare) or `e ?: let err => f` (with payload binding).
 // `err_binding` is empty when the bare form is used.
 struct CoalesceExpr final : Expr {

@@ -246,6 +246,20 @@ void CastExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+TernaryExpr::TernaryExpr(SourceLocation location, ExprPtr condition, ExprPtr then_expr,
+                         ExprPtr else_expr)
+    : Expr(location), condition(std::move(condition)), then_expr(std::move(then_expr)),
+      else_expr(std::move(else_expr)) {}
+
+void TernaryExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(ternary";
+  print_child(out, *condition, indent);
+  print_child(out, *then_expr, indent);
+  print_child(out, *else_expr, indent);
+  out << ")";
+}
+
 CoalesceExpr::CoalesceExpr(SourceLocation location, ExprPtr left, std::string err_binding,
                            ExprPtr right)
     : Expr(location), left(std::move(left)), err_binding(std::move(err_binding)),

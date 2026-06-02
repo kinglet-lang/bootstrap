@@ -1822,7 +1822,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     auto src_is = [&](TypeKind k) { return src_k == k; };
     if (target == "int") {
       if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
-          src_is(TypeKind::Char)) {
+          src_is(TypeKind::Char) || src_is(TypeKind::Enum)) {
         return int_type();
       }
     } else if (target == "float") {
@@ -1834,8 +1834,8 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           src_is(TypeKind::Char)) {
         return string_type();
       }
-    } else if (target == "char") {
-      // char ↔ int: infallible; string → char: fallible (empty → CastError)
+    } else if (target == "char" || target == "byte") {
+      // char/byte ↔ int: infallible; string → char: fallible (empty → CastError)
       if (src_is(TypeKind::Int) || src_is(TypeKind::Char) || src_is(TypeKind::String)) {
         return char_type();
       }
@@ -1847,6 +1847,22 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     error_at(cast->location,
              "Cannot cast " + type_to_string(src) + " to " + target + ".");
     return null_type();
+  }
+
+  if (const auto *ternary = dynamic_cast<const ast::TernaryExpr *>(&expr)) {
+    Type cond_type = check_expr(*ternary->condition);
+    if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
+      error_at(ternary->location,
+               "Ternary condition must be bool or int, got " + type_to_string(cond_type) + ".");
+    }
+    Type then_type = check_expr(*ternary->then_expr);
+    Type else_type = check_expr(*ternary->else_expr);
+    if (!then_type.is_compatible_with(else_type)) {
+      error_at(ternary->location,
+               "Ternary branches have incompatible types: " + type_to_string(then_type) +
+                   " vs " + type_to_string(else_type) + ".");
+    }
+    return then_type;
   }
 
   if (const auto *coalesce = dynamic_cast<const ast::CoalesceExpr *>(&expr)) {
