@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cerrno>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
