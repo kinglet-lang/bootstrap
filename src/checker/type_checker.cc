@@ -58,7 +58,7 @@ Type TypeChecker::resolve_type_name(const std::string &name) const {
   if (name == "string") {
     return string_type();
   }
-  if (name == "char") {
+  if (name == "char" || name == "byte") {
     return char_type();
   }
   if (name == "void") {
