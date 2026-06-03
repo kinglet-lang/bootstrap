@@ -1,0 +1,14 @@
+using io;
+
+import {
+  "math.kl"
+}
+
+using math { add, multiply };
+
+int main() {
+  io::out.line("{}", add(1, 2));
+  io::out.line("{}", multiply(3, 4));
+  io::out.line("{}", math::add(10, 20));
+  return 0;
+}

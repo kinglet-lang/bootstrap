@@ -1,8 +1,10 @@
 #pragma once
 
 #include "ast/ast.h"
+#include "module/project_config.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -26,6 +28,7 @@ class ModuleLoader {
 public:
   explicit ModuleLoader(std::string base_dir);
   const std::string &base_dir() const { return base_dir_; }
+  const std::optional<ProjectConfig> &project_config() const { return project_config_; }
 
   struct LoadResult {
     const ParsedModule *module = nullptr;
@@ -33,6 +36,7 @@ public:
   };
 
   void register_source_file(const std::string &path);
+  void discover_project_root(const std::string &source_file_dir);
   LoadResult load(const std::string &path);
   LoadResult load_from(const std::string &path, const std::string &importing_file_dir);
 
@@ -42,6 +46,7 @@ private:
   std::string derive_namespace(const std::string &path) const;
 
   std::string base_dir_;
+  std::optional<ProjectConfig> project_config_;
   std::unordered_map<std::string, ParsedModule> cache_;
   std::unordered_set<std::string> loading_;
   std::unordered_set<std::string> source_files_;

@@ -201,12 +201,23 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   for (const ast::DeclPtr &decl : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
       if (using_decl->namespace_name != "io" && using_decl->namespace_name != "fs" &&
-          using_decl->namespace_name != "sys") {
+          using_decl->namespace_name != "sys" && !imported_namespaces_.count(using_decl->namespace_name)) {
         error_at(using_decl->location, "Unknown module '" + using_decl->namespace_name + "'.");
       }
       used_.insert(using_decl->namespace_name);
       if (using_decl->is_namespace) {
         opened_.insert(using_decl->namespace_name);
+      }
+      if (!using_decl->selected_symbols.empty()) {
+        const std::string &ns = using_decl->namespace_name;
+        for (const auto &sym : using_decl->selected_symbols) {
+          std::string qualified = ns + "::" + sym;
+          auto resolved = lookup_var(qualified);
+          if (resolved) {
+            declare_var(sym, *resolved, false);
+            imported_bare_names_.insert(sym);
+          }
+        }
       }
       continue;
     }
@@ -438,6 +449,56 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               ft2.return_type = std::make_unique<Type>(*func_type.return_type);
               declare_var(fn->name, ft2, false);
               imported_bare_names_.insert(fn->name);
+            }
+          }
+        }
+      }
+    }
+    if (const auto *import_block = dynamic_cast<const ast::ImportBlockDecl *>(decl.get())) {
+      for (const auto &imp : import_block->imports) {
+        if (const auto *import_decl = dynamic_cast<const ast::ImportDecl *>(imp.get())) {
+          if (module_loader_) {
+            auto result = module_loader_->load(import_decl->path);
+            if (result.module) {
+              const auto &mod = *result.module;
+              std::string ns = import_decl->alias.empty() ? mod.namespace_name : import_decl->alias;
+              imported_namespaces_.insert(ns);
+              for (const auto *sd : mod.public_structs) {
+                if (sd->type_params.empty()) {
+                  Type struct_type(TypeKind::Struct);
+                  struct_type.name = sd->name;
+                  for (const auto &field : sd->fields) {
+                    Type ft = resolve_type_expr(field.type);
+                    struct_type.fields.push_back(
+                        FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft)});
+                  }
+                  type_registry_.insert_or_assign(sd->name, struct_type);
+                } else {
+                  generic_structs_[sd->name] = sd;
+                }
+              }
+              for (const auto *ed : mod.public_enums) {
+                Type enum_type(TypeKind::Enum);
+                enum_type.name = ed->name;
+                for (const auto &v : ed->variants) {
+                  enum_type.variants.push_back(v.name);
+                  std::vector<Type> ptypes;
+                  for (const auto &pt : v.param_types) ptypes.push_back(resolve_type_expr(pt));
+                  enum_type.variant_param_types.push_back(std::move(ptypes));
+                }
+                type_registry_.insert_or_assign(ed->name, enum_type);
+              }
+              for (const auto *fn : mod.public_functions) {
+                Type return_type = resolve_type_expr(fn->return_type);
+                std::vector<Type> param_types;
+                for (const auto &param : fn->params) {
+                  param_types.push_back(resolve_type_expr(param.type));
+                }
+                Type func_type(TypeKind::Function);
+                func_type.param_types = std::move(param_types);
+                func_type.return_type = std::make_unique<Type>(return_type);
+                declare_var(ns + "::" + fn->name, func_type, false);
+              }
             }
           }
         }

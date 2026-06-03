@@ -64,12 +64,10 @@ const char *token_type_name(TokenType type) {
     return "STRUCT";
   case TokenType::ENUM:
     return "ENUM";
-  case TokenType::TRAIT:
-    return "TRAIT";
-  case TokenType::IMPL:
-    return "IMPL";
-  case TokenType::SELF:
-    return "SELF";
+  case TokenType::CONCEPT:
+    return "CONCEPT";
+  case TokenType::WHERE:
+    return "WHERE";
   case TokenType::SPAWN:
     return "SPAWN";
   case TokenType::SELECT:

@@ -387,12 +387,21 @@ struct ImportDecl final : Decl {
   std::vector<std::string> selected_symbols;
 };
 
+struct ImportBlockDecl final : Decl {
+  ImportBlockDecl(SourceLocation location, std::vector<DeclPtr> imports);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::vector<DeclPtr> imports;
+};
+
 struct UsingDecl final : Decl {
-  UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace);
+  UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace,
+            std::vector<std::string> selected_symbols = {});
   void print(std::ostream &out, int indent = 0) const override;
 
   std::string namespace_name;
   bool is_namespace;
+  std::vector<std::string> selected_symbols;
 };
 
 struct NamespaceAccessExpr final : Expr {

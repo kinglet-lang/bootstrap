@@ -36,12 +36,34 @@ CompileResult Compiler::compile(const ast::Program &program) {
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
       used_.insert(using_decl->namespace_name);
-      if (using_decl->is_namespace) {
+      if (using_decl->is_namespace || using_decl->selected_symbols.empty()) {
         opened_.insert(using_decl->namespace_name);
       }
     }
     if (const auto *import_decl = dynamic_cast<const ast::ImportDecl *>(declaration.get())) {
       process_import(*import_decl);
+    }
+    if (const auto *import_block = dynamic_cast<const ast::ImportBlockDecl *>(declaration.get())) {
+      for (const auto &imp : import_block->imports) {
+        if (const auto *id = dynamic_cast<const ast::ImportDecl *>(imp.get())) {
+          process_import(*id);
+        }
+      }
+    }
+  }
+
+  // Resolve using mod { syms } after all imports are processed
+  for (const ast::DeclPtr &declaration : program.declarations) {
+    if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
+      if (!using_decl->selected_symbols.empty()) {
+        const std::string &ns = using_decl->namespace_name;
+        for (const auto &sym : using_decl->selected_symbols) {
+          std::string qualified = ns + "::" + sym;
+          if (function_indices_.count(qualified)) {
+            function_indices_[sym] = function_indices_[qualified];
+          }
+        }
+      }
     }
   }
 
@@ -161,8 +183,20 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
       used_.insert(using_decl->namespace_name);
-      if (using_decl->is_namespace) {
+      if (using_decl->is_namespace || using_decl->selected_symbols.empty()) {
         opened_.insert(using_decl->namespace_name);
+      }
+      if (!using_decl->selected_symbols.empty()) {
+        const std::string &ns = using_decl->namespace_name;
+        for (const auto &sym : using_decl->selected_symbols) {
+          std::string qualified = ns + "::" + sym;
+          if (function_indices_.count(qualified)) {
+            function_indices_[sym] = function_indices_[qualified];
+          }
+          if (struct_indices_.count(qualified) || struct_indices_.count(sym)) {
+            // struct already registered unqualified during import
+          }
+        }
       }
     }
   }

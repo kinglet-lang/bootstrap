@@ -12,6 +12,10 @@ namespace kinglet {
 ModuleLoader::ModuleLoader(std::string base_dir)
     : base_dir_(std::move(base_dir)) {}
 
+void ModuleLoader::discover_project_root(const std::string &source_file_dir) {
+  project_config_ = find_project_config(source_file_dir);
+}
+
 std::string ModuleLoader::resolve_path(const std::string &relative_path) const {
   std::filesystem::path base(base_dir_);
   std::filesystem::path resolved = base / relative_path;
@@ -127,7 +131,17 @@ ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
 ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const std::string &importing_file_dir) {
   std::string resolved;
   try {
-    resolved = resolve_path_from(path, importing_file_dir);
+    if (path.size() >= 2 && path[0] == '/' && path[1] == '/') {
+      // Project-root-relative path: //parser/ast.kl
+      if (!project_config_) {
+        return {nullptr, "Cannot resolve '//' path: no kinglet.toml found"};
+      }
+      std::string relative = path.substr(2);
+      std::filesystem::path root(project_config_->root_dir);
+      resolved = std::filesystem::canonical(root / relative).string();
+    } else {
+      resolved = resolve_path_from(path, importing_file_dir);
+    }
   } catch (const std::filesystem::filesystem_error &) {
     return {nullptr, "Cannot resolve import path: " + path};
   }

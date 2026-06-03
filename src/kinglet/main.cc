@@ -379,6 +379,7 @@ int main(int argc, char **argv) {
     }
   }
   kinglet::ModuleLoader module_loader(base_dir);
+  module_loader.discover_project_root(base_dir);
   if (!input_path.empty()) {
     std::filesystem::path input_p(input_path);
     if (input_p.is_absolute()) {

@@ -2,6 +2,8 @@ static_library("module") {
   sources = [
     "module_loader.cc",
     "module_loader.h",
+    "project_config.cc",
+    "project_config.h",
   ]
 
   deps = [

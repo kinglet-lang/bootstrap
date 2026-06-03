@@ -248,12 +248,53 @@ ast::DeclPtr Parser::using_declaration() {
     return nullptr;
   }
   const Token &name = consume(TokenType::IDENTIFIER, "Expected namespace name after 'using'.");
+  std::string ns_name(token_text(name));
+
+  std::vector<std::string> selected;
+  if (match(TokenType::LEFT_BRACE)) {
+    do {
+      const Token &sym = consume(TokenType::IDENTIFIER, "Expected symbol name in using list.");
+      selected.push_back(std::string(token_text(sym)));
+    } while (match(TokenType::COMMA));
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after using symbol list.");
+  }
+
   consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
-  return std::make_unique<ast::UsingDecl>(location_of(using_token), token_text(name), is_namespace);
+  return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(ns_name),
+                                          is_namespace, std::move(selected));
 }
 
 ast::DeclPtr Parser::import_declaration() {
   const Token &import_token = previous();
+
+  // New block form: import { "path1" \n "path2" as alias }
+  if (match(TokenType::LEFT_BRACE)) {
+    std::vector<ast::DeclPtr> imports;
+    while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+      const Token &path_token = consume(TokenType::STRING_LIT, "Expected file path string in import block.");
+      std::string path(token_text(path_token));
+      if (path.size() >= 2 && path.front() == '"' && path.back() == '"') {
+        path = path.substr(1, path.size() - 2);
+      }
+
+      std::string alias;
+      if (check(TokenType::IDENTIFIER) && token_text(peek()) == "as") {
+        advance(); // consume 'as'
+        const Token &alias_token = consume(TokenType::IDENTIFIER, "Expected alias name after 'as'.");
+        alias = token_text(alias_token);
+      }
+
+      imports.push_back(std::make_unique<ast::ImportDecl>(
+          location_of(import_token), std::move(path), std::move(alias), std::vector<std::string>{}));
+    }
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after import block.");
+    if (imports.size() == 1) {
+      return std::move(imports[0]);
+    }
+    return std::make_unique<ast::ImportBlockDecl>(location_of(import_token), std::move(imports));
+  }
+
+  // Old form: import "path" as alias; OR import "path" { sym1, sym2 };
   const Token &path_token = consume(TokenType::STRING_LIT, "Expected file path string after 'import'.");
   std::string path(token_text(path_token));
   if (path.size() >= 2 && path.front() == '"' && path.back() == '"') {

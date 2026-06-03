@@ -554,12 +554,34 @@ void ImportDecl::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
-UsingDecl::UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace)
-    : Decl(location), namespace_name(std::move(namespace_name)), is_namespace(is_namespace) {}
+ImportBlockDecl::ImportBlockDecl(SourceLocation location, std::vector<DeclPtr> imports)
+    : Decl(location), imports(std::move(imports)) {}
+
+void ImportBlockDecl::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(import-block";
+  for (const auto &imp : imports) {
+    out << "\n";
+    imp->print(out, indent + 2);
+  }
+  out << ")";
+}
+
+UsingDecl::UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace,
+                     std::vector<std::string> selected_symbols)
+    : Decl(location), namespace_name(std::move(namespace_name)), is_namespace(is_namespace),
+      selected_symbols(std::move(selected_symbols)) {}
 
 void UsingDecl::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
-  if (is_namespace) {
+  if (!selected_symbols.empty()) {
+    out << "(using " << namespace_name << " {";
+    for (std::size_t i = 0; i < selected_symbols.size(); ++i) {
+      if (i > 0) out << ", ";
+      out << selected_symbols[i];
+    }
+    out << "})";
+  } else if (is_namespace) {
     out << "(using-namespace " << namespace_name << ")";
   } else {
     out << "(using " << namespace_name << ")";
