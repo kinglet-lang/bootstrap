@@ -582,49 +582,7 @@ json::Array CompletionResolver::resolve_impl_method(const std::string &target_ty
   }
   if (trait_name.empty()) return items;
 
-  auto visible = analysis_.symbols.visible_at(line_ + 1);
-  const ast::TraitDecl *trait_decl = nullptr;
-  if (analysis_.program) {
-    for (const auto &decl : analysis_.program->declarations) {
-      if (const auto *td = dynamic_cast<const ast::TraitDecl *>(decl.get())) {
-        if (td->name == trait_name) { trait_decl = td; break; }
-      }
-    }
-  }
-  if (!trait_decl) return items;
-
-  std::set<std::string> implemented;
-  for (const auto *s : visible) {
-    if (s->kind == SymbolKind::Function) {
-      std::string method_prefix = target_type + "::";
-      if (s->name.size() > method_prefix.size() &&
-          s->name.compare(0, method_prefix.size(), method_prefix) == 0) {
-        implemented.insert(s->name.substr(method_prefix.size()));
-      }
-    }
-  }
-
-  for (const auto &tm : trait_decl->methods) {
-    if (implemented.count(tm.name)) continue;
-    if (!matches_prefix(tm.name)) continue;
-    std::string sig = tm.return_type.to_string() + " " + tm.name + "(";
-    std::string snippet = tm.return_type.to_string() + " " + tm.name + "(";
-    bool first = true;
-    for (const auto &p : tm.params) {
-      if (!first) { sig += ", "; snippet += ", "; }
-      first = false;
-      if (p.name == "self") {
-        sig += "self";
-        snippet += "self";
-      } else {
-        sig += p.type.to_string() + " " + p.name;
-        snippet += p.type.to_string() + " " + p.name;
-      }
-    }
-    sig += ")";
-    snippet += ") {\n\t$0\n}";
-    items.push_back(protocol::completion_item(tm.name, 2, sig, snippet, 2));
-  }
+  // Concept-based completion: concepts have no impl blocks; return empty
   return items;
 }
 

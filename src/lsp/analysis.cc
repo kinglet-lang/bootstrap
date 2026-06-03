@@ -14,11 +14,6 @@ class SymbolCollector {
 public:
   void collect(const ast::Program &program) {
     for (const auto &decl : program.declarations) {
-      if (const auto *trait_decl = dynamic_cast<const ast::TraitDecl *>(decl.get())) {
-        traits_[trait_decl->name] = trait_decl;
-      }
-    }
-    for (const auto &decl : program.declarations) {
       visit_decl(*decl);
     }
   }
@@ -79,98 +74,15 @@ private:
         sym.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
       }
       table_.symbols.push_back(std::move(sym));
-    } else if (const auto *impl_decl = dynamic_cast<const ast::ImplDecl *>(&decl)) {
-      std::unordered_set<std::string> overridden;
-      for (const auto &method : impl_decl->methods) {
-        overridden.insert(method->name);
-        Symbol sym;
-        sym.name = impl_decl->target_type + "::" + method->name;
-        sym.kind = SymbolKind::Function;
-        sym.type_name = method->return_type.to_string();
-        sym.location = method->location;
-        sym.return_type = method->return_type.to_string();
-        sym.params = method->params;
-        sym.scope_start_line = 0;
-        sym.scope_end_line = 999999;
-        table_.symbols.push_back(std::move(sym));
-
-        for (const auto &param : method->params) {
-          Symbol psym;
-          psym.name = param.name;
-          psym.kind = SymbolKind::Parameter;
-          if (param.name == "self") {
-            psym.type_name = impl_decl->target_type;
-          } else {
-            psym.type_name = param.type.to_string();
-          }
-          psym.location = method->location;
-          psym.scope_start_line = method->location.line;
-          psym.scope_end_line = 999999;
-          table_.symbols.push_back(std::move(psym));
-        }
-
-        if (method->body) {
-          visit_stmt(*method->body, method->location.line);
-        }
-      }
-      if (!impl_decl->trait_name.empty()) {
-        auto it = traits_.find(impl_decl->trait_name);
-        if (it != traits_.end()) {
-          for (const auto &tm : it->second->methods) {
-            if (overridden.count(tm.name) || !tm.default_body) continue;
-            Symbol sym;
-            sym.name = impl_decl->target_type + "::" + tm.name;
-            sym.kind = SymbolKind::Function;
-            sym.type_name = tm.return_type.to_string();
-            sym.location = impl_decl->location;
-            sym.return_type = tm.return_type.to_string();
-            sym.params = tm.params;
-            sym.scope_start_line = 0;
-            sym.scope_end_line = 999999;
-            table_.symbols.push_back(std::move(sym));
-          }
-        }
-      }
-    } else if (const auto *trait_decl = dynamic_cast<const ast::TraitDecl *>(&decl)) {
+    } else if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(&decl)) {
       Symbol sym;
-      sym.name = trait_decl->name;
+      sym.name = concept_decl->name;
       sym.kind = SymbolKind::Trait;
-      sym.type_name = "trait";
-      sym.location = trait_decl->location;
+      sym.type_name = "concept";
+      sym.location = concept_decl->location;
       sym.scope_start_line = 0;
       sym.scope_end_line = 999999;
       table_.symbols.push_back(std::move(sym));
-
-      for (const auto &method : trait_decl->methods) {
-        Symbol msym;
-        msym.name = trait_decl->name + "::" + method.name;
-        msym.kind = SymbolKind::Function;
-        msym.type_name = method.return_type.to_string();
-        msym.return_type = method.return_type.to_string();
-        msym.params = method.params;
-        msym.location = trait_decl->location;
-        msym.scope_start_line = trait_decl->location.line;
-        msym.scope_end_line = 999999;
-        table_.symbols.push_back(std::move(msym));
-
-        if (method.default_body) {
-          for (const auto &param : method.params) {
-            Symbol psym;
-            psym.name = param.name;
-            psym.kind = SymbolKind::Parameter;
-            if (param.name == "self") {
-              psym.type_name = trait_decl->name;
-            } else {
-              psym.type_name = param.type.to_string();
-            }
-            psym.location = trait_decl->location;
-            psym.scope_start_line = trait_decl->location.line;
-            psym.scope_end_line = 999999;
-            table_.symbols.push_back(std::move(psym));
-          }
-          visit_stmt(*method.default_body, trait_decl->location.line);
-        }
-      }
     } else if (const auto *top = dynamic_cast<const ast::TopLevelStmtDecl *>(&decl)) {
       visit_stmt(*top->stmt, 0);
     }
@@ -204,7 +116,6 @@ private:
   }
 
   SymbolTable table_;
-  std::unordered_map<std::string, const ast::TraitDecl *> traits_;
 };
 
 } // namespace

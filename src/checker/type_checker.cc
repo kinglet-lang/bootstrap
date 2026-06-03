@@ -165,8 +165,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   used_.clear();
   opened_.clear();
   type_registry_.clear();
-  trait_registry_.clear();
-  trait_impls_.clear();
+  concept_registry_.clear();
   method_registry_.clear();
 
   push_scope();
@@ -276,82 +275,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       func_type.return_type = std::make_unique<Type>(return_type);
       declare_var(func->name, func_type, false);
     }
-    if (const auto *trait_decl = dynamic_cast<const ast::TraitDecl *>(decl.get())) {
-      trait_registry_[trait_decl->name] = trait_decl;
-      continue;
-    }
-    if (const auto *impl_decl = dynamic_cast<const ast::ImplDecl *>(decl.get())) {
-      for (const auto &method : impl_decl->methods) {
-        std::string key = impl_decl->target_type + "::" + method->name;
-        method_registry_[key] = MethodInfo{method.get(), impl_decl->target_type};
-      }
-      if (!impl_decl->trait_name.empty()) {
-        auto trait_it = trait_registry_.find(impl_decl->trait_name);
-        if (trait_it == trait_registry_.end()) {
-          error_at(impl_decl->location, "Unknown trait '" + impl_decl->trait_name + "'.");
-        } else {
-          const auto *trait = trait_it->second;
-          trait_impls_[impl_decl->target_type].push_back(impl_decl->trait_name);
-          for (const auto &trait_method : trait->methods) {
-            std::string key = impl_decl->target_type + "::" + trait_method.name;
-            auto impl_it = method_registry_.find(key);
-            if (impl_it == method_registry_.end()) {
-              if (!trait_method.default_body) {
-                error_at(impl_decl->location,
-                         "Type '" + impl_decl->target_type +
-                             "' does not implement required method '" +
-                             trait_method.name + "' from trait '" +
-                             impl_decl->trait_name + "'.");
-              } else {
-                method_registry_[key] = MethodInfo{nullptr, impl_decl->target_type};
-              }
-            } else {
-              const auto *impl_method = impl_it->second.decl;
-              if (impl_method) {
-                auto resolve_self = [&](const ast::TypeExpr &te) -> Type {
-                  if (te.name == "Self")
-                    return resolve_type_name(impl_decl->target_type);
-                  return resolve_type_expr(te);
-                };
-                Type trait_ret = resolve_self(trait_method.return_type);
-                Type impl_ret = resolve_type_expr(impl_method->return_type);
-                bool sig_mismatch = false;
-                if (!impl_ret.is_compatible_with(trait_ret)) sig_mismatch = true;
-                size_t trait_param_count = 0;
-                for (const auto &p : trait_method.params) {
-                  if (p.name != "self") ++trait_param_count;
-                }
-                size_t impl_param_count = 0;
-                for (const auto &p : impl_method->params) {
-                  if (p.name != "self") ++impl_param_count;
-                }
-                if (trait_param_count != impl_param_count) {
-                  sig_mismatch = true;
-                } else {
-                  size_t ti = 0, ii = 0;
-                  while (ti < trait_method.params.size() && ii < impl_method->params.size()) {
-                    if (trait_method.params[ti].name == "self") { ++ti; continue; }
-                    if (impl_method->params[ii].name == "self") { ++ii; continue; }
-                    Type tp = resolve_self(trait_method.params[ti].type);
-                    Type ip = resolve_type_expr(impl_method->params[ii].type);
-                    if (!ip.is_compatible_with(tp)) { sig_mismatch = true; break; }
-                    ++ti; ++ii;
-                  }
-                }
-                if (sig_mismatch) {
-                  error_at(impl_method->location,
-                           "Method '" + trait_method.name +
-                               "' signature does not match trait '" +
-                               impl_decl->trait_name + "' declaration.");
-                }
-              }
-            }
-          }
-        }
-      }
-      for (const auto &method : impl_decl->methods) {
-        check_function(*method);
-      }
+    if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(decl.get())) {
+      concept_registry_[concept_decl->name] = concept_decl;
       continue;
     }
     if (const auto *import_decl = dynamic_cast<const ast::ImportDecl *>(decl.get())) {
@@ -876,8 +801,8 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
       return *enum_type;
     }
-    // Check for trait namespace (e.g. Printable::to_string)
-    if (trait_registry_.count(ns_access->namespace_name)) {
+    // Check for concept namespace (e.g. Printable::to_string)
+    if (concept_registry_.count(ns_access->namespace_name)) {
       return void_type();
     }
     return void_type();
@@ -1692,32 +1617,9 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           if (param.name == "self") continue;
           fn.param_types.push_back(resolve_type_expr(param.type));
         }
-      } else {
-        auto trait_impls_it = trait_impls_.find(obj_type.name);
-        if (trait_impls_it != trait_impls_.end()) {
-          for (const auto &trait_name : trait_impls_it->second) {
-            auto trait_it = trait_registry_.find(trait_name);
-            if (trait_it == trait_registry_.end()) continue;
-            for (const auto &tm : trait_it->second->methods) {
-              if (tm.name == field_access->field_name) {
-                auto resolve_self = [&](const ast::TypeExpr &te) -> Type {
-                  if (te.name == "Self") return resolve_type_name(obj_type.name);
-                  return resolve_type_expr(te);
-                };
-                fn.return_type = std::make_unique<Type>(resolve_self(tm.return_type));
-                for (const auto &param : tm.params) {
-                  if (param.name == "self") continue;
-                  fn.param_types.push_back(resolve_self(param.type));
-                }
-                break;
-              }
-            }
-            if (fn.return_type) break;
-          }
-        }
-        if (!fn.return_type) {
-          fn.return_type = std::make_unique<Type>(void_type());
-        }
+      }
+      if (!fn.return_type) {
+        fn.return_type = std::make_unique<Type>(void_type());
       }
       return fn;
     }

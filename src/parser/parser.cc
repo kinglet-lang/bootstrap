@@ -118,7 +118,6 @@ void Parser::set_completion(lsp::CompletionInfo info) {
 
 std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
   if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(expr)) {
-    if (id->name == "self") return current_impl_type_;
     return id->name;
   }
   // io::out / io::err / io::in are built-in stream objects; expose them under a
@@ -206,20 +205,11 @@ ast::DeclPtr Parser::declaration() {
     return decl;
   }
 
-  if (match(TokenType::IMPL)) {
-    auto decl = impl_declaration();
+  if (match(TokenType::CONCEPT)) {
+    auto decl = concept_declaration();
     if (decl) {
-      auto *id = static_cast<ast::ImplDecl *>(decl.get());
-      id->is_public = is_public;
-    }
-    return decl;
-  }
-
-  if (match(TokenType::TRAIT)) {
-    auto decl = trait_declaration();
-    if (decl) {
-      auto *td = static_cast<ast::TraitDecl *>(decl.get());
-      td->is_public = is_public;
+      auto *cd = static_cast<ast::ConceptDecl *>(decl.get());
+      cd->is_public = is_public;
     }
     return decl;
   }
@@ -234,7 +224,7 @@ ast::DeclPtr Parser::declaration() {
   }
 
   if (is_public) {
-    error_at(peek(), "'pub' can only be used before function, struct, enum, impl, or trait declarations.");
+    error_at(peek(), "'pub' can only be used before function, struct, enum, or concept declarations.");
   }
 
   ast::StmtPtr stmt = statement();
@@ -373,137 +363,34 @@ ast::DeclPtr Parser::enum_declaration() {
                                          std::move(variants));
 }
 
-ast::DeclPtr Parser::impl_declaration() {
-  const Token &impl_token = previous();
-  if (at_completion()) {
-    set_completion({lsp::CompletionPosition::ImplTarget, {}, {}, {}, {}, {}, {}});
-    return nullptr;
+ast::DeclPtr Parser::concept_declaration() {
+  const Token &concept_token = previous();
+  const Token &name = consume(TokenType::IDENTIFIER, "Expected concept name.");
+  std::vector<std::string> type_params;
+  if (match(TokenType::LESS)) {
+    do {
+      const Token &param = consume(TokenType::IDENTIFIER, "Expected type parameter name.");
+      type_params.push_back(token_text(param));
+    } while (match(TokenType::COMMA));
+    consume(TokenType::GREATER, "Expected '>' after type parameters.");
   }
-  const Token &type_name = consume(TokenType::IDENTIFIER, "Expected type name after 'impl'.");
-  std::string target_type = token_text(type_name);
-  if (completion_mode_) current_impl_type_ = target_type;
-
-  std::string trait_name;
-  if (match(TokenType::COLON)) {
-    if (at_completion()) {
-      set_completion({lsp::CompletionPosition::TraitName, target_type, {}, {}, {}, {}, {}});
-      return nullptr;
-    }
-    const Token &trait_tok = consume(TokenType::IDENTIFIER, "Expected trait name after ':'.");
-    trait_name = token_text(trait_tok);
+  if (type_params.empty()) {
+    error_at(previous(), "Concept must declare at least one type parameter.");
   }
-
-  consume(TokenType::LEFT_BRACE, "Expected '{' after impl header.");
-
-  std::vector<std::unique_ptr<ast::FunctionDecl>> methods;
+  consume(TokenType::LEFT_BRACE, "Expected '{' after concept name.");
+  std::vector<ast::ConceptMethodDecl> methods;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
-    if (at_completion()) {
-      set_completion({lsp::CompletionPosition::ImplMethodDecl, target_type, trait_name, {}, {}, {}, {}});
-      return nullptr;
-    }
-    // Recover from a missing '}': a top-level declaration keyword cannot begin
-    // an impl-body member, so treat it as the start of the next declaration and
-    // stop here rather than cascading errors through the rest of the file.
-    if (is_decl_keyword(peek().type)) {
-      error_at(peek(), "Expected '}' after impl body.");
-      return std::make_unique<ast::ImplDecl>(location_of(impl_token),
-                                             std::move(target_type),
-                                             std::move(trait_name),
-                                             std::move(methods));
-    }
-    size_t start_pos = current_;
-    ast::TypeExpr return_type = parse_type_expr();
-    if (has_completion()) return nullptr;
-    const Token &method_name = consume(TokenType::IDENTIFIER, "Expected method name.");
+    ast::TypeExpr ret_type = parse_type_expr();
+    const Token &method_name = consume(TokenType::IDENTIFIER, "Expected method name in concept.");
     consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
-
-    std::vector<ast::Parameter> params;
-    if (match(TokenType::SELF)) {
-      params.push_back(ast::Parameter{ast::TypeExpr{target_type, {}}, "self"});
-      if (check(TokenType::COMMA)) advance();
-    }
-    if (!check(TokenType::RIGHT_PAREN)) {
-      auto rest = parameters();
-      params.insert(params.end(), std::make_move_iterator(rest.begin()),
-                    std::make_move_iterator(rest.end()));
-    }
+    auto params = parameters();
     consume(TokenType::RIGHT_PAREN, "Expected ')' after parameter list.");
-
-    ast::StmtPtr body = function_body();
-    if (has_completion()) return nullptr;
-    auto method = std::make_unique<ast::FunctionDecl>(
-        location_of(method_name), std::move(return_type), token_text(method_name),
-        std::vector<std::string>{}, std::move(params), std::move(body));
-    methods.push_back(std::move(method));
-
-    if (current_ == start_pos) {
-      advance();
-    }
+    consume(TokenType::SEMICOLON, "Expected ';' after concept method signature.");
+    methods.push_back(ast::ConceptMethodDecl{ret_type, token_text(method_name), std::move(params)});
   }
-  consume(TokenType::RIGHT_BRACE, "Expected '}' after impl body.");
-
-  return std::make_unique<ast::ImplDecl>(location_of(impl_token), std::move(target_type),
-                                         std::move(trait_name), std::move(methods));
-}
-
-ast::DeclPtr Parser::trait_declaration() {
-  const Token &trait_token = previous();
-  const Token &name_token = consume(TokenType::IDENTIFIER, "Expected trait name after 'trait'.");
-  std::string name = token_text(name_token);
-  if (completion_mode_) current_impl_type_ = name;
-
-  consume(TokenType::LEFT_BRACE, "Expected '{' after trait name.");
-
-  std::vector<ast::TraitMethodDecl> methods;
-  while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
-    if (at_completion()) {
-      set_completion({lsp::CompletionPosition::TraitMethodDecl, token_text(name_token), {}, {}, {}, {}, {}});
-      return nullptr;
-    }
-    // Recover from a missing '}' (see impl_declaration for rationale).
-    if (is_decl_keyword(peek().type)) {
-      error_at(peek(), "Expected '}' after trait body.");
-      return std::make_unique<ast::TraitDecl>(location_of(trait_token),
-                                              std::move(name), std::move(methods));
-    }
-    size_t start_pos = current_;
-    ast::TypeExpr return_type = parse_type_expr();
-    if (has_completion()) return nullptr;
-    const Token &method_name = consume(TokenType::IDENTIFIER, "Expected method name.");
-    consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
-
-    std::vector<ast::Parameter> params;
-    if (match(TokenType::SELF)) {
-      params.push_back(ast::Parameter{ast::TypeExpr{"Self", {}}, "self"});
-      if (check(TokenType::COMMA)) advance();
-    }
-    if (!check(TokenType::RIGHT_PAREN)) {
-      auto rest = parameters();
-      params.insert(params.end(), std::make_move_iterator(rest.begin()),
-                    std::make_move_iterator(rest.end()));
-    }
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after parameter list.");
-
-    ast::StmtPtr default_body;
-    if (check(TokenType::LEFT_BRACE) || check(TokenType::FAT_ARROW)) {
-      default_body = function_body();
-      if (has_completion()) return nullptr;
-    } else {
-      consume(TokenType::SEMICOLON, "Expected ';' or '{' after method signature.");
-    }
-
-    methods.push_back(ast::TraitMethodDecl{
-        std::move(return_type), token_text(method_name), std::move(params),
-        std::move(default_body)});
-
-    if (current_ == start_pos) {
-      advance();
-    }
-  }
-  consume(TokenType::RIGHT_BRACE, "Expected '}' after trait body.");
-
-  return std::make_unique<ast::TraitDecl>(location_of(trait_token), std::move(name),
-                                          std::move(methods));
+  consume(TokenType::RIGHT_BRACE, "Expected '}' after concept body.");
+  return std::make_unique<ast::ConceptDecl>(location_of(concept_token), token_text(name),
+                                            std::move(type_params), std::move(methods));
 }
 
 ast::DeclPtr Parser::function_declaration() {
@@ -1137,7 +1024,7 @@ ast::ExprPtr Parser::call() {
       // postfix propagate.
       if (current_ + 1 < tokens_.size()) {
         switch (tokens_[current_ + 1].type) {
-        case TokenType::IDENTIFIER: case TokenType::SELF:
+        case TokenType::IDENTIFIER:
         case TokenType::INTEGER: case TokenType::FLOAT_LIT:
         case TokenType::STRING_LIT: case TokenType::CHAR_LIT:
         case TokenType::TRUE: case TokenType::FALSE: case TokenType::NULL_:
@@ -1231,9 +1118,6 @@ ast::ExprPtr Parser::primary() {
     consume(TokenType::RIGHT_BRACE, "Expected '}' after map literal.");
     return std::make_unique<ast::MapLiteralExpr>(location_of(left_brace),
                                                  std::move(keys), std::move(values));
-  }
-  if (match(TokenType::SELF)) {
-    return std::make_unique<ast::IdentifierExpr>(location_of(previous()), "self");
   }
   if (check(TokenType::INT) || check(TokenType::FLOAT) || check(TokenType::STRING) ||
       check(TokenType::BOOL) || check(TokenType::BYTE) || check(TokenType::DOUBLE) ||
@@ -1537,10 +1421,8 @@ bool Parser::is_type_start(TokenType type) const {
 
 bool Parser::is_decl_keyword(TokenType type) const {
   switch (type) {
-  case TokenType::IMPL:
   case TokenType::STRUCT:
   case TokenType::ENUM:
-  case TokenType::TRAIT:
   case TokenType::USING:
   case TokenType::IMPORT:
   case TokenType::PUB:

@@ -40,8 +40,7 @@ private:
   ast::DeclPtr function_declaration();
   ast::DeclPtr struct_declaration();
   ast::DeclPtr enum_declaration();
-  ast::DeclPtr impl_declaration();
-  ast::DeclPtr trait_declaration();
+  ast::DeclPtr concept_declaration();
   ast::StmtPtr statement();
   ast::StmtPtr block_statement();
   ast::StmtPtr return_statement();
@@ -120,7 +119,6 @@ private:
   bool completion_mode_ = false;
   std::size_t completion_index_ = 0;
   std::optional<lsp::CompletionInfo> completion_result_;
-  std::string current_impl_type_;
 };
 
 } // namespace kinglet

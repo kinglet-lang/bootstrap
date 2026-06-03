@@ -660,14 +660,11 @@ json::Value Server::handle_semantic_tokens(const json::Value &params) {
     case TokenType::PUB: case TokenType::LET: case TokenType::WHEN:
     case TokenType::IMPORT: case TokenType::EXPORT: case TokenType::NAMESPACE:
     case TokenType::USING:
-    case TokenType::STRUCT: case TokenType::ENUM: case TokenType::TRAIT:
-    case TokenType::IMPL:
+    case TokenType::STRUCT: case TokenType::ENUM: case TokenType::CONCEPT:
+    case TokenType::WHERE:
     case TokenType::SPAWN: case TokenType::SELECT: case TokenType::TRUE:
     case TokenType::FALSE: case TokenType::NULL_:
       token_type = TT::Keyword;
-      break;
-    case TokenType::SELF:
-      token_type = TT::Parameter;
       break;
     case TokenType::STRING_LIT:
       token_type = TT::String;

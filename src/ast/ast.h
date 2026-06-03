@@ -481,31 +481,21 @@ struct EnumDecl final : Decl {
   bool is_public = false;
 };
 
-struct TraitMethodDecl {
+struct ConceptMethodDecl {
   TypeExpr return_type;
   std::string name;
   std::vector<Parameter> params;
-  StmtPtr default_body;
 };
 
-struct TraitDecl final : Decl {
-  TraitDecl(SourceLocation location, std::string name,
-            std::vector<TraitMethodDecl> methods);
+struct ConceptDecl final : Decl {
+  ConceptDecl(SourceLocation location, std::string name,
+              std::vector<std::string> type_params,
+              std::vector<ConceptMethodDecl> methods);
   void print(std::ostream &out, int indent = 0) const override;
 
   std::string name;
-  std::vector<TraitMethodDecl> methods;
-  bool is_public = false;
-};
-
-struct ImplDecl final : Decl {
-  ImplDecl(SourceLocation location, std::string target_type, std::string trait_name,
-           std::vector<std::unique_ptr<FunctionDecl>> methods);
-  void print(std::ostream &out, int indent = 0) const override;
-
-  std::string target_type;
-  std::string trait_name;
-  std::vector<std::unique_ptr<FunctionDecl>> methods;
+  std::vector<std::string> type_params;
+  std::vector<ConceptMethodDecl> methods;
   bool is_public = false;
 };
 
