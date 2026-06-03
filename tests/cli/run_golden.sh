@@ -16,6 +16,19 @@ fail() {
   FAILURES=$((FAILURES + 1))
 }
 
+# Normalize CRLF to LF byte-for-byte. `tr -d` deletes raw 0x0D bytes, sidestepping
+# the text-mode pitfalls of in-place editors: BSD `sed -i` needs a backup-suffix
+# argument and does not interpret `\r`, while Windows `perl -i` re-adds `\r` on
+# write via its `:crlf` layer. tr operates on the byte stream and behaves the
+# same on macOS, Linux, and Git-Bash.
+strip_cr() {
+  local f
+  for f in "$@"; do
+    [[ -f "$f" ]] || continue
+    tr -d '\r' <"$f" >"$f.nocr" && mv -f "$f.nocr" "$f"
+  done
+}
+
 run_case() {
   local name="$1"
   local mode="$2"
@@ -33,10 +46,7 @@ run_case() {
   fi
   local actual_exit=$?
 
-  # Normalize CRLF to LF for cross-platform compatibility.
-  # perl -i is portable across GNU/BSD; BSD sed -i needs a backup-suffix arg
-  # and does not interpret \r, so plain `sed -i 's/\r$//'` breaks on macOS.
-  perl -i -pe 's/\r$//' "$stdout" "$stderr"
+  strip_cr "$stdout" "$stderr"
 
   if [[ "$actual_exit" -ne "$expected_exit" ]]; then
     fail "$name exit: expected $expected_exit, got $actual_exit"
@@ -63,7 +73,7 @@ run_contains_case() {
 
   "$KINGLET" "$mode" "$source" >"$stdout" 2>"$stderr"
   local actual_exit=$?
-  perl -i -pe 's/\r$//' "$stdout" "$stderr"
+  strip_cr "$stdout" "$stderr"
   if [[ "$actual_exit" -ne 0 ]]; then
     fail "$name exit: expected 0, got $actual_exit"
   fi
@@ -93,7 +103,7 @@ run_args_case() {
 
   "$KINGLET" "$source" "$@" >"$stdout" 2>"$stderr"
   local actual_exit=$?
-  perl -i -pe 's/\r$//' "$stdout" "$stderr"
+  strip_cr "$stdout" "$stderr"
 
   if [[ "$actual_exit" -ne "$expected_exit" ]]; then
     fail "$name exit: expected $expected_exit, got $actual_exit"
