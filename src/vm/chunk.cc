@@ -350,7 +350,7 @@ namespace {
 
 // .kbc format constants
 constexpr uint32_t kKbcMagic = 0x01424B43; // "KBC\x01" little-endian
-constexpr uint32_t kKbcVersion = 1;
+constexpr uint32_t kKbcVersion = 2;
 constexpr uint32_t kFlagHasDebugInfo = 1;
 
 void write_u8(std::ostream &out, uint8_t v) { out.write(reinterpret_cast<const char *>(&v), 1); }
@@ -377,6 +377,61 @@ bool read_str(std::istream &in, std::string &s) {
   if (!read_u32(in, len)) return false;
   s.resize(len);
   return in.read(s.data(), static_cast<std::streamsize>(len)).good();
+}
+
+// --- Sleb128 encoding/decoding for v2 format ---
+
+int encode_sleb128(int32_t value, uint8_t *buf) {
+  int count = 0;
+  bool more = true;
+  while (more) {
+    uint8_t byte = static_cast<uint8_t>(value & 0x7F);
+    value >>= 7;
+    if ((value == 0 && !(byte & 0x40)) || (value == -1 && (byte & 0x40))) {
+      more = false;
+    } else {
+      byte |= 0x80;
+    }
+    buf[count++] = byte;
+  }
+  return count;
+}
+
+int decode_sleb128(const uint8_t *buf, int32_t *value) {
+  int32_t result = 0;
+  int shift = 0;
+  int count = 0;
+  uint8_t byte;
+  do {
+    byte = buf[count++];
+    result |= (int32_t)(byte & 0x7F) << shift;
+    shift += 7;
+  } while (byte & 0x80);
+  if (shift < 32 && (byte & 0x40)) {
+    result |= -(1 << shift);
+  }
+  *value = result;
+  return count;
+}
+
+// Write Sleb128 to stream.
+void write_sleb128(std::ostream &out, int32_t v) {
+  uint8_t buf[5];
+  int n = encode_sleb128(v, buf);
+  out.write(reinterpret_cast<const char *>(buf), n);
+}
+
+// Read Sleb128 from stream.
+bool read_sleb128(std::istream &in, int32_t &v) {
+  uint8_t buf[5];
+  int count = 0;
+  uint8_t byte;
+  do {
+    if (!in.read(reinterpret_cast<char *>(&byte), 1).good()) return false;
+    buf[count++] = byte;
+  } while (byte & 0x80);
+  decode_sleb128(buf, &v);
+  return true;
 }
 
 bool values_equal(const Value &a, const Value &b) {
@@ -487,10 +542,10 @@ bool Chunk::serialize(const std::string &path, bool strip_debug) const {
   write_u32(out, static_cast<uint32_t>(instructions_.size()));
   for (const auto &inst : instructions_) {
     write_u8(out, static_cast<uint8_t>(inst.op));
-    write_i32(out, inst.operand);
+    write_sleb128(out, inst.operand);
     if (!strip_debug) {
-      write_i32(out, inst.line);
-      write_i32(out, inst.column);
+      write_sleb128(out, inst.line);
+      write_sleb128(out, inst.column);
     }
   }
 
@@ -544,7 +599,7 @@ Chunk Chunk::deserialize(const std::string &path, std::string *error) {
     if (error) *error = "Invalid .kbc file: bad magic";
     return chunk;
   }
-  if (!read_u32(in, version) || version != kKbcVersion) {
+  if (!read_u32(in, version) || (version != 1 && version != 2)) {
     if (error) *error = "Unsupported .kbc version";
     return chunk;
   }
@@ -712,6 +767,7 @@ Chunk Chunk::deserialize(const std::string &path, std::string *error) {
 
   // Instructions section
   const bool has_debug = (flags & kFlagHasDebugInfo) != 0;
+  const bool use_sleb128 = (version >= 2);
   uint32_t inst_count = 0;
   if (!read_u32(in, inst_count)) {
     if (error) *error = "Truncated instructions count";
@@ -720,15 +776,33 @@ Chunk Chunk::deserialize(const std::string &path, std::string *error) {
   for (uint32_t i = 0; i < inst_count; ++i) {
     uint8_t op = 0;
     int32_t operand = 0;
-    if (!read_u8(in, op) || !read_i32(in, operand)) {
+    if (!read_u8(in, op)) {
       if (error) *error = "Truncated instruction";
       return chunk;
     }
+    if (use_sleb128) {
+      if (!read_sleb128(in, operand)) {
+        if (error) *error = "Truncated instruction operand";
+        return chunk;
+      }
+    } else {
+      if (!read_i32(in, operand)) {
+        if (error) *error = "Truncated instruction";
+        return chunk;
+      }
+    }
     int32_t line = 0, column = 0;
     if (has_debug) {
-      if (!read_i32(in, line) || !read_i32(in, column)) {
-        if (error) *error = "Truncated instruction debug info";
-        return chunk;
+      if (use_sleb128) {
+        if (!read_sleb128(in, line) || !read_sleb128(in, column)) {
+          if (error) *error = "Truncated instruction debug info";
+          return chunk;
+        }
+      } else {
+        if (!read_i32(in, line) || !read_i32(in, column)) {
+          if (error) *error = "Truncated instruction debug info";
+          return chunk;
+        }
       }
     }
     chunk.instructions_.push_back(Instruction{
