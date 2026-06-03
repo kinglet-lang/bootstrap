@@ -77,6 +77,11 @@ private:
   std::unordered_set<std::string> opened_;  // using namespace io;
   std::unordered_set<std::string> imported_namespaces_;
   std::unordered_set<std::string> imported_bare_names_;  // for selective imports
+  // Per-namespace exported / private symbol names, populated when an import is
+  // processed. Used to give a precise diagnostic for `using mod { sym };` when
+  // a symbol is missing from the module or exists but is not pub.
+  std::unordered_map<std::string, std::unordered_set<std::string>> module_public_symbols_;
+  std::unordered_map<std::string, std::unordered_set<std::string>> module_private_symbols_;
   int loop_depth_ = 0;
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
   ModuleLoader *module_loader_ = nullptr;

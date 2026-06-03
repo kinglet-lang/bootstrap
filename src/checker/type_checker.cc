@@ -210,12 +210,33 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       }
       if (!using_decl->selected_symbols.empty()) {
         const std::string &ns = using_decl->namespace_name;
+        const bool known_module = imported_namespaces_.count(ns) > 0;
         for (const auto &sym : using_decl->selected_symbols) {
           std::string qualified = ns + "::" + sym;
           auto resolved = lookup_var(qualified);
           if (resolved) {
             declare_var(sym, *resolved, false);
             imported_bare_names_.insert(sym);
+            continue;
+          }
+          // The symbol could not be pulled in. Diagnose why, distinguishing a
+          // non-pub symbol from one that does not exist. A pub struct/enum
+          // type resolves through the type registry rather than as a variable,
+          // so its absence from lookup_var is expected and not an error.
+          if (!known_module) {
+            continue;  // already reported as "Unknown module" above
+          }
+          const auto pub_it = module_public_symbols_.find(ns);
+          if (pub_it != module_public_symbols_.end() && pub_it->second.count(sym)) {
+            continue;  // pub type; usable via type registry, nothing to bind
+          }
+          const auto priv_it = module_private_symbols_.find(ns);
+          if (priv_it != module_private_symbols_.end() && priv_it->second.count(sym)) {
+            error_at(using_decl->location,
+                     "'" + sym + "' is not pub in module '" + ns + "'.");
+          } else {
+            error_at(using_decl->location,
+                     "Module '" + ns + "' has no symbol '" + sym + "'.");
           }
         }
       }
@@ -346,6 +367,18 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           }
           std::string ns = import_decl->alias.empty() ? mod.namespace_name : import_decl->alias;
           imported_namespaces_.insert(ns);
+          // Record exported / private symbol names so `using mod { sym };` can
+          // diagnose a missing or non-pub symbol precisely.
+          {
+            auto &pub_set = module_public_symbols_[ns];
+            for (const auto *fn : mod.public_functions) pub_set.insert(fn->name);
+            for (const auto *sd : mod.public_structs) pub_set.insert(sd->name);
+            for (const auto *ed : mod.public_enums) pub_set.insert(ed->name);
+            auto &priv_set = module_private_symbols_[ns];
+            for (const auto *fn : mod.private_functions) priv_set.insert(fn->name);
+            for (const auto *sd : mod.private_structs) priv_set.insert(sd->name);
+            for (const auto *ed : mod.private_enums) priv_set.insert(ed->name);
+          }
           // Validate selected symbols exist as public exports
           if (!import_decl->selected_symbols.empty()) {
             std::unordered_set<std::string> pub_names;
