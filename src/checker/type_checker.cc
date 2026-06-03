@@ -159,6 +159,35 @@ void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl, const 
   type_registry_.insert_or_assign(mangled, struct_type);
 }
 
+// Insert forward-declaration placeholders (name + kind only) for every type a
+// module exports, so that recursive variant payloads and cross-type references
+// resolve to the type rather than Void when the body is processed later. This
+// mirrors the local Pass 0 for imported modules.
+void TypeChecker::forward_declare_imported_types(const ParsedModule &mod) {
+  for (const ast::StructDecl *sd : mod.public_structs) {
+    if (!sd->type_params.empty()) continue;
+    Type fwd(TypeKind::Struct);
+    fwd.name = sd->name;
+    type_registry_.insert_or_assign(sd->name, fwd);
+  }
+  for (const ast::StructDecl *sd : mod.private_structs) {
+    if (!sd->type_params.empty()) continue;
+    Type fwd(TypeKind::Struct);
+    fwd.name = sd->name;
+    type_registry_.insert_or_assign(sd->name, fwd);
+  }
+  for (const ast::EnumDecl *ed : mod.public_enums) {
+    Type fwd(TypeKind::Enum);
+    fwd.name = ed->name;
+    type_registry_.insert_or_assign(ed->name, fwd);
+  }
+  for (const ast::EnumDecl *ed : mod.private_enums) {
+    Type fwd(TypeKind::Enum);
+    fwd.name = ed->name;
+    type_registry_.insert_or_assign(ed->name, fwd);
+  }
+}
+
 TypeCheckResult TypeChecker::check(const ast::Program &program) {
   errors_.clear();
   scopes_.clear();
@@ -184,6 +213,59 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       Type fwd(TypeKind::Enum);
       fwd.name = ed->name;
       type_registry_.insert_or_assign(ed->name, fwd);
+    }
+  }
+
+  // Pass 0b: forward-declare every type exported by imported modules (and their
+  // direct dependencies) before any body is resolved, mirroring local Pass 0.
+  // The per-import registration below resolves variant/field types inline, so
+  // without this a recursive payload (ast::Expr containing Expr) or a reference
+  // to a type declared later in another module collapses to Void across module
+  // boundaries. Singleton module loading makes the repeated load() calls cheap.
+  // Covers both `import "x" {}` (ImportDecl) and `import { ... }`
+  // (ImportBlockDecl) forms.
+  if (module_loader_) {
+    auto collect_imports = [](const ast::Decl *decl,
+                              std::vector<const ast::ImportDecl *> &out) {
+      if (const auto *id = dynamic_cast<const ast::ImportDecl *>(decl)) {
+        out.push_back(id);
+      } else if (const auto *ib =
+                     dynamic_cast<const ast::ImportBlockDecl *>(decl)) {
+        for (const auto &imp : ib->imports) {
+          if (const auto *id = dynamic_cast<const ast::ImportDecl *>(imp.get())) {
+            out.push_back(id);
+          }
+        }
+      }
+    };
+
+    std::vector<const ast::ImportDecl *> top_imports;
+    for (const ast::DeclPtr &decl : program.declarations) {
+      collect_imports(decl.get(), top_imports);
+    }
+
+    for (const ast::ImportDecl *id : top_imports) {
+      auto result = module_loader_->load(id->path);
+      if (!result.module) continue;
+      forward_declare_imported_types(*result.module);
+      // One level of transitive deps: a module's pub type may reference a type
+      // that module itself imports.
+      if (result.module->program) {
+        std::string mod_dir =
+            std::filesystem::path(result.module->resolved_path)
+                .parent_path()
+                .string();
+        std::vector<const ast::ImportDecl *> inner_imports;
+        for (const auto &inner : result.module->program->declarations) {
+          collect_imports(inner.get(), inner_imports);
+        }
+        for (const ast::ImportDecl *iid : inner_imports) {
+          auto inner_result = module_loader_->load_from(iid->path, mod_dir);
+          if (inner_result.module) {
+            forward_declare_imported_types(*inner_result.module);
+          }
+        }
+      }
     }
   }
 
@@ -496,6 +578,19 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               const auto &mod = *result.module;
               std::string ns = import_decl->alias.empty() ? mod.namespace_name : import_decl->alias;
               imported_namespaces_.insert(ns);
+              // Record exported / private symbol names so `using mod { sym };`
+              // diagnostics work for the block-import form too (without this,
+              // `using mod { SomeStruct }` misreports the type as missing).
+              {
+                auto &pub_set = module_public_symbols_[ns];
+                for (const auto *fn : mod.public_functions) pub_set.insert(fn->name);
+                for (const auto *sd : mod.public_structs) pub_set.insert(sd->name);
+                for (const auto *ed : mod.public_enums) pub_set.insert(ed->name);
+                auto &priv_set = module_private_symbols_[ns];
+                for (const auto *fn : mod.private_functions) priv_set.insert(fn->name);
+                for (const auto *sd : mod.private_structs) priv_set.insert(sd->name);
+                for (const auto *ed : mod.private_enums) priv_set.insert(ed->name);
+              }
               for (const auto *sd : mod.public_structs) {
                 if (sd->type_params.empty()) {
                   Type struct_type(TypeKind::Struct);

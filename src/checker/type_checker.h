@@ -5,6 +5,7 @@
 
 namespace kinglet {
 class ModuleLoader;
+struct ParsedModule;
 }
 
 #include <memory>
@@ -50,6 +51,7 @@ private:
   void error_at(ast::SourceLocation location, std::string message);
   void warn_at(ast::SourceLocation location, std::string message);
   void check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::SourceLocation location);
+  void forward_declare_imported_types(const ParsedModule &mod);
 
   struct VarInfo {
     Type type;
