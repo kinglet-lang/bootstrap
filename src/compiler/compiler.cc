@@ -21,6 +21,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
   function_indices_.clear();
   struct_indices_.clear();
   enum_indices_.clear();
+  processed_modules_.clear();
 
   // Pre-register the built-in CastError enum at chunk index 0 so the VM
   // can build CastError variants on Cast failure without an enum lookup.
@@ -169,6 +170,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   function_indices_.clear();
   struct_indices_.clear();
   enum_indices_.clear();
+  processed_modules_.clear();
 
   // Pre-register the built-in CastError enum at chunk index 0; see compile().
   {
@@ -1742,6 +1744,13 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
 
   const ParsedModule &mod = *result.module;
 
+  // Process each module once. Diamond dependencies (token/ast/bytecode reached
+  // via several import paths) would otherwise re-register functions and
+  // re-compile imported bodies repeatedly — exponential on a deep DAG.
+  if (!processed_modules_.insert(mod.resolved_path).second) {
+    return;
+  }
+
   // Determine the directory of the loaded module for resolving its nested
   // imports. We need the resolved (canonical) path to extract the parent dir.
   std::string mod_dir;
@@ -1767,6 +1776,13 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     for (const auto &inner_decl : mod.program->declarations) {
       if (const auto *inner_import = dynamic_cast<const ast::ImportDecl *>(inner_decl.get())) {
         process_import_from(*inner_import, mod_dir);
+      } else if (const auto *inner_block =
+                     dynamic_cast<const ast::ImportBlockDecl *>(inner_decl.get())) {
+        for (const auto &imp : inner_block->imports) {
+          if (const auto *id = dynamic_cast<const ast::ImportDecl *>(imp.get())) {
+            process_import_from(*id, mod_dir);
+          }
+        }
       }
     }
   }
@@ -1875,6 +1891,27 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     }
     int idx = chunk_.add_enum_meta(std::move(meta));
     enum_indices_[ed->name] = idx;
+  }
+
+  // Apply this module's own `using mod { sym };` selections. Under the new
+  // import{} syntax a module declares dependencies with import{} and selects
+  // symbols with `using`, so imported public functions are registered only as
+  // `ns::name` above (the bare-name branch fires only for old-style selective
+  // import). Register the bare name for each function the module's `using`
+  // pulls in, so unqualified calls inside this module's bodies — compiled in
+  // Pass 2b — resolve. Types selected via `using` are already registered
+  // unqualified.
+  if (mod.program) {
+    for (const auto &md : mod.program->declarations) {
+      const auto *ud = dynamic_cast<const ast::UsingDecl *>(md.get());
+      if (!ud || ud->selected_symbols.empty()) continue;
+      for (const auto &sym : ud->selected_symbols) {
+        auto it = function_indices_.find(ud->namespace_name + "::" + sym);
+        if (it != function_indices_.end()) {
+          function_indices_[sym] = it->second;
+        }
+      }
+    }
   }
 }
 

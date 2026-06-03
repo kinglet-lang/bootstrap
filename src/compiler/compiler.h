@@ -88,6 +88,10 @@ private:
   std::unordered_map<std::string, std::string> namespace_aliases_;
   std::unordered_set<std::string> imported_namespaces_;
   std::unordered_map<std::string, std::vector<const ast::FunctionDecl *>> imported_function_decls_;
+  // Resolved paths of modules already processed by process_import_from, so a
+  // module reached through several import paths (diamond deps) is registered
+  // and compiled exactly once.
+  std::unordered_set<std::string> processed_modules_;
   std::unordered_map<std::string, std::string> local_types_;
   std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
   std::unordered_map<std::string, std::string> method_return_types_;
