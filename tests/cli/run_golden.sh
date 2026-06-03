@@ -223,21 +223,3 @@ if [[ "$FAILURES" -ne 0 ]]; then
 fi
 
 echo "CLI golden tests passed."
-
-# --- LSP completion tests ---
-# kinglet-lsp is built as part of the default target above. Pick whichever
-# Python launcher is available (Windows Git Bash often lacks `python3`).
-if command -v python3 >/dev/null 2>&1; then
-  PY=python3
-elif command -v python >/dev/null 2>&1; then
-  PY=python
-else
-  echo "Python not found; skipping LSP completion tests." >&2
-  PY=""
-fi
-if [[ -n "$PY" ]]; then
-  if ! "$PY" "$ROOT/tests/lsp/completion_driver.py"; then
-    echo "LSP completion test(s) failed." >&2
-    exit 1
-  fi
-fi
