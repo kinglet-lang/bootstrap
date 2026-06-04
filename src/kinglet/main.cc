@@ -118,6 +118,11 @@ int main(int argc, char **argv) {
       program_args.emplace_back(arg);
       continue;
     }
+    // Once in RunBytecode mode, all remaining args belong to the program.
+    if (mode == Mode::RunBytecode) {
+      program_args.emplace_back(arg);
+      continue;
+    }
     if (arg == "-h" || arg == "--help") {
       print_usage(std::cout);
       return 0;
