@@ -320,7 +320,7 @@ int main(int argc, char **argv) {
 
       if (vm_result.value.type != kinglet::ValueType::Null &&
           (vm_result.value.type != kinglet::ValueType::Int ||
-           vm_result.value.int_value_storage != 0)) {
+           vm_result.value.as_int != 0)) {
         std::cout << vm_result.value << '\n';
       }
     }

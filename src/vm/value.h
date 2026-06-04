@@ -36,19 +36,62 @@ enum class NativeFn {
   SysArgs,
 };
 
+// ── Reference-counted heap infrastructure ──────────────────────────────
+
+struct HeapObj {
+  int refcount = 0;
+  ValueType tag = ValueType::Null;
+};
+
+template <typename T>
+struct RcPtr {
+  T *ptr = nullptr;
+
+  RcPtr() = default;
+  explicit RcPtr(T *p) : ptr(p) {
+    if (ptr) ++ptr->refcount;
+  }
+
+  RcPtr(const RcPtr &other) : ptr(other.ptr) {
+    if (ptr) ++ptr->refcount;
+  }
+
+  RcPtr(RcPtr &&other) noexcept : ptr(other.ptr) {
+    other.ptr = nullptr;
+  }
+
+  RcPtr &operator=(const RcPtr &other) {
+    if (this != &other) {
+      if (ptr && --ptr->refcount == 0) delete ptr;
+      ptr = other.ptr;
+      if (ptr) ++ptr->refcount;
+    }
+    return *this;
+  }
+
+  RcPtr &operator=(RcPtr &&other) noexcept {
+    if (this != &other) {
+      if (ptr && --ptr->refcount == 0) delete ptr;
+      ptr = other.ptr;
+      other.ptr = nullptr;
+    }
+    return *this;
+  }
+
+  ~RcPtr() {
+    if (ptr && --ptr->refcount == 0) delete ptr;
+  }
+
+  T *operator->() const { return ptr; }
+  T &operator*() const { return *ptr; }
+  explicit operator bool() const { return ptr != nullptr; }
+  bool operator==(const RcPtr &o) const { return ptr == o.ptr; }
+  bool operator!=(const RcPtr &o) const { return ptr != o.ptr; }
+};
+
 struct Value;
 
-struct StructData {
-  int type_index;
-  std::vector<Value> fields;
-};
-
-struct ArrayData {
-  std::vector<Value> elements;
-};
-
-// MapEntry / MapData hold Value by value, so they are defined after Value below.
-struct MapData;
+// ── Value ──────────────────────────────────────────────────────────────
 
 struct Value {
   static Value int_value(int64_t value);
@@ -61,42 +104,75 @@ struct Value {
   static Value native_function_value(NativeFn fn);
   static Value struct_value(int type_index, std::vector<Value> fields);
   static Value enum_value(int type_index, int variant_index);
-  static Value enum_value_with_payload(int type_index, int variant_index, std::vector<Value> payload);
+  static Value enum_value_with_payload(int type_index, int variant_index,
+                                        std::vector<Value> payload);
   static Value array_value(std::vector<Value> elements);
   static Value map_value();
 
   bool is_number() const;
   double as_double() const;
 
+  // Accessor helpers — defined in value.cc where Heap* are complete.
+  std::string &string_val();
+  const std::string &string_val() const;
+
+  // ── Fields ────────────────────────────────────────────────────────────
+
   ValueType type = ValueType::Null;
-  int64_t int_value_storage = 0;
-  double double_value_storage = 0.0;
-  bool bool_value_storage = false;
-  std::string string_storage;
-  int function_index_storage = -1;
-  NativeFn native_fn_storage = NativeFn::IoOut;
-  std::shared_ptr<StructData> struct_storage;
-  int enum_type_index = -1;
-  int enum_variant_index = -1;
-  std::vector<Value> enum_payload;
-  std::shared_ptr<ArrayData> array_storage;
-  std::shared_ptr<MapData> map_storage;
+  int64_t as_int = 0;                  // Int, Char
+  double as_double_storage = 0.0;      // Double
+  bool as_bool = false;                // Bool
+  int function_idx = -1;               // Function
+  NativeFn native_fn = NativeFn::IoOut; // NativeFunction
+  int enum_type_idx = -1;              // Enum (no-payload variant, inline)
+  int enum_variant_idx = -1;           // Enum (no-payload variant, inline)
+  RcPtr<HeapObj> heap;                 // String, Struct, Array, Enum(payload), Map
 };
 
-// A key/value pair retaining the original key Value (so keys() can return it)
-// alongside the stored value.
+// ── Heap-allocated value types (defined after Value so they see it complete) ─
+
+struct HeapString final : HeapObj {
+  std::string value;
+  explicit HeapString(std::string s) : value(std::move(s)) {
+    tag = ValueType::String; refcount = 1;
+  }
+};
+
+struct HeapStruct final : HeapObj {
+  int type_index;
+  std::vector<Value> fields;
+  HeapStruct(int ti, std::vector<Value> f)
+      : type_index(ti), fields(std::move(f)) {
+    tag = ValueType::Struct; refcount = 1;
+  }
+};
+
+struct HeapArray final : HeapObj {
+  std::vector<Value> elements;
+  explicit HeapArray(std::vector<Value> e) : elements(std::move(e)) {
+    tag = ValueType::Array; refcount = 1;
+  }
+};
+
 struct MapEntry {
   Value key;
   Value value;
 };
 
-// Native map backing store. `order` holds encoded keys in insertion order so
-// keys()/iteration are deterministic; `entries` is the O(1) lookup keyed by the
-// same encoded string (see encode_map_key in vm.cc — "s:" / "i:" prefixed to
-// keep int 65 distinct from string "65").
-struct MapData {
+struct HeapEnum final : HeapObj {
+  int type_index;
+  int variant_index;
+  std::vector<Value> payload;
+  HeapEnum(int ti, int vi, std::vector<Value> p)
+      : type_index(ti), variant_index(vi), payload(std::move(p)) {
+    tag = ValueType::Enum; refcount = 1;
+  }
+};
+
+struct HeapMap final : HeapObj {
   std::vector<std::string> order;
   std::unordered_map<std::string, MapEntry> entries;
+  HeapMap() { tag = ValueType::Map; refcount = 1; }
 };
 
 std::ostream &operator<<(std::ostream &out, const Value &value);

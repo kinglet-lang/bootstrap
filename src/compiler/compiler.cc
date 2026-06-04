@@ -325,7 +325,7 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
   const std::string &name = lookup_name.empty() ? function.name : lookup_name;
   auto it = function_indices_.find(name);
   int const_idx = it->second;
-  int func_idx = chunk_.constants()[static_cast<std::size_t>(const_idx)].function_index_storage;
+  int func_idx = chunk_.constants()[static_cast<std::size_t>(const_idx)].function_idx;
   const_cast<FunctionInfo &>(chunk_.functions()[static_cast<std::size_t>(func_idx)]).entry =
       chunk_.instructions().size();
 
@@ -1078,7 +1078,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
             compile_expr(*arg);
           }
           emit_constant(Value::function_value(
-              chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_index_storage),
+              chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
               call_expr->location);
           emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size() + 1),
                        call_expr->location);
@@ -1114,7 +1114,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_index_storage),
+            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
             call_expr->location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
         return;
@@ -1142,7 +1142,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_index_storage),
+            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
             call_expr->location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
         return;
@@ -1414,7 +1414,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       auto it = function_indices_.find(qualified);
       if (it != function_indices_.end()) {
         emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(it->second)].function_index_storage),
+            chunk_.constants()[static_cast<std::size_t>(it->second)].function_idx),
             ns_access->location);
         return;
       }

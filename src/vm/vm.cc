@@ -18,22 +18,47 @@
 #include <termios.h>
 #include <unistd.h>
 #endif
+
 namespace kinglet {
 
 namespace {
 
-// Encode a map key Value into a lookup string. The "s:"/"i:" prefix keeps the
-// string key "65" distinct from the int key 65. Only string and int keys are
-// supported (enforced by the type checker); other types return empty, treated
-// as a non-match by callers.
 std::string encode_map_key(const Value &key) {
-  if (key.type == ValueType::String) {
-    return "s:" + key.string_storage;
-  }
-  if (key.type == ValueType::Int) {
-    return "i:" + std::to_string(key.int_value_storage);
-  }
+  if (key.type == ValueType::String) return "s:" + key.string_val();
+  if (key.type == ValueType::Int) return "i:" + std::to_string(key.as_int);
   return std::string();
+}
+
+// Shorthands to avoid verbose casting in hot path.
+inline HeapString *as_string(Value &v) {
+  return static_cast<HeapString *>(v.heap.ptr);
+}
+inline const HeapString *as_string(const Value &v) {
+  return static_cast<const HeapString *>(v.heap.ptr);
+}
+inline HeapStruct *as_struct(Value &v) {
+  return static_cast<HeapStruct *>(v.heap.ptr);
+}
+inline const HeapStruct *as_struct(const Value &v) {
+  return static_cast<const HeapStruct *>(v.heap.ptr);
+}
+inline HeapArray *as_array(Value &v) {
+  return static_cast<HeapArray *>(v.heap.ptr);
+}
+inline const HeapArray *as_array(const Value &v) {
+  return static_cast<const HeapArray *>(v.heap.ptr);
+}
+inline HeapEnum *as_enum(Value &v) {
+  return static_cast<HeapEnum *>(v.heap.ptr);
+}
+inline const HeapEnum *as_enum(const Value &v) {
+  return static_cast<const HeapEnum *>(v.heap.ptr);
+}
+inline HeapMap *as_map(Value &v) {
+  return static_cast<HeapMap *>(v.heap.ptr);
+}
+inline const HeapMap *as_map(const Value &v) {
+  return static_cast<const HeapMap *>(v.heap.ptr);
 }
 
 } // namespace
@@ -84,10 +109,12 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         Value right = pop();
         Value left = pop();
         auto to_str = [](const Value &v) -> std::string {
-          if (v.type == ValueType::String) return v.string_storage;
-          if (v.type == ValueType::Int) return std::to_string(v.int_value_storage);
-          if (v.type == ValueType::Double) return std::to_string(v.double_value_storage);
-          if (v.type == ValueType::Bool) return v.bool_value_storage ? "true" : "false";
+          if (v.type == ValueType::String) return v.string_val();
+          if (v.type == ValueType::Int) return std::to_string(v.as_int);
+          if (v.type == ValueType::Double)
+            return std::to_string(v.as_double_storage);
+          if (v.type == ValueType::Bool)
+            return v.as_bool ? "true" : "false";
           if (v.type == ValueType::Null) return "null";
           return std::string();
         };
@@ -105,7 +132,7 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         return runtime_error("Operand must be an integer.");
       }
       Value value = pop();
-      push(Value::int_value(~value.int_value_storage));
+      push(Value::int_value(~value.as_int));
       break;
     }
     case OpCode::BitAnd:
@@ -113,17 +140,15 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::BitXor:
     case OpCode::Shl:
     case OpCode::Shr: {
-      if (stack_.size() < 2) {
-        return runtime_error("Stack underflow.");
-      }
+      if (stack_.size() < 2) return runtime_error("Stack underflow.");
       if (stack_[stack_.size() - 1].type != ValueType::Int ||
           stack_[stack_.size() - 2].type != ValueType::Int) {
         return runtime_error("Bitwise operands must be integers.");
       }
       Value right = pop();
       Value left = pop();
-      int64_t l = left.int_value_storage;
-      int64_t r = right.int_value_storage;
+      int64_t l = left.as_int;
+      int64_t r = right.as_int;
       int64_t result = 0;
       switch (instruction.op) {
       case OpCode::BitAnd:
@@ -137,8 +162,6 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         break;
       case OpCode::Shl:
       case OpCode::Shr:
-        // A shift amount outside [0, 63] is undefined in C++; define it here as
-        // yielding 0 so Kinglet programs get deterministic behaviour.
         if (r < 0 || r >= 64) {
           result = 0;
         } else if (instruction.op == OpCode::Shl) {
@@ -154,38 +177,34 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       break;
     }
     case OpCode::Negate: {
-      if (stack_.empty() || !stack_.back().is_number()) {
+      if (stack_.empty() || !stack_.back().is_number())
         return runtime_error("Operand must be numeric.");
-      }
       Value value = pop();
-      if (value.type == ValueType::Int) {
-        push(Value::int_value(-value.int_value_storage));
-      } else {
-        push(Value::double_value(-value.double_value_storage));
-      }
+      if (value.type == ValueType::Int)
+        push(Value::int_value(-value.as_int));
+      else
+        push(Value::double_value(-value.as_double_storage));
       break;
     }
     case OpCode::Not: {
-      if (stack_.empty()) {
-        return runtime_error("Stack underflow.");
-      }
+      if (stack_.empty()) return runtime_error("Stack underflow.");
       Value value = pop();
       bool truthy = false;
       switch (value.type) {
       case ValueType::Bool:
-        truthy = value.bool_value_storage;
+        truthy = value.as_bool;
         break;
       case ValueType::Null:
         truthy = false;
         break;
       case ValueType::Int:
-        truthy = value.int_value_storage != 0;
+        truthy = value.as_int != 0;
         break;
       case ValueType::Double:
-        truthy = value.double_value_storage != 0.0;
+        truthy = value.as_double_storage != 0.0;
         break;
       case ValueType::String:
-        truthy = !value.string_storage.empty();
+        truthy = !value.string_val().empty();
         break;
       case ValueType::Char:
       case ValueType::Function:
@@ -202,42 +221,33 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     }
     case OpCode::LoadLocal:
       if (instruction.operand < 0 ||
-          static_cast<std::size_t>(instruction.operand) >= frame.locals.size()) {
+          static_cast<std::size_t>(instruction.operand) >= frame.locals.size())
         return runtime_error("Local slot out of range.");
-      }
       push(frame.locals[static_cast<std::size_t>(instruction.operand)]);
       break;
     case OpCode::StoreLocal:
-      if (stack_.empty()) {
-        return runtime_error("Stack underflow.");
+      if (stack_.empty()) return runtime_error("Stack underflow.");
+      if (instruction.operand < 0) return runtime_error("Invalid local slot.");
+      if (static_cast<std::size_t>(instruction.operand) >=
+          frame.locals.size()) {
+        frame.locals.resize(
+            static_cast<std::size_t>(instruction.operand) + 1,
+            Value::null_value());
       }
-      if (instruction.operand < 0) {
-        return runtime_error("Invalid local slot.");
-      }
-      if (static_cast<std::size_t>(instruction.operand) >= frame.locals.size()) {
-        frame.locals.resize(static_cast<std::size_t>(instruction.operand) + 1,
-                            Value::null_value());
-      }
-      frame.locals[static_cast<std::size_t>(instruction.operand)] = stack_.back();
+      frame.locals[static_cast<std::size_t>(instruction.operand)] =
+          stack_.back();
       break;
     case OpCode::Pop:
-      if (stack_.empty()) {
-        return runtime_error("Stack underflow.");
-      }
+      if (stack_.empty()) return runtime_error("Stack underflow.");
       pop();
       break;
     case OpCode::Dup:
-      if (stack_.empty()) {
-        return runtime_error("Stack underflow.");
-      }
+      if (stack_.empty()) return runtime_error("Stack underflow.");
       stack_.push_back(stack_.back());
       break;
     case OpCode::CastTo: {
       Value src = pop();
       const int kind = instruction.operand;
-      // CastError lives at chunk enum-meta index 0 (pre-registered by the
-      // compiler). Variant order matches the EnumMeta:
-      // 0 = Empty, 1 = NotANumber(string), 2 = Overflow(string).
       const int kCastErrorIdx = 0;
       auto cast_err_empty = [&]() {
         return Value::enum_value(kCastErrorIdx, 0);
@@ -245,19 +255,21 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       auto cast_err_with = [&](int variant, const std::string &payload) {
         std::vector<Value> p;
         p.push_back(Value::string_value(payload));
-        return Value::enum_value_with_payload(kCastErrorIdx, variant, std::move(p));
+        return Value::enum_value_with_payload(kCastErrorIdx, variant,
+                                               std::move(p));
       };
       if (kind == 0) { // int
         if (src.type == ValueType::Int) {
           push(src);
         } else if (src.type == ValueType::Double) {
-          push(Value::int_value(static_cast<int64_t>(src.double_value_storage)));
+          push(Value::int_value(
+              static_cast<int64_t>(src.as_double_storage)));
         } else if (src.type == ValueType::Char) {
-          push(Value::int_value(src.int_value_storage));
+          push(Value::int_value(src.as_int));
         } else if (src.type == ValueType::Enum) {
-          push(Value::int_value(static_cast<int64_t>(src.enum_variant_index)));
+          push(Value::int_value(static_cast<int64_t>(src.enum_variant_idx)));
         } else if (src.type == ValueType::String) {
-          const std::string &s = src.string_storage;
+          const std::string &s = src.string_val();
           if (s.empty()) {
             push(cast_err_empty());
           } else {
@@ -273,17 +285,20 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
             }
           }
         } else {
-          return runtime_error("Cast to int requires int, float, char, or string operand.");
+          return runtime_error(
+              "Cast to int requires int, float, char, or string operand.");
         }
       } else if (kind == 1) { // float
         if (src.type == ValueType::Double) {
           push(src);
         } else if (src.type == ValueType::Int) {
-          push(Value::double_value(static_cast<double>(src.int_value_storage)));
+          push(Value::double_value(
+              static_cast<double>(src.as_int)));
         } else if (src.type == ValueType::Char) {
-          push(Value::double_value(static_cast<double>(src.int_value_storage)));
+          push(Value::double_value(
+              static_cast<double>(src.as_int)));
         } else if (src.type == ValueType::String) {
-          const std::string &s = src.string_storage;
+          const std::string &s = src.string_val();
           if (s.empty()) {
             push(cast_err_empty());
           } else {
@@ -299,34 +314,42 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
             }
           }
         } else {
-          return runtime_error("Cast to float requires int, float, or string operand.");
+          return runtime_error(
+              "Cast to float requires int, float, or string operand.");
         }
       } else if (kind == 2) { // string
         if (src.type == ValueType::String) {
           push(src);
-        } else if (src.type == ValueType::Int || src.type == ValueType::Double) {
+        } else if (src.type == ValueType::Int ||
+                   src.type == ValueType::Double) {
           std::ostringstream oss;
           oss << src;
           push(Value::string_value(oss.str()));
         } else if (src.type == ValueType::Char) {
-          push(Value::string_value(std::string(1, static_cast<char>(src.int_value_storage))));
+          push(Value::string_value(
+              std::string(1, static_cast<char>(src.as_int))));
         } else {
-          return runtime_error("Cast to string requires int, float, char, or string operand.");
+          return runtime_error(
+              "Cast to string requires int, float, char, or string operand.");
         }
       } else if (kind == 3) { // char
         if (src.type == ValueType::Char) {
           push(src);
         } else if (src.type == ValueType::Int) {
-          push(Value::char_value(static_cast<int8_t>(src.int_value_storage & 0xFF)));
+          push(Value::char_value(
+              static_cast<int8_t>(src.as_int & 0xFF)));
         } else if (src.type == ValueType::String) {
-          const std::string &s = src.string_storage;
+          const std::string &s = src.string_val();
           if (s.empty()) {
             push(cast_err_empty());
           } else {
-            push(Value::char_value(static_cast<int8_t>(static_cast<unsigned char>(s[0]))));
+            push(Value::char_value(
+                static_cast<int8_t>(
+                    static_cast<unsigned char>(s[0]))));
           }
         } else {
-          return runtime_error("Cast to char requires int, char, or string operand.");
+          return runtime_error(
+              "Cast to char requires int, char, or string operand.");
         }
       } else {
         return runtime_error("Unknown CastTo target kind.");
@@ -334,34 +357,35 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       break;
     }
     case OpCode::FloatToBits: {
-      const Value &src = pop();
+      const Value src = pop();
       if (src.type != ValueType::Double) {
         return runtime_error("FloatToBits requires a float operand.");
       }
       int64_t bits;
-      std::memcpy(&bits, &src.double_value_storage, sizeof(bits));
+      std::memcpy(&bits, &src.as_double_storage, sizeof(bits));
       push(Value::int_value(bits));
       break;
     }
     case OpCode::Call: {
-      const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
-      if (stack_.size() < arg_count + 1) {
+      const uint32_t arg_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (stack_.size() < arg_count + 1)
         return runtime_error("Stack underflow for function call.");
-      }
       Value callee = pop();
       if (callee.type == ValueType::NativeFunction) {
         std::vector<Value> args(arg_count);
         for (uint32_t i = 0; i < arg_count; ++i) {
           args[arg_count - 1 - i] = pop();
         }
-        switch (callee.native_fn_storage) {
+        switch (callee.native_fn) {
         case NativeFn::IoOut:
         case NativeFn::IoOutLine:
           if (!args.empty() && args[0].type == ValueType::String) {
-            const std::string &fmt = args[0].string_storage;
+            const std::string &fmt = args[0].string_val();
             std::size_t val_idx = 1;
             for (std::size_t pos = 0; pos < fmt.size(); ++pos) {
-              if (pos + 1 < fmt.size() && fmt[pos] == '{' && fmt[pos + 1] == '}') {
+              if (pos + 1 < fmt.size() && fmt[pos] == '{' &&
+                  fmt[pos + 1] == '}') {
                 if (val_idx < args.size()) {
                   std::cout << args[val_idx++];
                 } else {
@@ -377,19 +401,18 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
               std::cout << arg;
             }
           }
-          if (callee.native_fn_storage == NativeFn::IoOutLine) {
-            std::cout << '\n';
-          }
+          if (callee.native_fn == NativeFn::IoOutLine) std::cout << '\n';
           std::cout << std::flush;
           push(Value::null_value());
           break;
         case NativeFn::IoErr:
         case NativeFn::IoErrLine:
           if (!args.empty() && args[0].type == ValueType::String) {
-            const std::string &fmt = args[0].string_storage;
+            const std::string &fmt = args[0].string_val();
             std::size_t val_idx = 1;
             for (std::size_t pos = 0; pos < fmt.size(); ++pos) {
-              if (pos + 1 < fmt.size() && fmt[pos] == '{' && fmt[pos + 1] == '}') {
+              if (pos + 1 < fmt.size() && fmt[pos] == '{' &&
+                  fmt[pos + 1] == '}') {
                 if (val_idx < args.size()) {
                   std::cerr << args[val_idx++];
                 } else {
@@ -405,9 +428,7 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
               std::cerr << arg;
             }
           }
-          if (callee.native_fn_storage == NativeFn::IoErrLine) {
-            std::cerr << '\n';
-          }
+          if (callee.native_fn == NativeFn::IoErrLine) std::cerr << '\n';
           std::cerr << std::flush;
           push(Value::null_value());
           break;
@@ -415,12 +436,10 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         case NativeFn::IoInSecret:
           for (const Value &arg : args) {
             if (arg.type == ValueType::String) {
-              std::cout << arg.string_storage << std::flush;
+              std::cout << arg.string_val() << std::flush;
             }
           }
-          if (callee.native_fn_storage == NativeFn::IoInSecret) {
-            disable_echo();
-          }
+          if (callee.native_fn == NativeFn::IoInSecret) disable_echo();
           {
             std::string line;
             if (!std::getline(std::cin, line)) {
@@ -429,7 +448,7 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
               push(Value::string_value(std::move(line)));
             }
           }
-          if (callee.native_fn_storage == NativeFn::IoInSecret) {
+          if (callee.native_fn == NativeFn::IoInSecret) {
             restore_echo();
             std::cout << '\n';
           }
@@ -439,7 +458,7 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
             push(Value::null_value());
             break;
           }
-          std::ifstream file(args[0].string_storage, std::ios::binary);
+          std::ifstream file(args[0].string_val(), std::ios::binary);
           if (!file) {
             push(Value::null_value());
             break;
@@ -456,11 +475,12 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         case NativeFn::FsWrite: {
           if (args.size() == 2 && args[0].type == ValueType::String &&
               args[1].type == ValueType::String) {
-            std::ofstream file(args[0].string_storage,
+            std::ofstream file(args[0].string_val(),
                                std::ios::binary | std::ios::trunc);
             if (file) {
-              file.write(args[1].string_storage.data(),
-                         static_cast<std::streamsize>(args[1].string_storage.size()));
+              file.write(args[1].string_val().data(),
+                         static_cast<std::streamsize>(
+                             args[1].string_val().size()));
             }
           }
           push(Value::null_value());
@@ -481,15 +501,18 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       if (callee.type != ValueType::Function) {
         return runtime_error("Attempted to call a non-function value.");
       }
-      int func_idx = callee.function_index_storage;
+      int func_idx = callee.function_idx;
       const auto &functions = frame.chunk->functions();
-      if (func_idx < 0 || static_cast<std::size_t>(func_idx) >= functions.size()) {
+      if (func_idx < 0 ||
+          static_cast<std::size_t>(func_idx) >= functions.size()) {
         return runtime_error("Invalid function index.");
       }
-      const FunctionInfo &info = functions[static_cast<std::size_t>(func_idx)];
+      const FunctionInfo &info =
+          functions[static_cast<std::size_t>(func_idx)];
       if (static_cast<int>(arg_count) != info.param_count) {
         return runtime_error("Expected " + std::to_string(info.param_count) +
-                             " arguments but got " + std::to_string(arg_count) + ".");
+                             " arguments but got " +
+                             std::to_string(arg_count) + ".");
       }
       CallFrame new_frame;
       new_frame.chunk = frame.chunk;
@@ -514,47 +537,32 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       frame.ip += static_cast<std::size_t>(instruction.operand);
       break;
     case OpCode::JmpIfErr: {
-      // Peek the top of the stack: if it is the "fallible" sentinel — null
-      // or a CastError variant — branch to the fallback. Leaves the stack
-      // unchanged so the success arm gets the original LHS, and the
-      // fallback arm sees the error value (typically Pop'd, or bound to a
-      // let-name in the bound form).
-      //
-      // When a handler is active (inside try), the `?` operator uses this
-      // same opcode but the operand encodes the relative jump to a tiny
-      // stub that pops the error value and jumps to the catch landing pad.
-      if (stack_.empty()) {
-        return runtime_error("Stack underflow.");
-      }
+      if (stack_.empty()) return runtime_error("Stack underflow.");
       const Value &top = stack_.back();
       bool is_err = top.type == ValueType::Null ||
-                    (top.type == ValueType::Enum && top.enum_type_index == 0);
-      if (is_err) {
-        frame.ip += static_cast<std::size_t>(instruction.operand);
-      }
+                    (top.type == ValueType::Enum && top.enum_type_idx == 0);
+      if (is_err) frame.ip += static_cast<std::size_t>(instruction.operand);
       break;
     }
     case OpCode::JmpFalse: {
-      if (stack_.empty()) {
-        return runtime_error("Stack underflow.");
-      }
+      if (stack_.empty()) return runtime_error("Stack underflow.");
       Value condition = pop();
       bool truthy = false;
       switch (condition.type) {
       case ValueType::Bool:
-        truthy = condition.bool_value_storage;
+        truthy = condition.as_bool;
         break;
       case ValueType::Null:
         truthy = false;
         break;
       case ValueType::Int:
-        truthy = condition.int_value_storage != 0;
+        truthy = condition.as_int != 0;
         break;
       case ValueType::Double:
-        truthy = condition.double_value_storage != 0.0;
+        truthy = condition.as_double_storage != 0.0;
         break;
       case ValueType::String:
-        truthy = !condition.string_storage.empty();
+        truthy = !condition.string_val().empty();
         break;
       case ValueType::Char:
       case ValueType::Function:
@@ -566,9 +574,7 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         truthy = true;
         break;
       }
-      if (!truthy) {
-        frame.ip += static_cast<std::size_t>(instruction.operand);
-      }
+      if (!truthy) frame.ip += static_cast<std::size_t>(instruction.operand);
       break;
     }
     case OpCode::Eq:
@@ -577,9 +583,7 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::Gt:
     case OpCode::Le:
     case OpCode::Ge: {
-      if (stack_.size() < 2) {
-        return runtime_error("Stack underflow.");
-      }
+      if (stack_.size() < 2) return runtime_error("Stack underflow.");
       Value right = pop();
       Value left = pop();
       bool result = false;
@@ -587,46 +591,47 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         if (left.type != right.type) {
           result = false;
         } else if (left.type == ValueType::Enum) {
-          result = left.enum_type_index == right.enum_type_index &&
-                   left.enum_variant_index == right.enum_variant_index;
+          result = left.enum_type_idx == right.enum_type_idx &&
+                   left.enum_variant_idx == right.enum_variant_idx;
         } else if (left.type == ValueType::String) {
-          result = left.string_storage == right.string_storage;
+          result = left.string_val() == right.string_val();
         } else if (left.type == ValueType::Array) {
-          result = left.array_storage == right.array_storage;
+          result = left.heap.ptr == right.heap.ptr;
         } else {
-          result = left.int_value_storage == right.int_value_storage &&
-                   left.double_value_storage == right.double_value_storage &&
-                   left.bool_value_storage == right.bool_value_storage;
+          result = left.as_int == right.as_int &&
+                   left.as_double_storage == right.as_double_storage &&
+                   left.as_bool == right.as_bool;
         }
       } else if (instruction.op == OpCode::Neq) {
         if (left.type != right.type) {
           result = true;
         } else if (left.type == ValueType::Enum) {
-          result = left.enum_type_index != right.enum_type_index ||
-                   left.enum_variant_index != right.enum_variant_index;
+          result = left.enum_type_idx != right.enum_type_idx ||
+                   left.enum_variant_idx != right.enum_variant_idx;
         } else if (left.type == ValueType::String) {
-          result = left.string_storage != right.string_storage;
+          result = left.string_val() != right.string_val();
         } else if (left.type == ValueType::Array) {
-          result = left.array_storage != right.array_storage;
+          result = left.heap.ptr != right.heap.ptr;
         } else {
-          result = !(left.int_value_storage == right.int_value_storage &&
-                     left.double_value_storage == right.double_value_storage &&
-                     left.bool_value_storage == right.bool_value_storage);
+          result = !(left.as_int == right.as_int &&
+                     left.as_double_storage == right.as_double_storage &&
+                     left.as_bool == right.as_bool);
         }
       } else {
-        if (left.type == ValueType::String && right.type == ValueType::String) {
+        if (left.type == ValueType::String &&
+            right.type == ValueType::String) {
           switch (instruction.op) {
           case OpCode::Lt:
-            result = left.string_storage < right.string_storage;
+            result = left.string_val() < right.string_val();
             break;
           case OpCode::Gt:
-            result = left.string_storage > right.string_storage;
+            result = left.string_val() > right.string_val();
             break;
           case OpCode::Le:
-            result = left.string_storage <= right.string_storage;
+            result = left.string_val() <= right.string_val();
             break;
           case OpCode::Ge:
-            result = left.string_storage >= right.string_storage;
+            result = left.string_val() >= right.string_val();
             break;
           default:
             break;
@@ -659,21 +664,20 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     }
     case OpCode::NativeOut:
     case OpCode::NativeOutLn: {
-      const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
-      if (stack_.size() < arg_count) {
+      const uint32_t arg_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (stack_.size() < arg_count)
         return runtime_error("Stack underflow for io::out.");
-      }
-
       std::vector<Value> args(arg_count);
       for (uint32_t i = 0; i < arg_count; ++i) {
         args[arg_count - 1 - i] = pop();
       }
-
       if (!args.empty() && args[0].type == ValueType::String) {
-        const std::string &fmt = args[0].string_storage;
+        const std::string &fmt = args[0].string_val();
         std::size_t val_idx = 1;
         for (std::size_t pos = 0; pos < fmt.size(); ++pos) {
-          if (pos + 1 < fmt.size() && fmt[pos] == '{' && fmt[pos + 1] == '}') {
+          if (pos + 1 < fmt.size() && fmt[pos] == '{' &&
+              fmt[pos + 1] == '}') {
             if (val_idx < args.size()) {
               std::cout << args[val_idx];
               ++val_idx;
@@ -690,28 +694,27 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
           std::cout << arg;
         }
       }
-      if (instruction.op == OpCode::NativeOutLn) {
-        std::cout << '\n';
-      }
+      if (instruction.op == OpCode::NativeOutLn) std::cout << '\n';
       std::cout << std::flush;
       push(Value::null_value());
       break;
     }
     case OpCode::NativeErr:
     case OpCode::NativeErrLn: {
-      const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
-      if (stack_.size() < arg_count) {
+      const uint32_t arg_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (stack_.size() < arg_count)
         return runtime_error("Stack underflow for io::err.");
-      }
       std::vector<Value> args(arg_count);
       for (uint32_t i = 0; i < arg_count; ++i) {
         args[arg_count - 1 - i] = pop();
       }
       if (!args.empty() && args[0].type == ValueType::String) {
-        const std::string &fmt = args[0].string_storage;
+        const std::string &fmt = args[0].string_val();
         std::size_t val_idx = 1;
         for (std::size_t pos = 0; pos < fmt.size(); ++pos) {
-          if (pos + 1 < fmt.size() && fmt[pos] == '{' && fmt[pos + 1] == '}') {
+          if (pos + 1 < fmt.size() && fmt[pos] == '{' &&
+              fmt[pos + 1] == '}') {
             if (val_idx < args.size()) {
               std::cerr << args[val_idx];
               ++val_idx;
@@ -728,9 +731,7 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
           std::cerr << arg;
         }
       }
-      if (instruction.op == OpCode::NativeErrLn) {
-        std::cerr << '\n';
-      }
+      if (instruction.op == OpCode::NativeErrLn) std::cerr << '\n';
       std::cerr << std::flush;
       push(Value::null_value());
       break;
@@ -739,17 +740,13 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::NativeInSecret: {
       const uint32_t argc = static_cast<uint32_t>(instruction.operand);
       for (uint32_t i = 0; i < argc; ++i) {
-        if (stack_.empty()) {
+        if (stack_.empty())
           return runtime_error("Stack underflow for io::in.");
-        }
         Value prompt = pop();
-        if (prompt.type == ValueType::String) {
-          std::cout << prompt.string_storage << std::flush;
-        }
+        if (prompt.type == ValueType::String)
+          std::cout << prompt.string_val() << std::flush;
       }
-      if (instruction.op == OpCode::NativeInSecret) {
-        disable_echo();
-      }
+      if (instruction.op == OpCode::NativeInSecret) disable_echo();
       std::string line;
       if (!std::getline(std::cin, line)) {
         push(Value::null_value());
@@ -763,18 +760,16 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       break;
     }
     case OpCode::NativeFsRead: {
-      const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
-      if (arg_count != 1) {
+      const uint32_t arg_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (arg_count != 1)
         return runtime_error("fs::__read expects exactly one argument.");
-      }
-      if (stack_.empty()) {
+      if (stack_.empty())
         return runtime_error("Stack underflow for fs::__read.");
-      }
       Value path = pop();
-      if (path.type != ValueType::String) {
+      if (path.type != ValueType::String)
         return runtime_error("fs::__read expects a string path.");
-      }
-      std::ifstream file(path.string_storage, std::ios::binary);
+      std::ifstream file(path.string_val(), std::ios::binary);
       if (!file) {
         push(Value::null_value());
         break;
@@ -789,34 +784,33 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       break;
     }
     case OpCode::NativeFsWrite: {
-      const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
-      if (arg_count != 2) {
+      const uint32_t arg_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (arg_count != 2)
         return runtime_error("fs::__write expects exactly two arguments.");
-      }
-      if (stack_.size() < 2) {
+      if (stack_.size() < 2)
         return runtime_error("Stack underflow for fs::__write.");
-      }
       Value content = pop();
       Value path = pop();
-      if (path.type != ValueType::String) {
+      if (path.type != ValueType::String)
         return runtime_error("fs::__write expects a string path.");
-      }
-      if (content.type != ValueType::String) {
+      if (content.type != ValueType::String)
         return runtime_error("fs::__write expects string content.");
-      }
-      std::ofstream file(path.string_storage, std::ios::binary | std::ios::trunc);
+      std::ofstream file(path.string_val(),
+                         std::ios::binary | std::ios::trunc);
       if (file) {
-        file.write(content.string_storage.data(),
-                   static_cast<std::streamsize>(content.string_storage.size()));
+        file.write(content.string_val().data(),
+                   static_cast<std::streamsize>(
+                       content.string_val().size()));
       }
       push(Value::null_value());
       break;
     }
     case OpCode::NativeSysArgs: {
-      const uint32_t arg_count = static_cast<uint32_t>(instruction.operand);
-      if (arg_count != 0) {
+      const uint32_t arg_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (arg_count != 0)
         return runtime_error("sys::args expects no arguments.");
-      }
       std::vector<Value> elements;
       elements.reserve(program_args_.size());
       for (const std::string &arg : program_args_) {
@@ -828,9 +822,8 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::StructNew: {
       int type_idx = instruction.operand >> 16;
       int field_count = instruction.operand & 0xFFFF;
-      if (static_cast<int>(stack_.size()) < field_count) {
+      if (static_cast<int>(stack_.size()) < field_count)
         return runtime_error("Stack underflow for struct creation.");
-      }
       std::vector<Value> fields(static_cast<std::size_t>(field_count));
       for (int i = field_count - 1; i >= 0; --i) {
         fields[static_cast<std::size_t>(i)] = pop();
@@ -839,17 +832,16 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       break;
     }
     case OpCode::FieldGet: {
-      if (stack_.empty()) {
+      if (stack_.empty())
         return runtime_error("Stack underflow for field access.");
-      }
       Value obj = pop();
-      if (obj.type != ValueType::Struct || !obj.struct_storage) {
+      if (obj.type != ValueType::Struct || !obj.heap)
         return runtime_error("Cannot access field on non-struct value.");
-      }
       const std::string &field_name =
-          constants[static_cast<std::size_t>(instruction.operand)].string_storage;
-      int type_idx = obj.struct_storage->type_index;
-      const auto &meta = frame.chunk->struct_metas()[static_cast<std::size_t>(type_idx)];
+          constants[static_cast<std::size_t>(instruction.operand)].string_val();
+      int type_idx = as_struct(obj)->type_index;
+      const auto &meta =
+          frame.chunk->struct_metas()[static_cast<std::size_t>(type_idx)];
       int field_idx = -1;
       for (int i = 0; i < static_cast<int>(meta.field_names.size()); ++i) {
         if (meta.field_names[static_cast<std::size_t>(i)] == field_name) {
@@ -858,25 +850,25 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         }
       }
       if (field_idx < 0 ||
-          static_cast<std::size_t>(field_idx) >= obj.struct_storage->fields.size()) {
+          static_cast<std::size_t>(field_idx) >=
+              as_struct(obj)->fields.size()) {
         return runtime_error("Unknown field '" + field_name + "'.");
       }
-      push(obj.struct_storage->fields[static_cast<std::size_t>(field_idx)]);
+      push(as_struct(obj)->fields[static_cast<std::size_t>(field_idx)]);
       break;
     }
     case OpCode::FieldSet: {
-      if (stack_.size() < 2) {
+      if (stack_.size() < 2)
         return runtime_error("Stack underflow for field assignment.");
-      }
       Value value = pop();
       Value obj = pop();
-      if (obj.type != ValueType::Struct || !obj.struct_storage) {
+      if (obj.type != ValueType::Struct || !obj.heap)
         return runtime_error("Cannot set field on non-struct value.");
-      }
       const std::string &field_name =
-          constants[static_cast<std::size_t>(instruction.operand)].string_storage;
-      int type_idx = obj.struct_storage->type_index;
-      const auto &meta = frame.chunk->struct_metas()[static_cast<std::size_t>(type_idx)];
+          constants[static_cast<std::size_t>(instruction.operand)].string_val();
+      int type_idx = as_struct(obj)->type_index;
+      const auto &meta =
+          frame.chunk->struct_metas()[static_cast<std::size_t>(type_idx)];
       int field_idx = -1;
       for (int i = 0; i < static_cast<int>(meta.field_names.size()); ++i) {
         if (meta.field_names[static_cast<std::size_t>(i)] == field_name) {
@@ -885,10 +877,11 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         }
       }
       if (field_idx < 0 ||
-          static_cast<std::size_t>(field_idx) >= obj.struct_storage->fields.size()) {
+          static_cast<std::size_t>(field_idx) >=
+              as_struct(obj)->fields.size()) {
         return runtime_error("Unknown field '" + field_name + "'.");
       }
-      obj.struct_storage->fields[static_cast<std::size_t>(field_idx)] = value;
+      as_struct(obj)->fields[static_cast<std::size_t>(field_idx)] = value;
       push(obj);
       break;
     }
@@ -901,35 +894,41 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::EnumVariantPayload: {
       int type_idx = instruction.operand >> 16;
       int variant_idx = instruction.operand & 0xFFFF;
-      const auto &meta = chunk.enum_metas()[static_cast<std::size_t>(type_idx)];
-      int param_count = meta.variant_param_counts[static_cast<std::size_t>(variant_idx)];
+      const auto &meta =
+          chunk.enum_metas()[static_cast<std::size_t>(type_idx)];
+      int param_count =
+          meta.variant_param_counts[static_cast<std::size_t>(variant_idx)];
       std::vector<Value> payload(static_cast<std::size_t>(param_count));
       for (int i = param_count - 1; i >= 0; --i) {
         payload[static_cast<std::size_t>(i)] = pop();
       }
-      push(Value::enum_value_with_payload(type_idx, variant_idx, std::move(payload)));
+      push(Value::enum_value_with_payload(type_idx, variant_idx,
+                                           std::move(payload)));
       break;
     }
     case OpCode::EnumPayloadGet: {
-      if (stack_.size() < 1) {
+      if (stack_.size() < 1)
         return runtime_error("Stack underflow for enum payload get.");
-      }
       Value enum_val = pop();
-      if (enum_val.type != ValueType::Enum) {
+      if (enum_val.type != ValueType::Enum)
         return runtime_error("EnumPayloadGet: value is not an enum.");
-      }
+      if (!enum_val.heap)
+        return runtime_error(
+            "EnumPayloadGet: enum variant has no payload.");
       int payload_idx = instruction.operand;
-      if (payload_idx < 0 || payload_idx >= static_cast<int>(enum_val.enum_payload.size())) {
+      auto &payload = as_enum(enum_val)->payload;
+      if (payload_idx < 0 ||
+          static_cast<std::size_t>(payload_idx) >= payload.size()) {
         return runtime_error("EnumPayloadGet: payload index out of bounds.");
       }
-      push(enum_val.enum_payload[static_cast<std::size_t>(payload_idx)]);
+      push(payload[static_cast<std::size_t>(payload_idx)]);
       break;
     }
     case OpCode::ArrayNew: {
-      const uint32_t element_count = static_cast<uint32_t>(instruction.operand);
-      if (stack_.size() < element_count) {
+      const uint32_t element_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (stack_.size() < element_count)
         return runtime_error("Stack underflow for array creation.");
-      }
       std::vector<Value> elements(element_count);
       for (uint32_t i = 0; i < element_count; ++i) {
         elements[element_count - 1 - i] = pop();
@@ -938,17 +937,15 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       break;
     }
     case OpCode::IndexGet: {
-      if (stack_.size() < 2) {
+      if (stack_.size() < 2)
         return runtime_error("Stack underflow for array indexing.");
-      }
       Value index = pop();
       Value object = pop();
       if (object.type == ValueType::Map) {
-        if (!object.map_storage) {
+        if (!object.heap)
           return runtime_error("Cannot index null map.");
-        }
-        auto it = object.map_storage->entries.find(encode_map_key(index));
-        if (it == object.map_storage->entries.end()) {
+        auto it = as_map(object)->entries.find(encode_map_key(index));
+        if (it == as_map(object)->entries.end()) {
           push(Value::null_value());
         } else {
           push(it->second.value);
@@ -956,87 +953,87 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         break;
       }
       if (object.type == ValueType::String) {
-        if (index.type != ValueType::Int) {
+        if (index.type != ValueType::Int)
           return runtime_error("String index must be an integer.");
-        }
-        if (index.int_value_storage < 0 ||
-            static_cast<std::size_t>(index.int_value_storage) >= object.string_storage.size()) {
+        if (index.as_int < 0 ||
+            static_cast<std::size_t>(index.as_int) >=
+                object.string_val().size()) {
           return runtime_error("String index out of bounds.");
         }
         push(Value::char_value(static_cast<int8_t>(
             static_cast<unsigned char>(
-                object.string_storage[static_cast<std::size_t>(index.int_value_storage)]))));
+                object.string_val()[
+                    static_cast<std::size_t>(index.as_int)]))));
         break;
       }
-      if (object.type != ValueType::Array || !object.array_storage) {
+      if (object.type != ValueType::Array || !object.heap)
         return runtime_error("Cannot index non-array value.");
-      }
-      if (index.type != ValueType::Int) {
+      if (index.type != ValueType::Int)
         return runtime_error("Array index must be an integer.");
-      }
-      if (index.int_value_storage < 0 ||
-          static_cast<std::size_t>(index.int_value_storage) >= object.array_storage->elements.size()) {
+      if (index.as_int < 0 ||
+          static_cast<std::size_t>(index.as_int) >=
+              as_array(object)->elements.size()) {
         return runtime_error("Array index out of bounds.");
       }
-      push(object.array_storage->elements[static_cast<std::size_t>(index.int_value_storage)]);
+      push(as_array(object)->elements[static_cast<std::size_t>(index.as_int)]);
       break;
     }
     case OpCode::IndexSet: {
-      if (stack_.size() < 3) {
+      if (stack_.size() < 3)
         return runtime_error("Stack underflow for array assignment.");
-      }
       Value value = pop();
       Value index = pop();
       Value array = pop();
       if (array.type == ValueType::Map) {
-        if (!array.map_storage) {
+        if (!array.heap)
           return runtime_error("Cannot assign on null map.");
-        }
         std::string ek = encode_map_key(index);
-        if (array.map_storage->entries.find(ek) == array.map_storage->entries.end()) {
-          array.map_storage->order.push_back(ek);
+        if (as_map(array)->entries.find(ek) ==
+            as_map(array)->entries.end()) {
+          as_map(array)->order.push_back(ek);
         }
-        array.map_storage->entries[ek] = MapEntry{index, value};
+        as_map(array)->entries[ek] = MapEntry{index, value};
         push(value);
         break;
       }
-      if (array.type != ValueType::Array || !array.array_storage) {
+      if (array.type != ValueType::Array || !array.heap)
         return runtime_error("Cannot assign indexed value on non-array value.");
-      }
-      if (index.type != ValueType::Int) {
+      if (index.type != ValueType::Int)
         return runtime_error("Array index must be an integer.");
-      }
-      if (index.int_value_storage < 0 ||
-          static_cast<std::size_t>(index.int_value_storage) >= array.array_storage->elements.size()) {
+      if (index.as_int < 0 ||
+          static_cast<std::size_t>(index.as_int) >=
+              as_array(array)->elements.size()) {
         return runtime_error("Array index out of bounds.");
       }
-      array.array_storage->elements[static_cast<std::size_t>(index.int_value_storage)] = value;
+      as_array(array)->elements[static_cast<std::size_t>(index.as_int)] =
+          std::move(value);
       push(value);
       break;
     }
     case OpCode::ArrayLen: {
       Value obj = pop();
       if (obj.type == ValueType::String) {
-        push(Value::int_value(static_cast<int64_t>(obj.string_storage.size())));
+        push(Value::int_value(
+            static_cast<int64_t>(obj.string_val().size())));
         break;
       }
-      if (obj.type == ValueType::Map && obj.map_storage) {
-        push(Value::int_value(static_cast<int64_t>(obj.map_storage->order.size())));
+      if (obj.type == ValueType::Map && obj.heap) {
+        push(Value::int_value(
+            static_cast<int64_t>(as_map(obj)->order.size())));
         break;
       }
-      if (obj.type != ValueType::Array || !obj.array_storage) {
+      if (obj.type != ValueType::Array || !obj.heap)
         return runtime_error("Cannot call len() on non-array value.");
-      }
-      push(Value::int_value(static_cast<int64_t>(obj.array_storage->elements.size())));
+      push(Value::int_value(
+          static_cast<int64_t>(as_array(obj)->elements.size())));
       break;
     }
     case OpCode::ArrayPush: {
       Value value = pop();
       Value array = pop();
-      if (array.type != ValueType::Array || !array.array_storage) {
+      if (array.type != ValueType::Array || !array.heap)
         return runtime_error("Cannot call push() on non-array value.");
-      }
-      array.array_storage->elements.push_back(value);
+      as_array(array)->elements.push_back(std::move(value));
       push(Value::null_value());
       break;
     }
@@ -1044,30 +1041,25 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value default_value = pop();
       Value count = pop();
       Value array = pop();
-      if (array.type != ValueType::Array || !array.array_storage) {
+      if (array.type != ValueType::Array || !array.heap)
         return runtime_error("Cannot call resize() on non-array value.");
-      }
-      if (count.type != ValueType::Int) {
+      if (count.type != ValueType::Int)
         return runtime_error("resize() count must be an integer.");
-      }
-      if (count.int_value_storage < 0) {
+      if (count.as_int < 0)
         return runtime_error("resize() count must be non-negative.");
-      }
-      array.array_storage->elements.resize(
-          static_cast<std::size_t>(count.int_value_storage), default_value);
+      as_array(array)->elements.resize(
+          static_cast<std::size_t>(count.as_int), default_value);
       push(Value::null_value());
       break;
     }
     case OpCode::ArrayPop: {
       Value array = pop();
-      if (array.type != ValueType::Array || !array.array_storage) {
+      if (array.type != ValueType::Array || !array.heap)
         return runtime_error("Cannot call pop() on non-array value.");
-      }
-      if (array.array_storage->elements.empty()) {
+      if (as_array(array)->elements.empty())
         return runtime_error("Cannot pop from empty array.");
-      }
-      Value last = array.array_storage->elements.back();
-      array.array_storage->elements.pop_back();
+      Value last = as_array(array)->elements.back();
+      as_array(array)->elements.pop_back();
       push(last);
       break;
     }
@@ -1075,34 +1067,33 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value index = pop();
       Value array = pop();
       if (array.type == ValueType::Map) {
-        // Map remove(key): delete the entry, return null. (Array remove returns
-        // the removed element, but map remove has no positional element.)
-        if (!array.map_storage) {
+        if (!array.heap)
           return runtime_error("Cannot call remove() on null map.");
-        }
         std::string ek = encode_map_key(index);
-        auto it = array.map_storage->entries.find(ek);
-        if (it != array.map_storage->entries.end()) {
-          array.map_storage->entries.erase(it);
-          auto &order = array.map_storage->order;
-          order.erase(std::remove(order.begin(), order.end(), ek), order.end());
+        auto it = as_map(array)->entries.find(ek);
+        if (it != as_map(array)->entries.end()) {
+          as_map(array)->entries.erase(it);
+          auto &order = as_map(array)->order;
+          order.erase(
+              std::remove(order.begin(), order.end(), ek), order.end());
         }
         push(Value::null_value());
         break;
       }
-      if (array.type != ValueType::Array || !array.array_storage) {
+      if (array.type != ValueType::Array || !array.heap)
         return runtime_error("Cannot call remove() on non-array value.");
-      }
-      if (index.type != ValueType::Int) {
+      if (index.type != ValueType::Int)
         return runtime_error("remove() index must be an integer.");
-      }
-      auto idx = index.int_value_storage;
-      if (idx < 0 || static_cast<std::size_t>(idx) >= array.array_storage->elements.size()) {
+      auto idx = index.as_int;
+      if (idx < 0 ||
+          static_cast<std::size_t>(idx) >=
+              as_array(array)->elements.size()) {
         return runtime_error("remove() index out of bounds.");
       }
-      Value removed = array.array_storage->elements[static_cast<std::size_t>(idx)];
-      array.array_storage->elements.erase(
-          array.array_storage->elements.begin() + idx);
+      Value removed =
+          as_array(array)->elements[static_cast<std::size_t>(idx)];
+      as_array(array)->elements.erase(
+          as_array(array)->elements.begin() + idx);
       push(removed);
       break;
     }
@@ -1110,29 +1101,37 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value needle = pop();
       Value obj = pop();
       if (obj.type == ValueType::String) {
-        if (needle.type != ValueType::String) {
+        if (needle.type != ValueType::String)
           return runtime_error("contains() argument must be a string.");
-        }
-        push(Value::bool_value(obj.string_storage.find(needle.string_storage) != std::string::npos));
+        push(Value::bool_value(
+            obj.string_val().find(needle.string_val()) !=
+            std::string::npos));
         break;
       }
-      if (obj.type != ValueType::Array || !obj.array_storage) {
+      if (obj.type != ValueType::Array || !obj.heap)
         return runtime_error("Cannot call contains() on non-array value.");
-      }
       bool found = false;
-      for (const auto &elem : obj.array_storage->elements) {
+      for (const auto &elem : as_array(obj)->elements) {
         if (elem.type == needle.type) {
-          if (elem.type == ValueType::Int && elem.int_value_storage == needle.int_value_storage) {
-            found = true; break;
+          if (elem.type == ValueType::Int &&
+              elem.as_int == needle.as_int) {
+            found = true;
+            break;
           }
-          if (elem.type == ValueType::String && elem.string_storage == needle.string_storage) {
-            found = true; break;
+          if (elem.type == ValueType::String &&
+              elem.string_val() == needle.string_val()) {
+            found = true;
+            break;
           }
-          if (elem.type == ValueType::Bool && elem.bool_value_storage == needle.bool_value_storage) {
-            found = true; break;
+          if (elem.type == ValueType::Bool &&
+              elem.as_bool == needle.as_bool) {
+            found = true;
+            break;
           }
-          if (elem.type == ValueType::Double && elem.double_value_storage == needle.double_value_storage) {
-            found = true; break;
+          if (elem.type == ValueType::Double &&
+              elem.as_double_storage == needle.as_double_storage) {
+            found = true;
+            break;
           }
         }
       }
@@ -1141,10 +1140,9 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     }
     case OpCode::ArrayClear: {
       Value array = pop();
-      if (array.type != ValueType::Array || !array.array_storage) {
+      if (array.type != ValueType::Array || !array.heap)
         return runtime_error("Cannot call clear() on non-array value.");
-      }
-      array.array_storage->elements.clear();
+      as_array(array)->elements.clear();
       push(Value::null_value());
       break;
     }
@@ -1152,23 +1150,20 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value value = pop();
       Value index = pop();
       Value array = pop();
-      if (array.type != ValueType::Array || !array.array_storage) {
+      if (array.type != ValueType::Array || !array.heap)
         return runtime_error("Cannot call insert() on non-array value.");
-      }
-      if (index.type != ValueType::Int) {
+      if (index.type != ValueType::Int)
         return runtime_error("insert() index must be an integer.");
-      }
-      auto idx = index.int_value_storage;
-      auto &elems = array.array_storage->elements;
-      if (idx < 0 || static_cast<std::size_t>(idx) > elems.size()) {
+      auto idx = index.as_int;
+      auto &elems = as_array(array)->elements;
+      if (idx < 0 || static_cast<std::size_t>(idx) > elems.size())
         return runtime_error("insert() index out of bounds.");
-      }
-      if (value.type == ValueType::Array && value.array_storage) {
+      if (value.type == ValueType::Array && value.heap) {
         elems.insert(elems.begin() + idx,
-                     value.array_storage->elements.begin(),
-                     value.array_storage->elements.end());
+                     as_array(value)->elements.begin(),
+                     as_array(value)->elements.end());
       } else {
-        elems.insert(elems.begin() + idx, value);
+        elems.insert(elems.begin() + idx, std::move(value));
       }
       push(Value::null_value());
       break;
@@ -1177,26 +1172,37 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value needle = pop();
       Value obj = pop();
       if (obj.type == ValueType::String) {
-        if (needle.type != ValueType::String) {
+        if (needle.type != ValueType::String)
           return runtime_error("index_of() argument must be a string.");
-        }
-        auto pos = obj.string_storage.find(needle.string_storage);
-        push(Value::int_value(pos == std::string::npos ? -1 : static_cast<int64_t>(pos)));
+        auto pos = obj.string_val().find(needle.string_val());
+        push(Value::int_value(pos == std::string::npos
+                                  ? -1
+                                  : static_cast<int64_t>(pos)));
         break;
       }
-      if (obj.type != ValueType::Array || !obj.array_storage) {
+      if (obj.type != ValueType::Array || !obj.heap)
         return runtime_error("Cannot call index_of() on non-array value.");
-      }
       int64_t found = -1;
-      for (std::size_t i = 0; i < obj.array_storage->elements.size(); ++i) {
-        const auto &elem = obj.array_storage->elements[i];
+      for (std::size_t i = 0; i < as_array(obj)->elements.size(); ++i) {
+        const auto &elem = as_array(obj)->elements[i];
         if (elem.type == needle.type) {
           bool match = false;
-          if (elem.type == ValueType::Int && elem.int_value_storage == needle.int_value_storage) match = true;
-          if (elem.type == ValueType::String && elem.string_storage == needle.string_storage) match = true;
-          if (elem.type == ValueType::Bool && elem.bool_value_storage == needle.bool_value_storage) match = true;
-          if (elem.type == ValueType::Double && elem.double_value_storage == needle.double_value_storage) match = true;
-          if (match) { found = static_cast<int64_t>(i); break; }
+          if (elem.type == ValueType::Int &&
+              elem.as_int == needle.as_int)
+            match = true;
+          if (elem.type == ValueType::String &&
+              elem.string_val() == needle.string_val())
+            match = true;
+          if (elem.type == ValueType::Bool &&
+              elem.as_bool == needle.as_bool)
+            match = true;
+          if (elem.type == ValueType::Double &&
+              elem.as_double_storage == needle.as_double_storage)
+            match = true;
+          if (match) {
+            found = static_cast<int64_t>(i);
+            break;
+          }
         }
       }
       push(Value::int_value(found));
@@ -1206,56 +1212,54 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value end_val = pop();
       Value start_val = pop();
       Value obj = pop();
-      if (start_val.type != ValueType::Int || end_val.type != ValueType::Int) {
+      if (start_val.type != ValueType::Int ||
+          end_val.type != ValueType::Int)
         return runtime_error("slice() arguments must be integers.");
-      }
-      auto start = start_val.int_value_storage;
-      auto end = end_val.int_value_storage;
+      auto start = start_val.as_int;
+      auto end = end_val.as_int;
       if (obj.type == ValueType::String) {
-        auto len = static_cast<int64_t>(obj.string_storage.size());
+        auto len = static_cast<int64_t>(obj.string_val().size());
         if (start < 0) start = 0;
         if (end > len) end = len;
         if (start >= end) {
           push(Value::string_value(""));
           break;
         }
-        push(Value::string_value(obj.string_storage.substr(
+        push(Value::string_value(obj.string_val().substr(
             static_cast<std::size_t>(start),
             static_cast<std::size_t>(end - start))));
         break;
       }
-      if (obj.type != ValueType::Array || !obj.array_storage) {
+      if (obj.type != ValueType::Array || !obj.heap)
         return runtime_error("Cannot call slice() on non-array value.");
-      }
-      auto &elems = obj.array_storage->elements;
+      auto &elems = as_array(obj)->elements;
       if (start < 0) start = 0;
-      if (end > static_cast<int64_t>(elems.size())) end = static_cast<int64_t>(elems.size());
+      if (end > static_cast<int64_t>(elems.size()))
+        end = static_cast<int64_t>(elems.size());
       if (start >= end) {
         push(Value::array_value({}));
         break;
       }
-      std::vector<Value> slice_elems(elems.begin() + start, elems.begin() + end);
+      std::vector<Value> slice_elems(elems.begin() + start,
+                                      elems.begin() + end);
       push(Value::array_value(std::move(slice_elems)));
       break;
     }
     case OpCode::ArrayReverse: {
       Value array = pop();
-      if (array.type != ValueType::Array || !array.array_storage) {
+      if (array.type != ValueType::Array || !array.heap)
         return runtime_error("Cannot call reverse() on non-array value.");
-      }
-      std::reverse(array.array_storage->elements.begin(),
-                   array.array_storage->elements.end());
+      std::reverse(as_array(array)->elements.begin(),
+                   as_array(array)->elements.end());
       push(Value::null_value());
       break;
     }
     case OpCode::MapNew: {
-      const uint32_t pair_count = static_cast<uint32_t>(instruction.operand);
-      if (stack_.size() < pair_count * 2) {
+      const uint32_t pair_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (stack_.size() < pair_count * 2)
         return runtime_error("Stack underflow for map literal.");
-      }
       Value map = Value::map_value();
-      // Pairs were pushed key,value left-to-right; pop in reverse and insert so
-      // the original textual order is preserved in `order`.
       std::vector<std::pair<Value, Value>> pairs(pair_count);
       for (uint32_t i = 0; i < pair_count; ++i) {
         Value v = pop();
@@ -1264,10 +1268,11 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       }
       for (auto &[k, v] : pairs) {
         std::string ek = encode_map_key(k);
-        if (map.map_storage->entries.find(ek) == map.map_storage->entries.end()) {
-          map.map_storage->order.push_back(ek);
+        if (as_map(map)->entries.find(ek) ==
+            as_map(map)->entries.end()) {
+          as_map(map)->order.push_back(ek);
         }
-        map.map_storage->entries[ek] = MapEntry{std::move(k), std::move(v)};
+        as_map(map)->entries[ek] = MapEntry{std::move(k), std::move(v)};
       }
       push(std::move(map));
       break;
@@ -1275,11 +1280,11 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::MapGet: {
       Value key = pop();
       Value map = pop();
-      if (map.type != ValueType::Map || !map.map_storage) {
+      if (map.type != ValueType::Map || !map.heap)
         return runtime_error("Cannot index non-map value.");
-      }
-      auto it = map.map_storage->entries.find(encode_map_key(key));
-      if (it == map.map_storage->entries.end()) {
+      auto it =
+          as_map(map)->entries.find(encode_map_key(key));
+      if (it == as_map(map)->entries.end()) {
         push(Value::null_value());
       } else {
         push(it->second.value);
@@ -1290,94 +1295,86 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value value = pop();
       Value key = pop();
       Value map = pop();
-      if (map.type != ValueType::Map || !map.map_storage) {
+      if (map.type != ValueType::Map || !map.heap)
         return runtime_error("Cannot assign on non-map value.");
-      }
       std::string ek = encode_map_key(key);
-      if (map.map_storage->entries.find(ek) == map.map_storage->entries.end()) {
-        map.map_storage->order.push_back(ek);
+      if (as_map(map)->entries.find(ek) ==
+          as_map(map)->entries.end()) {
+        as_map(map)->order.push_back(ek);
       }
-      map.map_storage->entries[ek] = MapEntry{std::move(key), value};
+      as_map(map)->entries[ek] = MapEntry{std::move(key), value};
       push(Value::null_value());
       break;
     }
     case OpCode::MapHas: {
       Value key = pop();
       Value map = pop();
-      if (map.type != ValueType::Map || !map.map_storage) {
+      if (map.type != ValueType::Map || !map.heap)
         return runtime_error("Cannot call has() on non-map value.");
-      }
-      bool found = map.map_storage->entries.count(encode_map_key(key)) != 0;
+      bool found =
+          as_map(map)->entries.count(encode_map_key(key)) != 0;
       push(Value::bool_value(found));
       break;
     }
     case OpCode::MapRemove: {
       Value key = pop();
       Value map = pop();
-      if (map.type != ValueType::Map || !map.map_storage) {
+      if (map.type != ValueType::Map || !map.heap)
         return runtime_error("Cannot call remove() on non-map value.");
-      }
       std::string ek = encode_map_key(key);
-      auto it = map.map_storage->entries.find(ek);
-      if (it != map.map_storage->entries.end()) {
-        map.map_storage->entries.erase(it);
-        auto &order = map.map_storage->order;
-        order.erase(std::remove(order.begin(), order.end(), ek), order.end());
+      auto it = as_map(map)->entries.find(ek);
+      if (it != as_map(map)->entries.end()) {
+        as_map(map)->entries.erase(it);
+        auto &order = as_map(map)->order;
+        order.erase(
+            std::remove(order.begin(), order.end(), ek), order.end());
       }
       push(Value::null_value());
       break;
     }
     case OpCode::MapKeys: {
       Value map = pop();
-      if (map.type != ValueType::Map || !map.map_storage) {
+      if (map.type != ValueType::Map || !map.heap)
         return runtime_error("Cannot call keys() on non-map value.");
-      }
       std::vector<Value> keys;
-      keys.reserve(map.map_storage->order.size());
-      for (const std::string &ek : map.map_storage->order) {
-        keys.push_back(map.map_storage->entries.at(ek).key);
+      keys.reserve(as_map(map)->order.size());
+      for (const std::string &ek : as_map(map)->order) {
+        keys.push_back(as_map(map)->entries.at(ek).key);
       }
       push(Value::array_value(std::move(keys)));
       break;
     }
     case OpCode::MapLen: {
       Value map = pop();
-      if (map.type != ValueType::Map || !map.map_storage) {
+      if (map.type != ValueType::Map || !map.heap)
         return runtime_error("Cannot call len() on non-map value.");
-      }
-      push(Value::int_value(static_cast<int64_t>(map.map_storage->order.size())));
+      push(Value::int_value(
+          static_cast<int64_t>(as_map(map)->order.size())));
       break;
     }
     case OpCode::PushHandler: {
-      // Operand is the catch landing-pad PC offset from the *next* instruction.
-      std::size_t catch_pc = frame.ip + static_cast<std::size_t>(instruction.operand);
+      std::size_t catch_pc =
+          frame.ip + static_cast<std::size_t>(instruction.operand);
       handler_stack_.push_back(catch_pc);
       break;
     }
     case OpCode::PopHandler: {
-      if (handler_stack_.empty()) {
+      if (handler_stack_.empty())
         return runtime_error("PopHandler with empty handler stack.");
-      }
       handler_stack_.pop_back();
       break;
     }
     case OpCode::PropagateErr: {
-      // `?` inside try: if top-of-stack is an error (null or CastError),
-      // jump to the current handler's catch PC. The error value remains on
-      // the stack for the catch landing pad to consume (StoreLocal into the
-      // binding slot). Otherwise no-op (success path).
-      if (stack_.empty()) {
-        return runtime_error("Stack underflow.");
-      }
+      if (stack_.empty()) return runtime_error("Stack underflow.");
       const Value &top = stack_.back();
       bool is_err = top.type == ValueType::Null ||
-                    (top.type == ValueType::Enum && top.enum_type_index == 0);
+                    (top.type == ValueType::Enum && top.enum_type_idx == 0);
       if (is_err) {
         if (handler_stack_.empty()) {
-          // No handler — function-level early return.
           pop();
           push(Value::null_value());
-          return VmResult{.ok = true, .value = Value::null_value(), .error = ""};
+          return VmResult{
+              .ok = true, .value = Value::null_value(), .error = ""};
         }
         frame.ip = handler_stack_.back();
       }
@@ -1386,24 +1383,30 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::StringStartsWith: {
       Value prefix = pop();
       Value str = pop();
-      if (str.type != ValueType::String || prefix.type != ValueType::String) {
+      if (str.type != ValueType::String ||
+          prefix.type != ValueType::String)
         return runtime_error("starts_with() requires string arguments.");
-      }
-      bool result = str.string_storage.size() >= prefix.string_storage.size() &&
-                    str.string_storage.compare(0, prefix.string_storage.size(), prefix.string_storage) == 0;
+      bool result = str.string_val().size() >=
+                        prefix.string_val().size() &&
+                    str.string_val().compare(
+                        0, prefix.string_val().size(),
+                        prefix.string_val()) == 0;
       push(Value::bool_value(result));
       break;
     }
     case OpCode::StringEndsWith: {
       Value suffix = pop();
       Value str = pop();
-      if (str.type != ValueType::String || suffix.type != ValueType::String) {
+      if (str.type != ValueType::String ||
+          suffix.type != ValueType::String)
         return runtime_error("ends_with() requires string arguments.");
-      }
-      bool result = str.string_storage.size() >= suffix.string_storage.size() &&
-                    str.string_storage.compare(
-                        str.string_storage.size() - suffix.string_storage.size(),
-                        suffix.string_storage.size(), suffix.string_storage) == 0;
+      bool result = str.string_val().size() >=
+                        suffix.string_val().size() &&
+                    str.string_val().compare(
+                        str.string_val().size() -
+                            suffix.string_val().size(),
+                        suffix.string_val().size(),
+                        suffix.string_val()) == 0;
       push(Value::bool_value(result));
       break;
     }
@@ -1411,16 +1414,18 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       Value new_str = pop();
       Value old_str = pop();
       Value str = pop();
-      if (str.type != ValueType::String || old_str.type != ValueType::String ||
-          new_str.type != ValueType::String) {
+      if (str.type != ValueType::String ||
+          old_str.type != ValueType::String ||
+          new_str.type != ValueType::String)
         return runtime_error("replace() requires string arguments.");
-      }
-      std::string result = str.string_storage;
-      if (!old_str.string_storage.empty()) {
+      std::string result = str.string_val();
+      if (!old_str.string_val().empty()) {
         std::size_t pos = 0;
-        while ((pos = result.find(old_str.string_storage, pos)) != std::string::npos) {
-          result.replace(pos, old_str.string_storage.size(), new_str.string_storage);
-          pos += new_str.string_storage.size();
+        while ((pos = result.find(old_str.string_val(), pos)) !=
+               std::string::npos) {
+          result.replace(pos, old_str.string_val().size(),
+                         new_str.string_val());
+          pos += new_str.string_val().size();
         }
       }
       push(Value::string_value(std::move(result)));
@@ -1429,32 +1434,34 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::StringSplit: {
       Value delim = pop();
       Value str = pop();
-      if (str.type != ValueType::String || delim.type != ValueType::String) {
+      if (str.type != ValueType::String ||
+          delim.type != ValueType::String)
         return runtime_error("split() requires string arguments.");
-      }
       std::vector<Value> parts;
-      if (delim.string_storage.empty()) {
-        for (char c : str.string_storage) {
+      if (delim.string_val().empty()) {
+        for (char c : str.string_val()) {
           parts.push_back(Value::string_value(std::string(1, c)));
         }
       } else {
         std::size_t start = 0;
         std::size_t pos;
-        while ((pos = str.string_storage.find(delim.string_storage, start)) != std::string::npos) {
-          parts.push_back(Value::string_value(str.string_storage.substr(start, pos - start)));
-          start = pos + delim.string_storage.size();
+        while ((pos = str.string_val().find(
+                    delim.string_val(), start)) != std::string::npos) {
+          parts.push_back(Value::string_value(
+              str.string_val().substr(start, pos - start)));
+          start = pos + delim.string_val().size();
         }
-        parts.push_back(Value::string_value(str.string_storage.substr(start)));
+        parts.push_back(
+            Value::string_value(str.string_val().substr(start)));
       }
       push(Value::array_value(std::move(parts)));
       break;
     }
     case OpCode::StringTrim: {
       Value str = pop();
-      if (str.type != ValueType::String) {
+      if (str.type != ValueType::String)
         return runtime_error("trim() requires a string.");
-      }
-      auto &s = str.string_storage;
+      auto &s = str.string_val();
       auto start = s.find_first_not_of(" \t\n\r");
       if (start == std::string::npos) {
         push(Value::string_value(""));
@@ -1466,21 +1473,23 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     }
     case OpCode::StringToUpper: {
       Value str = pop();
-      if (str.type != ValueType::String) {
+      if (str.type != ValueType::String)
         return runtime_error("to_upper() requires a string.");
-      }
-      std::string result = str.string_storage;
-      for (auto &c : result) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+      std::string result = str.string_val();
+      for (auto &c : result)
+        c = static_cast<char>(
+            std::toupper(static_cast<unsigned char>(c)));
       push(Value::string_value(std::move(result)));
       break;
     }
     case OpCode::StringToLower: {
       Value str = pop();
-      if (str.type != ValueType::String) {
+      if (str.type != ValueType::String)
         return runtime_error("to_lower() requires a string.");
-      }
-      std::string result = str.string_storage;
-      for (auto &c : result) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      std::string result = str.string_val();
+      for (auto &c : result)
+        c = static_cast<char>(
+            std::tolower(static_cast<unsigned char>(c)));
       push(Value::string_value(std::move(result)));
       break;
     }
@@ -1491,18 +1500,19 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
 }
 
 bool Vm::push(Value value) {
-  stack_.push_back(value);
+  stack_.push_back(std::move(value));
   return true;
 }
 
 Value Vm::pop() {
-  Value value = stack_.back();
+  Value value = std::move(stack_.back());
   stack_.pop_back();
   return value;
 }
 
 VmResult Vm::runtime_error(std::string message) const {
-  return VmResult{.ok = false, .value = Value::null_value(), .error = std::move(message)};
+  return VmResult{
+      .ok = false, .value = Value::null_value(), .error = std::move(message)};
 }
 
 bool Vm::binary_numeric(OpCode op, std::string *error) {
@@ -1518,31 +1528,32 @@ bool Vm::binary_numeric(OpCode op, std::string *error) {
     return false;
   }
 
-  const bool both_int = left.type == ValueType::Int && right.type == ValueType::Int;
+  const bool both_int =
+      left.type == ValueType::Int && right.type == ValueType::Int;
   if (both_int) {
     switch (op) {
     case OpCode::Add:
-      push(Value::int_value(left.int_value_storage + right.int_value_storage));
+      push(Value::int_value(left.as_int + right.as_int));
       return true;
     case OpCode::Subtract:
-      push(Value::int_value(left.int_value_storage - right.int_value_storage));
+      push(Value::int_value(left.as_int - right.as_int));
       return true;
     case OpCode::Multiply:
-      push(Value::int_value(left.int_value_storage * right.int_value_storage));
+      push(Value::int_value(left.as_int * right.as_int));
       return true;
     case OpCode::Divide:
-      if (right.int_value_storage == 0) {
+      if (right.as_int == 0) {
         *error = "Division by zero.";
         return false;
       }
-      push(Value::int_value(left.int_value_storage / right.int_value_storage));
+      push(Value::int_value(left.as_int / right.as_int));
       return true;
     case OpCode::Modulo:
-      if (right.int_value_storage == 0) {
+      if (right.as_int == 0) {
         *error = "Modulo by zero.";
         return false;
       }
-      push(Value::int_value(left.int_value_storage % right.int_value_storage));
+      push(Value::int_value(left.as_int % right.as_int));
       return true;
     default:
       break;

@@ -18,39 +18,41 @@ uint32_t Chunk::add_constant(Value value) {
     if (existing.type != value.type) continue;
     switch (value.type) {
     case ValueType::Int:
-      if (existing.int_value_storage == value.int_value_storage) return i;
+      if (existing.as_int == value.as_int) return i;
       break;
     case ValueType::Double:
-      if (existing.double_value_storage == value.double_value_storage) return i;
+      if (existing.as_double_storage == value.as_double_storage) return i;
       break;
     case ValueType::Bool:
-      if (existing.bool_value_storage == value.bool_value_storage) return i;
+      if (existing.as_bool == value.as_bool) return i;
       break;
     case ValueType::Char:
-      if (existing.int_value_storage == value.int_value_storage) return i;
+      if (existing.as_int == value.as_int) return i;
       break;
     case ValueType::Null:
       return i;
     case ValueType::String:
-      if (existing.string_storage == value.string_storage) return i;
+      if (existing.string_val() == value.string_val()) return i;
       break;
     case ValueType::Function:
-      if (existing.function_index_storage == value.function_index_storage) return i;
+      if (existing.function_idx == value.function_idx) return i;
       break;
-    case ValueType::Enum:
-      if (existing.enum_type_index == value.enum_type_index &&
-          existing.enum_variant_index == value.enum_variant_index &&
-          existing.enum_payload.size() == value.enum_payload.size()) {
-        bool match = true;
-        for (std::size_t k = 0; k < value.enum_payload.size(); ++k) {
-          if (!values_equal(existing.enum_payload[k], value.enum_payload[k])) {
-            match = false;
-            break;
-          }
-        }
-        if (match) return i;
+    case ValueType::Enum: {
+      if (existing.enum_type_idx != value.enum_type_idx ||
+          existing.enum_variant_idx != value.enum_variant_idx)
+        break;
+      if (!existing.heap && !value.heap) return i;
+      if (!existing.heap || !value.heap) break;
+      auto *ep = static_cast<HeapEnum *>(existing.heap.ptr);
+      auto *vp = static_cast<HeapEnum *>(value.heap.ptr);
+      if (ep->payload.size() != vp->payload.size()) break;
+      bool match = true;
+      for (std::size_t k = 0; k < ep->payload.size(); ++k) {
+        if (!values_equal(ep->payload[k], vp->payload[k])) { match = false; break; }
       }
+      if (match) return i;
       break;
+    }
     default:
       break;
     }
@@ -438,19 +440,19 @@ bool values_equal(const Value &a, const Value &b) {
   if (a.type != b.type) return false;
   switch (a.type) {
   case ValueType::Int:
-    return a.int_value_storage == b.int_value_storage;
+    return a.as_int == b.as_int;
   case ValueType::Double:
-    return a.double_value_storage == b.double_value_storage;
+    return a.as_double_storage == b.as_double_storage;
   case ValueType::Bool:
-    return a.bool_value_storage == b.bool_value_storage;
+    return a.as_bool == b.as_bool;
   case ValueType::Char:
-    return a.int_value_storage == b.int_value_storage;
+    return a.as_int == b.as_int;
   case ValueType::Null:
     return true;
   case ValueType::String:
-    return a.string_storage == b.string_storage;
+    return a.string_val() == b.string_val();
   case ValueType::Function:
-    return a.function_index_storage == b.function_index_storage;
+    return a.function_idx == b.function_idx;
   default:
     return false;
   }
@@ -480,56 +482,68 @@ bool Chunk::serialize(const std::string &path, bool strip_debug) const {
     write_u8(out, static_cast<uint8_t>(c.type));
     switch (c.type) {
     case ValueType::Int:
-      write_i64(out, c.int_value_storage);
+      write_i64(out, c.as_int);
       break;
     case ValueType::Double:
-      write_f64(out, c.double_value_storage);
+      write_f64(out, c.as_double_storage);
       break;
     case ValueType::Bool:
-      write_u8(out, c.bool_value_storage ? 1 : 0);
+      write_u8(out, c.as_bool ? 1 : 0);
       break;
     case ValueType::Char:
-      write_i8(out, static_cast<int8_t>(c.int_value_storage));
+      write_i8(out, static_cast<int8_t>(c.as_int));
       break;
     case ValueType::Null:
       break; // no data
     case ValueType::String:
-      write_str(out, c.string_storage);
+      write_str(out, c.string_val());
       break;
     case ValueType::Function:
       // Function constant: just the index into the function table.
-      write_i32(out, c.function_index_storage);
+      write_i32(out, c.function_idx);
       break;
     case ValueType::Enum:
       // Enum constant: type_index + variant_index + payload count + payload values.
-      write_i32(out, static_cast<int32_t>(c.enum_type_index));
-      write_i32(out, static_cast<int32_t>(c.enum_variant_index));
-      write_u32(out, static_cast<uint32_t>(c.enum_payload.size()));
-      for (const auto &p : c.enum_payload) {
+      {
+        int ti = c.enum_type_idx;
+        int vi = c.enum_variant_idx;
+        const std::vector<Value> *pl = nullptr;
+        if (c.heap) {
+          auto *e = static_cast<HeapEnum *>(c.heap.ptr);
+          ti = e->type_index;
+          vi = e->variant_index;
+          pl = &e->payload;
+        }
+        write_i32(out, static_cast<int32_t>(ti));
+        write_i32(out, static_cast<int32_t>(vi));
+        uint32_t pc = pl ? static_cast<uint32_t>(pl->size()) : 0;
+        write_u32(out, pc);
+        if (pl) for (const auto &p : *pl) {
         // Recurse — payload values should be simple types only.
         write_u8(out, static_cast<uint8_t>(p.type));
         switch (p.type) {
         case ValueType::Int:
-          write_i64(out, p.int_value_storage);
+          write_i64(out, p.as_int);
           break;
         case ValueType::Double:
-          write_f64(out, p.double_value_storage);
+          write_f64(out, p.as_double_storage);
           break;
         case ValueType::Bool:
-          write_u8(out, p.bool_value_storage ? 1 : 0);
+          write_u8(out, p.as_bool ? 1 : 0);
           break;
         case ValueType::Char:
-          write_i8(out, static_cast<int8_t>(p.int_value_storage));
+          write_i8(out, static_cast<int8_t>(p.as_int));
           break;
         case ValueType::Null:
           break;
         case ValueType::String:
-          write_str(out, p.string_storage);
+          write_str(out, p.string_val());
           break;
         default:
           break; // skip unsupported payload types
         }
       }
+      } /* ti/vi/pl block */
       break;
     default:
       // Runtime-only types (Struct, Array, Map, NativeFunction)
