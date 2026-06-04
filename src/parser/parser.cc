@@ -294,35 +294,8 @@ ast::DeclPtr Parser::import_declaration() {
     return std::make_unique<ast::ImportBlockDecl>(location_of(import_token), std::move(imports));
   }
 
-  // Old form: import "path" as alias; OR import "path" { sym1, sym2 };
-  const Token &path_token = consume(TokenType::STRING_LIT, "Expected file path string after 'import'.");
-  std::string path(token_text(path_token));
-  if (path.size() >= 2 && path.front() == '"' && path.back() == '"') {
-    path = path.substr(1, path.size() - 2);
-  }
-
-  std::string alias;
-  std::vector<std::string> selected;
-
-  if (check(TokenType::IDENTIFIER) && token_text(peek()) == "as") {
-    advance(); // consume 'as'
-    const Token &alias_token = consume(TokenType::IDENTIFIER, "Expected alias name after 'as'.");
-    alias = token_text(alias_token);
-  } else if (match(TokenType::LEFT_BRACE)) {
-    do {
-      if (at_completion()) {
-        set_completion({lsp::CompletionPosition::ImportSymbol, {}, {}, {}, {}, path, {}});
-        return nullptr;
-      }
-      const Token &sym = consume(TokenType::IDENTIFIER, "Expected symbol name in import list.");
-      selected.push_back(std::string(token_text(sym)));
-    } while (match(TokenType::COMMA));
-    consume(TokenType::RIGHT_BRACE, "Expected '}' after import list.");
-  }
-
-  match(TokenType::SEMICOLON);
-  return std::make_unique<ast::ImportDecl>(location_of(import_token), std::move(path),
-                                           std::move(alias), std::move(selected));
+  error_at(peek(), "Expected '{' after 'import'. Old-form imports removed; use: import { \"path\" }");
+  return nullptr;
 }
 
 ast::DeclPtr Parser::struct_declaration() {
