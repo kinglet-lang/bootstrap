@@ -52,7 +52,16 @@ void ModuleLoader::register_source_file(const std::string &path) {
 ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
   std::string resolved;
   try {
-    resolved = resolve_path(path);
+    if (path.size() >= 2 && path[0] == '/' && path[1] == '/') {
+      if (!project_config_) {
+        return {nullptr, "Cannot resolve '//' path: no kinglet.toml found"};
+      }
+      std::filesystem::path root(project_config_->root_dir);
+      std::string relative = path.substr(2);
+      resolved = std::filesystem::canonical(root / relative).string();
+    } else {
+      resolved = resolve_path(path);
+    }
   } catch (const std::filesystem::filesystem_error &) {
     return {nullptr, "Cannot resolve import path: " + path};
   }

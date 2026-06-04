@@ -1751,23 +1751,9 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     return;
   }
 
-  // Determine the directory of the loaded module for resolving its nested
-  // imports. We need the resolved (canonical) path to extract the parent dir.
-  std::string mod_dir;
-  try {
-    std::string resolved;
-    if (importing_file_dir.empty()) {
-      // Top-level import: resolve against module_loader's base_dir
-      std::filesystem::path base(module_loader_->base_dir());
-      resolved = std::filesystem::canonical(base / import_decl.path).string();
-    } else {
-      resolved = std::filesystem::canonical(
-          std::filesystem::path(importing_file_dir) / import_decl.path).string();
-    }
-    mod_dir = std::filesystem::path(resolved).parent_path().string();
-  } catch (...) {
-    mod_dir = importing_file_dir.empty() ? module_loader_->base_dir() : importing_file_dir;
-  }
+  // Use the resolved canonical path from load() to determine the module
+  // directory for transitive imports — works for both // and relative paths.
+  std::string mod_dir = std::filesystem::path(mod.resolved_path).parent_path().string();
 
   // Recursively process imports declared inside the loaded module so that
   // types and functions it depends on are registered before we compile calls
