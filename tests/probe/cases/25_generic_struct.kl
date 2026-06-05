@@ -1,0 +1,4 @@
+// EXPECT_OUT: 7
+using io;
+struct Box<T> { T value; }
+int main() { Box<int> b = Box { 7 }; io::out.line(b.value); return 0; }

@@ -1,0 +1,3 @@
+// EXPECT_OUT: 10
+using io;
+int main() { int s = 0; for (int i = 0; i < 5; i = i + 1) { s = s + i; } io::out.line(s); return 0; }

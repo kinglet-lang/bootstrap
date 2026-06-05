@@ -1,0 +1,4 @@
+// EXPECT_OUT: 5
+using io;
+int f(int x) { guard x > 0 else { return 99; } return x; }
+int main() { io::out.line(f(5)); return 0; }

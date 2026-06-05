@@ -1,0 +1,3 @@
+// EXPECT_OUT: 42
+using io;
+int main() { auto x = 21; io::out.line(x + x); return 0; }

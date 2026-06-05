@@ -1,0 +1,3 @@
+// EXPECT_OUT: 42
+using io;
+int main() { int n = int("42"); io::out.line(n); return 0; }

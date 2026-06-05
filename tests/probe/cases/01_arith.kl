@@ -1,0 +1,3 @@
+// EXPECT_OUT: 10
+using io;
+int main() { io::out.line(3 + 4 * 2 - 1); return 0; }

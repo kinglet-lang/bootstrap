@@ -1,0 +1,3 @@
+// EXPECT_OUT: 9
+using io;
+int main() { const int X = 9; io::out.line(X); return 0; }

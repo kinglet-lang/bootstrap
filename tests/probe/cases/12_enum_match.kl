@@ -1,0 +1,4 @@
+// EXPECT_OUT: 42
+using io;
+enum Option { Some(int), None }
+int main() { Option o = Option::Some(42); int r = o match { Option::Some(let x) => x, Option::None => 0, }; io::out.line(r); return 0; }

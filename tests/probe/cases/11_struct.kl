@@ -1,0 +1,4 @@
+// EXPECT_OUT: 7
+using io;
+struct P { int x; int y; }
+int main() { P p = P { 3, 4 }; io::out.line(p.x + p.y); return 0; }

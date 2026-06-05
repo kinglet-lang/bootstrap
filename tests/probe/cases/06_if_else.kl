@@ -1,0 +1,3 @@
+// EXPECT_OUT: 8
+using io;
+int main() { int x = 5; if (x > 10) { io::out.line(1); } else { io::out.line(8); } return 0; }

@@ -1,0 +1,4 @@
+// EXPECT_OUT: hello
+using io;
+using fs;
+int main() { string s = fs::__read("/tmp/_kl_probe_fs.txt"); io::out.line(s); return 0; }

@@ -1,0 +1,5 @@
+// EXPECT_OUT: 7
+using io;
+struct P { int v; }
+int getv(P p) { return p.v; }
+int main() { P p = P { 7 }; io::out.line(p.getv()); return 0; }

@@ -1,0 +1,4 @@
+// EXPECT_OUT: 42
+using io;
+T id<T>(T x) { return x; }
+int main() { io::out.line(id<int>(42)); return 0; }

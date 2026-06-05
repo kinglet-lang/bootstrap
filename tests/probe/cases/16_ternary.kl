@@ -1,0 +1,3 @@
+// EXPECT_OUT: 7
+using io;
+int main() { int x = 5 > 3 ? 7 : 0; io::out.line(x); return 0; }
