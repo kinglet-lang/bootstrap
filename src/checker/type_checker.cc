@@ -883,13 +883,11 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
     check_stmt(*try_catch->body, expected_return);
     for (const ast::CatchArm &arm : try_catch->catches) {
       push_scope();
-      auto err_it = type_registry_.find(arm.error_type.name);
-      if (err_it == type_registry_.end()) {
-        error_at(stmt.location,
-                 "Unknown error type '" + arm.error_type.name + "' in catch.");
-      } else {
-        declare_var(arm.binding_name, err_it->second, false, stmt.location);
-      }
+      // Accept any resolvable type as the caught error type: builtins such as
+      // `string`, user-declared enums, and the built-in CastError. An
+      // unresolvable name is reported by resolve_type_expr itself.
+      Type err_type = resolve_type_expr(arm.error_type, stmt.location);
+      declare_var(arm.binding_name, err_type, false, stmt.location);
       check_stmt(*arm.body, expected_return);
       pop_scope();
     }

@@ -198,6 +198,9 @@ run_case "string_ops" "run" 0 $'hello world\ntrue\ntrue\ntrue\ntrue\ntrue\ne\n5\
 # --- Error: missing using io ---
 run_case "error_missing_using_io" "run" 65 "" $'2:3: error: Module \'io\' is not imported. Add \'using io;\' at the top of the file.\n'
 
+# --- Try / Catch (builtin + CastError error types) ---
+run_case "try_catch" "run" 0 $'7\n-99\n' $'9:3: warning: Unused variable \'e\'.\n18:3: warning: Unused variable \'e\'.\n'
+
 # --- Enum Payload ---
 run_case "enum_payload_test" "run" 0 $'start\ndone\n' $'10:3: warning: Unused variable \'s\'.\n'
 
