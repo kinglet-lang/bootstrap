@@ -58,10 +58,17 @@ CompileResult Compiler::compile(const ast::Program &program) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
       if (!using_decl->selected_symbols.empty()) {
         const std::string &ns = using_decl->namespace_name;
+        const bool is_imported = imported_namespaces_.count(ns) > 0;
         for (const auto &sym : using_decl->selected_symbols) {
           std::string qualified = ns + "::" + sym;
           if (function_indices_.count(qualified)) {
             function_indices_[sym] = function_indices_[qualified];
+          }
+          // Non-imported namespaces (io, fs, sys, …) expose native members.
+          // Record the alias so call/field-access codegen can emit the right
+          // native opcode when it encounters the bare name.
+          if (!is_imported) {
+            using_aliases_[sym] = {ns, sym};
           }
         }
       }
@@ -971,6 +978,39 @@ void Compiler::compile_expr(const ast::Expr &expr) {
           emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr->args.size()),
                        call_expr->location);
           return;
+        }
+      }
+    }
+
+    // Handle aliased bare names from `using io { out }`: out.line(...)
+    // emits the same native opcode as io::out.line(...).
+    if (field_callee) {
+      const auto *id_obj =
+          dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
+      if (id_obj) {
+        auto alias_it = using_aliases_.find(id_obj->name);
+        if (alias_it != using_aliases_.end()) {
+          const auto &[ns, member] = alias_it->second;
+          if (ns == "io") {
+            if (member == "out" && field_callee->field_name == "line") {
+              for (const ast::ExprPtr &arg : call_expr->args) compile_expr(*arg);
+              emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr->args.size()),
+                           call_expr->location);
+              return;
+            }
+            if (member == "err" && field_callee->field_name == "line") {
+              for (const ast::ExprPtr &arg : call_expr->args) compile_expr(*arg);
+              emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr->args.size()),
+                           call_expr->location);
+              return;
+            }
+            if (member == "in" && field_callee->field_name == "secret") {
+              for (const ast::ExprPtr &arg : call_expr->args) compile_expr(*arg);
+              emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr->args.size()),
+                           call_expr->location);
+              return;
+            }
+          }
         }
       }
     }

@@ -89,6 +89,10 @@ private:
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
   ModuleLoader *module_loader_ = nullptr;
   std::unordered_map<std::string, std::string> namespace_aliases_;
+  // Bare names aliased by `using io { out }` etc. Maps bare name to
+  // (namespace, original member name), used to emit the correct native opcode
+  // when a bare aliased name appears in a call or field-access expression.
+  std::unordered_map<std::string, std::pair<std::string, std::string>> using_aliases_;
   std::unordered_set<std::string> imported_namespaces_;
   std::unordered_map<std::string, std::vector<const ast::FunctionDecl *>> imported_function_decls_;
   // Resolved paths of modules already processed by process_import_from, so a

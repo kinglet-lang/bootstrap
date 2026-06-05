@@ -1,0 +1,9 @@
+// Selective import of a system-library member: `using io { out }` makes the
+// bare name `out` an alias for io::out, so out.line(...) works identically to
+// io::out.line(...).
+using io { out };
+
+int main() {
+  out.line("ok");
+  return 0;
+}

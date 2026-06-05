@@ -167,6 +167,7 @@ run_case "functions_recursion" "run" 0 $'720\n55\n' ""
 
 # --- IO Methods ---
 run_case "io_methods" "run" 0 $'hello world\n1 + 2 = 3\nno newline here\ndone\n' ""
+run_case "using_system_selective" "run" 0 $'ok\n' ""
 
 # --- Warnings ---
 run_case "warnings" "run" 0 "" $'4:6: warning: Condition is always true.\n8:9: warning: Condition is always false; loop body never executes.\n9:5: warning: Unused variable \'x\'.\n13:3: warning: Unreachable code.\n2:3: warning: Unused variable \'unused\'.\n'
