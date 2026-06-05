@@ -316,6 +316,21 @@ std::string Compiler::infer_struct_type(const ast::Expr &expr) const {
   return "";
 }
 
+std::string Compiler::infer_arg_type_name(const ast::Expr &expr) const {
+  if (dynamic_cast<const ast::IntLiteralExpr *>(&expr)) return "int";
+  if (dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) return "float";
+  if (dynamic_cast<const ast::BoolLiteralExpr *>(&expr)) return "bool";
+  if (dynamic_cast<const ast::CharLiteralExpr *>(&expr)) return "char";
+  if (dynamic_cast<const ast::StringLiteralExpr *>(&expr)) return "string";
+  if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    auto it = local_types_.find(id->name);
+    if (it != local_types_.end()) return it->second;
+    return "";
+  }
+  // Struct value or method return — reuse the struct-type inferencer.
+  return infer_struct_type(expr);
+}
+
 void Compiler::compile_function(const ast::FunctionDecl &function, const std::string &lookup_name) {
   locals_.clear();
   scope_stack_.clear();
@@ -1087,17 +1102,42 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       }
     }
 
-    // Generic function call
-    if (callee_id && !call_expr->type_args.empty()) {
-      std::string mangled = callee_id->name;
-      for (const auto &arg : call_expr->type_args) {
-        mangled += "__" + arg.to_string();
+    // Generic function call — type arguments are explicit, or inferred from the
+    // argument expressions (matching parameters written as bare type params).
+    if (callee_id && generic_func_decls_.count(callee_id->name)) {
+      const ast::FunctionDecl *decl = generic_func_decls_.at(callee_id->name);
+      std::vector<std::string> type_arg_names;
+      if (!call_expr->type_args.empty()) {
+        for (const auto &arg : call_expr->type_args) {
+          type_arg_names.push_back(arg.to_string());
+        }
+      } else {
+        std::unordered_map<std::string, std::string> inferred;
+        for (size_t i = 0; i < decl->params.size() && i < call_expr->args.size(); ++i) {
+          const ast::TypeExpr &pt = decl->params[i].type;
+          if (!pt.type_args.empty() || inferred.count(pt.name)) continue;
+          bool is_type_param = false;
+          for (const std::string &tp : decl->type_params) {
+            if (tp == pt.name) { is_type_param = true; break; }
+          }
+          if (is_type_param) {
+            inferred[pt.name] = infer_arg_type_name(*call_expr->args[i]);
+          }
+        }
+        for (const std::string &tp : decl->type_params) {
+          auto it = inferred.find(tp);
+          if (it != inferred.end() && !it->second.empty()) {
+            type_arg_names.push_back(it->second);
+          }
+        }
       }
-      auto func_it = function_indices_.find(mangled);
-      if (func_it == function_indices_.end()) {
-        auto gen_it = generic_func_decls_.find(callee_id->name);
-        if (gen_it != generic_func_decls_.end()) {
-          const ast::FunctionDecl *decl = gen_it->second;
+      if (type_arg_names.size() == decl->type_params.size()) {
+        std::string mangled = callee_id->name;
+        for (const std::string &n : type_arg_names) {
+          mangled += "__" + n;
+        }
+        auto func_it = function_indices_.find(mangled);
+        if (func_it == function_indices_.end()) {
           int idx = chunk_.add_function(FunctionInfo{
               .name = mangled,
               .entry = 0,
@@ -1107,17 +1147,17 @@ void Compiler::compile_expr(const ast::Expr &expr) {
           function_indices_[mangled] = static_cast<int>(const_idx);
           pending_generic_funcs_.push_back({mangled, decl});
         }
-      }
-      func_it = function_indices_.find(mangled);
-      if (func_it != function_indices_.end()) {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
+        func_it = function_indices_.find(mangled);
+        if (func_it != function_indices_.end()) {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_constant(Value::function_value(
+              chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+              call_expr->location);
+          emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
+          return;
         }
-        emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
-            call_expr->location);
-        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
-        return;
       }
     }
 

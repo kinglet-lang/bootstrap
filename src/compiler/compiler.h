@@ -68,6 +68,9 @@ private:
   void process_import(const ast::ImportDecl &import_decl);
   void process_import_from(const ast::ImportDecl &import_decl, const std::string &importing_file_dir);
   std::string infer_struct_type(const ast::Expr &expr) const;
+  // Best-effort source-level type name of an expression, used to infer generic
+  // type arguments at a call site (literals, locals, struct/method returns).
+  std::string infer_arg_type_name(const ast::Expr &expr) const;
 
   Chunk chunk_;
   std::vector<Local> locals_;

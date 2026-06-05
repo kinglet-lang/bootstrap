@@ -43,6 +43,23 @@ ast::TypeExpr substitute_type_params(
   return result;
 }
 
+// Map a resolved type back to a source-level type expression, so an inferred
+// argument type can flow through the same substitution path as an explicit
+// type argument. Builtins use their source spelling; named types (structs,
+// enums) fall back to their registered name.
+ast::TypeExpr type_to_type_expr(const Type &t) {
+  ast::TypeExpr te;
+  switch (t.kind) {
+    case TypeKind::Int: te.name = "int"; break;
+    case TypeKind::Float: te.name = "float"; break;
+    case TypeKind::Bool: te.name = "bool"; break;
+    case TypeKind::Char: te.name = "char"; break;
+    case TypeKind::String: te.name = "string"; break;
+    default: te.name = t.name; break;
+  }
+  return te;
+}
+
 } // namespace
 
 Type TypeChecker::resolve_type_name(const std::string &name) const {
@@ -1482,19 +1499,48 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
-    if (!call_expr->type_args.empty()) {
+    {
       const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr->callee.get());
       if (callee_id) {
         auto gen_it = generic_functions_.find(callee_id->name);
         if (gen_it != generic_functions_.end()) {
           const ast::FunctionDecl *decl = gen_it->second;
-          if (call_expr->type_args.size() != decl->type_params.size()) {
+
+          // Check arguments once: their types both drive inference (when no
+          // explicit type arguments are written) and feed the compatibility
+          // check below.
+          std::vector<Type> arg_types;
+          arg_types.reserve(call_expr->args.size());
+          for (const auto &arg : call_expr->args) {
+            arg_types.push_back(check_expr(*arg));
+          }
+
+          // Type arguments are explicit, or inferred by matching each argument
+          // against a parameter written as a bare type parameter (e.g. `T x`).
+          std::vector<ast::TypeExpr> type_args = call_expr->type_args;
+          if (type_args.empty()) {
+            std::unordered_map<std::string, ast::TypeExpr> inferred;
+            for (size_t i = 0; i < decl->params.size() && i < arg_types.size(); ++i) {
+              const ast::TypeExpr &pt = decl->params[i].type;
+              if (!pt.type_args.empty() || inferred.count(pt.name)) continue;
+              if (std::find(decl->type_params.begin(), decl->type_params.end(), pt.name) !=
+                  decl->type_params.end()) {
+                inferred[pt.name] = type_to_type_expr(arg_types[i]);
+              }
+            }
+            for (const std::string &tp : decl->type_params) {
+              auto it = inferred.find(tp);
+              if (it != inferred.end()) type_args.push_back(it->second);
+            }
+          }
+
+          if (type_args.size() != decl->type_params.size()) {
             error_at(call_expr->location, "Wrong number of type arguments for '" + callee_id->name + "'.");
             return int_type();
           }
           std::unordered_map<std::string, ast::TypeExpr> subst;
           for (size_t i = 0; i < decl->type_params.size(); ++i) {
-            subst[decl->type_params[i]] = call_expr->type_args[i];
+            subst[decl->type_params[i]] = type_args[i];
           }
           auto substitute = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
             if (te.type_args.empty()) {
@@ -1508,18 +1554,17 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           for (const auto &param : decl->params) {
             param_types.push_back(resolve_type_expr(substitute(param.type)));
           }
-          if (call_expr->args.size() != param_types.size()) {
+          if (arg_types.size() != param_types.size()) {
             error_at(call_expr->location,
                      "Expected " + std::to_string(param_types.size()) + " arguments, got " +
-                         std::to_string(call_expr->args.size()) + ".");
+                         std::to_string(arg_types.size()) + ".");
             return ret;
           }
-          for (size_t i = 0; i < call_expr->args.size(); ++i) {
-            Type arg_type = check_expr(*call_expr->args[i]);
-            if (!arg_type.is_compatible_with(param_types[i])) {
+          for (size_t i = 0; i < arg_types.size(); ++i) {
+            if (!arg_types[i].is_compatible_with(param_types[i])) {
               error_at(call_expr->args[i]->location,
                        "Expected " + type_to_string(param_types[i]) + ", got " +
-                           type_to_string(arg_type) + ".");
+                           type_to_string(arg_types[i]) + ".");
             }
           }
           return ret;

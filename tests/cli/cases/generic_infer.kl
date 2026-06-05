@@ -1,0 +1,16 @@
+// Generic functions called WITHOUT explicit type arguments: the type
+// arguments are inferred from the argument expressions. Covers literals,
+// a local variable, and a function with two type parameters.
+using io;
+
+T id<T>(T x) { return x; }
+A first_of<A, B>(A a, B b) { return a; }
+
+int main() {
+  io::out.line("{}", id(42));         // infer T = int
+  io::out.line("{}", id("hi"));       // infer T = string
+  int n = 7;
+  io::out.line("{}", id(n));          // infer T = int from a local
+  io::out.line("{}", first_of(3, "x")); // infer A = int, B = string
+  return 0;
+}
