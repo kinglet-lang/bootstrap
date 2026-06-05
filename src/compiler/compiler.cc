@@ -411,7 +411,11 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       return;
     }
     if (!var_decl->type.name.empty()) {
-      local_types_[var_decl->name] = var_decl->type.name;
+      // Record the monomorphized name for a generic type (Box<int> -> Box__int)
+      // so member access on this local resolves to the instantiated struct.
+      std::string ty = var_decl->type.name;
+      for (const auto &a : var_decl->type.type_args) ty += "__" + a.to_string();
+      local_types_[var_decl->name] = ty;
     } else if (var_decl->init) {
       if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(var_decl->init.get())) {
         local_types_[var_decl->name] = struct_lit->struct_type.name;
@@ -1475,7 +1479,37 @@ void Compiler::compile_expr(const ast::Expr &expr) {
   }
 
   if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(&expr)) {
-    int struct_idx = resolve_struct(struct_lit->struct_type);
+    // Infer omitted type arguments for a generic struct literal from its field
+    // values (e.g. `Box { 7 }` -> `Box<int>`), mirroring the checker.
+    ast::TypeExpr lit_type = struct_lit->struct_type;
+    if (lit_type.type_args.empty() && generic_struct_decls_.count(lit_type.name)) {
+      const ast::StructDecl *decl = generic_struct_decls_.at(lit_type.name);
+      std::unordered_map<std::string, std::string> inferred;
+      for (size_t i = 0; i < decl->fields.size() && i < struct_lit->fields.size(); ++i) {
+        const ast::TypeExpr &ft = decl->fields[i].type;
+        if (!ft.type_args.empty() || inferred.count(ft.name)) continue;
+        bool is_type_param = false;
+        for (const std::string &tp : decl->type_params) {
+          if (tp == ft.name) { is_type_param = true; break; }
+        }
+        if (is_type_param) {
+          inferred[ft.name] = infer_arg_type_name(*struct_lit->fields[i].value);
+        }
+      }
+      std::vector<std::string> targs;
+      for (const std::string &tp : decl->type_params) {
+        auto it = inferred.find(tp);
+        if (it != inferred.end() && !it->second.empty()) targs.push_back(it->second);
+      }
+      if (targs.size() == decl->type_params.size()) {
+        for (const std::string &n : targs) {
+          ast::TypeExpr a;
+          a.name = n;
+          lit_type.type_args.push_back(a);
+        }
+      }
+    }
+    int struct_idx = resolve_struct(lit_type);
     if (struct_idx < 0) {
       std::string type_name = struct_lit->struct_type.to_string();
       error_at(struct_lit->location, "Unknown struct type '" + type_name + "'.");

@@ -157,6 +157,7 @@ run_case "match_array" "run" 0 $'20\n10\n1\n' ""
 # --- Generics ---
 run_case "generics_basic" "run" 0 $'42\nhello\n99\nworld\n1 one\n42\n' ""
 run_case "generic_infer" "run" 0 $'42\nhi\n7\n3\n' ""
+run_case "generic_struct_infer" "run" 0 $'7\nhi\n1 x\n' ""
 
 # --- Control Flow ---
 run_case "control_flow" "run" 0 $'10\n3\n2\n1\nyes\n' $'16:6: warning: Condition is always true.\n'

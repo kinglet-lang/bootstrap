@@ -1729,7 +1729,33 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
   }
 
   if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(&expr)) {
-    Type resolved = resolve_type_expr(struct_lit->struct_type, struct_lit->location);
+    // A generic struct literal written without type arguments (e.g. `Box { 7 }`)
+    // infers them from its field values: each field declared as a bare type
+    // parameter pins that parameter to the field's value type. It then resolves
+    // through the normal instantiation path.
+    ast::TypeExpr lit_type = struct_lit->struct_type;
+    if (lit_type.type_args.empty()) {
+      auto gen_it = generic_structs_.find(lit_type.name);
+      if (gen_it != generic_structs_.end()) {
+        const ast::StructDecl *decl = gen_it->second;
+        std::unordered_map<std::string, ast::TypeExpr> inferred;
+        for (size_t i = 0; i < decl->fields.size() && i < struct_lit->fields.size(); ++i) {
+          const ast::TypeExpr &ft = decl->fields[i].type;
+          if (!ft.type_args.empty() || inferred.count(ft.name)) continue;
+          if (std::find(decl->type_params.begin(), decl->type_params.end(), ft.name) !=
+              decl->type_params.end()) {
+            inferred[ft.name] = type_to_type_expr(check_expr(*struct_lit->fields[i].value));
+          }
+        }
+        std::vector<ast::TypeExpr> targs;
+        for (const std::string &tp : decl->type_params) {
+          auto it = inferred.find(tp);
+          if (it != inferred.end()) targs.push_back(it->second);
+        }
+        if (targs.size() == decl->type_params.size()) lit_type.type_args = std::move(targs);
+      }
+    }
+    Type resolved = resolve_type_expr(lit_type, struct_lit->location);
     std::string type_name = struct_lit->struct_type.to_string();
     auto type_opt = lookup_type(resolved.name);
     if (!type_opt.has_value()) {
