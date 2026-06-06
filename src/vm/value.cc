@@ -87,6 +87,8 @@ Value Value::enum_value_with_payload(int type_index, int variant_index,
                                       std::vector<Value> payload) {
   Value result;
   result.type = ValueType::Enum;
+  result.enum_type_idx = type_index;
+  result.enum_variant_idx = variant_index;
   result.heap =
       RcPtr<HeapObj>{new HeapEnum(type_index, variant_index, std::move(payload))};
   return result;
