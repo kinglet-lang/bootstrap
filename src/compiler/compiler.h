@@ -71,6 +71,7 @@ private:
   // Best-effort source-level type name of an expression, used to infer generic
   // type arguments at a call site (literals, locals, struct/method returns).
   std::string infer_arg_type_name(const ast::Expr &expr) const;
+  int resolve_free_function_for_type(const std::string &name, const std::string &arg_type) const;
 
   Chunk chunk_;
   std::vector<Local> locals_;
@@ -102,6 +103,8 @@ private:
   std::unordered_map<std::string, std::string> local_types_;
   std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
   std::unordered_map<std::string, std::string> method_return_types_;
+  std::unordered_map<std::string, std::string> func_first_param_;
+  std::unordered_map<std::string, const ast::Expr *> global_const_inits_;
   bool in_try_ = false;
   std::size_t try_catch_pc_ = 0; // catch landing pad PC for current try block
 };

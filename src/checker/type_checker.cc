@@ -413,6 +413,14 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       func_type.param_types = std::move(param_types);
       func_type.return_type = std::make_unique<Type>(return_type);
       declare_var(func->name, func_type, false);
+      if (!func->params.empty()) {
+        const std::string &receiver = func->params[0].type.name;
+        auto st = type_registry_.find(receiver);
+        if (st != type_registry_.end() && st->second.kind == TypeKind::Struct) {
+          method_registry_[receiver + "::" + func->name] =
+              MethodInfo{.decl = func, .target_type = receiver};
+        }
+      }
     }
     if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(decl.get())) {
       concept_registry_[concept_decl->name] = concept_decl;
@@ -1024,6 +1032,20 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     if (identifier->name == "_") {
       return null_type();
     }
+    if (opened_.count("io") != 0) {
+      if (identifier->name == "out" || identifier->name == "err") {
+        Type fn(TypeKind::Function);
+        fn.name = "native_fn";
+        fn.return_type = std::make_shared<Type>(void_type());
+        return fn;
+      }
+      if (identifier->name == "in") {
+        Type fn(TypeKind::Function);
+        fn.name = "native_fn";
+        fn.return_type = std::make_shared<Type>(string_type());
+        return fn;
+      }
+    }
     auto var_type = lookup_var(identifier->name);
     if (!var_type.has_value()) {
       // Check if this bare name aliases a system-namespace member (e.g. `out`
@@ -1284,10 +1306,55 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
+    if (ns_callee && concept_registry_.count(ns_callee->namespace_name)) {
+      if (call_expr->args.empty()) {
+        error_at(call_expr->location, "Concept method '" + ns_callee->namespace_name + "::" +
+                                        ns_callee->member_name + "' expects at least one argument.");
+        return int_type();
+      }
+      Type arg_ty = check_expr(*call_expr->args[0]);
+      auto fn_ty = lookup_var(ns_callee->member_name);
+      if (!fn_ty.has_value() || fn_ty->kind != TypeKind::Function) {
+        error_at(call_expr->location, "No implementation of '" + ns_callee->namespace_name + "::" +
+                                        ns_callee->member_name + "' for type '" +
+                                        type_to_string(arg_ty) + "'.");
+        return int_type();
+      }
+      if (call_expr->args.size() != fn_ty->param_types.size()) {
+        error_at(call_expr->location, "Wrong number of arguments.");
+        return fn_ty->return_type ? *fn_ty->return_type : int_type();
+      }
+      for (std::size_t i = 0; i < call_expr->args.size(); ++i) {
+        Type at = check_expr(*call_expr->args[i]);
+        if (!at.is_compatible_with(fn_ty->param_types[i])) {
+          error_at(call_expr->args[i]->location, "Argument type mismatch.");
+        }
+      }
+      return fn_ty->return_type ? *fn_ty->return_type : int_type();
+    }
+
     // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
     const auto *field_callee =
         dynamic_cast<const ast::FieldAccessExpr *>(call_expr->callee.get());
     if (field_callee) {
+      const auto *id_obj =
+          dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
+      if (id_obj && opened_.count("io") != 0) {
+        if ((id_obj->name == "out" || id_obj->name == "err") &&
+            field_callee->field_name == "line") {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            check_expr(*arg);
+          }
+          check_fmt_args(call_expr->args, call_expr->location);
+          return void_type();
+        }
+        if (id_obj->name == "in" && field_callee->field_name == "secret") {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            check_expr(*arg);
+          }
+          return string_type();
+        }
+      }
       const auto *ns_obj =
           dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
       if (ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
@@ -1534,6 +1601,30 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         }
         error_at(call_expr->location, "String has no method '" + method + "'.");
         return int_type();
+      }
+      if (obj_type.kind == TypeKind::Struct) {
+        const std::string method_key = obj_type.name + "::" + field_callee->field_name;
+        auto method_it = method_registry_.find(method_key);
+        if (method_it != method_registry_.end() && method_it->second.decl) {
+          const ast::FunctionDecl *decl = method_it->second.decl;
+          if (call_expr->args.size() + 1 != decl->params.size()) {
+            error_at(call_expr->location,
+                     "Expected " + std::to_string(decl->params.size() - 1) + " arguments, got " +
+                         std::to_string(call_expr->args.size()) + ".");
+          }
+          Type receiver_type = check_expr(*field_callee->object);
+          if (!receiver_type.is_compatible_with(resolve_type_expr(decl->params[0].type))) {
+            error_at(field_callee->object->location, "UFCS receiver type mismatch.");
+          }
+          for (std::size_t i = 0; i < call_expr->args.size(); ++i) {
+            Type arg_type = check_expr(*call_expr->args[i]);
+            Type param_type = resolve_type_expr(decl->params[i + 1].type);
+            if (!arg_type.is_compatible_with(param_type)) {
+              error_at(call_expr->args[i]->location, "Argument type mismatch.");
+            }
+          }
+          return resolve_type_expr(decl->return_type);
+        }
       }
     }
 
@@ -1851,6 +1942,25 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
+    // Handle `using namespace io;` bare out.line / err.line / in.secret.
+    if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_access->object.get())) {
+      if (opened_.count("io") != 0) {
+        if ((id_obj->name == "out" || id_obj->name == "err") &&
+            field_access->field_name == "line") {
+          Type fn(TypeKind::Function);
+          fn.name = "native_fn";
+          fn.return_type = std::make_shared<Type>(void_type());
+          return fn;
+        }
+        if (id_obj->name == "in" && field_access->field_name == "secret") {
+          Type fn(TypeKind::Function);
+          fn.name = "native_fn";
+          fn.return_type = std::make_shared<Type>(string_type());
+          return fn;
+        }
+      }
+    }
+
     // Handle aliased bare names from `using io { out }`: out.line(...)
     // behaves identically to io::out.line(...).
     if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_access->object.get())) {
@@ -2098,6 +2208,11 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     return then_type;
   }
 
+  if (const auto *null_coalesce = dynamic_cast<const ast::NullCoalesceExpr *>(&expr)) {
+    (void)check_expr(*null_coalesce->left);
+    return check_expr(*null_coalesce->right);
+  }
+
   if (const auto *coalesce = dynamic_cast<const ast::CoalesceExpr *>(&expr)) {
     Type left_type = check_expr(*coalesce->left);
     const bool has_binding = !coalesce->err_binding.empty();
@@ -2105,7 +2220,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       const auto *cast_lhs = dynamic_cast<const ast::CastExpr *>(coalesce->left.get());
       if (cast_lhs == nullptr) {
         error_at(coalesce->location,
-                 "?: let-binding requires a fallible cast on the left-hand side.");
+                 "?? let-binding requires a fallible cast on the left-hand side.");
       } else {
         push_scope();
         auto err_it = type_registry_.find("CastError");
@@ -2115,7 +2230,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         pop_scope();
         if (!right_type.is_compatible_with(left_type)) {
           error_at(coalesce->right->location,
-                   "?: fallback type " + type_to_string(right_type) +
+                   "?? fallback type " + type_to_string(right_type) +
                        " does not match left-hand type " + type_to_string(left_type) + ".");
         }
         return left_type;
@@ -2124,7 +2239,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     Type right_type = check_expr(*coalesce->right);
     if (!right_type.is_compatible_with(left_type)) {
       error_at(coalesce->right->location,
-               "?: fallback type " + type_to_string(right_type) +
+               "?? fallback type " + type_to_string(right_type) +
                    " does not match left-hand type " + type_to_string(left_type) + ".");
     }
     return left_type;

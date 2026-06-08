@@ -22,6 +22,9 @@ CompileResult Compiler::compile(const ast::Program &program) {
   struct_indices_.clear();
   enum_indices_.clear();
   processed_modules_.clear();
+  concept_registry_.clear();
+  func_first_param_.clear();
+  global_const_inits_.clear();
 
   // Pre-register the built-in CastError enum at chunk index 0 so the VM
   // can build CastError variants on Cast failure without an enum lookup.
@@ -102,7 +105,18 @@ CompileResult Compiler::compile(const ast::Program &program) {
     }
   }
 
-  // Pass 1b: (reserved — concept declarations are compile-time only, no bytecode)
+  for (const ast::DeclPtr &declaration : program.declarations) {
+    if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(declaration.get())) {
+      concept_registry_[concept_decl->name] = concept_decl;
+    }
+    if (const auto *top = dynamic_cast<const ast::TopLevelStmtDecl *>(declaration.get())) {
+      if (const auto *var = dynamic_cast<const ast::VarDeclStmt *>(top->stmt.get())) {
+        if (var->storage == "const" && var->init) {
+          global_const_inits_[var->name] = var->init.get();
+        }
+      }
+    }
+  }
 
   std::vector<const ast::FunctionDecl *> functions;
   int main_index = -1;
@@ -120,6 +134,13 @@ CompileResult Compiler::compile(const ast::Program &program) {
       uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
       function_indices_[function->name] = static_cast<int>(const_idx);
       method_return_types_[function->name] = function->return_type.name;
+      if (!function->params.empty()) {
+        const std::string &receiver = function->params[0].type.name;
+        func_first_param_[function->name] = receiver;
+        if (struct_indices_.count(receiver)) {
+          function_indices_[receiver + "::" + function->name] = static_cast<int>(const_idx);
+        }
+      }
       functions.push_back(function);
       if (function->name == "main") {
         main_index = idx;
@@ -321,6 +342,19 @@ std::string Compiler::infer_struct_type(const ast::Expr &expr) const {
     return struct_lit->struct_type.name;
   }
   return "";
+}
+
+int Compiler::resolve_free_function_for_type(const std::string &name,
+                                             const std::string &arg_type) const {
+  auto fit = func_first_param_.find(name);
+  if (fit == func_first_param_.end() || fit->second != arg_type) {
+    return -1;
+  }
+  auto it = function_indices_.find(name);
+  if (it == function_indices_.end()) {
+    return -1;
+  }
+  return it->second;
 }
 
 std::string Compiler::infer_arg_type_name(const ast::Expr &expr) const {
@@ -728,6 +762,11 @@ void Compiler::compile_expr(const ast::Expr &expr) {
   }
 
   if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    auto git = global_const_inits_.find(identifier->name);
+    if (git != global_const_inits_.end()) {
+      compile_expr(*git->second);
+      return;
+    }
     const int slot = resolve_local(identifier->name);
     if (slot < 0) {
       error_at(identifier->location, "Use of undeclared variable '" + identifier->name + "'.");
@@ -948,6 +987,30 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       }
     }
 
+    if (ns_callee && concept_registry_.count(ns_callee->namespace_name)) {
+      if (call_expr->args.empty()) {
+        error_at(call_expr->location, "Concept method '" + ns_callee->namespace_name + "::" +
+                                        ns_callee->member_name + "' expects at least one argument.");
+        return;
+      }
+      const std::string arg_ty = infer_arg_type_name(*call_expr->args[0]);
+      const int const_idx =
+          resolve_free_function_for_type(ns_callee->member_name, arg_ty);
+      if (const_idx < 0) {
+        error_at(call_expr->location, "No implementation of '" + ns_callee->namespace_name + "::" +
+                                        ns_callee->member_name + "' for type '" + arg_ty + "'.");
+        return;
+      }
+      for (const ast::ExprPtr &arg : call_expr->args) {
+        compile_expr(*arg);
+      }
+      emit_constant(Value::function_value(
+                        chunk_.constants()[static_cast<std::size_t>(const_idx)].function_idx),
+                    call_expr->location);
+      emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
+      return;
+    }
+
     // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
     const auto *field_callee =
         dynamic_cast<const ast::FieldAccessExpr *>(call_expr->callee.get());
@@ -987,6 +1050,32 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     if (field_callee) {
       const auto *id_obj =
           dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
+      if (id_obj && opened_.count("io") != 0) {
+        if (id_obj->name == "out" && field_callee->field_name == "line") {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr->args.size()),
+                       call_expr->location);
+          return;
+        }
+        if (id_obj->name == "err" && field_callee->field_name == "line") {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr->args.size()),
+                       call_expr->location);
+          return;
+        }
+        if (id_obj->name == "in" && field_callee->field_name == "secret") {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr->args.size()),
+                       call_expr->location);
+          return;
+        }
+      }
       if (id_obj) {
         auto alias_it = using_aliases_.find(id_obj->name);
         if (alias_it != using_aliases_.end()) {
@@ -1658,6 +1747,17 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     patch_jump(else_jump);
     compile_expr(*ternary->else_expr);
     patch_jump(end_jump);
+    return;
+  }
+
+  if (const auto *null_coalesce = dynamic_cast<const ast::NullCoalesceExpr *>(&expr)) {
+    compile_expr(*null_coalesce->left);
+    emit(OpCode::Dup, null_coalesce->location);
+    emit(OpCode::IsNull, null_coalesce->location);
+    const std::size_t skip_fallback = emit_jump(OpCode::JmpFalse, null_coalesce->location);
+    emit(OpCode::Pop, null_coalesce->location);
+    compile_expr(*null_coalesce->right);
+    patch_jump(skip_fallback);
     return;
   }
 
