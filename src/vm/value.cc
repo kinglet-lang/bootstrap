@@ -117,6 +117,26 @@ double Value::as_double() const {
   return as_double_storage;
 }
 
+int exit_code_from_value(const Value &value) {
+  switch (value.type) {
+  case ValueType::Int: {
+    if (value.as_int < 0) return 255;
+    if (value.as_int > 255) return 255;
+    return static_cast<int>(value.as_int);
+  }
+  case ValueType::Bool:
+    return value.as_bool ? 1 : 0;
+  case ValueType::Double: {
+    auto n = static_cast<int64_t>(value.as_double_storage);
+    if (n < 0) return 255;
+    if (n > 255) return 255;
+    return static_cast<int>(n);
+  }
+  default:
+    return 0;
+  }
+}
+
 // ── Printing ───────────────────────────────────────────────────────────
 
 std::ostream &operator<<(std::ostream &out, const Value &value) {

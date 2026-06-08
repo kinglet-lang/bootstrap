@@ -4,6 +4,7 @@
 #include "lexer/scanner.h"
 #include "lexer/token.h"
 #include "parser/parser.h"
+#include "vm/value.h"
 #include "vm/vm.h"
 
 #include <filesystem>
@@ -206,7 +207,7 @@ int main(int argc, char **argv) {
       return 70;
     }
 
-    return 0;
+    return kinglet::exit_code_from_value(result.value);
   }
 
   std::string source;
@@ -455,5 +456,5 @@ int main(int argc, char **argv) {
     return 70;
   }
 
-  return 0;
+  return kinglet::exit_code_from_value(vm_result.value);
 }

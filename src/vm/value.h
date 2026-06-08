@@ -177,4 +177,7 @@ struct HeapMap final : HeapObj {
 
 std::ostream &operator<<(std::ostream &out, const Value &value);
 
+// Map main()'s return value to a process exit code (shell-visible 0–255).
+int exit_code_from_value(const Value &value);
+
 } // namespace kinglet

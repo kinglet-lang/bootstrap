@@ -1,4 +1,5 @@
 #include "vm/chunk.h"
+#include "vm/value.h"
 #include "vm/vm.h"
 
 #include <iostream>
@@ -33,5 +34,5 @@ int main(int argc, char **argv) {
     return 70;
   }
 
-  return 0;
+  return kinglet::exit_code_from_value(result.value);
 }
