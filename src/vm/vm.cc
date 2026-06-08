@@ -1380,6 +1380,12 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       }
       break;
     }
+    case OpCode::IsNull: {
+      if (stack_.empty()) return runtime_error("Stack underflow.");
+      Value value = pop();
+      push(Value::bool_value(value.type == ValueType::Null));
+      break;
+    }
     case OpCode::StringStartsWith: {
       Value prefix = pop();
       Value str = pop();

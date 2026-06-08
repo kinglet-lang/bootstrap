@@ -340,6 +340,8 @@ const char *opcode_name(OpCode op) {
     return "PopHandler";
   case OpCode::PropagateErr:
     return "PropagateErr";
+  case OpCode::IsNull:
+    return "IsNull";
   }
   return "Unknown";
 }

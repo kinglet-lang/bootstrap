@@ -89,6 +89,7 @@ enum class OpCode : uint8_t {
   PushHandler,
   PopHandler,
   PropagateErr,
+  IsNull,
 };
 
 struct Instruction {
