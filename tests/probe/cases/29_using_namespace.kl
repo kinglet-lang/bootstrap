@@ -1,0 +1,3 @@
+// EXPECT_OUT: ok
+using namespace io;
+int main() { out.line("ok"); return 0; }
