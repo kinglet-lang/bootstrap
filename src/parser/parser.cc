@@ -791,6 +791,22 @@ ast::ExprPtr Parser::pipeline() {
 
 ast::ExprPtr Parser::coalesce() {
   ast::ExprPtr expr = pipeline();
+  while (match(TokenType::QUESTION_COLON)) {
+    auto loc = location_of(previous());
+    std::string err_binding;
+    if (check(TokenType::LET) && current_ + 1 < tokens_.size() &&
+        tokens_[current_ + 1].type == TokenType::IDENTIFIER &&
+        current_ + 2 < tokens_.size() &&
+        tokens_[current_ + 2].type == TokenType::FAT_ARROW) {
+      advance(); // consume `let`
+      const Token &name_tok = consume(TokenType::IDENTIFIER, "Expected error binding name.");
+      err_binding = token_text(name_tok);
+      consume(TokenType::FAT_ARROW, "Expected '=>' after error binding name.");
+    }
+    ast::ExprPtr rhs = coalesce();
+    expr = std::make_unique<ast::NullCoalesceExpr>(loc, std::move(expr), std::move(err_binding),
+                                                   std::move(rhs));
+  }
   if (match(TokenType::QUESTION_QUESTION)) {
     auto loc = location_of(previous());
     std::string err_binding;

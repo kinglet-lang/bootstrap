@@ -199,10 +199,20 @@ struct TernaryExpr final : Expr {
   ExprPtr else_expr;
 };
 
-// `e ?: f` (bare) or `e ?: let err => f` (with payload binding).
+// `e ?? f` (bare) or `e ?? let err => f` (Result / cast error propagation).
 // `err_binding` is empty when the bare form is used.
 struct CoalesceExpr final : Expr {
   CoalesceExpr(SourceLocation location, ExprPtr left, std::string err_binding, ExprPtr right);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr left;
+  std::string err_binding;
+  ExprPtr right;
+};
+
+// `e ?: f` (bare) or `e ?: let e => f` — null Elvis, aligned with selfhost.
+struct NullCoalesceExpr final : Expr {
+  NullCoalesceExpr(SourceLocation location, ExprPtr left, std::string err_binding, ExprPtr right);
   void print(std::ostream &out, int indent = 0) const override;
 
   ExprPtr left;
