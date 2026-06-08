@@ -1,5 +1,7 @@
 #include "vm/vm.h"
 
+#include "vm/cow.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
@@ -234,8 +236,26 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
             static_cast<std::size_t>(instruction.operand) + 1,
             Value::null_value());
       }
-      frame.locals[static_cast<std::size_t>(instruction.operand)] =
-          stack_.back();
+      {
+        const Value &src = stack_.back();
+        const std::size_t slot =
+            static_cast<std::size_t>(instruction.operand);
+        bool shared_with_other_local = false;
+        if (src.heap) {
+          for (std::size_t i = 0; i < frame.locals.size(); ++i) {
+            if (i == slot) continue;
+            if (frame.locals[i].heap.ptr == src.heap.ptr) {
+              shared_with_other_local = true;
+              break;
+            }
+          }
+        }
+        if (shared_with_other_local) {
+          frame.locals[slot] = value_deep_clone(src);
+        } else {
+          frame.locals[slot] = src;
+        }
+      }
       break;
     case OpCode::Pop:
       if (stack_.empty()) return runtime_error("Stack underflow.");
@@ -1155,9 +1175,10 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       if (index.type != ValueType::Int)
         return runtime_error("insert() index must be an integer.");
       auto idx = index.as_int;
-      auto &elems = as_array(array)->elements;
-      if (idx < 0 || static_cast<std::size_t>(idx) > elems.size())
+      if (idx < 0 || static_cast<std::size_t>(idx) >
+                         as_array(array)->elements.size())
         return runtime_error("insert() index out of bounds.");
+      auto &elems = as_array(array)->elements;
       if (value.type == ValueType::Array && value.heap) {
         elems.insert(elems.begin() + idx,
                      as_array(value)->elements.begin(),

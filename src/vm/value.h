@@ -134,7 +134,7 @@ struct Value {
 struct HeapString final : HeapObj {
   std::string value;
   explicit HeapString(std::string s) : value(std::move(s)) {
-    tag = ValueType::String; refcount = 1;
+    tag = ValueType::String;
   }
 };
 
@@ -143,14 +143,14 @@ struct HeapStruct final : HeapObj {
   std::vector<Value> fields;
   HeapStruct(int ti, std::vector<Value> f)
       : type_index(ti), fields(std::move(f)) {
-    tag = ValueType::Struct; refcount = 1;
+    tag = ValueType::Struct;
   }
 };
 
 struct HeapArray final : HeapObj {
   std::vector<Value> elements;
   explicit HeapArray(std::vector<Value> e) : elements(std::move(e)) {
-    tag = ValueType::Array; refcount = 1;
+    tag = ValueType::Array;
   }
 };
 
@@ -165,14 +165,14 @@ struct HeapEnum final : HeapObj {
   std::vector<Value> payload;
   HeapEnum(int ti, int vi, std::vector<Value> p)
       : type_index(ti), variant_index(vi), payload(std::move(p)) {
-    tag = ValueType::Enum; refcount = 1;
+    tag = ValueType::Enum;
   }
 };
 
 struct HeapMap final : HeapObj {
   std::vector<std::string> order;
   std::unordered_map<std::string, MapEntry> entries;
-  HeapMap() { tag = ValueType::Map; refcount = 1; }
+  HeapMap() { tag = ValueType::Map; }
 };
 
 std::ostream &operator<<(std::ostream &out, const Value &value);
