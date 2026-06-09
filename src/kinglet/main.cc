@@ -1,5 +1,8 @@
 #include "checker/type_checker.h"
 #include "compiler/compiler.h"
+#ifdef KINGLET_HAVE_LLVM
+#include "codegen/llvm/kir_to_llvm.h"
+#endif
 #include "ir/kir.h"
 #include "module/module_loader.h"
 #include "lexer/scanner.h"
@@ -27,12 +30,26 @@ enum class Mode {
   Check,
   Bytecode,
   Ir,
+  Native,
   SaveBytecode,
   Repl,
 };
 
+#ifdef KINGLET_HAVE_LLVM
+std::string resolve_rt_lib(const char *argv0) {
+  const std::filesystem::path dir = std::filesystem::absolute(argv0).parent_path();
+  for (const char *rel : { "libkinglet_rt.a", "obj/runtime/libkinglet_rt.a" }) {
+    const std::filesystem::path candidate = dir / rel;
+    if (std::filesystem::exists(candidate)) {
+      return candidate.string();
+    }
+  }
+  return (dir / "obj/runtime/libkinglet_rt.a").string();
+}
+#endif
+
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --ir | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles and runs main().\n"
@@ -107,6 +124,7 @@ void print_token(const kinglet::Token &token) {
 int main(int argc, char **argv) {
   std::string input_path;
   std::string save_bytecode_path;
+  std::string native_out_path;
   std::string run_bytecode_path;
   Mode mode = Mode::Run;
   bool strip_debug = false;
@@ -144,6 +162,17 @@ int main(int argc, char **argv) {
     }
     if (arg == "--ir") {
       mode = Mode::Ir;
+      continue;
+    }
+    if (arg == "--native") {
+      mode = Mode::Native;
+      if (i + 1 < argc) {
+        ++i;
+        native_out_path = argv[i];
+      } else {
+        std::cerr << "kinglet: --native requires an output path\n";
+        return 64;
+      }
       continue;
     }
     if (arg == "--check") {
@@ -450,6 +479,21 @@ int main(int argc, char **argv) {
   if (mode == Mode::Ir) {
     std::cout << dump_kir_module(compile_result.kir);
     return 0;
+  }
+
+  if (mode == Mode::Native) {
+#ifndef KINGLET_HAVE_LLVM
+    std::cerr << "kinglet: native backend not built (rebuild with enable_llvm=true)\n";
+    return 78;
+#else
+    kinglet::NativeCompileResult native = kinglet::KirToLlvm::compile_executable(
+        compile_result.kir, native_out_path, resolve_rt_lib(argv[0]));
+    if (!native.ok) {
+      std::cerr << "kinglet: native compile failed: " << native.error << "\n";
+      return 78;
+    }
+    return 0;
+#endif
   }
 
   if (mode == Mode::SaveBytecode) {

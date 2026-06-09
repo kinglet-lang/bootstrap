@@ -38,6 +38,9 @@ def main() -> int:
             continue
         if flag == "-Wl,-headerpad_max_install_names":
             continue
+        if what == "libs" and flag.startswith("-l"):
+            print(flag[2:])
+            continue
         print(flag)
     return 0
 

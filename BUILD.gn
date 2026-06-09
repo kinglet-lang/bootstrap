@@ -27,6 +27,14 @@ executable("kinglet") {
     "//src/vm",
   ]
 
+  if (enable_llvm) {
+    deps += [
+      "//runtime:kinglet_rt",
+      "//src/codegen/llvm:llvm_codegen",
+    ]
+    configs += [ "//src/codegen/llvm:llvm" ]
+  }
+
   include_dirs = [
     "//src",
   ]
