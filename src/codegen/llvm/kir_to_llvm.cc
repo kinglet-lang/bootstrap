@@ -9,10 +9,10 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/MC/TargetRegistry.h>
+#include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Support/CodeGen.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/TargetParser/Host.h>
 
@@ -20,68 +20,96 @@
 #include <filesystem>
 #include <sstream>
 #include <string>
+#include <map>
+#include <set>
+#include <unordered_map>
 #include <vector>
 
 namespace kinglet {
 
 namespace {
 
-const KirFunction *find_main(const KirModule &module) {
-  for (const KirFunction &fn : module.functions) {
-    if (fn.name == "main") {
-      return &fn;
-    }
+std::string fn_symbol(const std::string &name) {
+  if (name == "main") {
+    return "kinglet_user_main";
   }
-  return nullptr;
+  return "kinglet_fn_" + name;
 }
 
-bool lower_main(const KirFunction &fn, llvm::Module *llvm_module, std::string *error) {
-  if (fn.blocks.size() != 1) {
-    *error = "native L0 expects a single basic block in main";
-    return false;
-  }
-
-  llvm::LLVMContext &context = llvm_module->getContext();
-  llvm::IRBuilder<> builder(context);
-  auto *fn_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), false);
-  auto *func =
-      llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage, "kinglet_main", llvm_module);
-  auto *entry = llvm::BasicBlock::Create(context, "entry", func);
-  builder.SetInsertPoint(entry);
-
-  const KirBasicBlock &bb = fn.blocks[0];
-  std::vector<llvm::Value *> temps;
-  bool saw_ret = false;
-
-  for (const KirInstr &instr : bb.instrs) {
-    switch (instr.op) {
-    case KirOpcode::ConstInt:
-      temps.push_back(llvm::ConstantInt::get(context, llvm::APInt(32, instr.operands[0], true)));
-      break;
-    case KirOpcode::Ret:
-      saw_ret = true;
-      if (instr.operands.empty()) {
-        builder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(context), 0));
-      } else {
-        const int idx = instr.operands[0];
-        if (idx < 0 || static_cast<std::size_t>(idx) >= temps.size()) {
-          *error = "ret references missing value";
-          return false;
-        }
-        builder.CreateRet(temps[static_cast<std::size_t>(idx)]);
-      }
-      break;
-    default:
-      *error = "unsupported KIR opcode in native L0";
-      return false;
+std::vector<const KirInstr *> linear_instrs(const KirFunction &fn) {
+  std::vector<const KirInstr *> out;
+  for (const KirBasicBlock &bb : fn.blocks) {
+    for (const KirInstr &instr : bb.instrs) {
+      out.push_back(&instr);
     }
   }
+  return out;
+}
 
-  if (!saw_ret) {
-    *error = "main missing ret";
-    return false;
+int max_local_slot(const KirFunction &fn) {
+  int max_slot = fn.param_count - 1;
+  for (const KirBasicBlock &bb : fn.blocks) {
+    for (const KirInstr &instr : bb.instrs) {
+      if (instr.op == KirOpcode::LoadLocal || instr.op == KirOpcode::StoreLocal) {
+        if (!instr.operands.empty()) {
+          max_slot = std::max(max_slot, instr.operands[0]);
+        }
+      }
+    }
   }
-  return true;
+  return std::max(max_slot, 0);
+}
+
+llvm::Value *pop_value(std::vector<llvm::Value *> *stack, std::string *error) {
+  if (stack->empty()) {
+    *error = "native lowering stack underflow";
+    return nullptr;
+  }
+  llvm::Value *value = stack->back();
+  stack->pop_back();
+  return value;
+}
+
+llvm::Value *bool_to_i32(llvm::IRBuilder<> &builder, llvm::Value *cond) {
+  return builder.CreateZExt(cond, builder.getInt32Ty());
+}
+
+llvm::Value *binop(llvm::IRBuilder<> &builder, KirOpcode op, llvm::Value *left,
+                   llvm::Value *right) {
+  switch (op) {
+  case KirOpcode::IAdd:
+    return builder.CreateAdd(left, right);
+  case KirOpcode::ISub:
+    return builder.CreateSub(left, right);
+  case KirOpcode::IMul:
+    return builder.CreateMul(left, right);
+  case KirOpcode::IDiv:
+    return builder.CreateSDiv(left, right);
+  case KirOpcode::IMod:
+    return builder.CreateSRem(left, right);
+  default:
+    return nullptr;
+  }
+}
+
+llvm::Value *icmp(llvm::IRBuilder<> &builder, KirOpcode op, llvm::Value *left,
+                  llvm::Value *right) {
+  switch (op) {
+  case KirOpcode::ICmpEq:
+    return builder.CreateICmpEQ(left, right);
+  case KirOpcode::ICmpNeq:
+    return builder.CreateICmpNE(left, right);
+  case KirOpcode::ICmpLt:
+    return builder.CreateICmpSLT(left, right);
+  case KirOpcode::ICmpGt:
+    return builder.CreateICmpSGT(left, right);
+  case KirOpcode::ICmpLe:
+    return builder.CreateICmpSLE(left, right);
+  case KirOpcode::ICmpGe:
+    return builder.CreateICmpSGE(left, right);
+  default:
+    return nullptr;
+  }
 }
 
 bool emit_object(llvm::Module &module, const std::string &obj_path, std::string *error) {
@@ -101,9 +129,8 @@ bool emit_object(llvm::Module &module, const std::string &obj_path, std::string 
 
   llvm::TargetOptions options;
   std::string cpu = llvm::sys::getHostCPUName().str();
-  std::string features;
-  llvm::TargetMachine *machine = target->createTargetMachine(
-      triple, cpu, features, options, llvm::Reloc::Model::PIC_);
+  llvm::TargetMachine *machine =
+      target->createTargetMachine(triple, cpu, "", options, llvm::Reloc::Model::PIC_);
   if (machine == nullptr) {
     *error = "LLVM target machine creation failed";
     return false;
@@ -143,21 +170,363 @@ bool link_executable(const std::string &obj_path, const std::string &rt_lib_path
   return true;
 }
 
+class FunctionLowerer {
+public:
+  FunctionLowerer(llvm::LLVMContext *context, const KirModule &kir_module,
+                  llvm::Function *llvm_fn)
+      : context_(context), kir_module_(kir_module), llvm_fn_(llvm_fn) {}
+
+  bool lower(const KirFunction &fn, std::string *error) {
+    llvm::Type *i32 = llvm::Type::getInt32Ty(*context_);
+    linear_ = linear_instrs(fn);
+    if (linear_.empty()) {
+      llvm::BasicBlock *entry = llvm::BasicBlock::Create(*context_, "entry", llvm_fn_);
+      llvm::IRBuilder<> ret_builder(entry);
+      ret_builder.CreateRet(llvm::ConstantInt::get(i32, 0));
+      return true;
+    }
+
+    std::set<std::size_t> leaders;
+    leaders.insert(0);
+    for (std::size_t i = 0; i < linear_.size(); ++i) {
+      const KirInstr *instr = linear_[i];
+      if (instr->op == KirOpcode::Br || instr->op == KirOpcode::CondBr) {
+        if (instr->operands.empty()) {
+          *error = "jump instruction missing operand";
+          return false;
+        }
+        const int rel = instr->operands[0];
+        const int target = static_cast<int>(i) + 1 + rel;
+        if (target < 0 || static_cast<std::size_t>(target) > linear_.size()) {
+          *error = "jump target out of range";
+          return false;
+        }
+        leaders.insert(static_cast<std::size_t>(target));
+        if (instr->op == KirOpcode::CondBr) {
+          leaders.insert(i + 1);
+        }
+      }
+    }
+
+    llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(*context_, "entry", llvm_fn_);
+
+    std::vector<llvm::BasicBlock *> blocks;
+    blocks.reserve(leaders.size());
+    int block_id = 0;
+    for (std::size_t start : leaders) {
+      (void)start;
+      blocks.push_back(
+          llvm::BasicBlock::Create(*context_, "bb" + std::to_string(block_id++), llvm_fn_));
+    }
+
+    std::map<std::size_t, llvm::BasicBlock *> block_for_leader;
+    {
+      int idx = 0;
+      for (std::size_t start : leaders) {
+        block_for_leader[start] = blocks[static_cast<std::size_t>(idx++)];
+      }
+    }
+
+    auto block_index = [&](std::size_t pc) -> llvm::BasicBlock * {
+      auto it = block_for_leader.upper_bound(pc);
+      if (it == block_for_leader.begin()) {
+        return blocks.front();
+      }
+      --it;
+      return it->second;
+    };
+
+    llvm::BasicBlock *code_bb = block_for_leader[*leaders.begin()];
+    llvm::IRBuilder<> alloca_builder(entry_bb);
+    const int locals = max_local_slot(fn) + 1;
+    local_slots_.resize(static_cast<std::size_t>(locals));
+    for (int i = 0; i < locals; ++i) {
+      local_slots_[static_cast<std::size_t>(i)] =
+          alloca_builder.CreateAlloca(i32, nullptr, "local" + std::to_string(i));
+    }
+    for (int i = 0; i < fn.param_count; ++i) {
+      alloca_builder.CreateStore(llvm_fn_->getArg(static_cast<unsigned>(i)),
+                                 local_slots_[static_cast<std::size_t>(i)]);
+    }
+    alloca_builder.CreateBr(code_bb);
+
+    std::vector<llvm::Value *> temps(linear_.size(), nullptr);
+    std::vector<llvm::Value *> stack;
+
+    for (std::size_t i = 0; i < linear_.size(); ++i) {
+      const KirInstr *instr = linear_[i];
+      llvm::BasicBlock *bb = block_index(i);
+      llvm::IRBuilder<> builder(bb);
+      auto push = [&](llvm::Value *v) { stack.push_back(v); };
+
+      auto pop_binop = [&](KirOpcode op) -> bool {
+        llvm::Value *rhs = pop_value(&stack, error);
+        llvm::Value *lhs = pop_value(&stack, error);
+        if (lhs == nullptr || rhs == nullptr) {
+          return false;
+        }
+        llvm::Value *result = binop(builder, op, lhs, rhs);
+        if (result == nullptr) {
+          *error = "unsupported integer binop";
+          return false;
+        }
+        push(result);
+        temps[i] = result;
+        return true;
+      };
+
+      auto pop_icmp = [&](KirOpcode op) -> bool {
+        llvm::Value *rhs = pop_value(&stack, error);
+        llvm::Value *lhs = pop_value(&stack, error);
+        if (lhs == nullptr || rhs == nullptr) {
+          return false;
+        }
+        llvm::Value *result = bool_to_i32(builder, icmp(builder, op, lhs, rhs));
+        push(result);
+        temps[i] = result;
+        return true;
+      };
+
+      switch (instr->op) {
+      case KirOpcode::ConstInt:
+        push(llvm::ConstantInt::get(i32, instr->operands[0]));
+        temps[i] = stack.back();
+        break;
+      case KirOpcode::ConstBool:
+        push(llvm::ConstantInt::get(i32, instr->operands.empty() ? 0 : instr->operands[0]));
+        temps[i] = stack.back();
+        break;
+      case KirOpcode::ConstNull:
+        push(llvm::ConstantInt::get(i32, 0));
+        temps[i] = stack.back();
+        break;
+      case KirOpcode::ConstFn: {
+        const int fn_index = instr->operands[0];
+        if (fn_index < 0 || static_cast<std::size_t>(fn_index) >= kir_module_.functions.size()) {
+          *error = "const_fn index out of range";
+          return false;
+        }
+        push(llvm::ConstantInt::get(i32, fn_index));
+        temps[i] = stack.back();
+        break;
+      }
+      case KirOpcode::LoadLocal: {
+        const int slot = instr->operands[0];
+        if (slot < 0 || static_cast<std::size_t>(slot) >= local_slots_.size()) {
+          *error = "load_local slot out of range";
+          return false;
+        }
+        llvm::Value *loaded = builder.CreateLoad(i32, local_slots_[static_cast<std::size_t>(slot)]);
+        push(loaded);
+        temps[i] = loaded;
+        break;
+      }
+      case KirOpcode::StoreLocal: {
+        const int slot = instr->operands[0];
+        if (stack.empty()) {
+          *error = "store_local stack underflow";
+          return false;
+        }
+        llvm::Value *value = stack.back();
+        if (slot < 0 || static_cast<std::size_t>(slot) >= local_slots_.size()) {
+          *error = "store_local slot out of range";
+          return false;
+        }
+        builder.CreateStore(value, local_slots_[static_cast<std::size_t>(slot)]);
+        break;
+      }
+      case KirOpcode::Pop:
+        if (pop_value(&stack, error) == nullptr) {
+          return false;
+        }
+        break;
+      case KirOpcode::IAdd:
+      case KirOpcode::ISub:
+      case KirOpcode::IMul:
+      case KirOpcode::IDiv:
+      case KirOpcode::IMod:
+        if (instr->operands.size() >= 2) {
+          const int lhs_i = instr->operands[0];
+          const int rhs_i = instr->operands[1];
+          if (lhs_i < 0 || static_cast<std::size_t>(lhs_i) >= i || rhs_i < 0 ||
+              static_cast<std::size_t>(rhs_i) >= i) {
+            *error = "indexed binop operand out of range";
+            return false;
+          }
+          llvm::Value *lhs = temps[static_cast<std::size_t>(lhs_i)];
+          llvm::Value *rhs = temps[static_cast<std::size_t>(rhs_i)];
+          llvm::Value *result = binop(builder, instr->op, lhs, rhs);
+          if (result == nullptr) {
+            *error = "unsupported indexed binop";
+            return false;
+          }
+          push(result);
+          temps[i] = result;
+        } else if (!pop_binop(instr->op)) {
+          return false;
+        }
+        break;
+      case KirOpcode::ICmpEq:
+      case KirOpcode::ICmpNeq:
+      case KirOpcode::ICmpLt:
+      case KirOpcode::ICmpGt:
+      case KirOpcode::ICmpLe:
+      case KirOpcode::ICmpGe:
+        if (!pop_icmp(instr->op)) {
+          return false;
+        }
+        break;
+      case KirOpcode::Call: {
+        const int argc = instr->operands[0];
+        if (argc < 0) {
+          *error = "call arg count invalid";
+          return false;
+        }
+        llvm::Value *callee_tag = pop_value(&stack, error);
+        if (callee_tag == nullptr) {
+          return false;
+        }
+        std::vector<llvm::Value *> args(static_cast<std::size_t>(argc));
+        for (int arg = argc - 1; arg >= 0; --arg) {
+          args[static_cast<std::size_t>(arg)] = pop_value(&stack, error);
+          if (args[static_cast<std::size_t>(arg)] == nullptr) {
+            return false;
+          }
+        }
+        llvm::ConstantInt *callee_const = llvm::dyn_cast<llvm::ConstantInt>(callee_tag);
+        if (callee_const == nullptr) {
+          *error = "call callee is not a known function constant";
+          return false;
+        }
+        const int fn_index = static_cast<int>(callee_const->getSExtValue());
+        if (fn_index < 0 || static_cast<std::size_t>(fn_index) >= kir_module_.functions.size()) {
+          *error = "call function index out of range";
+          return false;
+        }
+        const std::string &target_name = kir_module_.functions[static_cast<std::size_t>(fn_index)].name;
+        llvm::Function *target = llvm_fn_->getParent()->getFunction(fn_symbol(target_name));
+        if (target == nullptr) {
+          *error = "call target not lowered";
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(target, args);
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::Ret: {
+        if (bb->getTerminator() != nullptr) {
+          break;
+        }
+        llvm::Value *retv = llvm::ConstantInt::get(i32, 0);
+        if (!instr->operands.empty()) {
+          const int idx = instr->operands[0];
+          if (idx >= 0 && static_cast<std::size_t>(idx) < i) {
+            retv = temps[static_cast<std::size_t>(idx)];
+          }
+        } else if (!stack.empty()) {
+          retv = stack.back();
+        }
+        builder.CreateRet(retv);
+        break;
+      }
+      case KirOpcode::Br: {
+        if (bb->getTerminator() != nullptr) {
+          break;
+        }
+        const int rel = instr->operands[0];
+        const std::size_t target = i + 1 + static_cast<std::size_t>(rel);
+        builder.CreateBr(block_index(target));
+        break;
+      }
+      case KirOpcode::CondBr: {
+        if (bb->getTerminator() != nullptr) {
+          break;
+        }
+        llvm::Value *cond_i32 = pop_value(&stack, error);
+        if (cond_i32 == nullptr) {
+          return false;
+        }
+        llvm::Value *cond = builder.CreateICmpNE(cond_i32, llvm::ConstantInt::get(i32, 0));
+        const int rel = instr->operands[0];
+        const std::size_t false_target = i + 1 + static_cast<std::size_t>(rel);
+        const std::size_t true_target = i + 1;
+        builder.CreateCondBr(cond, block_index(true_target), block_index(false_target));
+        break;
+      }
+      default:
+        *error = "unsupported KIR opcode in native lowering";
+        return false;
+      }
+    }
+
+    std::vector<std::size_t> leader_list(leaders.begin(), leaders.end());
+    for (std::size_t li = 0; li + 1 < leader_list.size(); ++li) {
+      llvm::BasicBlock *bb = block_for_leader[leader_list[li]];
+      if (bb->getTerminator() == nullptr) {
+        llvm::IRBuilder<> builder(bb);
+        builder.CreateBr(block_for_leader[leader_list[li + 1]]);
+      }
+    }
+    for (llvm::BasicBlock *bb : blocks) {
+      if (bb->getTerminator() == nullptr) {
+        llvm::IRBuilder<> builder(bb);
+        builder.CreateRet(llvm::ConstantInt::get(i32, 0));
+      }
+    }
+    return true;
+  }
+
+private:
+  llvm::LLVMContext *context_;
+  const KirModule &kir_module_;
+  llvm::Function *llvm_fn_;
+  std::vector<llvm::AllocaInst *> local_slots_;
+  std::vector<const KirInstr *> linear_;
+};
+
+bool lower_module(llvm::Module *module, const KirModule &kir_module, std::string *error) {
+  llvm::LLVMContext &context = module->getContext();
+  llvm::Type *i32 = llvm::Type::getInt32Ty(context);
+
+  for (const KirFunction &fn : kir_module.functions) {
+    std::vector<llvm::Type *> param_types(static_cast<std::size_t>(fn.param_count), i32);
+    auto *fn_type = llvm::FunctionType::get(i32, param_types, false);
+    llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage, fn_symbol(fn.name), module);
+  }
+
+  for (const KirFunction &fn : kir_module.functions) {
+    llvm::Function *llvm_fn = module->getFunction(fn_symbol(fn.name));
+    FunctionLowerer lowerer(&context, kir_module, llvm_fn);
+    if (!lowerer.lower(fn, error)) {
+      return false;
+    }
+  }
+
+  auto *entry_type = llvm::FunctionType::get(i32, false);
+  auto *entry = llvm::Function::Create(entry_type, llvm::Function::ExternalLinkage, "kinglet_main",
+                                       module);
+  llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(context, "entry", entry);
+  llvm::IRBuilder<> builder(entry_bb);
+  llvm::Function *user_main = module->getFunction("kinglet_user_main");
+  if (user_main == nullptr) {
+    *error = "KIR module missing main";
+    return false;
+  }
+  builder.CreateRet(builder.CreateCall(user_main, {}));
+  return true;
+}
+
 } // namespace
 
 NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
                                                   const std::string &out_path,
                                                   const std::string &rt_lib_path) {
-  const KirFunction *main_fn = find_main(module);
-  if (main_fn == nullptr) {
-    return {.ok = false, .error = "KIR module missing main"};
-  }
-
   llvm::LLVMContext context;
   llvm::Module llvm_module("kinglet", context);
 
   std::string error;
-  if (!lower_main(*main_fn, &llvm_module, &error)) {
+  if (!lower_module(&llvm_module, module, &error)) {
     return {.ok = false, .error = error};
   }
 
