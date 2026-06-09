@@ -6,7 +6,7 @@
   "publisher": "kinglet",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sentomk/kinglet"
+    "url": "https://github.com/kinglet-lang/bootstrap"
   },
   "license": "MIT",
   "icon": "icons/logo.png",

@@ -1,6 +1,6 @@
 # Kinglet Language Support
 
-Language support for [Kinglet](https://github.com/sentomk/kinglet), a statically-typed, compiled programming language.
+Language support for [Kinglet](https://github.com/kinglet-lang/kinglet), a statically-typed, compiled programming language.
 
 ## Features
 

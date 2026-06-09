@@ -1,4 +1,4 @@
-> **Bootstrap (Ref)** — C++ reference compiler and VM host for Kinglet: lexer, parser, checker, bytecode VM, KIR, and optional LLVM native (`enable_llvm=true`). Language design, ADRs, self-host tests, and `kinglet build` live in the main **kinglet** repository; this repo is the bootstrap stage used until v0 native execution ships.
+> **Bootstrap (Ref)** — C++ reference compiler and VM host for Kinglet: lexer, parser, checker, bytecode VM, KIR, and optional LLVM native (`enable_llvm=true`). Language design, ADRs, self-host tests, and `kinglet build` live in [kinglet-lang/kinglet](https://github.com/kinglet-lang/kinglet); this repo is the bootstrap stage used until v0 native execution ships.
 
 <p align="center">
   <picture>
@@ -11,9 +11,9 @@
 <p align="center">A bytecode-compiled language exploring the C++ proposals that deserved a second life.</p>
 
 <p align="center">
-  <a href="https://github.com/sentomk/kinglet/releases"><img src="https://img.shields.io/github/v/tag/sentomk/kinglet?label=version&sort=semver" alt="Version"></a>
-  <a href="https://github.com/sentomk/kinglet/actions"><img src="https://img.shields.io/github/actions/workflow/status/sentomk/kinglet/ci.yml?branch=main" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/sentomk/kinglet" alt="License"></a>
+  <a href="https://github.com/kinglet-lang/bootstrap/releases"><img src="https://img.shields.io/github/v/tag/kinglet-lang/bootstrap?label=version&sort=semver" alt="Version"></a>
+  <a href="https://github.com/kinglet-lang/bootstrap/actions"><img src="https://img.shields.io/github/actions/workflow/status/kinglet-lang/bootstrap/ci.yml?branch=main" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/kinglet-lang/bootstrap" alt="License"></a>
 </p>
 
 > [!NOTE]
@@ -21,7 +21,7 @@
 
 ## Install
 
-Download the latest release for your platform from [Releases](https://github.com/sentomk/kinglet/releases):
+Download the latest release for your platform from [Releases](https://github.com/kinglet-lang/bootstrap/releases):
 
 | Platform | Archive |
 |----------|---------|
