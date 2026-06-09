@@ -1,3 +1,5 @@
+> **Bootstrap (Ref)** — C++ reference compiler and VM host for Kinglet: lexer, parser, checker, bytecode VM, KIR, and optional LLVM native (`enable_llvm=true`). Language design, ADRs, self-host tests, and `kinglet build` live in the main **kinglet** repository; this repo is the bootstrap stage used until v0 native execution ships.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/brand-dark.svg">
