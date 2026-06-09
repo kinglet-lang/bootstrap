@@ -23,4 +23,5 @@ bash tests/differential/run_matrix.sh   # bs-only-fail=0, behavior identical
 bash tests/differential/run.sh
 ```
 
-`??` (Result propagation) remains supported alongside selfhost `?:` (null Elvis).
+`?:` (null / CastError Elvis) is the sole coalesce operator, aligned with selfhost.
+`??` is rejected at parse time.

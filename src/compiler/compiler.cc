@@ -1793,32 +1793,19 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
   if (const auto *null_coalesce = dynamic_cast<const ast::NullCoalesceExpr *>(&expr)) {
     compile_expr(*null_coalesce->left);
-    emit(OpCode::Dup, null_coalesce->location);
-    emit(OpCode::IsNull, null_coalesce->location);
-    const std::size_t skip_fallback = emit_jump(OpCode::JmpFalse, null_coalesce->location);
-    emit(OpCode::Pop, null_coalesce->location);
-    compile_expr(*null_coalesce->right);
-    patch_jump(skip_fallback);
-    return;
-  }
-
-  if (const auto *coalesce = dynamic_cast<const ast::CoalesceExpr *>(&expr)) {
-    compile_expr(*coalesce->left);
-    // Peek-and-branch on null / CastError variant. Stack is unchanged on
-    // both arms: success arm keeps the original LHS; fallback arm sees the
-    // error value, which we either Pop (bare form) or StoreLocal into the
-    // user's `let err` binding (bound form).
-    const std::size_t fallback_jump = emit_jump(OpCode::JmpIfErr, coalesce->location);
-    const std::size_t end_jump = emit_jump(OpCode::Jmp, coalesce->location);
+    // Peek-and-branch on null / CastError. Success arm keeps the original LHS;
+    // fallback arm sees the error value (Pop for bare ?:, or bind with let err =>).
+    const std::size_t fallback_jump = emit_jump(OpCode::JmpIfErr, null_coalesce->location);
+    const std::size_t end_jump = emit_jump(OpCode::Jmp, null_coalesce->location);
     patch_jump(fallback_jump);
-    if (coalesce->err_binding.empty()) {
-      emit(OpCode::Pop, coalesce->location);
-      compile_expr(*coalesce->right);
+    if (null_coalesce->err_binding.empty()) {
+      emit(OpCode::Pop, null_coalesce->location);
+      compile_expr(*null_coalesce->right);
     } else {
       const uint32_t err_slot = static_cast<uint32_t>(locals_.size());
-      locals_.push_back(Local{.name = coalesce->err_binding, .is_mutable = false});
-      emit_operand(OpCode::StoreLocal, err_slot, coalesce->location);
-      compile_expr(*coalesce->right);
+      locals_.push_back(Local{.name = null_coalesce->err_binding, .is_mutable = false});
+      emit_operand(OpCode::StoreLocal, err_slot, null_coalesce->location);
+      compile_expr(*null_coalesce->right);
       locals_.pop_back();
     }
     patch_jump(end_jump);

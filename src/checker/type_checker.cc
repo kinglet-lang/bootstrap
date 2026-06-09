@@ -2209,37 +2209,32 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
   }
 
   if (const auto *null_coalesce = dynamic_cast<const ast::NullCoalesceExpr *>(&expr)) {
-    (void)check_expr(*null_coalesce->left);
-    return check_expr(*null_coalesce->right);
-  }
-
-  if (const auto *coalesce = dynamic_cast<const ast::CoalesceExpr *>(&expr)) {
-    Type left_type = check_expr(*coalesce->left);
-    const bool has_binding = !coalesce->err_binding.empty();
+    Type left_type = check_expr(*null_coalesce->left);
+    const bool has_binding = !null_coalesce->err_binding.empty();
     if (has_binding) {
-      const auto *cast_lhs = dynamic_cast<const ast::CastExpr *>(coalesce->left.get());
+      const auto *cast_lhs = dynamic_cast<const ast::CastExpr *>(null_coalesce->left.get());
       if (cast_lhs == nullptr) {
-        error_at(coalesce->location,
-                 "?? let-binding requires a fallible cast on the left-hand side.");
+        error_at(null_coalesce->location,
+                 "?: let-binding requires a fallible cast on the left-hand side.");
       } else {
         push_scope();
         auto err_it = type_registry_.find("CastError");
         Type err_ty = (err_it != type_registry_.end()) ? err_it->second : null_type();
-        declare_var(coalesce->err_binding, err_ty, false, coalesce->location);
-        Type right_type = check_expr(*coalesce->right);
+        declare_var(null_coalesce->err_binding, err_ty, false, null_coalesce->location);
+        Type right_type = check_expr(*null_coalesce->right);
         pop_scope();
         if (!right_type.is_compatible_with(left_type)) {
-          error_at(coalesce->right->location,
-                   "?? fallback type " + type_to_string(right_type) +
+          error_at(null_coalesce->right->location,
+                   "?: fallback type " + type_to_string(right_type) +
                        " does not match left-hand type " + type_to_string(left_type) + ".");
         }
         return left_type;
       }
     }
-    Type right_type = check_expr(*coalesce->right);
+    Type right_type = check_expr(*null_coalesce->right);
     if (!right_type.is_compatible_with(left_type)) {
-      error_at(coalesce->right->location,
-               "?? fallback type " + type_to_string(right_type) +
+      error_at(null_coalesce->right->location,
+               "?: fallback type " + type_to_string(right_type) +
                    " does not match left-hand type " + type_to_string(left_type) + ".");
     }
     return left_type;

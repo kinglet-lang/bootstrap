@@ -27,7 +27,7 @@
 - [x] Explicit binding with `let` in match patterns
 - [x] Structured binding patterns for arrays (`[a, b, ...rest] = arr`)
 - [x] Exhaustiveness checking for enum match (warning on missing variants)
-- [x] Error propagation `try` operator + null coalescing `??` operator
+- [x] Error propagation `try` operator + null coalescing `?:` operator
 - [ ] Error propagation `?` postfix operator (requires Result/Optional type)
 - [ ] Zero-overhead optional (P2723): `int? x = null;` with niche optimization
 - [ ] `[[nodiscard]]` for functions (P1029): warn on unused return values
