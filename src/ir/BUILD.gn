@@ -1,0 +1,10 @@
+static_library("ir") {
+  sources = [
+    "kir.cc",
+    "kir.h",
+  ]
+
+  include_dirs = [
+    "//src",
+  ]
+}

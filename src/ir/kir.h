@@ -1,0 +1,59 @@
+#pragma once
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace kinglet {
+
+enum class KirOpcode {
+  ConstInt,
+  ConstFloat,
+  ConstBool,
+  ConstNull,
+  ConstString,
+  LoadLocal,
+  StoreLocal,
+  Pop,
+  IAdd,
+  ISub,
+  IMul,
+  IDiv,
+  IMod,
+  Call,
+  Ret,
+  Br,
+  CondBr,
+  Switch,
+  Unreachable,
+  Nop,
+};
+
+struct KirInstr {
+  KirOpcode op = KirOpcode::Nop;
+  std::vector<int32_t> operands;
+  int line = 0;
+  int col = 0;
+};
+
+struct KirBasicBlock {
+  std::string label;
+  std::vector<KirInstr> instrs;
+};
+
+struct KirFunction {
+  std::string name;
+  int param_count = 0;
+  std::vector<std::string> param_names;
+  std::vector<KirBasicBlock> blocks;
+};
+
+struct KirModule {
+  std::vector<KirFunction> functions;
+};
+
+const char *kir_opcode_name(KirOpcode op);
+std::string dump_kir_module(const KirModule &module);
+std::string dump_kir_function(const KirFunction &function);
+
+} // namespace kinglet
