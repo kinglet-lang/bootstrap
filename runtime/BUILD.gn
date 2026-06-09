@@ -1,0 +1,13 @@
+static_library("kinglet_rt") {
+  sources = [
+    "kinglet_rt_main.cc",
+  ]
+
+  public = [
+    "kinglet_rt.h",
+  ]
+
+  include_dirs = [
+    "//",
+  ]
+}

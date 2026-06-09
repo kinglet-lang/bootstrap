@@ -3,6 +3,7 @@ group("default") {
     ":kinglet",
     ":kinglet-lsp",
     ":kinglet-vm",
+    "//runtime:kinglet_rt",
   ]
 }
 
