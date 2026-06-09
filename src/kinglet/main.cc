@@ -1,5 +1,6 @@
 #include "checker/type_checker.h"
 #include "compiler/compiler.h"
+#include "ir/kir.h"
 #include "module/module_loader.h"
 #include "lexer/scanner.h"
 #include "lexer/token.h"
@@ -25,12 +26,13 @@ enum class Mode {
   Ast,
   Check,
   Bytecode,
+  Ir,
   SaveBytecode,
   Repl,
 };
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles and runs main().\n"
@@ -138,6 +140,10 @@ int main(int argc, char **argv) {
     }
     if (arg == "--bytecode") {
       mode = Mode::Bytecode;
+      continue;
+    }
+    if (arg == "--ir") {
+      mode = Mode::Ir;
       continue;
     }
     if (arg == "--check") {
@@ -438,6 +444,11 @@ int main(int argc, char **argv) {
 
   if (mode == Mode::Bytecode) {
     compile_result.chunk.disassemble(std::cout);
+    return 0;
+  }
+
+  if (mode == Mode::Ir) {
+    std::cout << dump_kir_module(compile_result.kir);
     return 0;
   }
 
