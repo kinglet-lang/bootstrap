@@ -49,7 +49,7 @@ std::string resolve_rt_lib(const char *argv0) {
 #endif
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> | --backend native -o <out> | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles and runs main().\n"
@@ -171,6 +171,29 @@ int main(int argc, char **argv) {
         native_out_path = argv[i];
       } else {
         std::cerr << "kinglet: --native requires an output path\n";
+        return 64;
+      }
+      continue;
+    }
+    if (arg == "--backend") {
+      if (i + 1 < argc && std::string_view(argv[i + 1]) == "native") {
+        mode = Mode::Native;
+        ++i;
+      } else {
+        std::cerr << "kinglet: --backend requires 'native'\n";
+        return 64;
+      }
+      continue;
+    }
+    if (arg == "-o") {
+      if (i + 1 < argc) {
+        ++i;
+        native_out_path = argv[i];
+        if (mode != Mode::Native) {
+          mode = Mode::Native;
+        }
+      } else {
+        std::cerr << "kinglet: -o requires an output path\n";
         return 64;
       }
       continue;
@@ -482,6 +505,10 @@ int main(int argc, char **argv) {
   }
 
   if (mode == Mode::Native) {
+    if (native_out_path.empty()) {
+      std::cerr << "kinglet: native output path required (--native <out> or -o <out>)\n";
+      return 64;
+    }
 #ifndef KINGLET_HAVE_LLVM
     std::cerr << "kinglet: native backend not built (rebuild with enable_llvm=true)\n";
     return 78;
