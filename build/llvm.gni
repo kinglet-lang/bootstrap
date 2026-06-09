@@ -1,0 +1,32 @@
+# Optional LLVM integration for the native backend (ADR 0015 L0).
+#
+# Enable:
+#   gn gen out/Default --args='enable_llvm=true llvm_config="/path/to/llvm-config"'
+# or set LLVM_CONFIG in the environment and omit llvm_config.
+
+declare_args() {
+  enable_llvm = false
+  llvm_config = ""
+}
+
+llvm_config_bin = ""
+llvm_cxxflags = []
+llvm_ldflags = []
+llvm_libs = []
+
+if (enable_llvm) {
+  llvm_config_bin = llvm_config
+  if (llvm_config_bin == "") {
+    llvm_config_bin = exec_script("//build/scripts/find_llvm_config.py", [], "trim string")
+  }
+
+  llvm_cxxflags = exec_script("//build/scripts/llvm_config.py",
+                              [ llvm_config_bin, "cxxflags" ],
+                              "list lines")
+  llvm_ldflags = exec_script("//build/scripts/llvm_config.py",
+                              [ llvm_config_bin, "ldflags" ],
+                              "list lines")
+  llvm_libs = exec_script("//build/scripts/llvm_config.py",
+                          [ llvm_config_bin, "libs" ],
+                          "list lines")
+}

@@ -1,3 +1,5 @@
+import("//build/llvm.gni")
+
 if (host_os == "win") {
   set_default_toolchain("//build/toolchain:win")
 } else {
