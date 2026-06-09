@@ -1,7 +1,13 @@
 static_library("ir") {
   sources = [
+    "ir_builder.cc",
+    "ir_builder.h",
     "kir.cc",
     "kir.h",
+  ]
+
+  deps = [
+    "//src/ast",
   ]
 
   include_dirs = [
