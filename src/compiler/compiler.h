@@ -3,6 +3,7 @@
 #include "ast/ast.h"
 #include "compiler/bytecode_emitter.h"
 #include "ir/kir.h"
+#include "ir/kir_recorder.h"
 #include "module/module_loader.h"
 #include "vm/chunk.h"
 
@@ -79,6 +80,7 @@ private:
   Chunk chunk_;
   BytecodeEmitter emitter_;
   KirModule kir_module_;
+  KirRecorder kir_recorder_;
   std::vector<Local> locals_;
   std::vector<std::size_t> scope_stack_;
   std::vector<CompileError> errors_;

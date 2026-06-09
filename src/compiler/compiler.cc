@@ -425,6 +425,17 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     }
   }
 
+  // KIR fast path: single `return <expr>` with IrBuilder-supported expression.
+  if (const ast::Expr *ret_expr = single_return_expr(function)) {
+    IrBuilder builder;
+    if (auto kir = builder.build_expr_function(function.name, *ret_expr)) {
+      kir_module_.functions.push_back(*kir);
+      emitter_.lower(*kir);
+      implicit_return_stmt_ = nullptr;
+      return;
+    }
+  }
+
   // Detect implicit return: if last statement in body is an ExprStmt,
   // compile it as a return instead of discarding the value.
   const auto *body = dynamic_cast<const ast::BlockStmt *>(function.body.get());
@@ -435,6 +446,8 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     }
   }
 
+  kir_recorder_.begin_function(function.name,
+                               static_cast<int>(function.params.size()));
   compile_stmt(*function.body);
   implicit_return_stmt_ = nullptr;
 
@@ -443,6 +456,7 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     emit(OpCode::Null, function.location);
     emit(OpCode::Return, function.location);
   }
+  kir_recorder_.end_function(&kir_module_);
 }
 
 void Compiler::compile_stmt(const ast::Stmt &stmt) {
@@ -1872,14 +1886,17 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
 }
 
 void Compiler::emit(OpCode op, ast::SourceLocation location) {
+  kir_recorder_.on_emit(op, 0, location);
   emitter_.emit(op, location);
 }
 
 void Compiler::emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location) {
+  kir_recorder_.on_emit(op, operand, location);
   emitter_.emit_operand(op, operand, location);
 }
 
 void Compiler::emit_constant(Value value, ast::SourceLocation location) {
+  kir_recorder_.on_constant(value, location);
   emitter_.emit_constant(value, location);
 }
 

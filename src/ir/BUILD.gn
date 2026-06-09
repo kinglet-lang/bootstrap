@@ -4,10 +4,13 @@ static_library("ir") {
     "ir_builder.h",
     "kir.cc",
     "kir.h",
+    "kir_recorder.cc",
+    "kir_recorder.h",
   ]
 
   deps = [
     "//src/ast",
+    "//src/vm",
   ]
 
   include_dirs = [
