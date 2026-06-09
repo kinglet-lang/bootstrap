@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast/ast.h"
+#include "ir/kir.h"
 #include "vm/chunk.h"
 #include "vm/value.h"
 
@@ -19,6 +20,9 @@ public:
   std::size_t emit_jump(OpCode op, ast::SourceLocation location);
   void patch_jump(std::size_t offset);
   void patch_jump_to(std::size_t offset, std::size_t target);
+
+  // Lower structured KIR into bytecode (stack machine).
+  void lower(const KirFunction &function);
 
   Chunk *chunk() const { return chunk_; }
 

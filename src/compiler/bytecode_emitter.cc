@@ -31,4 +31,49 @@ void BytecodeEmitter::patch_jump_to(std::size_t offset, std::size_t target) {
   instruction.operand = jump_offset;
 }
 
+void BytecodeEmitter::lower(const KirFunction &function) {
+  for (const KirBasicBlock &bb : function.blocks) {
+    for (const KirInstr &instr : bb.instrs) {
+      ast::SourceLocation loc{instr.line, instr.col};
+      switch (instr.op) {
+      case KirOpcode::ConstInt:
+        emit_constant(Value::int_value(instr.operands[0]), loc);
+        break;
+      case KirOpcode::IAdd:
+        emit(OpCode::Add, loc);
+        break;
+      case KirOpcode::ISub:
+        emit(OpCode::Subtract, loc);
+        break;
+      case KirOpcode::IMul:
+        emit(OpCode::Multiply, loc);
+        break;
+      case KirOpcode::IDiv:
+        emit(OpCode::Divide, loc);
+        break;
+      case KirOpcode::IMod:
+        emit(OpCode::Modulo, loc);
+        break;
+      case KirOpcode::LoadLocal:
+        emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(instr.operands[0]), loc);
+        break;
+      case KirOpcode::StoreLocal:
+        emit_operand(OpCode::StoreLocal, static_cast<uint32_t>(instr.operands[0]), loc);
+        break;
+      case KirOpcode::Pop:
+        emit(OpCode::Pop, loc);
+        break;
+      case KirOpcode::Call:
+        emit_operand(OpCode::Call, static_cast<uint32_t>(instr.operands[0]), loc);
+        break;
+      case KirOpcode::Ret:
+        emit(OpCode::Return, loc);
+        break;
+      default:
+        break;
+      }
+    }
+  }
+}
+
 } // namespace kinglet

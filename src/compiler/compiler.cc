@@ -1,5 +1,7 @@
 #include "compiler/compiler.h"
 
+#include "ir/ir_builder.h"
+
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -8,6 +10,18 @@
 namespace kinglet {
 
 namespace {
+
+const ast::Expr *single_return_expr(const ast::FunctionDecl &function) {
+  const auto *body = dynamic_cast<const ast::BlockStmt *>(function.body.get());
+  if (!body || body->statements.size() != 1) {
+    return nullptr;
+  }
+  const auto *ret = dynamic_cast<const ast::ReturnStmt *>(body->statements[0].get());
+  if (!ret || !ret->value) {
+    return nullptr;
+  }
+  return ret->value.get();
+}
 
 } // namespace
 
@@ -292,7 +306,10 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
     if (!errors_.empty()) break;
   }
 
-  return CompileResult{.chunk = std::move(chunk_), .errors = std::move(errors_), .warnings = std::move(warnings_)};
+  return CompileResult{.chunk = std::move(chunk_),
+                       .kir = std::move(kir_module_),
+                       .errors = std::move(errors_),
+                       .warnings = std::move(warnings_)};
 }
 
 void Compiler::push_scope() {
