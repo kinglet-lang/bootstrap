@@ -16,6 +16,10 @@ public:
   void on_emit(OpCode op, uint32_t operand, ast::SourceLocation location);
   void on_constant(const Value &value, ast::SourceLocation location);
 
+  std::size_t record_jump(OpCode op, ast::SourceLocation location);
+  void patch_jump(std::size_t jump_instr_index, int32_t relative_offset);
+  std::size_t instr_count() const;
+
   bool active() const { return active_; }
 
 private:

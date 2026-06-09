@@ -114,6 +114,7 @@ private:
   std::unordered_map<std::string, const ast::Expr *> global_const_inits_;
   bool in_try_ = false;
   std::size_t try_catch_pc_ = 0; // catch landing pad PC for current try block
+  std::unordered_map<std::size_t, std::size_t> kir_instr_at_bc_;
 };
 
 } // namespace kinglet

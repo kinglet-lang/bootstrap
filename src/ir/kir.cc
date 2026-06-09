@@ -32,6 +32,20 @@ const char *kir_opcode_name(KirOpcode op) {
     return "idiv";
   case KirOpcode::IMod:
     return "imod";
+  case KirOpcode::ICmpEq:
+    return "icmp_eq";
+  case KirOpcode::ICmpNeq:
+    return "icmp_neq";
+  case KirOpcode::ICmpLt:
+    return "icmp_lt";
+  case KirOpcode::ICmpGt:
+    return "icmp_gt";
+  case KirOpcode::ICmpLe:
+    return "icmp_le";
+  case KirOpcode::ICmpGe:
+    return "icmp_ge";
+  case KirOpcode::ConstFn:
+    return "const_fn";
   case KirOpcode::Call:
     return "call";
   case KirOpcode::Ret:
@@ -82,7 +96,11 @@ std::string dump_kir_function(const KirFunction &function) {
                               instr.op == KirOpcode::LoadLocal ||
                               instr.op == KirOpcode::IAdd || instr.op == KirOpcode::ISub ||
                               instr.op == KirOpcode::IMul || instr.op == KirOpcode::IDiv ||
-                              instr.op == KirOpcode::IMod || instr.op == KirOpcode::Call;
+                              instr.op == KirOpcode::IMod || instr.op == KirOpcode::ICmpEq ||
+                              instr.op == KirOpcode::ICmpNeq || instr.op == KirOpcode::ICmpLt ||
+                              instr.op == KirOpcode::ICmpGt || instr.op == KirOpcode::ICmpLe ||
+                              instr.op == KirOpcode::ICmpGe || instr.op == KirOpcode::ConstFn ||
+                              instr.op == KirOpcode::Call;
       if (has_result) {
         out << "    %" << temp++ << " = ";
       } else {

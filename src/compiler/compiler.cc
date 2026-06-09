@@ -448,6 +448,7 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
 
   kir_recorder_.begin_function(function.name,
                                static_cast<int>(function.params.size()));
+  kir_instr_at_bc_.clear();
   compile_stmt(*function.body);
   implicit_return_stmt_ = nullptr;
 
@@ -1873,30 +1874,74 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
 }
 
 void Compiler::emit(OpCode op, ast::SourceLocation location) {
+  kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
   kir_recorder_.on_emit(op, 0, location);
   emitter_.emit(op, location);
 }
 
 void Compiler::emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location) {
+  kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
   kir_recorder_.on_emit(op, operand, location);
   emitter_.emit_operand(op, operand, location);
 }
 
 void Compiler::emit_constant(Value value, ast::SourceLocation location) {
+  kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
   kir_recorder_.on_constant(value, location);
   emitter_.emit_constant(value, location);
 }
 
 std::size_t Compiler::emit_jump(OpCode op, ast::SourceLocation location) {
+  kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
+  kir_recorder_.record_jump(op, location);
   return emitter_.emit_jump(op, location);
 }
 
 void Compiler::patch_jump(std::size_t offset) {
   emitter_.patch_jump(offset);
+  if (offset >= chunk_.instructions().size()) {
+    return;
+  }
+  const auto jump_it = kir_instr_at_bc_.find(offset);
+  if (jump_it == kir_instr_at_bc_.end()) {
+    return;
+  }
+  const int32_t rel = chunk_.instructions()[offset].operand;
+  const std::size_t bc_target = offset + 1 + static_cast<std::size_t>(rel);
+  std::size_t kir_target = 0;
+  if (bc_target == chunk_.instructions().size()) {
+    kir_target = kir_recorder_.instr_count();
+  } else {
+    const auto target_it = kir_instr_at_bc_.find(bc_target);
+    if (target_it == kir_instr_at_bc_.end()) {
+      return;
+    }
+    kir_target = target_it->second;
+  }
+  const int32_t kir_rel =
+      static_cast<int32_t>(kir_target) - static_cast<int32_t>(jump_it->second) - 1;
+  kir_recorder_.patch_jump(jump_it->second, kir_rel);
 }
 
 void Compiler::patch_jump_to(std::size_t offset, std::size_t target) {
   emitter_.patch_jump_to(offset, target);
+  const auto jump_it = kir_instr_at_bc_.find(offset);
+  if (jump_it == kir_instr_at_bc_.end()) {
+    return;
+  }
+  std::size_t kir_target = 0;
+  if (target == chunk_.instructions().size()) {
+    kir_target = kir_recorder_.instr_count();
+  } else {
+    const auto target_it = kir_instr_at_bc_.find(target);
+    if (target_it == kir_instr_at_bc_.end()) {
+      return;
+    }
+    kir_target = target_it->second;
+  }
+  const int32_t kir_rel =
+      static_cast<int32_t>(kir_target) - static_cast<int32_t>(jump_it->second) - 1;
+  kir_recorder_.patch_jump(jump_it->second, kir_rel);
 }
 
 int Compiler::resolve_local(const std::string &name) const {
