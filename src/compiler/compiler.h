@@ -1,6 +1,8 @@
 #pragma once
 
 #include "ast/ast.h"
+#include "compiler/bytecode_emitter.h"
+#include "ir/kir.h"
 #include "module/module_loader.h"
 #include "vm/chunk.h"
 
@@ -24,6 +26,7 @@ struct CompileWarning {
 
 struct CompileResult {
   Chunk chunk;
+  KirModule kir;
   std::vector<CompileError> errors;
   std::vector<CompileWarning> warnings;
 };
@@ -74,6 +77,8 @@ private:
   int resolve_free_function_for_type(const std::string &name, const std::string &arg_type) const;
 
   Chunk chunk_;
+  BytecodeEmitter emitter_;
+  KirModule kir_module_;
   std::vector<Local> locals_;
   std::vector<std::size_t> scope_stack_;
   std::vector<CompileError> errors_;

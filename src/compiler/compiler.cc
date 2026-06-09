@@ -13,6 +13,8 @@ namespace {
 
 CompileResult Compiler::compile(const ast::Program &program) {
   chunk_ = Chunk();
+  emitter_.reset(&chunk_);
+  kir_module_ = KirModule();
   locals_.clear();
   errors_.clear();
   warnings_.clear();
@@ -150,7 +152,10 @@ CompileResult Compiler::compile(const ast::Program &program) {
 
   if (main_index < 0) {
     error_at(program.location, "Expected a main function.");
-    return CompileResult{.chunk = std::move(chunk_), .errors = std::move(errors_), .warnings = std::move(warnings_)};
+    return CompileResult{.chunk = std::move(chunk_),
+                         .kir = std::move(kir_module_),
+                         .errors = std::move(errors_),
+                         .warnings = std::move(warnings_)};
   }
 
   // Emit preamble: call main, then return its result
@@ -185,11 +190,16 @@ CompileResult Compiler::compile(const ast::Program &program) {
     }
   }
 
-  return CompileResult{.chunk = std::move(chunk_), .errors = std::move(errors_), .warnings = std::move(warnings_)};
+  return CompileResult{.chunk = std::move(chunk_),
+                       .kir = std::move(kir_module_),
+                       .errors = std::move(errors_),
+                       .warnings = std::move(warnings_)};
 }
 
 CompileResult Compiler::compile_module(const ast::Program &program) {
   chunk_ = Chunk();
+  emitter_.reset(&chunk_);
+  kir_module_ = KirModule();
   locals_.clear();
   errors_.clear();
   warnings_.clear();
@@ -1845,30 +1855,27 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
 }
 
 void Compiler::emit(OpCode op, ast::SourceLocation location) {
-  chunk_.write(op, location.line, location.column);
+  emitter_.emit(op, location);
 }
 
 void Compiler::emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location) {
-  chunk_.write_operand(op, operand, location.line, location.column);
+  emitter_.emit_operand(op, operand, location);
 }
 
 void Compiler::emit_constant(Value value, ast::SourceLocation location) {
-  chunk_.write_constant(value, location.line, location.column);
+  emitter_.emit_constant(value, location);
 }
 
 std::size_t Compiler::emit_jump(OpCode op, ast::SourceLocation location) {
-  emit_operand(op, 0, location);
-  return chunk_.instructions().size() - 1;
+  return emitter_.emit_jump(op, location);
 }
 
 void Compiler::patch_jump(std::size_t offset) {
-  patch_jump_to(offset, chunk_.instructions().size());
+  emitter_.patch_jump(offset);
 }
 
 void Compiler::patch_jump_to(std::size_t offset, std::size_t target) {
-  const int32_t jump_offset = static_cast<int32_t>(target - offset - 1);
-  Instruction &instruction = const_cast<Instruction &>(chunk_.instructions()[offset]);
-  instruction.operand = jump_offset;
+  emitter_.patch_jump_to(offset, target);
 }
 
 int Compiler::resolve_local(const std::string &name) const {

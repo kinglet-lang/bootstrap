@@ -1,11 +1,14 @@
 static_library("compiler") {
   sources = [
+    "bytecode_emitter.cc",
+    "bytecode_emitter.h",
     "compiler.cc",
     "compiler.h",
   ]
 
   deps = [
     "//src/ast",
+    "//src/ir",
     "//src/module",
     "//src/vm",
   ]
