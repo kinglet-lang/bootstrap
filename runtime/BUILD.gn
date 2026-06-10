@@ -3,6 +3,7 @@ static_library("kinglet_rt") {
     "kinglet_rt_main.cc",
     "kinglet_rt_string.cc",
     "kinglet_rt_agg.cc",
+    "kinglet_rt_enum.cc",
   ]
 
   public = [
