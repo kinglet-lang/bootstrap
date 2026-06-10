@@ -215,6 +215,9 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
   case OpCode::CastTo:
     bb_.instrs.push_back(rec(KirOpcode::CastTo, {static_cast<int32_t>(operand)}, location));
     break;
+  case OpCode::FloatToBits:
+    bb_.instrs.push_back(rec(KirOpcode::FloatToBits, {}, location));
+    break;
   case OpCode::NativeOut:
     bb_.instrs.push_back(rec(KirOpcode::NativeOut, {static_cast<int32_t>(operand)}, location));
     break;

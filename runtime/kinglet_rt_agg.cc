@@ -1,29 +1,6 @@
-#include "runtime/kinglet_rt_value.h"
+#include "runtime/kinglet_rt_internal.h"
 
 #include <vector>
-
-namespace {
-
-enum class KlKind : uint8_t { String = 0, Array = 1, Struct = 2 };
-
-struct KlHeader {
-  KlKind kind;
-};
-
-struct KlArray {
-  KlHeader hdr{KlKind::Array};
-  std::vector<kl_h> elements;
-};
-
-struct KlStruct {
-  KlHeader hdr{KlKind::Struct};
-  int32_t type_index = 0;
-  std::vector<kl_h> fields;
-};
-
-} // namespace
-
-extern "C" int32_t kl_string_len(kl_h value);
 
 extern "C" {
 
@@ -39,7 +16,21 @@ kl_h kl_array_get(kl_h array, int32_t index) {
   if (!kl_is_heap(array) || index < 0) {
     return kl_from_int(0);
   }
-  auto *obj = static_cast<KlArray *>(kl_unbox_ptr(array));
+  void *ptr = kl_unbox_ptr(array);
+  auto *hdr = static_cast<KlHeader *>(ptr);
+  if (hdr->kind == KlKind::String) {
+    // Mirror the VM: indexing a string yields the byte as a char (int8).
+    const std::string &bytes = static_cast<KlString *>(ptr)->bytes;
+    if (static_cast<std::size_t>(index) >= bytes.size()) {
+      return kl_from_int(0);
+    }
+    return kl_from_int(static_cast<int8_t>(
+        static_cast<unsigned char>(bytes[static_cast<std::size_t>(index)])));
+  }
+  if (hdr->kind != KlKind::Array) {
+    return kl_from_int(0);
+  }
+  auto *obj = static_cast<KlArray *>(ptr);
   if (static_cast<std::size_t>(index) >= obj->elements.size()) {
     return kl_from_int(0);
   }

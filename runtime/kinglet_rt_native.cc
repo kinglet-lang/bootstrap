@@ -1,4 +1,4 @@
-#include "runtime/kinglet_rt_value.h"
+#include "runtime/kinglet_rt_internal.h"
 
 #include <cstdio>
 #include <fstream>
@@ -14,51 +14,7 @@
 
 namespace {
 
-enum class KlKind : uint8_t { String = 0, Array = 1, Struct = 2, Enum = 3 };
-
-struct KlHeader {
-  KlKind kind;
-};
-
-struct KlString {
-  KlHeader hdr{KlKind::String};
-  std::string bytes;
-};
-
-struct KlArray {
-  KlHeader hdr{KlKind::Array};
-  std::vector<kl_h> elements;
-};
-
 std::vector<std::string> g_program_args;
-
-std::string value_to_string(kl_h value) {
-  if (value == 0) {
-    return "null";
-  }
-  if (kl_is_inline_enum(value)) {
-    const int variant = static_cast<int>(static_cast<uint64_t>(value) & 0xFFFF);
-    return std::to_string(variant);
-  }
-  if (!kl_is_heap(value)) {
-    return std::to_string(kl_to_int(value));
-  }
-  void *ptr = kl_unbox_ptr(value);
-  auto *hdr = static_cast<KlHeader *>(ptr);
-  if (hdr->kind == KlKind::String) {
-    return static_cast<KlString *>(ptr)->bytes;
-  }
-  if (hdr->kind == KlKind::Enum) {
-    return "<enum>";
-  }
-  if (hdr->kind == KlKind::Array) {
-    return "[array]";
-  }
-  if (hdr->kind == KlKind::Struct) {
-    return "<struct>";
-  }
-  return "?";
-}
 
 void write_formatted(std::ostream &out, int32_t argc, const kl_h *args) {
   if (argc > 0) {
@@ -70,7 +26,7 @@ void write_formatted(std::ostream &out, int32_t argc, const kl_h *args) {
       for (std::size_t pos = 0; pos < fmt.size(); ++pos) {
         if (pos + 1 < fmt.size() && fmt[pos] == '{' && fmt[pos + 1] == '}') {
           if (val_idx < argc) {
-            out << value_to_string(args[val_idx++]);
+            out << kl_value_text(args[val_idx++]);
           } else {
             out << "{}";
           }
@@ -83,7 +39,7 @@ void write_formatted(std::ostream &out, int32_t argc, const kl_h *args) {
     }
   }
   for (int32_t i = 0; i < argc; ++i) {
-    out << value_to_string(args[i]);
+    out << kl_value_text(args[i]);
   }
 }
 

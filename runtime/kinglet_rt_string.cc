@@ -1,21 +1,6 @@
-#include "runtime/kinglet_rt_value.h"
+#include "runtime/kinglet_rt_internal.h"
 
 #include <string>
-
-namespace {
-
-enum class KlKind : uint8_t { String = 0, Array = 1, Struct = 2 };
-
-struct KlHeader {
-  KlKind kind;
-};
-
-struct KlString {
-  KlHeader hdr{KlKind::String};
-  std::string bytes;
-};
-
-} // namespace
 
 extern "C" {
 

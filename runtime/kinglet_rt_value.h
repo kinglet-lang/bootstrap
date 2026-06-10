@@ -74,6 +74,20 @@ kl_h kl_struct_field_at(kl_h object, int32_t field_index);
 kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value);
 kl_h kl_slice(kl_h value, int64_t start, int64_t end);
 
+kl_h kl_float_new(double value);
+kl_h kl_float_from_bits(int64_t bits);
+int64_t kl_float_to_bits(kl_h value);
+
+// Polymorphic arithmetic mirroring the VM's tag dispatch: string concat for
+// `+`, IEEE double math when either side is a boxed float, int64 otherwise.
+kl_h kl_value_add(kl_h left, kl_h right);
+kl_h kl_value_sub(kl_h left, kl_h right);
+kl_h kl_value_mul(kl_h left, kl_h right);
+kl_h kl_value_div(kl_h left, kl_h right);
+kl_h kl_value_mod(kl_h left, kl_h right);
+// Three-way compare: strings lexicographic, floats as doubles, else int64.
+int32_t kl_value_cmp(kl_h left, kl_h right);
+
 kl_h kl_enum_new(int32_t type_index, int32_t variant_index);
 kl_h kl_enum_new_payload(int32_t type_index, int32_t variant_index, int32_t count,
                          const kl_h *elements);

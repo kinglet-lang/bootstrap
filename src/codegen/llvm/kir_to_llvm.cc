@@ -112,6 +112,14 @@ struct RtFns {
   llvm::Function *value_eq = nullptr;
   llvm::Function *value_is_err = nullptr;
   llvm::Function *exit_code = nullptr;
+  llvm::Function *float_from_bits = nullptr;
+  llvm::Function *float_to_bits = nullptr;
+  llvm::Function *value_add = nullptr;
+  llvm::Function *value_sub = nullptr;
+  llvm::Function *value_mul = nullptr;
+  llvm::Function *value_div = nullptr;
+  llvm::Function *value_mod = nullptr;
+  llvm::Function *value_cmp = nullptr;
 };
 
 RtFns declare_runtime(llvm::Module *module) {
@@ -190,6 +198,24 @@ RtFns declare_runtime(llvm::Module *module) {
                                            llvm::Function::ExternalLinkage, "kl_value_is_err", module);
   rt.exit_code = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_exit_code", module);
+  rt.float_from_bits = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                              llvm::Function::ExternalLinkage,
+                                              "kl_float_from_bits", module);
+  rt.float_to_bits = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                            llvm::Function::ExternalLinkage,
+                                            "kl_float_to_bits", module);
+  rt.value_add = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_value_add", module);
+  rt.value_sub = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_value_sub", module);
+  rt.value_mul = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_value_mul", module);
+  rt.value_div = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_value_div", module);
+  rt.value_mod = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_value_mod", module);
+  rt.value_cmp = llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_value_cmp", module);
   return rt;
 }
 
@@ -234,39 +260,45 @@ llvm::Value *resolve_field_index(llvm::IRBuilder<> &builder, llvm::Value *type_i
   return result;
 }
 
-llvm::Value *binop(llvm::IRBuilder<> &builder, KirOpcode op, llvm::Value *left,
-                   llvm::Value *right) {
+// Arithmetic dispatches through the runtime: string concat for `+`, IEEE
+// double math when either operand is a boxed float, plain int64 otherwise.
+llvm::Value *binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op,
+                   llvm::Value *left, llvm::Value *right) {
   switch (op) {
   case KirOpcode::IAdd:
-    return builder.CreateAdd(left, right);
+    return builder.CreateCall(rt.value_add, {left, right});
   case KirOpcode::ISub:
-    return builder.CreateSub(left, right);
+    return builder.CreateCall(rt.value_sub, {left, right});
   case KirOpcode::IMul:
-    return builder.CreateMul(left, right);
+    return builder.CreateCall(rt.value_mul, {left, right});
   case KirOpcode::IDiv:
-    return builder.CreateSDiv(left, right);
+    return builder.CreateCall(rt.value_div, {left, right});
   case KirOpcode::IMod:
-    return builder.CreateSRem(left, right);
+    return builder.CreateCall(rt.value_mod, {left, right});
   default:
     return nullptr;
   }
 }
 
-llvm::Value *icmp(llvm::IRBuilder<> &builder, KirOpcode op, llvm::Value *left,
-                  llvm::Value *right) {
+// Relational compares go through kl_value_cmp so strings and boxed floats
+// order correctly; the three-way result is then compared against zero.
+llvm::Value *icmp(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op,
+                  llvm::Value *left, llvm::Value *right) {
+  llvm::Value *zero32 = llvm::ConstantInt::get(builder.getInt32Ty(), 0);
+  llvm::Value *cmp = nullptr;
   switch (op) {
-  case KirOpcode::ICmpEq:
-    return builder.CreateICmpEQ(left, right);
-  case KirOpcode::ICmpNeq:
-    return builder.CreateICmpNE(left, right);
   case KirOpcode::ICmpLt:
-    return builder.CreateICmpSLT(left, right);
+    cmp = builder.CreateCall(rt.value_cmp, {left, right});
+    return builder.CreateICmpSLT(cmp, zero32);
   case KirOpcode::ICmpGt:
-    return builder.CreateICmpSGT(left, right);
+    cmp = builder.CreateCall(rt.value_cmp, {left, right});
+    return builder.CreateICmpSGT(cmp, zero32);
   case KirOpcode::ICmpLe:
-    return builder.CreateICmpSLE(left, right);
+    cmp = builder.CreateCall(rt.value_cmp, {left, right});
+    return builder.CreateICmpSLE(cmp, zero32);
   case KirOpcode::ICmpGe:
-    return builder.CreateICmpSGE(left, right);
+    cmp = builder.CreateCall(rt.value_cmp, {left, right});
+    return builder.CreateICmpSGE(cmp, zero32);
   default:
     return nullptr;
   }
@@ -636,9 +668,9 @@ public:
         if (lhs == nullptr || rhs == nullptr) {
           return false;
         }
-        llvm::Value *result = binop(builder, op, lhs, rhs);
+        llvm::Value *result = binop(builder, rt_, op, lhs, rhs);
         if (result == nullptr) {
-          *error = "unsupported integer binop";
+          *error = "unsupported binop";
           return false;
         }
         push(result);
@@ -661,7 +693,7 @@ public:
           }
           result = bool_to_i64(builder, builder.CreateICmpNE(eq, llvm::ConstantInt::get(i32, 0)));
         } else {
-          result = bool_to_i64(builder, icmp(builder, op, lhs, rhs));
+          result = bool_to_i64(builder, icmp(builder, rt_, op, lhs, rhs));
         }
         push(result);
         temps[i] = result;
@@ -669,9 +701,15 @@ public:
       };
 
       switch (instr->op) {
-      case KirOpcode::ConstInt:
-      case KirOpcode::ConstFloat: {
+      case KirOpcode::ConstInt: {
         llvm::Value *value = const_i64(builder, instr);
+        push(value);
+        temps[i] = value;
+        break;
+      }
+      case KirOpcode::ConstFloat: {
+        llvm::Value *value =
+            builder.CreateCall(rt_.float_from_bits, {const_i64(builder, instr)});
         push(value);
         temps[i] = value;
         break;
@@ -758,7 +796,7 @@ public:
           }
           llvm::Value *lhs = temps[static_cast<std::size_t>(lhs_i)];
           llvm::Value *rhs = temps[static_cast<std::size_t>(rhs_i)];
-          llvm::Value *result = binop(builder, instr->op, lhs, rhs);
+          llvm::Value *result = binop(builder, rt_, instr->op, lhs, rhs);
           if (result == nullptr) {
             *error = "unsupported indexed binop";
             return false;
@@ -971,9 +1009,20 @@ public:
         if (v == nullptr) {
           return false;
         }
-        llvm::Value *neg = builder.CreateSub(llvm::ConstantInt::get(i64, 0), v);
+        llvm::Value *neg =
+            builder.CreateCall(rt_.value_sub, {llvm::ConstantInt::get(i64, 0), v});
         push(neg);
         temps[i] = neg;
+        break;
+      }
+      case KirOpcode::FloatToBits: {
+        llvm::Value *v = pop_value(&stack, error);
+        if (v == nullptr) {
+          return false;
+        }
+        llvm::Value *bits = builder.CreateCall(rt_.float_to_bits, {v});
+        push(bits);
+        temps[i] = bits;
         break;
       }
       case KirOpcode::Nop:

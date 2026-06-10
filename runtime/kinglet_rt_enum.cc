@@ -1,4 +1,4 @@
-#include "runtime/kinglet_rt_value.h"
+#include "runtime/kinglet_rt_internal.h"
 
 #include <cerrno>
 #include <cstdlib>
@@ -7,24 +7,6 @@
 #include <vector>
 
 namespace {
-
-enum class KlKind : uint8_t { String = 0, Array = 1, Struct = 2, Enum = 3 };
-
-struct KlHeader {
-  KlKind kind;
-};
-
-struct KlString {
-  KlHeader hdr{KlKind::String};
-  std::string bytes;
-};
-
-struct KlEnum {
-  KlHeader hdr{KlKind::Enum};
-  int32_t type_index = 0;
-  int32_t variant_index = 0;
-  std::vector<kl_h> payload;
-};
 
 bool decode_enum_tag(kl_h value, int32_t *type_index, int32_t *variant_index) {
   if (kl_is_inline_enum(value)) {
@@ -49,12 +31,6 @@ kl_h cast_error(int32_t variant, kl_h payload) {
   kl_h elements[1] = {payload};
   const int32_t count = payload == 0 ? 0 : 1;
   return kl_enum_new_payload(0, variant, count, count > 0 ? elements : nullptr);
-}
-
-kl_h double_bits(double value) {
-  int64_t bits = 0;
-  std::memcpy(&bits, &value, sizeof(bits));
-  return static_cast<kl_h>(bits);
 }
 
 } // namespace
@@ -113,6 +89,9 @@ kl_h kl_cast_to_int(kl_h value) {
   if (hdr->kind == KlKind::Enum) {
     return kl_from_int(static_cast<KlEnum *>(ptr)->variant_index);
   }
+  if (hdr->kind == KlKind::Float) {
+    return kl_from_int(static_cast<int64_t>(static_cast<KlFloat *>(ptr)->value));
+  }
   if (hdr->kind != KlKind::String) {
     return kl_from_int(0);
   }
@@ -137,18 +116,21 @@ kl_h kl_cast_to_float(kl_h value) {
     int32_t type_idx = 0;
     int32_t variant_idx = 0;
     if (!decode_enum_tag(value, &type_idx, &variant_idx)) {
-      return double_bits(0.0);
+      return kl_float_new(0.0);
     }
-    return double_bits(static_cast<double>(variant_idx));
+    return kl_float_new(static_cast<double>(variant_idx));
   }
   if (kl_is_heap(value)) {
     void *ptr = kl_unbox_ptr(value);
     auto *hdr = static_cast<KlHeader *>(ptr);
+    if (hdr->kind == KlKind::Float) {
+      return value;
+    }
     if (hdr->kind == KlKind::Enum) {
-      return double_bits(static_cast<double>(static_cast<KlEnum *>(ptr)->variant_index));
+      return kl_float_new(static_cast<double>(static_cast<KlEnum *>(ptr)->variant_index));
     }
     if (hdr->kind != KlKind::String) {
-      return double_bits(0.0);
+      return kl_float_new(0.0);
     }
     const std::string &s = static_cast<KlString *>(ptr)->bytes;
     if (s.empty()) {
@@ -163,9 +145,9 @@ kl_h kl_cast_to_float(kl_h value) {
     if (errno == ERANGE) {
       return cast_error(2, value);
     }
-    return double_bits(v);
+    return kl_float_new(v);
   }
-  return double_bits(static_cast<double>(kl_to_int(value)));
+  return kl_float_new(static_cast<double>(kl_to_int(value)));
 }
 
 kl_h kl_cast_to_string(kl_h value) {
@@ -173,6 +155,10 @@ kl_h kl_cast_to_string(kl_h value) {
     void *ptr = kl_unbox_ptr(value);
     if (static_cast<KlHeader *>(ptr)->kind == KlKind::String) {
       return value;
+    }
+    if (static_cast<KlHeader *>(ptr)->kind == KlKind::Float) {
+      const std::string text = kl_value_text(value);
+      return kl_string_new(text.data(), static_cast<int32_t>(text.size()));
     }
   }
   if (kl_is_inline_enum(value)) {
@@ -242,6 +228,14 @@ int32_t kl_value_eq(kl_h left, kl_h right) {
     }
     return (lt == rt && lv == rv) ? 1 : 0;
   }
+  if (kl_is_kind(left, KlKind::Float) || kl_is_kind(right, KlKind::Float)) {
+    const bool left_num = kl_is_kind(left, KlKind::Float) || !kl_is_heap(left);
+    const bool right_num = kl_is_kind(right, KlKind::Float) || !kl_is_heap(right);
+    if (!left_num || !right_num) {
+      return 0;
+    }
+    return kl_as_double(left) == kl_as_double(right) ? 1 : 0;
+  }
   if (!kl_is_heap(left) && !kl_is_heap(right)) {
     return left == right ? 1 : 0;
   }
@@ -262,6 +256,13 @@ int32_t kl_value_eq(kl_h left, kl_h right) {
 }
 
 int32_t kl_exit_code(kl_h value) {
+  if (kl_is_kind(value, KlKind::Float)) {
+    const auto n = static_cast<int64_t>(kl_as_double(value));
+    if (n < 0 || n > 255) {
+      return 255;
+    }
+    return static_cast<int32_t>(n);
+  }
   if (kl_is_heap(value)) {
     return 0;
   }

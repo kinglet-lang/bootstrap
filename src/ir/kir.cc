@@ -86,6 +86,8 @@ const char *kir_opcode_name(KirOpcode op) {
     return "enum_payload_get";
   case KirOpcode::CastTo:
     return "cast_to";
+  case KirOpcode::FloatToBits:
+    return "float_to_bits";
   case KirOpcode::NativeOut:
     return "native_out";
   case KirOpcode::NativeOutLn:
