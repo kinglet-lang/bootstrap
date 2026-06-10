@@ -348,6 +348,10 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         } else if (src.type == ValueType::Char) {
           push(Value::string_value(
               std::string(1, static_cast<char>(src.as_int))));
+        } else if (src.type == ValueType::Bool) {
+          push(Value::string_value(src.as_bool ? "true" : "false"));
+        } else if (src.type == ValueType::Null) {
+          push(Value::string_value("null"));
         } else {
           return runtime_error(
               "Cast to string requires int, float, char, or string operand.");

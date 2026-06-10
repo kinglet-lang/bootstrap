@@ -4,6 +4,7 @@
 #include "codegen/llvm/kir_to_llvm.h"
 #endif
 #include "ir/kir.h"
+#include "ir/kir_typing.h"
 #include "module/module_loader.h"
 #include "lexer/scanner.h"
 #include "lexer/token.h"
@@ -616,6 +617,9 @@ int main(int argc, char **argv) {
     std::cerr << warning.location.line << ':' << warning.location.column
               << ": warning: " << warning.message << '\n';
   }
+
+  checker.populate_kir_types(&compile_result.kir);
+  infer_kir_types(&compile_result.kir);
 
   if (mode == Mode::Bytecode) {
     compile_result.chunk.disassemble(std::cout);

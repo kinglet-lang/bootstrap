@@ -6,6 +6,8 @@ static_library("ir") {
     "kir.h",
     "kir_recorder.cc",
     "kir_recorder.h",
+    "kir_typing.cc",
+    "kir_typing.h",
   ]
 
   deps = [
