@@ -7,9 +7,18 @@
 #include "runtime/kinglet_rt_value.h"
 
 #include <string>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
-enum class KlKind : uint8_t { String = 0, Array = 1, Struct = 2, Enum = 3, Float = 4 };
+enum class KlKind : uint8_t {
+  String = 0,
+  Array = 1,
+  Struct = 2,
+  Enum = 3,
+  Float = 4,
+  Map = 5,
+};
 
 struct KlHeader {
   KlKind kind;
@@ -41,6 +50,18 @@ struct KlEnum {
 struct KlFloat {
   KlHeader hdr{KlKind::Float};
   double value = 0.0;
+};
+
+struct KlMapEntry {
+  kl_h key = 0;
+  kl_h value = 0;
+};
+
+// Insertion-ordered map keyed by the VM's encoded key text ("s:" / "i:").
+struct KlMap {
+  KlHeader hdr{KlKind::Map};
+  std::vector<std::string> order;
+  std::unordered_map<std::string, KlMapEntry> entries;
 };
 
 inline KlKind kl_heap_kind(kl_h value) {

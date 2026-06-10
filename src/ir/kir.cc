@@ -32,6 +32,20 @@ const char *kir_opcode_name(KirOpcode op) {
     return "idiv";
   case KirOpcode::IMod:
     return "imod";
+  case KirOpcode::Not:
+    return "not";
+  case KirOpcode::BitNot:
+    return "bit_not";
+  case KirOpcode::BitAnd:
+    return "bit_and";
+  case KirOpcode::BitOr:
+    return "bit_or";
+  case KirOpcode::BitXor:
+    return "bit_xor";
+  case KirOpcode::Shl:
+    return "shl";
+  case KirOpcode::Shr:
+    return "shr";
   case KirOpcode::ICmpEq:
     return "icmp_eq";
   case KirOpcode::ICmpNeq:
@@ -74,10 +88,50 @@ const char *kir_opcode_name(KirOpcode op) {
     return "array_new";
   case KirOpcode::IndexGet:
     return "index_get";
+  case KirOpcode::IndexSet:
+    return "index_set";
   case KirOpcode::ArrayLen:
     return "array_len";
   case KirOpcode::ArraySlice:
     return "array_slice";
+  case KirOpcode::ArrayPush:
+    return "array_push";
+  case KirOpcode::ArrayResize:
+    return "array_resize";
+  case KirOpcode::ArrayPop:
+    return "array_pop";
+  case KirOpcode::ArrayRemove:
+    return "array_remove";
+  case KirOpcode::ArrayContains:
+    return "array_contains";
+  case KirOpcode::ArrayClear:
+    return "array_clear";
+  case KirOpcode::ArrayInsert:
+    return "array_insert";
+  case KirOpcode::ArrayIndexOf:
+    return "array_index_of";
+  case KirOpcode::ArrayReverse:
+    return "array_reverse";
+  case KirOpcode::StrStartsWith:
+    return "str_starts_with";
+  case KirOpcode::StrEndsWith:
+    return "str_ends_with";
+  case KirOpcode::StrReplace:
+    return "str_replace";
+  case KirOpcode::StrSplit:
+    return "str_split";
+  case KirOpcode::StrTrim:
+    return "str_trim";
+  case KirOpcode::StrToUpper:
+    return "str_to_upper";
+  case KirOpcode::StrToLower:
+    return "str_to_lower";
+  case KirOpcode::MapNew:
+    return "map_new";
+  case KirOpcode::MapHas:
+    return "map_has";
+  case KirOpcode::MapKeys:
+    return "map_keys";
   case KirOpcode::EnumVariant:
     return "enum_variant";
   case KirOpcode::EnumVariantPayload:

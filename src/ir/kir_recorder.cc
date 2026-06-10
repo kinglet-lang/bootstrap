@@ -130,6 +130,27 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
   case OpCode::Modulo:
     bb_.instrs.push_back(rec(KirOpcode::IMod, {}, location));
     break;
+  case OpCode::Not:
+    bb_.instrs.push_back(rec(KirOpcode::Not, {}, location));
+    break;
+  case OpCode::BitNot:
+    bb_.instrs.push_back(rec(KirOpcode::BitNot, {}, location));
+    break;
+  case OpCode::BitAnd:
+    bb_.instrs.push_back(rec(KirOpcode::BitAnd, {}, location));
+    break;
+  case OpCode::BitOr:
+    bb_.instrs.push_back(rec(KirOpcode::BitOr, {}, location));
+    break;
+  case OpCode::BitXor:
+    bb_.instrs.push_back(rec(KirOpcode::BitXor, {}, location));
+    break;
+  case OpCode::Shl:
+    bb_.instrs.push_back(rec(KirOpcode::Shl, {}, location));
+    break;
+  case OpCode::Shr:
+    bb_.instrs.push_back(rec(KirOpcode::Shr, {}, location));
+    break;
   case OpCode::Eq:
     bb_.instrs.push_back(rec(KirOpcode::ICmpEq, {}, location));
     break;
@@ -194,11 +215,71 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
   case OpCode::IndexGet:
     bb_.instrs.push_back(rec(KirOpcode::IndexGet, {}, location));
     break;
+  case OpCode::IndexSet:
+    bb_.instrs.push_back(rec(KirOpcode::IndexSet, {}, location));
+    break;
   case OpCode::ArrayLen:
     bb_.instrs.push_back(rec(KirOpcode::ArrayLen, {}, location));
     break;
   case OpCode::ArraySlice:
     bb_.instrs.push_back(rec(KirOpcode::ArraySlice, {}, location));
+    break;
+  case OpCode::ArrayPush:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayPush, {}, location));
+    break;
+  case OpCode::ArrayResize:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayResize, {}, location));
+    break;
+  case OpCode::ArrayPop:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayPop, {}, location));
+    break;
+  case OpCode::ArrayRemove:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayRemove, {}, location));
+    break;
+  case OpCode::ArrayContains:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayContains, {}, location));
+    break;
+  case OpCode::ArrayClear:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayClear, {}, location));
+    break;
+  case OpCode::ArrayInsert:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayInsert, {}, location));
+    break;
+  case OpCode::ArrayIndexOf:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayIndexOf, {}, location));
+    break;
+  case OpCode::ArrayReverse:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayReverse, {}, location));
+    break;
+  case OpCode::StringStartsWith:
+    bb_.instrs.push_back(rec(KirOpcode::StrStartsWith, {}, location));
+    break;
+  case OpCode::StringEndsWith:
+    bb_.instrs.push_back(rec(KirOpcode::StrEndsWith, {}, location));
+    break;
+  case OpCode::StringReplace:
+    bb_.instrs.push_back(rec(KirOpcode::StrReplace, {}, location));
+    break;
+  case OpCode::StringSplit:
+    bb_.instrs.push_back(rec(KirOpcode::StrSplit, {}, location));
+    break;
+  case OpCode::StringTrim:
+    bb_.instrs.push_back(rec(KirOpcode::StrTrim, {}, location));
+    break;
+  case OpCode::StringToUpper:
+    bb_.instrs.push_back(rec(KirOpcode::StrToUpper, {}, location));
+    break;
+  case OpCode::StringToLower:
+    bb_.instrs.push_back(rec(KirOpcode::StrToLower, {}, location));
+    break;
+  case OpCode::MapNew:
+    bb_.instrs.push_back(rec(KirOpcode::MapNew, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::MapHas:
+    bb_.instrs.push_back(rec(KirOpcode::MapHas, {}, location));
+    break;
+  case OpCode::MapKeys:
+    bb_.instrs.push_back(rec(KirOpcode::MapKeys, {}, location));
     break;
   case OpCode::EnumVariant:
     bb_.instrs.push_back(

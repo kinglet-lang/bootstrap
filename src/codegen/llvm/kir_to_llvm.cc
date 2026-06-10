@@ -120,6 +120,27 @@ struct RtFns {
   llvm::Function *value_div = nullptr;
   llvm::Function *value_mod = nullptr;
   llvm::Function *value_cmp = nullptr;
+  llvm::Function *array_push = nullptr;
+  llvm::Function *array_resize = nullptr;
+  llvm::Function *array_pop = nullptr;
+  llvm::Function *array_clear = nullptr;
+  llvm::Function *array_insert = nullptr;
+  llvm::Function *array_reverse = nullptr;
+  llvm::Function *contains = nullptr;
+  llvm::Function *index_of = nullptr;
+  llvm::Function *map_new = nullptr;
+  llvm::Function *map_has = nullptr;
+  llvm::Function *map_keys = nullptr;
+  llvm::Function *index_get = nullptr;
+  llvm::Function *index_set = nullptr;
+  llvm::Function *remove = nullptr;
+  llvm::Function *str_starts_with = nullptr;
+  llvm::Function *str_ends_with = nullptr;
+  llvm::Function *str_replace = nullptr;
+  llvm::Function *str_split = nullptr;
+  llvm::Function *str_trim = nullptr;
+  llvm::Function *str_to_upper = nullptr;
+  llvm::Function *str_to_lower = nullptr;
 };
 
 RtFns declare_runtime(llvm::Module *module) {
@@ -216,6 +237,45 @@ RtFns declare_runtime(llvm::Module *module) {
                                         llvm::Function::ExternalLinkage, "kl_value_mod", module);
   rt.value_cmp = llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_value_cmp", module);
+
+  auto fn_1 = [&](const char *name) {
+    return llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                  llvm::Function::ExternalLinkage, name, module);
+  };
+  auto fn_2 = [&](const char *name) {
+    return llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                                  llvm::Function::ExternalLinkage, name, module);
+  };
+  auto fn_3 = [&](const char *name) {
+    return llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64, i64}, false),
+                                  llvm::Function::ExternalLinkage, name, module);
+  };
+  auto fn_2_i32 = [&](const char *name) {
+    return llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
+                                  llvm::Function::ExternalLinkage, name, module);
+  };
+  rt.array_push = fn_2("kl_array_push");
+  rt.array_resize = fn_3("kl_array_resize");
+  rt.array_pop = fn_1("kl_array_pop");
+  rt.array_clear = fn_1("kl_array_clear");
+  rt.array_insert = fn_3("kl_array_insert");
+  rt.array_reverse = fn_1("kl_array_reverse");
+  rt.contains = fn_2_i32("kl_contains");
+  rt.index_of = fn_2("kl_index_of");
+  rt.map_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
+                                      llvm::Function::ExternalLinkage, "kl_map_new", module);
+  rt.map_has = fn_2_i32("kl_map_has");
+  rt.map_keys = fn_1("kl_map_keys");
+  rt.index_get = fn_2("kl_index_get");
+  rt.index_set = fn_3("kl_index_set");
+  rt.remove = fn_2("kl_remove");
+  rt.str_starts_with = fn_2_i32("kl_str_starts_with");
+  rt.str_ends_with = fn_2_i32("kl_str_ends_with");
+  rt.str_replace = fn_3("kl_str_replace");
+  rt.str_split = fn_2("kl_str_split");
+  rt.str_trim = fn_1("kl_str_trim");
+  rt.str_to_upper = fn_1("kl_str_to_upper");
+  rt.str_to_lower = fn_1("kl_str_to_lower");
   return rt;
 }
 
@@ -817,6 +877,68 @@ public:
           return false;
         }
         break;
+      case KirOpcode::Not: {
+        llvm::Value *v = pop_value(&stack, error);
+        if (v == nullptr) {
+          return false;
+        }
+        llvm::Value *result = bool_to_i64(
+            builder, builder.CreateICmpEQ(v, llvm::ConstantInt::get(i64, 0)));
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::BitNot: {
+        llvm::Value *v = pop_value(&stack, error);
+        if (v == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateXor(v, llvm::ConstantInt::get(i64, -1));
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::BitAnd:
+      case KirOpcode::BitOr:
+      case KirOpcode::BitXor: {
+        llvm::Value *rhs = pop_value(&stack, error);
+        llvm::Value *lhs = pop_value(&stack, error);
+        if (lhs == nullptr || rhs == nullptr) {
+          return false;
+        }
+        llvm::Value *result = nullptr;
+        if (instr->op == KirOpcode::BitAnd) {
+          result = builder.CreateAnd(lhs, rhs);
+        } else if (instr->op == KirOpcode::BitOr) {
+          result = builder.CreateOr(lhs, rhs);
+        } else {
+          result = builder.CreateXor(lhs, rhs);
+        }
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::Shl:
+      case KirOpcode::Shr: {
+        llvm::Value *rhs = pop_value(&stack, error);
+        llvm::Value *lhs = pop_value(&stack, error);
+        if (lhs == nullptr || rhs == nullptr) {
+          return false;
+        }
+        // The VM clamps out-of-range shift amounts to a zero result.
+        llvm::Value *in_range =
+            builder.CreateICmpULT(rhs, llvm::ConstantInt::get(i64, 64));
+        llvm::Value *amount =
+            builder.CreateSelect(in_range, rhs, llvm::ConstantInt::get(i64, 0));
+        llvm::Value *shifted = instr->op == KirOpcode::Shl
+                                   ? builder.CreateShl(lhs, amount)
+                                   : builder.CreateLShr(lhs, amount);
+        llvm::Value *result =
+            builder.CreateSelect(in_range, shifted, llvm::ConstantInt::get(i64, 0));
+        push(result);
+        temps[i] = result;
+        break;
+      }
       case KirOpcode::Call: {
         const int argc = instr->operands[0];
         if (argc < 0) {
@@ -969,10 +1091,232 @@ public:
         if (index == nullptr || array == nullptr) {
           return false;
         }
-        llvm::Value *idx32 = builder.CreateTrunc(index, i32);
-        llvm::Value *value = builder.CreateCall(rt_.array_get, {array, idx32});
+        llvm::Value *value = builder.CreateCall(rt_.index_get, {array, index});
         push(value);
         temps[i] = value;
+        break;
+      }
+      case KirOpcode::IndexSet: {
+        llvm::Value *value = pop_value(&stack, error);
+        llvm::Value *index = pop_value(&stack, error);
+        llvm::Value *object = pop_value(&stack, error);
+        if (value == nullptr || index == nullptr || object == nullptr) {
+          return false;
+        }
+        llvm::Value *result =
+            builder.CreateCall(rt_.index_set, {object, index, value});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayPush: {
+        llvm::Value *value = pop_value(&stack, error);
+        llvm::Value *array = pop_value(&stack, error);
+        if (value == nullptr || array == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.array_push, {array, value});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayResize: {
+        llvm::Value *default_value = pop_value(&stack, error);
+        llvm::Value *count = pop_value(&stack, error);
+        llvm::Value *array = pop_value(&stack, error);
+        if (default_value == nullptr || count == nullptr || array == nullptr) {
+          return false;
+        }
+        llvm::Value *result =
+            builder.CreateCall(rt_.array_resize, {array, count, default_value});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayPop: {
+        llvm::Value *array = pop_value(&stack, error);
+        if (array == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.array_pop, {array});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayRemove: {
+        llvm::Value *key = pop_value(&stack, error);
+        llvm::Value *object = pop_value(&stack, error);
+        if (key == nullptr || object == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.remove, {object, key});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayContains: {
+        llvm::Value *needle = pop_value(&stack, error);
+        llvm::Value *object = pop_value(&stack, error);
+        if (needle == nullptr || object == nullptr) {
+          return false;
+        }
+        llvm::Value *found32 = builder.CreateCall(rt_.contains, {object, needle});
+        llvm::Value *result = builder.CreateZExt(found32, i64);
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayClear: {
+        llvm::Value *array = pop_value(&stack, error);
+        if (array == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.array_clear, {array});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayInsert: {
+        llvm::Value *value = pop_value(&stack, error);
+        llvm::Value *index = pop_value(&stack, error);
+        llvm::Value *array = pop_value(&stack, error);
+        if (value == nullptr || index == nullptr || array == nullptr) {
+          return false;
+        }
+        llvm::Value *result =
+            builder.CreateCall(rt_.array_insert, {array, index, value});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayIndexOf: {
+        llvm::Value *needle = pop_value(&stack, error);
+        llvm::Value *object = pop_value(&stack, error);
+        if (needle == nullptr || object == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.index_of, {object, needle});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::ArrayReverse: {
+        llvm::Value *array = pop_value(&stack, error);
+        if (array == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.array_reverse, {array});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::StrStartsWith:
+      case KirOpcode::StrEndsWith: {
+        llvm::Value *needle = pop_value(&stack, error);
+        llvm::Value *str = pop_value(&stack, error);
+        if (needle == nullptr || str == nullptr) {
+          return false;
+        }
+        llvm::Function *fn = instr->op == KirOpcode::StrStartsWith
+                                 ? rt_.str_starts_with
+                                 : rt_.str_ends_with;
+        llvm::Value *found32 = builder.CreateCall(fn, {str, needle});
+        llvm::Value *result = builder.CreateZExt(found32, i64);
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::StrReplace: {
+        llvm::Value *new_str = pop_value(&stack, error);
+        llvm::Value *old_str = pop_value(&stack, error);
+        llvm::Value *str = pop_value(&stack, error);
+        if (new_str == nullptr || old_str == nullptr || str == nullptr) {
+          return false;
+        }
+        llvm::Value *result =
+            builder.CreateCall(rt_.str_replace, {str, old_str, new_str});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::StrSplit: {
+        llvm::Value *delim = pop_value(&stack, error);
+        llvm::Value *str = pop_value(&stack, error);
+        if (delim == nullptr || str == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.str_split, {str, delim});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::StrTrim:
+      case KirOpcode::StrToUpper:
+      case KirOpcode::StrToLower: {
+        llvm::Value *str = pop_value(&stack, error);
+        if (str == nullptr) {
+          return false;
+        }
+        llvm::Function *fn = rt_.str_trim;
+        if (instr->op == KirOpcode::StrToUpper) {
+          fn = rt_.str_to_upper;
+        } else if (instr->op == KirOpcode::StrToLower) {
+          fn = rt_.str_to_lower;
+        }
+        llvm::Value *result = builder.CreateCall(fn, {str});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::MapNew: {
+        const int pair_count = instr->operands.empty() ? 0 : instr->operands[0];
+        if (pair_count < 0) {
+          *error = "map_new pair count invalid";
+          return false;
+        }
+        llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
+        llvm::AllocaInst *pairs = builder.CreateAlloca(
+            i64, llvm::ConstantInt::get(i32, pair_count * 2), "map_pairs");
+        for (int pi = pair_count - 1; pi >= 0; --pi) {
+          llvm::Value *value = pop_value(&stack, error);
+          llvm::Value *key = pop_value(&stack, error);
+          if (value == nullptr || key == nullptr) {
+            return false;
+          }
+          llvm::Value *key_slot =
+              builder.CreateGEP(i64, pairs, llvm::ConstantInt::get(i32, 2 * pi));
+          llvm::Value *value_slot =
+              builder.CreateGEP(i64, pairs, llvm::ConstantInt::get(i32, 2 * pi + 1));
+          builder.CreateStore(key, key_slot);
+          builder.CreateStore(value, value_slot);
+        }
+        llvm::Value *map = builder.CreateCall(
+            rt_.map_new, {llvm::ConstantInt::get(i32, pair_count),
+                          builder.CreateBitCast(pairs, i64p)});
+        push(map);
+        temps[i] = map;
+        break;
+      }
+      case KirOpcode::MapHas: {
+        llvm::Value *key = pop_value(&stack, error);
+        llvm::Value *map = pop_value(&stack, error);
+        if (key == nullptr || map == nullptr) {
+          return false;
+        }
+        llvm::Value *found32 = builder.CreateCall(rt_.map_has, {map, key});
+        llvm::Value *result = builder.CreateZExt(found32, i64);
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::MapKeys: {
+        llvm::Value *map = pop_value(&stack, error);
+        if (map == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.map_keys, {map});
+        push(result);
+        temps[i] = result;
         break;
       }
       case KirOpcode::ArrayLen: {

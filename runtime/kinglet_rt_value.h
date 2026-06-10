@@ -67,6 +67,31 @@ int32_t kl_value_len(kl_h value);
 kl_h kl_array_new(int32_t count, const kl_h *elements);
 kl_h kl_array_get(kl_h array, int32_t index);
 int32_t kl_array_len(kl_h array);
+kl_h kl_array_push(kl_h array, kl_h value);
+kl_h kl_array_resize(kl_h array, kl_h count, kl_h default_value);
+kl_h kl_array_pop(kl_h array);
+kl_h kl_array_clear(kl_h array);
+kl_h kl_array_insert(kl_h array, kl_h index, kl_h value);
+kl_h kl_array_reverse(kl_h array);
+int32_t kl_contains(kl_h object, kl_h needle);
+int64_t kl_index_of(kl_h object, kl_h needle);
+
+kl_h kl_map_new(int32_t pair_count, const kl_h *pairs);
+int32_t kl_map_has(kl_h map, kl_h key);
+kl_h kl_map_keys(kl_h map);
+// Generic indexed access dispatching across maps, strings, and arrays.
+kl_h kl_index_get(kl_h object, kl_h key);
+kl_h kl_index_set(kl_h object, kl_h key, kl_h value);
+// remove() on maps (by key) and arrays (by index, returns removed element).
+kl_h kl_remove(kl_h object, kl_h key);
+
+int32_t kl_str_starts_with(kl_h str, kl_h prefix);
+int32_t kl_str_ends_with(kl_h str, kl_h suffix);
+kl_h kl_str_replace(kl_h str, kl_h old_str, kl_h new_str);
+kl_h kl_str_split(kl_h str, kl_h delim);
+kl_h kl_str_trim(kl_h str);
+kl_h kl_str_to_upper(kl_h str);
+kl_h kl_str_to_lower(kl_h str);
 
 kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields);
 int32_t kl_struct_type_index(kl_h object);

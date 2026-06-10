@@ -6,6 +6,7 @@ static_library("kinglet_rt") {
     "kinglet_rt_enum.cc",
     "kinglet_rt_native.cc",
     "kinglet_rt_num.cc",
+    "kinglet_rt_map.cc",
   ]
 
   public = [

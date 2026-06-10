@@ -32,10 +32,9 @@ kl_h concat(kl_h left, kl_h right) {
 
 } // namespace
 
+// Note: null and integer 0 share the wire value 0; format the common case
+// (integer zero). Bools likewise print as 1/0 — there is no bool tag.
 std::string kl_value_text(kl_h value) {
-  if (value == 0) {
-    return "null";
-  }
   if (kl_is_inline_enum(value)) {
     const int variant = static_cast<int>(static_cast<uint64_t>(value) & 0xFFFF);
     return std::to_string(variant);
@@ -55,6 +54,8 @@ std::string kl_value_text(kl_h value) {
     return "[array]";
   case KlKind::Struct:
     return "<struct>";
+  case KlKind::Map:
+    return "<map>";
   }
   return "?";
 }

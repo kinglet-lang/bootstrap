@@ -66,7 +66,127 @@ int32_t kl_value_len(kl_h value) {
   if (hdr->kind == KlKind::Array) {
     return static_cast<int32_t>(static_cast<KlArray *>(ptr)->elements.size());
   }
+  if (hdr->kind == KlKind::Map) {
+    return static_cast<int32_t>(static_cast<KlMap *>(ptr)->order.size());
+  }
   return 0;
+}
+
+kl_h kl_array_push(kl_h array, kl_h value) {
+  if (kl_is_kind(array, KlKind::Array)) {
+    static_cast<KlArray *>(kl_unbox_ptr(array))->elements.push_back(value);
+  }
+  return 0;
+}
+
+kl_h kl_array_resize(kl_h array, kl_h count, kl_h default_value) {
+  if (kl_is_kind(array, KlKind::Array)) {
+    const int64_t n = kl_to_int(count);
+    if (n >= 0) {
+      static_cast<KlArray *>(kl_unbox_ptr(array))
+          ->elements.resize(static_cast<std::size_t>(n), default_value);
+    }
+  }
+  return 0;
+}
+
+kl_h kl_array_pop(kl_h array) {
+  if (!kl_is_kind(array, KlKind::Array)) {
+    return 0;
+  }
+  auto *arr = static_cast<KlArray *>(kl_unbox_ptr(array));
+  if (arr->elements.empty()) {
+    return 0;
+  }
+  kl_h last = arr->elements.back();
+  arr->elements.pop_back();
+  return last;
+}
+
+kl_h kl_array_clear(kl_h array) {
+  if (kl_is_kind(array, KlKind::Array)) {
+    static_cast<KlArray *>(kl_unbox_ptr(array))->elements.clear();
+  }
+  return 0;
+}
+
+kl_h kl_array_insert(kl_h array, kl_h index, kl_h value) {
+  if (!kl_is_kind(array, KlKind::Array)) {
+    return 0;
+  }
+  auto *arr = static_cast<KlArray *>(kl_unbox_ptr(array));
+  const int64_t idx = kl_to_int(index);
+  if (idx < 0 || static_cast<std::size_t>(idx) > arr->elements.size()) {
+    return 0;
+  }
+  // Inserting an array splices its elements, mirroring the VM.
+  if (kl_is_kind(value, KlKind::Array)) {
+    auto *src = static_cast<KlArray *>(kl_unbox_ptr(value));
+    arr->elements.insert(arr->elements.begin() + idx, src->elements.begin(),
+                         src->elements.end());
+  } else {
+    arr->elements.insert(arr->elements.begin() + idx, value);
+  }
+  return 0;
+}
+
+kl_h kl_array_reverse(kl_h array) {
+  if (kl_is_kind(array, KlKind::Array)) {
+    auto *arr = static_cast<KlArray *>(kl_unbox_ptr(array));
+    for (std::size_t i = 0, j = arr->elements.size(); i + 1 < j; ++i, --j) {
+      kl_h tmp = arr->elements[i];
+      arr->elements[i] = arr->elements[j - 1];
+      arr->elements[j - 1] = tmp;
+    }
+  }
+  return 0;
+}
+
+// contains() dispatches: substring search on strings, element search on
+// arrays (via kl_value_eq).
+int32_t kl_contains(kl_h object, kl_h needle) {
+  if (kl_is_kind(object, KlKind::String)) {
+    if (!kl_is_kind(needle, KlKind::String)) {
+      return 0;
+    }
+    const std::string &hay = static_cast<KlString *>(kl_unbox_ptr(object))->bytes;
+    const std::string &sub = static_cast<KlString *>(kl_unbox_ptr(needle))->bytes;
+    return hay.find(sub) != std::string::npos ? 1 : 0;
+  }
+  if (!kl_is_kind(object, KlKind::Array)) {
+    return 0;
+  }
+  auto *arr = static_cast<KlArray *>(kl_unbox_ptr(object));
+  for (kl_h elem : arr->elements) {
+    if (kl_value_eq(elem, needle)) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+// index_of() dispatches: substring position on strings, element position on
+// arrays; -1 when not found.
+int64_t kl_index_of(kl_h object, kl_h needle) {
+  if (kl_is_kind(object, KlKind::String)) {
+    if (!kl_is_kind(needle, KlKind::String)) {
+      return -1;
+    }
+    const std::string &hay = static_cast<KlString *>(kl_unbox_ptr(object))->bytes;
+    const std::string &sub = static_cast<KlString *>(kl_unbox_ptr(needle))->bytes;
+    const std::size_t pos = hay.find(sub);
+    return pos == std::string::npos ? -1 : static_cast<int64_t>(pos);
+  }
+  if (!kl_is_kind(object, KlKind::Array)) {
+    return -1;
+  }
+  auto *arr = static_cast<KlArray *>(kl_unbox_ptr(object));
+  for (std::size_t i = 0; i < arr->elements.size(); ++i) {
+    if (kl_value_eq(arr->elements[i], needle)) {
+      return static_cast<int64_t>(i);
+    }
+  }
+  return -1;
 }
 
 int32_t kl_struct_type_index(kl_h object) {
