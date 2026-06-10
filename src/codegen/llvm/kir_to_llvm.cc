@@ -81,6 +81,7 @@ struct RtFns {
   llvm::Function *struct_field_at = nullptr;
   llvm::Function *enum_new = nullptr;
   llvm::Function *value_eq = nullptr;
+  llvm::Function *value_is_err = nullptr;
   llvm::Function *exit_code = nullptr;
 };
 
@@ -115,6 +116,8 @@ RtFns declare_runtime(llvm::Module *module) {
                                        llvm::Function::ExternalLinkage, "kl_enum_new", module);
   rt.value_eq = llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
                                        llvm::Function::ExternalLinkage, "kl_value_eq", module);
+  rt.value_is_err = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
+                                           llvm::Function::ExternalLinkage, "kl_value_is_err", module);
   rt.exit_code = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_exit_code", module);
   return rt;
@@ -278,7 +281,14 @@ public:
     leaders.insert(0);
     for (std::size_t i = 0; i < linear_.size(); ++i) {
       const KirInstr *instr = linear_[i];
-      if (instr->op == KirOpcode::Br || instr->op == KirOpcode::CondBr) {
+      if (instr->op == KirOpcode::PushHandler) {
+        if (instr->operands.empty()) {
+          *error = "push_handler missing operand";
+          return false;
+        }
+        leaders.insert(i + 1 + static_cast<std::size_t>(instr->operands[0]));
+      } else if (instr->op == KirOpcode::Br || instr->op == KirOpcode::CondBr ||
+                 instr->op == KirOpcode::JmpIfErr) {
         if (instr->operands.empty()) {
           *error = "jump instruction missing operand";
           return false;
@@ -290,9 +300,11 @@ public:
           return false;
         }
         leaders.insert(static_cast<std::size_t>(target));
-        if (instr->op == KirOpcode::CondBr) {
+        if (instr->op == KirOpcode::CondBr || instr->op == KirOpcode::JmpIfErr) {
           leaders.insert(i + 1);
         }
+      } else if (instr->op == KirOpcode::PropagateErr) {
+        leaders.insert(i + 1);
       }
     }
 
@@ -341,6 +353,7 @@ public:
     std::vector<llvm::Value *> temps(linear_.size(), nullptr);
     std::vector<llvm::Value *> stack;
     std::map<llvm::BasicBlock *, std::vector<llvm::Value *>> exit_stacks;
+    std::vector<std::size_t> handler_pcs;
 
     auto merge_stack_at_leader = [&](std::size_t leader_pc) -> bool {
       if (leader_pc == 0) {
@@ -354,17 +367,32 @@ public:
           preds.push_back(pred);
         }
       };
+      std::vector<std::size_t> sim_handlers;
       for (std::size_t j = 0; j < linear_.size(); ++j) {
         const KirInstr *jump = linear_[j];
+        if (jump->op == KirOpcode::PushHandler) {
+          sim_handlers.push_back(j + 1 + static_cast<std::size_t>(jump->operands[0]));
+        } else if (jump->op == KirOpcode::PopHandler) {
+          if (!sim_handlers.empty()) {
+            sim_handlers.pop_back();
+          }
+        }
         if (jump->op == KirOpcode::Br) {
           if (j + 1 + static_cast<std::size_t>(jump->operands[0]) == leader_pc) {
             add_pred(block_index(j));
           }
-        } else if (jump->op == KirOpcode::CondBr) {
+        } else if (jump->op == KirOpcode::CondBr || jump->op == KirOpcode::JmpIfErr) {
           if (j + 1 == leader_pc) {
             add_pred(block_index(j));
           }
           if (j + 1 + static_cast<std::size_t>(jump->operands[0]) == leader_pc) {
+            add_pred(block_index(j));
+          }
+        } else if (jump->op == KirOpcode::PropagateErr) {
+          if (j + 1 == leader_pc) {
+            add_pred(block_index(j));
+          }
+          if (!sim_handlers.empty() && sim_handlers.back() == leader_pc) {
             add_pred(block_index(j));
           }
         }
@@ -377,7 +405,9 @@ public:
           bool can_fallthrough = true;
           for (std::size_t j = prev_leader; j < leader_pc; ++j) {
             const KirInstr *instr = linear_[j];
-            if (instr->op == KirOpcode::Br || instr->op == KirOpcode::Ret) {
+            if (instr->op == KirOpcode::Br || instr->op == KirOpcode::Ret ||
+                instr->op == KirOpcode::CondBr || instr->op == KirOpcode::JmpIfErr ||
+                instr->op == KirOpcode::PropagateErr) {
               can_fallthrough = false;
               break;
             }
@@ -793,6 +823,60 @@ public:
         const std::size_t false_target = i + 1 + static_cast<std::size_t>(rel);
         const std::size_t true_target = i + 1;
         builder.CreateCondBr(cond, block_index(true_target), block_index(false_target));
+        exit_stacks[bb] = stack;
+        break;
+      }
+      case KirOpcode::JmpIfErr: {
+        if (bb->getTerminator() != nullptr) {
+          break;
+        }
+        if (stack.empty()) {
+          *error = "jmp_if_err stack underflow";
+          return false;
+        }
+        llvm::Value *top = stack.back();
+        llvm::Value *is_err =
+            builder.CreateCall(rt_.value_is_err, {top});
+        llvm::Value *cond = builder.CreateICmpNE(is_err, llvm::ConstantInt::get(i32, 0));
+        const int rel = instr->operands[0];
+        const std::size_t err_target = i + 1 + static_cast<std::size_t>(rel);
+        const std::size_t ok_target = i + 1;
+        builder.CreateCondBr(cond, block_index(err_target), block_index(ok_target));
+        exit_stacks[bb] = stack;
+        break;
+      }
+      case KirOpcode::PushHandler: {
+        const int rel = instr->operands[0];
+        handler_pcs.push_back(i + 1 + static_cast<std::size_t>(rel));
+        break;
+      }
+      case KirOpcode::PopHandler: {
+        if (handler_pcs.empty()) {
+          *error = "pop_handler with empty handler stack";
+          return false;
+        }
+        handler_pcs.pop_back();
+        break;
+      }
+      case KirOpcode::PropagateErr: {
+        if (bb->getTerminator() != nullptr) {
+          break;
+        }
+        if (stack.empty()) {
+          *error = "propagate_err stack underflow";
+          return false;
+        }
+        if (handler_pcs.empty()) {
+          *error = "propagate_err without active handler";
+          return false;
+        }
+        llvm::Value *top = stack.back();
+        llvm::Value *is_err =
+            builder.CreateCall(rt_.value_is_err, {top});
+        llvm::Value *cond = builder.CreateICmpNE(is_err, llvm::ConstantInt::get(i32, 0));
+        const std::size_t catch_target = handler_pcs.back();
+        const std::size_t ok_target = i + 1;
+        builder.CreateCondBr(cond, block_index(catch_target), block_index(ok_target));
         exit_stacks[bb] = stack;
         break;
       }

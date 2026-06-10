@@ -41,9 +41,9 @@ int32_t kl_value_is_err(kl_h value) {
     return type_idx == 0 ? 1 : 0;
   }
   if (kl_is_heap(value)) {
-    auto *hdr = static_cast<KlHeader *>(kl_unbox_ptr(value));
-    if (hdr->kind == KlKind::Enum) {
-      return static_cast<KlEnum *>(hdr)->type_index == 0 ? 1 : 0;
+    auto *obj = static_cast<KlEnum *>(kl_unbox_ptr(value));
+    if (obj->hdr.kind == KlKind::Enum) {
+      return obj->type_index == 0 ? 1 : 0;
     }
   }
   return 0;
