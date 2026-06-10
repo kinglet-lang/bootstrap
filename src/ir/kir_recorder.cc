@@ -145,6 +145,9 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
   case OpCode::StoreLocal:
     bb_.instrs.push_back(rec(KirOpcode::StoreLocal, {static_cast<int32_t>(operand)}, location));
     break;
+  case OpCode::Null:
+    bb_.instrs.push_back(rec(KirOpcode::ConstNull, {}, location));
+    break;
   case OpCode::Pop:
     bb_.instrs.push_back(rec(KirOpcode::Pop, {}, location));
     break;
@@ -195,6 +198,33 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     break;
   case OpCode::CastTo:
     bb_.instrs.push_back(rec(KirOpcode::CastTo, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeOut:
+    bb_.instrs.push_back(rec(KirOpcode::NativeOut, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeOutLn:
+    bb_.instrs.push_back(rec(KirOpcode::NativeOutLn, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeErr:
+    bb_.instrs.push_back(rec(KirOpcode::NativeErr, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeErrLn:
+    bb_.instrs.push_back(rec(KirOpcode::NativeErrLn, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeIn:
+    bb_.instrs.push_back(rec(KirOpcode::NativeIn, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeInSecret:
+    bb_.instrs.push_back(rec(KirOpcode::NativeInSecret, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeFsRead:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFsRead, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeFsWrite:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFsWrite, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::NativeSysArgs:
+    bb_.instrs.push_back(rec(KirOpcode::NativeSysArgs, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::Negate:
     bb_.instrs.push_back(rec(KirOpcode::INeg, {}, location));

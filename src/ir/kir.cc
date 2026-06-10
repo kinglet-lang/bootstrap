@@ -82,6 +82,24 @@ const char *kir_opcode_name(KirOpcode op) {
     return "enum_payload_get";
   case KirOpcode::CastTo:
     return "cast_to";
+  case KirOpcode::NativeOut:
+    return "native_out";
+  case KirOpcode::NativeOutLn:
+    return "native_out_ln";
+  case KirOpcode::NativeErr:
+    return "native_err";
+  case KirOpcode::NativeErrLn:
+    return "native_err_ln";
+  case KirOpcode::NativeIn:
+    return "native_in";
+  case KirOpcode::NativeInSecret:
+    return "native_in_secret";
+  case KirOpcode::NativeFsRead:
+    return "native_fs_read";
+  case KirOpcode::NativeFsWrite:
+    return "native_fs_write";
+  case KirOpcode::NativeSysArgs:
+    return "native_sys_args";
   case KirOpcode::INeg:
     return "ineg";
   case KirOpcode::Unreachable:

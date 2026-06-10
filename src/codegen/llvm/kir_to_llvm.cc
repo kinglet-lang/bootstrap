@@ -61,9 +61,15 @@ int max_local_slot(const KirFunction &fn) {
   return std::max(max_slot, 0);
 }
 
+std::string g_lower_context;
+
 llvm::Value *pop_value(std::vector<llvm::Value *> *stack, std::string *error) {
   if (stack->empty()) {
-    *error = "native lowering stack underflow";
+    if (g_lower_context.empty()) {
+      *error = "native lowering stack underflow";
+    } else {
+      *error = "native lowering stack underflow at " + g_lower_context;
+    }
     return nullptr;
   }
   llvm::Value *value = stack->back();
@@ -83,6 +89,14 @@ struct RtFns {
   llvm::Function *enum_new_payload = nullptr;
   llvm::Function *enum_payload_at = nullptr;
   llvm::Function *cast_to_int = nullptr;
+  llvm::Function *native_out = nullptr;
+  llvm::Function *native_out_ln = nullptr;
+  llvm::Function *native_err = nullptr;
+  llvm::Function *native_err_ln = nullptr;
+  llvm::Function *native_in = nullptr;
+  llvm::Function *native_fs_read = nullptr;
+  llvm::Function *native_fs_write = nullptr;
+  llvm::Function *native_sys_args = nullptr;
   llvm::Function *value_eq = nullptr;
   llvm::Function *value_is_err = nullptr;
   llvm::Function *exit_code = nullptr;
@@ -125,6 +139,27 @@ RtFns declare_runtime(llvm::Module *module) {
                                               module);
   rt.cast_to_int = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                                           llvm::Function::ExternalLinkage, "kl_cast_to_int", module);
+  rt.native_out = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
+                                         llvm::Function::ExternalLinkage, "kl_native_out", module);
+  rt.native_out_ln = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
+                                            llvm::Function::ExternalLinkage, "kl_native_out_ln",
+                                            module);
+  rt.native_err = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
+                                         llvm::Function::ExternalLinkage, "kl_native_err", module);
+  rt.native_err_ln = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
+                                           llvm::Function::ExternalLinkage, "kl_native_err_ln",
+                                           module);
+  rt.native_in = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p, i32}, false),
+                                        llvm::Function::ExternalLinkage, "kl_native_in", module);
+  rt.native_fs_read = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                             llvm::Function::ExternalLinkage, "kl_native_fs_read",
+                                             module);
+  rt.native_fs_write = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                                              llvm::Function::ExternalLinkage, "kl_native_fs_write",
+                                              module);
+  rt.native_sys_args = llvm::Function::Create(llvm::FunctionType::get(i64, false),
+                                               llvm::Function::ExternalLinkage, "kl_native_sys_args",
+                                               module);
   rt.value_eq = llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
                                        llvm::Function::ExternalLinkage, "kl_value_eq", module);
   rt.value_is_err = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
@@ -491,6 +526,7 @@ public:
 
     for (std::size_t i = 0; i < linear_.size(); ++i) {
       const KirInstr *instr = linear_[i];
+      g_lower_context = "fn " + fn.name + " @" + kir_opcode_name(instr->op);
       llvm::BasicBlock *bb = block_index(i);
       if (leaders.count(i) > 0) {
         if (i > 0) {
@@ -505,6 +541,24 @@ public:
       }
       llvm::IRBuilder<> builder(bb);
       auto push = [&](llvm::Value *v) { stack.push_back(v); };
+
+      auto pop_args_array = [&](int argc) -> llvm::Value * {
+        if (argc <= 0) {
+          return llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(i64));
+        }
+        llvm::AllocaInst *elements =
+            builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, argc), "native_args");
+        for (int ai = argc - 1; ai >= 0; --ai) {
+          llvm::Value *elem = pop_value(&stack, error);
+          if (elem == nullptr) {
+            return nullptr;
+          }
+          llvm::Value *slot =
+              builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ai));
+          builder.CreateStore(elem, slot);
+        }
+        return builder.CreateBitCast(elements, llvm::PointerType::getUnqual(i64));
+      };
 
       auto pop_binop = [&](KirOpcode op) -> bool {
         llvm::Value *rhs = pop_value(&stack, error);
@@ -892,6 +946,81 @@ public:
         }
         push(result);
         temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeOut:
+      case KirOpcode::NativeOutLn:
+      case KirOpcode::NativeErr:
+      case KirOpcode::NativeErrLn: {
+        const int argc = instr->operands[0];
+        llvm::Value *args = pop_args_array(argc);
+        if (args == nullptr) {
+          return false;
+        }
+        llvm::Function *target = rt_.native_out;
+        if (instr->op == KirOpcode::NativeOutLn) {
+          target = rt_.native_out_ln;
+        } else if (instr->op == KirOpcode::NativeErr) {
+          target = rt_.native_err;
+        } else if (instr->op == KirOpcode::NativeErrLn) {
+          target = rt_.native_err_ln;
+        }
+        builder.CreateCall(target, {llvm::ConstantInt::get(i32, argc), args});
+        push(llvm::ConstantInt::get(i64, 0));
+        temps[i] = stack.back();
+        break;
+      }
+      case KirOpcode::NativeIn:
+      case KirOpcode::NativeInSecret: {
+        const int argc = instr->operands[0];
+        llvm::Value *args = pop_args_array(argc);
+        if (args == nullptr) {
+          return false;
+        }
+        const int secret = instr->op == KirOpcode::NativeInSecret ? 1 : 0;
+        llvm::Value *line =
+            builder.CreateCall(rt_.native_in,
+                               {llvm::ConstantInt::get(i32, argc), args,
+                                llvm::ConstantInt::get(i32, secret)});
+        push(line);
+        temps[i] = line;
+        break;
+      }
+      case KirOpcode::NativeFsRead: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_fs_read expects exactly one argument";
+          return false;
+        }
+        llvm::Value *path = pop_value(&stack, error);
+        if (path == nullptr) {
+          return false;
+        }
+        llvm::Value *contents = builder.CreateCall(rt_.native_fs_read, {path});
+        push(contents);
+        temps[i] = contents;
+        break;
+      }
+      case KirOpcode::NativeFsWrite: {
+        const int argc = instr->operands[0];
+        if (argc != 2) {
+          *error = "native_fs_write expects exactly two arguments";
+          return false;
+        }
+        llvm::Value *content = pop_value(&stack, error);
+        llvm::Value *path = pop_value(&stack, error);
+        if (path == nullptr || content == nullptr) {
+          return false;
+        }
+        builder.CreateCall(rt_.native_fs_write, {path, content});
+        push(llvm::ConstantInt::get(i64, 0));
+        temps[i] = stack.back();
+        break;
+      }
+      case KirOpcode::NativeSysArgs: {
+        llvm::Value *argv = builder.CreateCall(rt_.native_sys_args, {});
+        push(argv);
+        temps[i] = argv;
         break;
       }
       case KirOpcode::Ret: {
