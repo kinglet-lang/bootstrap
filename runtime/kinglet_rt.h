@@ -1,5 +1,7 @@
 #pragma once
 
+#include "runtime/kinglet_rt_value.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
