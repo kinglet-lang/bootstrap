@@ -468,11 +468,16 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
   kir_recorder_.begin_function(function.name,
                                static_cast<int>(function.params.size()));
   kir_instr_at_bc_.clear();
+  bool body_returned = false;
+  if (body && !body->statements.empty()) {
+    body_returned =
+        dynamic_cast<const ast::ReturnStmt *>(body->statements.back().get()) != nullptr;
+  }
   compile_stmt(*function.body);
   implicit_return_stmt_ = nullptr;
 
   // Fallthrough safety: implicit null return
-  if (errors_.empty()) {
+  if (errors_.empty() && !body_returned) {
     emit(OpCode::Null, function.location);
     emit(OpCode::Return, function.location);
   }
