@@ -32,8 +32,19 @@ enum class KirOpcode {
   Br,
   CondBr,
   Switch,
+  StructNew,
+  FieldGet,
+  ArrayNew,
+  IndexGet,
+  ArrayLen,
+  EnumVariant,
   Unreachable,
   Nop,
+};
+
+struct KirStructMeta {
+  std::string name;
+  std::vector<std::string> field_names;
 };
 
 struct KirInstr {
@@ -57,6 +68,9 @@ struct KirFunction {
 
 struct KirModule {
   std::vector<KirFunction> functions;
+  // Parallel to compile-time constant pool indices (string entries used by FieldGet).
+  std::vector<std::string> constant_strings;
+  std::vector<KirStructMeta> struct_metas;
 };
 
 const char *kir_opcode_name(KirOpcode op);

@@ -204,6 +204,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
     }
   }
 
+  attach_kir_metadata();
   return CompileResult{.chunk = std::move(chunk_),
                        .kir = std::move(kir_module_),
                        .errors = std::move(errors_),
@@ -306,10 +307,28 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
     if (!errors_.empty()) break;
   }
 
+  attach_kir_metadata();
   return CompileResult{.chunk = std::move(chunk_),
                        .kir = std::move(kir_module_),
                        .errors = std::move(errors_),
                        .warnings = std::move(warnings_)};
+}
+
+void Compiler::attach_kir_metadata() {
+  kir_module_.struct_metas.clear();
+  for (const StructMeta &meta : chunk_.struct_metas()) {
+    KirStructMeta km;
+    km.name = meta.name;
+    km.field_names = meta.field_names;
+    kir_module_.struct_metas.push_back(std::move(km));
+  }
+  const std::vector<Value> &constants = chunk_.constants();
+  kir_module_.constant_strings.resize(constants.size());
+  for (std::size_t i = 0; i < constants.size(); ++i) {
+    if (constants[i].type == ValueType::String) {
+      kir_module_.constant_strings[i] = constants[i].string_val();
+    }
+  }
 }
 
 void Compiler::push_scope() {
@@ -1887,8 +1906,9 @@ void Compiler::emit_operand(OpCode op, uint32_t operand, ast::SourceLocation loc
 
 void Compiler::emit_constant(Value value, ast::SourceLocation location) {
   kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
-  kir_recorder_.on_constant(value, location);
+  const uint32_t pool_index = static_cast<uint32_t>(chunk_.constants().size());
   emitter_.emit_constant(value, location);
+  kir_recorder_.on_constant(value, pool_index, location);
 }
 
 std::size_t Compiler::emit_jump(OpCode op, ast::SourceLocation location) {

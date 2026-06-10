@@ -56,7 +56,8 @@ void KirRecorder::patch_jump(std::size_t jump_instr_index, int32_t relative_offs
   bb_.instrs[jump_instr_index].operands[0] = relative_offset;
 }
 
-void KirRecorder::on_constant(const Value &value, ast::SourceLocation location) {
+void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
+                              ast::SourceLocation location) {
   if (!active_) {
     return;
   }
@@ -67,9 +68,12 @@ void KirRecorder::on_constant(const Value &value, ast::SourceLocation location) 
     bb_.instrs.push_back(rec(KirOpcode::ConstBool, {value.as_bool ? 1 : 0}, location));
   } else if (value.type == ValueType::Null) {
     bb_.instrs.push_back(rec(KirOpcode::ConstNull, {}, location));
+  } else if (value.type == ValueType::String) {
+    bb_.instrs.push_back(
+        rec(KirOpcode::ConstString, {static_cast<int32_t>(pool_index)}, location));
   } else if (value.type == ValueType::Function) {
     bb_.instrs.push_back(
-        rec(KirOpcode::ConstFn, {static_cast<int32_t>(value.as_int)}, location));
+        rec(KirOpcode::ConstFn, {static_cast<int32_t>(value.function_idx)}, location));
   }
 }
 
@@ -131,6 +135,28 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     break;
   case OpCode::Return:
     bb_.instrs.push_back(rec(KirOpcode::Ret, {}, location));
+    break;
+  case OpCode::StructNew:
+    bb_.instrs.push_back(
+        rec(KirOpcode::StructNew, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::FieldGet:
+    bb_.instrs.push_back(
+        rec(KirOpcode::FieldGet, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::ArrayNew:
+    bb_.instrs.push_back(
+        rec(KirOpcode::ArrayNew, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::IndexGet:
+    bb_.instrs.push_back(rec(KirOpcode::IndexGet, {}, location));
+    break;
+  case OpCode::ArrayLen:
+    bb_.instrs.push_back(rec(KirOpcode::ArrayLen, {}, location));
+    break;
+  case OpCode::EnumVariant:
+    bb_.instrs.push_back(
+        rec(KirOpcode::EnumVariant, {static_cast<int32_t>(operand)}, location));
     break;
   default:
     break;

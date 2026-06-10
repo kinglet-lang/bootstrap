@@ -14,7 +14,7 @@ public:
   void end_function(KirModule *module);
 
   void on_emit(OpCode op, uint32_t operand, ast::SourceLocation location);
-  void on_constant(const Value &value, ast::SourceLocation location);
+  void on_constant(const Value &value, uint32_t pool_index, ast::SourceLocation location);
 
   std::size_t record_jump(OpCode op, ast::SourceLocation location);
   void patch_jump(std::size_t jump_instr_index, int32_t relative_offset);

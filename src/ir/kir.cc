@@ -56,6 +56,18 @@ const char *kir_opcode_name(KirOpcode op) {
     return "cond_br";
   case KirOpcode::Switch:
     return "switch";
+  case KirOpcode::StructNew:
+    return "struct_new";
+  case KirOpcode::FieldGet:
+    return "field_get";
+  case KirOpcode::ArrayNew:
+    return "array_new";
+  case KirOpcode::IndexGet:
+    return "index_get";
+  case KirOpcode::ArrayLen:
+    return "array_len";
+  case KirOpcode::EnumVariant:
+    return "enum_variant";
   case KirOpcode::Unreachable:
     return "unreachable";
   case KirOpcode::Nop:

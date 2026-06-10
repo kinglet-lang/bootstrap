@@ -76,6 +76,7 @@ private:
   // type arguments at a call site (literals, locals, struct/method returns).
   std::string infer_arg_type_name(const ast::Expr &expr) const;
   int resolve_free_function_for_type(const std::string &name, const std::string &arg_type) const;
+  void attach_kir_metadata();
 
   Chunk chunk_;
   BytecodeEmitter emitter_;
