@@ -354,6 +354,13 @@ public:
     std::vector<llvm::Value *> stack;
     std::map<llvm::BasicBlock *, std::vector<llvm::Value *>> exit_stacks;
     std::vector<std::size_t> handler_pcs;
+    std::set<std::size_t> handler_landings;
+    for (std::size_t i = 0; i < linear_.size(); ++i) {
+      const KirInstr *instr = linear_[i];
+      if (instr->op == KirOpcode::PushHandler && !instr->operands.empty()) {
+        handler_landings.insert(i + 1 + static_cast<std::size_t>(instr->operands[0]));
+      }
+    }
 
     auto merge_stack_at_leader = [&](std::size_t leader_pc) -> bool {
       if (leader_pc == 0) {
@@ -419,6 +426,10 @@ public:
       }
       if (preds.empty()) {
         stack.clear();
+        if (handler_landings.count(leader_pc) > 0) {
+          // Unreachable in success-only paths; keep stack depth for catch binding.
+          stack.push_back(llvm::UndefValue::get(i64));
+        }
         return true;
       }
       if (preds.size() == 1) {
