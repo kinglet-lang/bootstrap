@@ -98,6 +98,7 @@ struct KirModule {
   std::vector<KirEnumMeta> enum_metas;
   // Chunk function pool indices (ConstFn operands) → symbol names.
   std::vector<std::string> function_names;
+  std::vector<std::string> function_symbols;
   std::vector<int32_t> function_param_counts;
 };
 

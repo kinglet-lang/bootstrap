@@ -78,6 +78,7 @@ private:
   std::string infer_arg_type_name(const ast::Expr &expr) const;
   int resolve_free_function_for_type(const std::string &name, const std::string &arg_type) const;
   void attach_kir_metadata();
+  void record_function_source(int function_idx, const std::string &source_path);
 
   Chunk chunk_;
   BytecodeEmitter emitter_;
@@ -111,6 +112,7 @@ private:
   std::unordered_set<std::string> processed_modules_;
   std::unordered_map<std::string, std::string> namespace_source_paths_;
   std::string entry_source_path_;
+  std::vector<std::string> function_source_paths_;
   std::unordered_map<std::string, std::string> local_types_;
   std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
   std::unordered_map<std::string, std::string> method_return_types_;

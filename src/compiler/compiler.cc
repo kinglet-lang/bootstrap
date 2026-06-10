@@ -39,6 +39,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
   enum_indices_.clear();
   processed_modules_.clear();
   namespace_source_paths_.clear();
+  function_source_paths_.clear();
   concept_registry_.clear();
   func_first_param_.clear();
   global_const_inits_.clear();
@@ -148,6 +149,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
           .entry = 0,
           .param_count = static_cast<int>(function->params.size()),
       });
+      record_function_source(idx, entry_source_path_);
       uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
       function_indices_[function->name] = static_cast<int>(const_idx);
       method_return_types_[function->name] = function->return_type.name;
@@ -297,6 +299,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
           .entry = 0,
           .param_count = static_cast<int>(function->params.size()),
       });
+      record_function_source(idx, entry_source_path_);
       uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
       function_indices_[function->name] = static_cast<int>(const_idx);
       functions.push_back(function);
@@ -315,6 +318,31 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
                        .warnings = std::move(warnings_)};
 }
 
+namespace {
+
+std::string mangled_native_symbol(const std::string &name, const std::string &source_path) {
+  if (name == "main") {
+    return "kinglet_user_main";
+  }
+  if (!source_path.empty()) {
+    return "kinglet_fn_" + std::filesystem::path(source_path).stem().string() + "_" + name;
+  }
+  return "kinglet_fn_" + name;
+}
+
+} // namespace
+
+void Compiler::record_function_source(int function_idx, const std::string &source_path) {
+  if (function_idx < 0) {
+    return;
+  }
+  const auto idx = static_cast<std::size_t>(function_idx);
+  if (function_source_paths_.size() <= idx) {
+    function_source_paths_.resize(idx + 1);
+  }
+  function_source_paths_[idx] = source_path;
+}
+
 void Compiler::attach_kir_metadata() {
   kir_module_.struct_metas.clear();
   for (const StructMeta &meta : chunk_.struct_metas()) {
@@ -325,10 +353,17 @@ void Compiler::attach_kir_metadata() {
   }
   kir_module_.enum_metas.clear();
   kir_module_.function_names.clear();
+  kir_module_.function_symbols.clear();
   kir_module_.function_param_counts.clear();
-  for (const FunctionInfo &fn : chunk_.functions()) {
+  for (std::size_t i = 0; i < chunk_.functions().size(); ++i) {
+    const FunctionInfo &fn = chunk_.functions()[i];
     kir_module_.function_names.push_back(fn.name);
     kir_module_.function_param_counts.push_back(static_cast<int32_t>(fn.param_count));
+    std::string src;
+    if (i < function_source_paths_.size()) {
+      src = function_source_paths_[i];
+    }
+    kir_module_.function_symbols.push_back(mangled_native_symbol(fn.name, src));
   }
   for (const EnumMeta &meta : chunk_.enum_metas()) {
     KirEnumMeta km;
@@ -1375,6 +1410,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
               .entry = 0,
               .param_count = static_cast<int>(decl->params.size()),
           });
+          record_function_source(idx, entry_source_path_);
           uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
           function_indices_[mangled] = static_cast<int>(const_idx);
           pending_generic_funcs_.push_back({mangled, decl});
@@ -1944,8 +1980,8 @@ void Compiler::emit_operand(OpCode op, uint32_t operand, ast::SourceLocation loc
 
 void Compiler::emit_constant(Value value, ast::SourceLocation location) {
   kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
-  const uint32_t pool_index = static_cast<uint32_t>(chunk_.constants().size());
-  emitter_.emit_constant(value, location);
+  const uint32_t pool_index = chunk_.add_constant(value);
+  emitter_.emit_operand(OpCode::Constant, pool_index, location);
   kir_recorder_.on_constant(value, pool_index, location);
 }
 
@@ -2137,6 +2173,7 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
         .entry = 0,
         .param_count = static_cast<int>(func->params.size()),
     });
+    record_function_source(idx, mod.resolved_path);
     uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
 
     std::string qualified = ns + "::" + func->name;
@@ -2157,6 +2194,7 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
         .entry = 0,
         .param_count = static_cast<int>(func->params.size()),
     });
+    record_function_source(idx, mod.resolved_path);
     uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
     function_indices_[ns + "::" + func->name] = static_cast<int>(const_idx);
     function_indices_[func->name] = static_cast<int>(const_idx);

@@ -77,6 +77,9 @@ kl_h kl_enum_new_payload(int32_t type_index, int32_t variant_index, int32_t coun
                          const kl_h *elements);
 kl_h kl_enum_payload_at(kl_h value, int32_t index);
 kl_h kl_cast_to_int(kl_h value);
+kl_h kl_cast_to_float(kl_h value);
+kl_h kl_cast_to_string(kl_h value);
+kl_h kl_cast_to_char(kl_h value);
 int32_t kl_value_eq(kl_h left, kl_h right);
 int32_t kl_value_is_err(kl_h value);
 int32_t kl_exit_code(kl_h value);

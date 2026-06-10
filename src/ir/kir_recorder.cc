@@ -1,5 +1,7 @@
 #include "ir/kir_recorder.h"
 
+#include <cstring>
+
 namespace kinglet {
 
 namespace {
@@ -84,6 +86,13 @@ void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
                              location));
   } else if (value.type == ValueType::Bool) {
     bb_.instrs.push_back(rec(KirOpcode::ConstBool, {value.as_bool ? 1 : 0}, location));
+  } else if (value.type == ValueType::Double) {
+    int64_t bits = 0;
+    std::memcpy(&bits, &value.as_double_storage, sizeof(bits));
+    bb_.instrs.push_back(rec(KirOpcode::ConstFloat,
+                             {static_cast<int32_t>(bits),
+                              static_cast<int32_t>(static_cast<uint64_t>(bits) >> 32)},
+                             location));
   } else if (value.type == ValueType::Null) {
     bb_.instrs.push_back(rec(KirOpcode::ConstNull, {}, location));
   } else if (value.type == ValueType::String) {

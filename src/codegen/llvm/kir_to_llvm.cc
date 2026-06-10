@@ -30,9 +30,12 @@ namespace kinglet {
 
 namespace {
 
-std::string fn_symbol(const std::string &name) {
+std::string fn_symbol(const std::string &name, const std::string &source_path = "") {
   if (name == "main") {
     return "kinglet_user_main";
+  }
+  if (!source_path.empty()) {
+    return "kinglet_fn_" + std::filesystem::path(source_path).stem().string() + "_" + name;
   }
   return "kinglet_fn_" + name;
 }
@@ -68,7 +71,7 @@ llvm::Value *pop_value(std::vector<llvm::Value *> *stack, std::string *error) {
     if (g_lower_context.empty()) {
       *error = "native lowering stack underflow";
     } else {
-      *error = "native lowering stack underflow at " + g_lower_context;
+      *error = "native lowering stack underflow in " + g_lower_context;
     }
     return nullptr;
   }
@@ -89,6 +92,9 @@ struct RtFns {
   llvm::Function *enum_new_payload = nullptr;
   llvm::Function *enum_payload_at = nullptr;
   llvm::Function *cast_to_int = nullptr;
+  llvm::Function *cast_to_float = nullptr;
+  llvm::Function *cast_to_string = nullptr;
+  llvm::Function *cast_to_char = nullptr;
   llvm::Function *native_out = nullptr;
   llvm::Function *native_out_ln = nullptr;
   llvm::Function *native_err = nullptr;
@@ -139,6 +145,13 @@ RtFns declare_runtime(llvm::Module *module) {
                                               module);
   rt.cast_to_int = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                                           llvm::Function::ExternalLinkage, "kl_cast_to_int", module);
+  rt.cast_to_float = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                            llvm::Function::ExternalLinkage, "kl_cast_to_float", module);
+  rt.cast_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                              llvm::Function::ExternalLinkage, "kl_cast_to_string",
+                                              module);
+  rt.cast_to_char = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                           llvm::Function::ExternalLinkage, "kl_cast_to_char", module);
   rt.native_out = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
                                          llvm::Function::ExternalLinkage, "kl_native_out", module);
   rt.native_out_ln = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
@@ -245,6 +258,44 @@ llvm::Value *icmp(llvm::IRBuilder<> &builder, KirOpcode op, llvm::Value *left,
     return builder.CreateICmpSGE(left, right);
   default:
     return nullptr;
+  }
+}
+
+void rebuild_phi_predecessors(llvm::Function *fn) {
+  for (llvm::BasicBlock &bb : *fn) {
+    std::vector<llvm::PHINode *> phis;
+    for (llvm::Instruction &inst : bb) {
+      if (auto *phi = llvm::dyn_cast<llvm::PHINode>(&inst)) {
+        phis.push_back(phi);
+      }
+    }
+    if (phis.empty()) {
+      continue;
+    }
+    const llvm::SmallVector<llvm::BasicBlock *, 8> preds(llvm::pred_begin(&bb),
+                                                        llvm::pred_end(&bb));
+    for (llvm::PHINode *phi : phis) {
+      llvm::SmallVector<llvm::Value *, 8> values;
+      values.reserve(preds.size());
+      for (llvm::BasicBlock *pred : preds) {
+        llvm::Value *incoming = llvm::UndefValue::get(phi->getType());
+        for (unsigned i = 0; i < phi->getNumIncomingValues(); ++i) {
+          if (phi->getIncomingBlock(i) == pred) {
+            incoming = phi->getIncomingValue(i);
+            break;
+          }
+        }
+        values.push_back(incoming);
+      }
+      llvm::IRBuilder<> builder(&bb, bb.begin());
+      llvm::PHINode *fixed =
+          builder.CreatePHI(phi->getType(), static_cast<unsigned>(preds.size()), phi->getName());
+      for (unsigned i = 0; i < preds.size(); ++i) {
+        fixed->addIncoming(values[i], preds[i]);
+      }
+      phi->replaceAllUsesWith(fixed);
+      phi->eraseFromParent();
+    }
   }
 }
 
@@ -526,7 +577,8 @@ public:
 
     for (std::size_t i = 0; i < linear_.size(); ++i) {
       const KirInstr *instr = linear_[i];
-      g_lower_context = "fn " + fn.name + " @" + kir_opcode_name(instr->op);
+      g_lower_context =
+          "function '" + fn.name + "' at instruction '" + kir_opcode_name(instr->op) + "'";
       llvm::BasicBlock *bb = block_index(i);
       if (leaders.count(i) > 0) {
         if (i > 0) {
@@ -599,7 +651,8 @@ public:
       };
 
       switch (instr->op) {
-      case KirOpcode::ConstInt: {
+      case KirOpcode::ConstInt:
+      case KirOpcode::ConstFloat: {
         llvm::Value *value = const_i64(builder, instr);
         push(value);
         temps[i] = value;
@@ -617,7 +670,10 @@ public:
         const int pool_idx = instr->operands[0];
         if (pool_idx < 0 ||
             static_cast<std::size_t>(pool_idx) >= kir_module_.constant_strings.size()) {
-          *error = "const_string pool index out of range";
+          *error = "const_string pool index " + std::to_string(pool_idx) +
+                   " out of range (pool size " +
+                   std::to_string(kir_module_.constant_strings.size()) + ") in " +
+                   g_lower_context;
           return false;
         }
         const std::string &text = kir_module_.constant_strings[static_cast<std::size_t>(pool_idx)];
@@ -729,21 +785,21 @@ public:
         }
         const int fn_index = static_cast<int>(callee_const->getSExtValue());
         if (fn_index < 0 ||
-            static_cast<std::size_t>(fn_index) >= kir_module_.function_names.size()) {
+            static_cast<std::size_t>(fn_index) >= kir_module_.function_symbols.size()) {
           *error = "call function index out of range";
           return false;
         }
-        const std::string &target_name =
-            kir_module_.function_names[static_cast<std::size_t>(fn_index)];
+        const std::string &target_symbol =
+            kir_module_.function_symbols[static_cast<std::size_t>(fn_index)];
         llvm::Module *llvm_module = llvm_fn_->getParent();
-        llvm::Function *target = llvm_module->getFunction(fn_symbol(target_name));
+        llvm::Function *target = llvm_module->getFunction(target_symbol);
         if (target == nullptr) {
           const int param_count =
               kir_module_.function_param_counts[static_cast<std::size_t>(fn_index)];
           std::vector<llvm::Type *> param_types(static_cast<std::size_t>(param_count), i64);
           auto *fn_type = llvm::FunctionType::get(i64, param_types, false);
           target = llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage,
-                                          fn_symbol(target_name), llvm_module);
+                                          target_symbol, llvm_module);
         }
         llvm::Value *result = builder.CreateCall(target, args);
         push(result);
@@ -937,13 +993,20 @@ public:
         if (src == nullptr) {
           return false;
         }
-        llvm::Value *result = nullptr;
+        llvm::Function *cast_fn = nullptr;
         if (kind == 0) {
-          result = builder.CreateCall(rt_.cast_to_int, {src});
+          cast_fn = rt_.cast_to_int;
+        } else if (kind == 1) {
+          cast_fn = rt_.cast_to_float;
+        } else if (kind == 2) {
+          cast_fn = rt_.cast_to_string;
+        } else if (kind == 3) {
+          cast_fn = rt_.cast_to_char;
         } else {
           *error = "unsupported CastTo target kind in native lowering";
           return false;
         }
+        llvm::Value *result = builder.CreateCall(cast_fn, {src});
         push(result);
         temps[i] = result;
         break;
@@ -1121,7 +1184,7 @@ public:
         break;
       }
       default:
-        *error = "unsupported KIR opcode in native lowering";
+        *error = "unsupported KIR opcode in native lowering (" + g_lower_context + ")";
         return false;
       }
     }
@@ -1140,6 +1203,7 @@ public:
         builder.CreateRet(llvm::ConstantInt::get(i64, 0));
       }
     }
+    rebuild_phi_predecessors(llvm_fn_);
     return true;
   }
 
@@ -1157,23 +1221,26 @@ void copy_kir_metadata(KirModule *dst, const KirModule &src) {
   dst->struct_metas = src.struct_metas;
   dst->enum_metas = src.enum_metas;
   dst->function_names = src.function_names;
+  dst->function_symbols = src.function_symbols;
   dst->function_param_counts = src.function_param_counts;
 }
 
-bool lower_user_functions(llvm::Module *module, const KirModule &kir_module, std::string *error) {
+bool lower_user_functions(llvm::Module *module, const KirModule &functions,
+                          const KirModule &metadata, std::string *error) {
   llvm::LLVMContext &context = module->getContext();
   llvm::Type *i64 = llvm::Type::getInt64Ty(context);
   const RtFns rt = declare_runtime(module);
 
-  for (const KirFunction &fn : kir_module.functions) {
+  for (const KirFunction &fn : functions.functions) {
     std::vector<llvm::Type *> param_types(static_cast<std::size_t>(fn.param_count), i64);
     auto *fn_type = llvm::FunctionType::get(i64, param_types, false);
-    llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage, fn_symbol(fn.name), module);
+    llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage,
+                           fn_symbol(fn.name, fn.source_path), module);
   }
 
-  for (const KirFunction &fn : kir_module.functions) {
-    llvm::Function *llvm_fn = module->getFunction(fn_symbol(fn.name));
-    FunctionLowerer lowerer(&context, kir_module, llvm_fn, rt);
+  for (const KirFunction &fn : functions.functions) {
+    llvm::Function *llvm_fn = module->getFunction(fn_symbol(fn.name, fn.source_path));
+    FunctionLowerer lowerer(&context, metadata, llvm_fn, rt);
     if (!lowerer.lower(fn, error)) {
       return false;
     }
@@ -1229,7 +1296,7 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     copy_kir_metadata(&shard, module);
     llvm::LLVMContext context;
     llvm::Module llvm_module("kinglet_mod_" + std::to_string(shard_idx++), context);
-    if (!lower_user_functions(&llvm_module, shard, &error)) {
+    if (!lower_user_functions(&llvm_module, shard, module, &error)) {
       return {.ok = false, .error = error};
     }
     if (llvm::verifyModule(llvm_module, &llvm::errs())) {

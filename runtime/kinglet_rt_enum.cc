@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,12 @@ kl_h cast_error(int32_t variant, kl_h payload) {
   kl_h elements[1] = {payload};
   const int32_t count = payload == 0 ? 0 : 1;
   return kl_enum_new_payload(0, variant, count, count > 0 ? elements : nullptr);
+}
+
+kl_h double_bits(double value) {
+  int64_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  return static_cast<kl_h>(bits);
 }
 
 } // namespace
@@ -123,6 +130,86 @@ kl_h kl_cast_to_int(kl_h value) {
     return cast_error(2, value);
   }
   return kl_from_int(static_cast<int64_t>(v));
+}
+
+kl_h kl_cast_to_float(kl_h value) {
+  if (kl_is_inline_enum(value)) {
+    int32_t type_idx = 0;
+    int32_t variant_idx = 0;
+    if (!decode_enum_tag(value, &type_idx, &variant_idx)) {
+      return double_bits(0.0);
+    }
+    return double_bits(static_cast<double>(variant_idx));
+  }
+  if (kl_is_heap(value)) {
+    void *ptr = kl_unbox_ptr(value);
+    auto *hdr = static_cast<KlHeader *>(ptr);
+    if (hdr->kind == KlKind::Enum) {
+      return double_bits(static_cast<double>(static_cast<KlEnum *>(ptr)->variant_index));
+    }
+    if (hdr->kind != KlKind::String) {
+      return double_bits(0.0);
+    }
+    const std::string &s = static_cast<KlString *>(ptr)->bytes;
+    if (s.empty()) {
+      return cast_error(0, 0);
+    }
+    char *end = nullptr;
+    errno = 0;
+    const double v = std::strtod(s.c_str(), &end);
+    if (end == s.c_str() || *end != '\0') {
+      return cast_error(1, value);
+    }
+    if (errno == ERANGE) {
+      return cast_error(2, value);
+    }
+    return double_bits(v);
+  }
+  return double_bits(static_cast<double>(kl_to_int(value)));
+}
+
+kl_h kl_cast_to_string(kl_h value) {
+  if (kl_is_heap(value)) {
+    void *ptr = kl_unbox_ptr(value);
+    if (static_cast<KlHeader *>(ptr)->kind == KlKind::String) {
+      return value;
+    }
+  }
+  if (kl_is_inline_enum(value)) {
+    int32_t type_idx = 0;
+    int32_t variant_idx = 0;
+    if (!decode_enum_tag(value, &type_idx, &variant_idx)) {
+      return kl_string_new("", 0);
+    }
+    return kl_cast_to_string(kl_from_int(variant_idx));
+  }
+  const std::string text = std::to_string(kl_to_int(value));
+  return kl_string_new(text.data(), static_cast<int32_t>(text.size()));
+}
+
+kl_h kl_cast_to_char(kl_h value) {
+  if (kl_is_inline_enum(value)) {
+    int32_t type_idx = 0;
+    int32_t variant_idx = 0;
+    if (!decode_enum_tag(value, &type_idx, &variant_idx)) {
+      return kl_from_int(0);
+    }
+    return kl_from_int(static_cast<int8_t>(variant_idx & 0xFF));
+  }
+  if (kl_is_heap(value)) {
+    void *ptr = kl_unbox_ptr(value);
+    auto *hdr = static_cast<KlHeader *>(ptr);
+    if (hdr->kind == KlKind::String) {
+      const std::string &s = static_cast<KlString *>(ptr)->bytes;
+      if (s.empty()) {
+        return cast_error(0, 0);
+      }
+      return kl_from_int(static_cast<int8_t>(
+          static_cast<unsigned char>(s[0])));
+    }
+    return kl_from_int(0);
+  }
+  return kl_from_int(static_cast<int8_t>(kl_to_int(value) & 0xFF));
 }
 
 int32_t kl_value_is_err(kl_h value) {
