@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast/ast.h"
+#include "ir/kir.h"
 #include "types/types.h"
 
 namespace kinglet {
@@ -33,6 +34,7 @@ class TypeChecker {
 public:
   TypeCheckResult check(const ast::Program &program);
   void set_module_loader(ModuleLoader *loader) { module_loader_ = loader; }
+  void populate_kir_types(KirModule *module) const;
 
 private:
   void check_function(const ast::FunctionDecl &function);
@@ -75,6 +77,7 @@ private:
   std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
 
   std::vector<TypeError> errors_;
+  std::unordered_map<std::string, KirFunctionSig> kir_function_sigs_;
   std::unordered_set<std::string> used_;    // using io;
   std::unordered_set<std::string> opened_;  // using namespace io;
   std::unordered_set<std::string> imported_namespaces_;

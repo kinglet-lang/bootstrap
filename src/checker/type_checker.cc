@@ -60,6 +60,47 @@ ast::TypeExpr type_to_type_expr(const Type &t) {
   return te;
 }
 
+KirType kir_type_from(const Type &type) {
+  switch (type.kind) {
+  case TypeKind::Int:
+    return KirType::Int;
+  case TypeKind::Float:
+    return KirType::Float;
+  case TypeKind::Bool:
+    return KirType::Bool;
+  case TypeKind::Null:
+    return KirType::Null;
+  case TypeKind::Char:
+    return KirType::Char;
+  case TypeKind::String:
+    return KirType::String;
+  case TypeKind::Void:
+    return KirType::Void;
+  case TypeKind::Array:
+    return KirType::Array;
+  case TypeKind::Map:
+    return KirType::Map;
+  case TypeKind::Struct:
+    return KirType::Struct;
+  case TypeKind::Enum:
+    return KirType::Enum;
+  case TypeKind::Function:
+    return KirType::Fn;
+  }
+  return KirType::Any;
+}
+
+KirFunctionSig kir_sig_from(const Type &func_type) {
+  KirFunctionSig sig;
+  for (const Type &param : func_type.param_types) {
+    sig.param_types.push_back(kir_type_from(param));
+  }
+  if (func_type.return_type) {
+    sig.return_type = kir_type_from(*func_type.return_type);
+  }
+  return sig;
+}
+
 } // namespace
 
 Type TypeChecker::resolve_type_name(const std::string &name) const {
@@ -213,6 +254,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   type_registry_.clear();
   concept_registry_.clear();
   method_registry_.clear();
+  kir_function_sigs_.clear();
 
   push_scope();
 
@@ -413,6 +455,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       func_type.param_types = std::move(param_types);
       func_type.return_type = std::make_unique<Type>(return_type);
       declare_var(func->name, func_type, false);
+      kir_function_sigs_[func->name] = kir_sig_from(func_type);
       if (!func->params.empty()) {
         const std::string &receiver = func->params[0].type.name;
         auto st = type_registry_.find(receiver);
@@ -591,11 +634,13 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             func_type.param_types = std::move(param_types);
             func_type.return_type = std::make_unique<Type>(return_type);
             declare_var(ns + "::" + fn->name, func_type, false);
+            kir_function_sigs_[ns + "::" + fn->name] = kir_sig_from(func_type);
             if (!import_decl->selected_symbols.empty()) {
               Type ft2(TypeKind::Function);
               ft2.param_types = func_type.param_types;
               ft2.return_type = std::make_unique<Type>(*func_type.return_type);
               declare_var(fn->name, ft2, false);
+              kir_function_sigs_[fn->name] = kir_sig_from(ft2);
               imported_bare_names_.insert(fn->name);
             }
           }
@@ -659,6 +704,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
                 func_type.param_types = std::move(param_types);
                 func_type.return_type = std::make_unique<Type>(return_type);
                 declare_var(ns + "::" + fn->name, func_type, false);
+                kir_function_sigs_[ns + "::" + fn->name] = kir_sig_from(func_type);
               }
             }
           }
@@ -2174,7 +2220,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     } else if (target == "string") {
       if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
-          src_is(TypeKind::Char)) {
+          src_is(TypeKind::Char) || src_is(TypeKind::Bool) || src_is(TypeKind::Null)) {
         return string_type();
       }
     } else if (target == "char" || target == "byte") {
@@ -2333,6 +2379,63 @@ void TypeChecker::error_at(ast::SourceLocation location, std::string message) {
 
 void TypeChecker::warn_at(ast::SourceLocation location, std::string message) {
   errors_.push_back(TypeError{.location = location, .message = std::move(message), .severity = DiagnosticSeverity::Warning});
+}
+
+void TypeChecker::populate_kir_types(KirModule *module) const {
+  if (module == nullptr) {
+    return;
+  }
+
+  module->function_signatures.assign(module->function_names.size(), KirFunctionSig{});
+  for (std::size_t i = 0; i < module->function_names.size(); ++i) {
+    const std::string &name = module->function_names[i];
+    auto it = kir_function_sigs_.find(name);
+    if (it != kir_function_sigs_.end()) {
+      module->function_signatures[i] = it->second;
+      continue;
+    }
+    for (const auto &[key, sig] : kir_function_sigs_) {
+      const auto pos = key.rfind("::");
+      if (pos != std::string::npos && key.substr(pos + 2) == name) {
+        module->function_signatures[i] = sig;
+        break;
+      }
+    }
+  }
+
+  for (KirStructMeta &meta : module->struct_metas) {
+    meta.field_types.clear();
+    const auto it = type_registry_.find(meta.name);
+    if (it == type_registry_.end()) {
+      continue;
+    }
+    for (const FieldInfo &field : it->second.fields) {
+      if (field.type) {
+        meta.field_types.push_back(kir_type_from(*field.type));
+      } else {
+        Type fallback(field.type_kind);
+        fallback.name = field.type_name;
+        meta.field_types.push_back(kir_type_from(fallback));
+      }
+    }
+  }
+
+  for (KirFunction &fn : module->functions) {
+    auto it = kir_function_sigs_.find(fn.name);
+    if (it == kir_function_sigs_.end()) {
+      for (const auto &[key, sig] : kir_function_sigs_) {
+        const auto pos = key.rfind("::");
+        if (pos != std::string::npos && key.substr(pos + 2) == fn.name) {
+          fn.param_types = sig.param_types;
+          fn.return_type = sig.return_type;
+          break;
+        }
+      }
+      continue;
+    }
+    fn.param_types = it->second.param_types;
+    fn.return_type = it->second.return_type;
+  }
 }
 
 void TypeChecker::check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::SourceLocation location) {

@@ -6,6 +6,29 @@
 
 namespace kinglet {
 
+// Flat KIR type for native lowering. Scalar types lower to raw LLVM registers;
+// heap/reference types use the kl_h wire format.
+enum class KirType : uint8_t {
+  Void,
+  Any,
+  Int,
+  Float,
+  Bool,
+  Null,
+  Char,
+  String,
+  Array,
+  Map,
+  Struct,
+  Enum,
+  Fn,
+};
+
+struct KirFunctionSig {
+  std::vector<KirType> param_types;
+  KirType return_type = KirType::Any;
+};
+
 enum class KirOpcode {
   ConstInt,
   ConstFloat,
@@ -92,6 +115,7 @@ enum class KirOpcode {
 struct KirStructMeta {
   std::string name;
   std::vector<std::string> field_names;
+  std::vector<KirType> field_types;
 };
 
 struct KirEnumMeta {
@@ -117,6 +141,10 @@ struct KirFunction {
   std::string source_path;
   int param_count = 0;
   std::vector<std::string> param_names;
+  std::vector<KirType> param_types;
+  KirType return_type = KirType::Any;
+  std::vector<KirType> local_types;
+  std::vector<KirType> instr_types;
   std::vector<KirBasicBlock> blocks;
 };
 
@@ -130,7 +158,14 @@ struct KirModule {
   std::vector<std::string> function_names;
   std::vector<std::string> function_symbols;
   std::vector<int32_t> function_param_counts;
+  std::vector<KirFunctionSig> function_signatures;
 };
+
+const char *kir_type_name(KirType type);
+KirType kir_type_join(KirType a, KirType b);
+bool kir_type_is_scalar(KirType type);
+bool kir_type_is_heap(KirType type);
+KirType kir_cast_target_type(int kind);
 
 const char *kir_opcode_name(KirOpcode op);
 std::string dump_kir_module(const KirModule &module);

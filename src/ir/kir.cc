@@ -170,6 +170,99 @@ const char *kir_opcode_name(KirOpcode op) {
   return "unknown";
 }
 
+const char *kir_type_name(KirType type) {
+  switch (type) {
+  case KirType::Void:
+    return "void";
+  case KirType::Any:
+    return "any";
+  case KirType::Int:
+    return "int";
+  case KirType::Float:
+    return "float";
+  case KirType::Bool:
+    return "bool";
+  case KirType::Null:
+    return "null";
+  case KirType::Char:
+    return "char";
+  case KirType::String:
+    return "string";
+  case KirType::Array:
+    return "array";
+  case KirType::Map:
+    return "map";
+  case KirType::Struct:
+    return "struct";
+  case KirType::Enum:
+    return "enum";
+  case KirType::Fn:
+    return "fn";
+  }
+  return "unknown";
+}
+
+KirType kir_type_join(KirType a, KirType b) {
+  if (a == b) {
+    return a;
+  }
+  if (a == KirType::Void) {
+    return b;
+  }
+  if (b == KirType::Void) {
+    return a;
+  }
+  if (a == KirType::Any || b == KirType::Any) {
+    return KirType::Any;
+  }
+  if ((a == KirType::Int && b == KirType::Char) || (a == KirType::Char && b == KirType::Int)) {
+    return KirType::Int;
+  }
+  return KirType::Any;
+}
+
+bool kir_type_is_scalar(KirType type) {
+  switch (type) {
+  case KirType::Int:
+  case KirType::Float:
+  case KirType::Bool:
+  case KirType::Null:
+  case KirType::Char:
+    return true;
+  default:
+    return false;
+  }
+}
+
+KirType kir_cast_target_type(int kind) {
+  switch (kind) {
+  case 0:
+    return KirType::Int;
+  case 1:
+    return KirType::Float;
+  case 2:
+    return KirType::String;
+  case 3:
+    return KirType::Char;
+  default:
+    return KirType::Any;
+  }
+}
+
+bool kir_type_is_heap(KirType type) {
+  switch (type) {
+  case KirType::String:
+  case KirType::Array:
+  case KirType::Map:
+  case KirType::Struct:
+  case KirType::Enum:
+  case KirType::Fn:
+    return true;
+  default:
+    return false;
+  }
+}
+
 static void dump_operands(std::ostream &out, const KirInstr &instr) {
   for (std::size_t i = 0; i < instr.operands.size(); ++i) {
     if (i > 0) {
@@ -187,9 +280,18 @@ std::string dump_kir_function(const KirFunction &function) {
       out << ", ";
     }
     out << function.param_names[i];
+    if (i < function.param_types.size()) {
+      out << ": " << kir_type_name(function.param_types[i]);
+    }
   }
-  out << ") {\n";
+  if (function.return_type != KirType::Any) {
+    out << ") -> " << kir_type_name(function.return_type);
+  } else {
+    out << ')';
+  }
+  out << " {\n";
 
+  int instr_idx = 0;
   for (const KirBasicBlock &bb : function.blocks) {
     out << "  " << bb.label << ":\n";
     int temp = 0;
@@ -217,7 +319,12 @@ std::string dump_kir_function(const KirFunction &function) {
         out << ' ';
         dump_operands(out, instr);
       }
+      if (static_cast<std::size_t>(instr_idx) < function.instr_types.size() &&
+          function.instr_types[static_cast<std::size_t>(instr_idx)] != KirType::Void) {
+        out << " : " << kir_type_name(function.instr_types[static_cast<std::size_t>(instr_idx)]);
+      }
       out << '\n';
+      ++instr_idx;
     }
   }
   out << "}\n";
