@@ -1,7 +1,10 @@
 #include "codegen/llvm/kir_to_llvm.h"
 
+#include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DIBuilder.h>
+#include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
@@ -18,6 +21,7 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <algorithm>
@@ -376,6 +380,8 @@ public:
                   const RtFns &rt)
       : context_(context), kir_module_(kir_module), llvm_fn_(llvm_fn), rt_(rt) {}
 
+  void set_debug_scope(llvm::DISubprogram *subprogram) { di_subprogram_ = subprogram; }
+
   bool lower(const KirFunction &fn, std::string *error) {
     llvm::Type *i32 = llvm::Type::getInt32Ty(*context_);
     llvm::Type *i64 = llvm::Type::getInt64Ty(*context_);
@@ -599,6 +605,11 @@ public:
         }
       }
       llvm::IRBuilder<> builder(bb);
+      if (di_subprogram_ != nullptr) {
+        builder.SetCurrentDebugLocation(llvm::DILocation::get(
+            *context_, instr->line > 0 ? static_cast<unsigned>(instr->line) : 1,
+            instr->col > 0 ? static_cast<unsigned>(instr->col) : 0, di_subprogram_));
+      }
       auto push = [&](llvm::Value *v) { stack.push_back(v); };
 
       auto pop_args_array = [&](int argc) -> llvm::Value * {
@@ -1263,6 +1274,7 @@ private:
   const KirModule &kir_module_;
   llvm::Function *llvm_fn_;
   const RtFns &rt_;
+  llvm::DISubprogram *di_subprogram_ = nullptr;
   std::vector<llvm::AllocaInst *> local_slots_;
   std::vector<const KirInstr *> linear_;
 };
@@ -1276,11 +1288,36 @@ void copy_kir_metadata(KirModule *dst, const KirModule &src) {
   dst->function_param_counts = src.function_param_counts;
 }
 
+int first_instr_line(const KirFunction &fn) {
+  for (const KirBasicBlock &bb : fn.blocks) {
+    for (const KirInstr &instr : bb.instrs) {
+      if (instr.line > 0) {
+        return instr.line;
+      }
+    }
+  }
+  return 1;
+}
+
 bool lower_user_functions(llvm::Module *module, const KirModule &functions,
-                          const KirModule &metadata, std::string *error) {
+                          const KirModule &metadata, bool debug_info, std::string *error) {
   llvm::LLVMContext &context = module->getContext();
   llvm::Type *i64 = llvm::Type::getInt64Ty(context);
   const RtFns rt = declare_runtime(module);
+
+  std::unique_ptr<llvm::DIBuilder> di;
+  if (debug_info) {
+    module->addModuleFlag(llvm::Module::Warning, "Debug Info Version",
+                          llvm::DEBUG_METADATA_VERSION);
+    module->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 4);
+    di = std::make_unique<llvm::DIBuilder>(*module);
+    const std::string &cu_src = functions.functions.front().source_path;
+    const std::filesystem::path cu_path(cu_src.empty() ? "<entry>" : cu_src);
+    llvm::DIFile *cu_file =
+        di->createFile(cu_path.filename().string(), cu_path.parent_path().string());
+    di->createCompileUnit(llvm::dwarf::DW_LANG_C, cu_file, "kinglet", /*isOptimized=*/false,
+                          /*Flags=*/"", /*RuntimeVersion=*/0);
+  }
 
   for (const KirFunction &fn : functions.functions) {
     std::vector<llvm::Type *> param_types(static_cast<std::size_t>(fn.param_count), i64);
@@ -1292,9 +1329,27 @@ bool lower_user_functions(llvm::Module *module, const KirModule &functions,
   for (const KirFunction &fn : functions.functions) {
     llvm::Function *llvm_fn = module->getFunction(fn_symbol(fn.name, fn.source_path));
     FunctionLowerer lowerer(&context, metadata, llvm_fn, rt);
+    if (di) {
+      const std::filesystem::path src_path(fn.source_path.empty() ? "<entry>"
+                                                                  : fn.source_path);
+      llvm::DIFile *file =
+          di->createFile(src_path.filename().string(), src_path.parent_path().string());
+      llvm::DISubroutineType *sp_type =
+          di->createSubroutineType(di->getOrCreateTypeArray({}));
+      const int line = first_instr_line(fn);
+      llvm::DISubprogram *sp = di->createFunction(
+          file, fn.name, llvm_fn->getName(), file, static_cast<unsigned>(line), sp_type,
+          static_cast<unsigned>(line), llvm::DINode::FlagZero,
+          llvm::DISubprogram::SPFlagDefinition);
+      llvm_fn->setSubprogram(sp);
+      lowerer.set_debug_scope(sp);
+    }
     if (!lowerer.lower(fn, error)) {
       return false;
     }
+  }
+  if (di) {
+    di->finalize();
   }
   return true;
 }
@@ -1330,7 +1385,8 @@ std::string temp_object_path(const std::string &tag, const std::string &out_path
 
 NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
                                                   const std::string &out_path,
-                                                  const std::string &rt_lib_path) {
+                                                  const std::string &rt_lib_path,
+                                                  const NativeCompileOptions &options) {
   std::string error;
   std::map<std::string, KirModule> shards;
   for (const KirFunction &fn : module.functions) {
@@ -1347,7 +1403,7 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     copy_kir_metadata(&shard, module);
     llvm::LLVMContext context;
     llvm::Module llvm_module("kinglet_mod_" + std::to_string(shard_idx++), context);
-    if (!lower_user_functions(&llvm_module, shard, module, &error)) {
+    if (!lower_user_functions(&llvm_module, shard, module, options.debug_info, &error)) {
       return {.ok = false, .error = error};
     }
     if (llvm::verifyModule(llvm_module, &llvm::errs())) {
@@ -1381,6 +1437,21 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     }
     return {.ok = false, .error = error};
   }
+
+#if defined(__APPLE__)
+  // Mach-O keeps DWARF in the object files (debug map); bake a dSYM before the
+  // temporary objects are removed.
+  if (options.debug_info) {
+    const std::string dsym_cmd = "dsymutil \"" + out_path + "\"";
+    if (std::system(dsym_cmd.c_str()) != 0) {
+      std::error_code ec;
+      for (const std::string &obj_path : obj_paths) {
+        std::filesystem::remove(obj_path, ec);
+      }
+      return {.ok = false, .error = "dsymutil failed for " + out_path};
+    }
+  }
+#endif
 
   std::error_code ec;
   for (const std::string &obj_path : obj_paths) {

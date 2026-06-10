@@ -49,11 +49,12 @@ std::string resolve_rt_lib(const char *argv0) {
 #endif
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> | --backend native -o <out> | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] | --backend native -o <out> | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles and runs main().\n"
       << "With --run, loads and executes a pre-compiled .kbc file.\n"
+      << "With --native -g, emits DWARF debug info from KIR line tables.\n"
       << "With --save-bytecode --strip-debug, omits debug info for smaller output.\n";
 }
 
@@ -128,6 +129,7 @@ int main(int argc, char **argv) {
   std::string run_bytecode_path;
   Mode mode = Mode::Run;
   bool strip_debug = false;
+  bool native_debug_info = false;
   std::vector<std::string> program_args;
 
   for (int i = 1; i < argc; ++i) {
@@ -220,6 +222,10 @@ int main(int argc, char **argv) {
     }
     if (arg == "--strip-debug") {
       strip_debug = true;
+      continue;
+    }
+    if (arg == "-g") {
+      native_debug_info = true;
       continue;
     }
     if (arg == "--run") {
@@ -520,8 +526,10 @@ int main(int argc, char **argv) {
     std::cerr << "kinglet: native backend not built (rebuild with enable_llvm=true)\n";
     return 78;
 #else
+    kinglet::NativeCompileOptions native_options;
+    native_options.debug_info = native_debug_info;
     kinglet::NativeCompileResult native = kinglet::KirToLlvm::compile_executable(
-        compile_result.kir, native_out_path, resolve_rt_lib(argv[0]));
+        compile_result.kir, native_out_path, resolve_rt_lib(argv[0]), native_options);
     if (!native.ok) {
       std::cerr << "kinglet: native compile failed: " << native.error << "\n";
       return 78;
