@@ -80,6 +80,9 @@ struct RtFns {
   llvm::Function *struct_type_index = nullptr;
   llvm::Function *struct_field_at = nullptr;
   llvm::Function *enum_new = nullptr;
+  llvm::Function *enum_new_payload = nullptr;
+  llvm::Function *enum_payload_at = nullptr;
+  llvm::Function *cast_to_int = nullptr;
   llvm::Function *value_eq = nullptr;
   llvm::Function *value_is_err = nullptr;
   llvm::Function *exit_code = nullptr;
@@ -114,6 +117,14 @@ RtFns declare_runtime(llvm::Module *module) {
                                               "kl_struct_field_at", module);
   rt.enum_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32}, false),
                                        llvm::Function::ExternalLinkage, "kl_enum_new", module);
+  rt.enum_new_payload = llvm::Function::Create(
+      llvm::FunctionType::get(i64, {i32, i32, i32, i64p}, false), llvm::Function::ExternalLinkage,
+      "kl_enum_new_payload", module);
+  rt.enum_payload_at = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
+                                              llvm::Function::ExternalLinkage, "kl_enum_payload_at",
+                                              module);
+  rt.cast_to_int = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                          llvm::Function::ExternalLinkage, "kl_cast_to_int", module);
   rt.value_eq = llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
                                        llvm::Function::ExternalLinkage, "kl_value_eq", module);
   rt.value_is_err = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
@@ -245,13 +256,19 @@ bool emit_object(llvm::Module &module, const std::string &obj_path, std::string 
   return true;
 }
 
-bool link_executable(const std::string &obj_path, const std::string &rt_lib_path,
-                     const std::string &out_path, std::string *error) {
+bool link_objects(const std::vector<std::string> &obj_paths, const std::string &rt_lib_path,
+                  const std::string &out_path, std::string *error) {
+  if (obj_paths.empty()) {
+    *error = "link_objects requires at least one object file";
+    return false;
+  }
   std::ostringstream cmd;
   cmd << "clang++ -o ";
-  cmd << '"' << out_path << "\" ";
-  cmd << '"' << obj_path << "\" ";
-  cmd << '"' << rt_lib_path << '"';
+  cmd << '"' << out_path << "\"";
+  for (const std::string &obj_path : obj_paths) {
+    cmd << " \"" << obj_path << '"';
+  }
+  cmd << " \"" << rt_lib_path << '"';
   const int rc = std::system(cmd.str().c_str());
   if (rc != 0) {
     *error = "link failed (exit " + std::to_string(rc) + "): " + cmd.str();
@@ -560,7 +577,7 @@ public:
       }
       case KirOpcode::ConstFn: {
         const int fn_index = instr->operands[0];
-        if (fn_index < 0 || static_cast<std::size_t>(fn_index) >= kir_module_.functions.size()) {
+        if (fn_index < 0 || static_cast<std::size_t>(fn_index) >= kir_module_.function_names.size()) {
           *error = "const_fn index out of range";
           return false;
         }
@@ -657,15 +674,22 @@ public:
           return false;
         }
         const int fn_index = static_cast<int>(callee_const->getSExtValue());
-        if (fn_index < 0 || static_cast<std::size_t>(fn_index) >= kir_module_.functions.size()) {
+        if (fn_index < 0 ||
+            static_cast<std::size_t>(fn_index) >= kir_module_.function_names.size()) {
           *error = "call function index out of range";
           return false;
         }
-        const std::string &target_name = kir_module_.functions[static_cast<std::size_t>(fn_index)].name;
-        llvm::Function *target = llvm_fn_->getParent()->getFunction(fn_symbol(target_name));
+        const std::string &target_name =
+            kir_module_.function_names[static_cast<std::size_t>(fn_index)];
+        llvm::Module *llvm_module = llvm_fn_->getParent();
+        llvm::Function *target = llvm_module->getFunction(fn_symbol(target_name));
         if (target == nullptr) {
-          *error = "call target not lowered";
-          return false;
+          const int param_count =
+              kir_module_.function_param_counts[static_cast<std::size_t>(fn_index)];
+          std::vector<llvm::Type *> param_types(static_cast<std::size_t>(param_count), i64);
+          auto *fn_type = llvm::FunctionType::get(i64, param_types, false);
+          target = llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage,
+                                          fn_symbol(target_name), llvm_module);
         }
         llvm::Value *result = builder.CreateCall(target, args);
         push(result);
@@ -792,6 +816,82 @@ public:
         llvm::Value *value = llvm::ConstantInt::get(i64, wire);
         push(value);
         temps[i] = value;
+        break;
+      }
+      case KirOpcode::EnumVariantPayload: {
+        const int packed = instr->operands[0];
+        const int type_idx = packed >> 16;
+        const int variant_idx = packed & 0xFFFF;
+        int param_count = 0;
+        if (type_idx >= 0 &&
+            static_cast<std::size_t>(type_idx) < kir_module_.enum_metas.size()) {
+          const KirEnumMeta &meta =
+              kir_module_.enum_metas[static_cast<std::size_t>(type_idx)];
+          if (variant_idx >= 0 &&
+              static_cast<std::size_t>(variant_idx) < meta.variant_param_counts.size()) {
+            param_count =
+                meta.variant_param_counts[static_cast<std::size_t>(variant_idx)];
+          }
+        }
+        if (param_count < 0) {
+          *error = "enum_variant_payload param count invalid";
+          return false;
+        }
+        llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
+        llvm::AllocaInst *elements = nullptr;
+        if (param_count > 0) {
+          elements = builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, param_count),
+                                          "enum_payload");
+          for (int pi = param_count - 1; pi >= 0; --pi) {
+            llvm::Value *elem = pop_value(&stack, error);
+            if (elem == nullptr) {
+              return false;
+            }
+            llvm::Value *slot =
+                builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, pi));
+            builder.CreateStore(elem, slot);
+          }
+        }
+        llvm::Value *payload_ptr =
+            param_count > 0
+                ? builder.CreateBitCast(elements, i64p)
+                : llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(i64));
+        llvm::Value *value = builder.CreateCall(
+            rt_.enum_new_payload,
+            {llvm::ConstantInt::get(i32, type_idx), llvm::ConstantInt::get(i32, variant_idx),
+             llvm::ConstantInt::get(i32, param_count), payload_ptr});
+        push(value);
+        temps[i] = value;
+        break;
+      }
+      case KirOpcode::EnumPayloadGet: {
+        const int payload_idx = instr->operands[0];
+        llvm::Value *enum_val = pop_value(&stack, error);
+        if (enum_val == nullptr) {
+          return false;
+        }
+        llvm::Value *payload = builder.CreateCall(
+            rt_.enum_payload_at,
+            {enum_val, llvm::ConstantInt::get(i32, payload_idx)});
+        push(payload);
+        temps[i] = payload;
+        break;
+      }
+      case KirOpcode::CastTo: {
+        const int kind = instr->operands[0];
+        llvm::Value *src = pop_value(&stack, error);
+        if (src == nullptr) {
+          return false;
+        }
+        llvm::Value *result = nullptr;
+        if (kind == 0) {
+          result = builder.CreateCall(rt_.cast_to_int, {src});
+        } else {
+          *error = "unsupported CastTo target kind in native lowering";
+          return false;
+        }
+        push(result);
+        temps[i] = result;
         break;
       }
       case KirOpcode::Ret: {
@@ -923,9 +1023,16 @@ private:
   std::vector<const KirInstr *> linear_;
 };
 
-bool lower_module(llvm::Module *module, const KirModule &kir_module, std::string *error) {
+void copy_kir_metadata(KirModule *dst, const KirModule &src) {
+  dst->constant_strings = src.constant_strings;
+  dst->struct_metas = src.struct_metas;
+  dst->enum_metas = src.enum_metas;
+  dst->function_names = src.function_names;
+  dst->function_param_counts = src.function_param_counts;
+}
+
+bool lower_user_functions(llvm::Module *module, const KirModule &kir_module, std::string *error) {
   llvm::LLVMContext &context = module->getContext();
-  llvm::Type *i32 = llvm::Type::getInt32Ty(context);
   llvm::Type *i64 = llvm::Type::getInt64Ty(context);
   const RtFns rt = declare_runtime(module);
 
@@ -942,16 +1049,21 @@ bool lower_module(llvm::Module *module, const KirModule &kir_module, std::string
       return false;
     }
   }
+  return true;
+}
 
-  auto *entry_type = llvm::FunctionType::get(i32, false);
+bool lower_entry_shim(llvm::Module *module, std::string *error) {
+  llvm::LLVMContext &context = module->getContext();
+  const RtFns rt = declare_runtime(module);
+  auto *entry_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), false);
   auto *entry = llvm::Function::Create(entry_type, llvm::Function::ExternalLinkage, "kinglet_main",
                                        module);
   llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(context, "entry", entry);
   llvm::IRBuilder<> builder(entry_bb);
   llvm::Function *user_main = module->getFunction("kinglet_user_main");
   if (user_main == nullptr) {
-    *error = "KIR module missing main";
-    return false;
+    user_main = llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getInt64Ty(context), false),
+                                       llvm::Function::ExternalLinkage, "kinglet_user_main", module);
   }
   llvm::Value *raw_result = builder.CreateCall(user_main, {});
   llvm::Value *exit_code = builder.CreateCall(rt.exit_code, {raw_result});
@@ -959,40 +1071,74 @@ bool lower_module(llvm::Module *module, const KirModule &kir_module, std::string
   return true;
 }
 
+std::string temp_object_path(const std::string &tag, const std::string &out_path) {
+  const unsigned long tag_hash =
+      static_cast<unsigned long>(std::hash<std::string>{}(out_path + tag));
+  return (std::filesystem::temp_directory_path() /
+          ("kinglet-" + std::to_string(tag_hash) + ".o"))
+      .string();
+}
+
 } // namespace
 
 NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
                                                   const std::string &out_path,
                                                   const std::string &rt_lib_path) {
-  llvm::LLVMContext context;
-  llvm::Module llvm_module("kinglet", context);
-
   std::string error;
-  if (!lower_module(&llvm_module, module, &error)) {
+  std::map<std::string, KirModule> shards;
+  for (const KirFunction &fn : module.functions) {
+    const std::string key = fn.source_path.empty() ? "__entry__" : fn.source_path;
+    shards[key].functions.push_back(fn);
+  }
+  if (shards.empty()) {
+    return {.ok = false, .error = "KIR module has no functions"};
+  }
+
+  std::vector<std::string> obj_paths;
+  std::size_t shard_idx = 0;
+  for (auto &[key, shard] : shards) {
+    copy_kir_metadata(&shard, module);
+    llvm::LLVMContext context;
+    llvm::Module llvm_module("kinglet_mod_" + std::to_string(shard_idx++), context);
+    if (!lower_user_functions(&llvm_module, shard, &error)) {
+      return {.ok = false, .error = error};
+    }
+    if (llvm::verifyModule(llvm_module, &llvm::errs())) {
+      return {.ok = false, .error = "invalid LLVM module after lowering"};
+    }
+    const std::string obj_path = temp_object_path(key, out_path);
+    if (!emit_object(llvm_module, obj_path, &error)) {
+      return {.ok = false, .error = error};
+    }
+    obj_paths.push_back(obj_path);
+  }
+
+  llvm::LLVMContext entry_context;
+  llvm::Module entry_module("kinglet_entry", entry_context);
+  if (!lower_entry_shim(&entry_module, &error)) {
     return {.ok = false, .error = error};
   }
-
-  if (llvm::verifyModule(llvm_module, &llvm::errs())) {
-    return {.ok = false, .error = "invalid LLVM module after lowering"};
+  if (llvm::verifyModule(entry_module, &llvm::errs())) {
+    return {.ok = false, .error = "invalid LLVM entry module"};
   }
-
-  const std::filesystem::path obj_path =
-      std::filesystem::temp_directory_path() /
-      ("kinglet-" + std::to_string(static_cast<unsigned long>(std::hash<std::string>{}(out_path))) +
-       ".o");
-
-  if (!emit_object(llvm_module, obj_path.string(), &error)) {
+  const std::string entry_obj = temp_object_path("entry", out_path);
+  if (!emit_object(entry_module, entry_obj, &error)) {
     return {.ok = false, .error = error};
   }
+  obj_paths.push_back(entry_obj);
 
-  if (!link_executable(obj_path.string(), rt_lib_path, out_path, &error)) {
+  if (!link_objects(obj_paths, rt_lib_path, out_path, &error)) {
     std::error_code ec;
-    std::filesystem::remove(obj_path, ec);
+    for (const std::string &obj_path : obj_paths) {
+      std::filesystem::remove(obj_path, ec);
+    }
     return {.ok = false, .error = error};
   }
 
   std::error_code ec;
-  std::filesystem::remove(obj_path, ec);
+  for (const std::string &obj_path : obj_paths) {
+    std::filesystem::remove(obj_path, ec);
+  }
   return {.ok = true};
 }
 
