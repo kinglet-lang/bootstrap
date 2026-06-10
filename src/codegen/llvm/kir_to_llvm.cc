@@ -75,6 +75,9 @@ struct RtFns {
   llvm::Function *array_new = nullptr;
   llvm::Function *array_get = nullptr;
   llvm::Function *value_len = nullptr;
+  llvm::Function *struct_new = nullptr;
+  llvm::Function *struct_type_index = nullptr;
+  llvm::Function *struct_field_at = nullptr;
 };
 
 RtFns declare_runtime(llvm::Module *module) {
@@ -95,11 +98,45 @@ RtFns declare_runtime(llvm::Module *module) {
                                         llvm::Function::ExternalLinkage, "kl_array_get", module);
   rt.value_len = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_value_len", module);
+  rt.struct_new = llvm::Function::Create(
+      llvm::FunctionType::get(i64, {i32, i32, i64p}, false), llvm::Function::ExternalLinkage,
+      "kl_struct_new", module);
+  rt.struct_type_index = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
+                                               llvm::Function::ExternalLinkage,
+                                               "kl_struct_type_index", module);
+  rt.struct_field_at = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
+                                              llvm::Function::ExternalLinkage,
+                                              "kl_struct_field_at", module);
   return rt;
 }
 
 llvm::Value *bool_to_i64(llvm::IRBuilder<> &builder, llvm::Value *cond) {
   return builder.CreateZExt(cond, builder.getInt64Ty());
+}
+
+int field_index_for_name(const KirStructMeta &meta, const std::string &field_name) {
+  for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
+    if (meta.field_names[i] == field_name) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
+
+llvm::Value *resolve_field_index(llvm::IRBuilder<> &builder, llvm::Value *type_idx,
+                                const KirModule &kir_module, const std::string &field_name) {
+  llvm::Type *i32 = builder.getInt32Ty();
+  llvm::Value *result = llvm::ConstantInt::get(i32, -1);
+  for (std::size_t t = 0; t < kir_module.struct_metas.size(); ++t) {
+    const int fi = field_index_for_name(kir_module.struct_metas[t], field_name);
+    if (fi < 0) {
+      continue;
+    }
+    llvm::Value *is_match =
+        builder.CreateICmpEQ(type_idx, llvm::ConstantInt::get(i32, static_cast<int>(t)));
+    result = builder.CreateSelect(is_match, llvm::ConstantInt::get(i32, fi), result);
+  }
+  return result;
 }
 
 llvm::Value *binop(llvm::IRBuilder<> &builder, KirOpcode op, llvm::Value *left,
@@ -459,6 +496,55 @@ public:
         temps[i] = result;
         break;
       }
+      case KirOpcode::StructNew: {
+        const int packed = instr->operands[0];
+        const int type_idx = packed >> 16;
+        const int field_count = packed & 0xFFFF;
+        if (field_count < 0) {
+          *error = "struct_new field count invalid";
+          return false;
+        }
+        llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
+        llvm::AllocaInst *fields =
+            builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, field_count), "struct_fields");
+        for (int fi = field_count - 1; fi >= 0; --fi) {
+          llvm::Value *field = pop_value(&stack, error);
+          if (field == nullptr) {
+            return false;
+          }
+          llvm::Value *slot =
+              builder.CreateGEP(i64, fields, llvm::ConstantInt::get(i32, fi));
+          builder.CreateStore(field, slot);
+        }
+        llvm::Value *obj = builder.CreateCall(
+            rt_.struct_new,
+            {llvm::ConstantInt::get(i32, type_idx), llvm::ConstantInt::get(i32, field_count),
+             builder.CreateBitCast(fields, i64p)});
+        push(obj);
+        temps[i] = obj;
+        break;
+      }
+      case KirOpcode::FieldGet: {
+        const int pool_idx = instr->operands[0];
+        if (pool_idx < 0 ||
+            static_cast<std::size_t>(pool_idx) >= kir_module_.constant_strings.size()) {
+          *error = "field_get pool index out of range";
+          return false;
+        }
+        llvm::Value *obj = pop_value(&stack, error);
+        if (obj == nullptr) {
+          return false;
+        }
+        const std::string &field_name =
+            kir_module_.constant_strings[static_cast<std::size_t>(pool_idx)];
+        llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
+        llvm::Value *field_idx =
+            resolve_field_index(builder, type_idx, kir_module_, field_name);
+        llvm::Value *value = builder.CreateCall(rt_.struct_field_at, {obj, field_idx});
+        push(value);
+        temps[i] = value;
+        break;
+      }
       case KirOpcode::ArrayNew: {
         const int element_count = instr->operands[0];
         if (element_count < 0) {
@@ -506,6 +592,13 @@ public:
         llvm::Value *len64 = builder.CreateSExt(len32, i64);
         push(len64);
         temps[i] = len64;
+        break;
+      }
+      case KirOpcode::EnumVariant: {
+        const int packed = instr->operands[0];
+        const int variant_idx = packed & 0xFFFF;
+        push(llvm::ConstantInt::get(i64, variant_idx));
+        temps[i] = stack.back();
         break;
       }
       case KirOpcode::Ret: {
