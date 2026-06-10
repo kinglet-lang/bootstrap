@@ -20,7 +20,76 @@
 #include <utility>
 #include <vector>
 
+#if defined(KINGLET_HAVE_EMBEDDED_COMPILER) && !defined(_WIN32)
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
+#ifdef KINGLET_HAVE_EMBEDDED_COMPILER
+namespace kinglet {
+extern const unsigned char kEmbeddedCompilerData[];
+extern const std::size_t kEmbeddedCompilerSize;
+extern const char kEmbeddedCompilerHash[];
+} // namespace kinglet
+#endif
+
 namespace {
+
+#ifdef KINGLET_HAVE_EMBEDDED_COMPILER
+// `kinglet selfhost <args...>`: materialise the embedded native self-host
+// compiler in a content-addressed temp path and exec it (ADR 0015 L5-2).
+int run_embedded_compiler(int argc, char **argv) {
+#if defined(_WIN32)
+  (void)argc;
+  (void)argv;
+  std::cerr << "kinglet: selfhost embedding is not supported on Windows\n";
+  return 78;
+#else
+  namespace fs = std::filesystem;
+  const fs::path cache_path =
+      fs::temp_directory_path() /
+      (std::string("kinglet-selfhost-") + kinglet::kEmbeddedCompilerHash);
+  const std::string cache = cache_path.string();
+
+  std::error_code ec;
+  const bool fresh = fs::exists(cache_path, ec) &&
+                     fs::file_size(cache_path, ec) == kinglet::kEmbeddedCompilerSize;
+  if (!fresh) {
+    const fs::path tmp_path = cache + ".tmp." + std::to_string(::getpid());
+    {
+      std::ofstream out(tmp_path, std::ios::binary | std::ios::trunc);
+      if (!out) {
+        std::cerr << "kinglet: cannot write embedded compiler to " << tmp_path << "\n";
+        return 74;
+      }
+      out.write(reinterpret_cast<const char *>(kinglet::kEmbeddedCompilerData),
+                static_cast<std::streamsize>(kinglet::kEmbeddedCompilerSize));
+      if (!out) {
+        std::cerr << "kinglet: short write for embedded compiler\n";
+        return 74;
+      }
+    }
+    ::chmod(tmp_path.c_str(), 0755);
+    fs::rename(tmp_path, cache_path, ec);
+    if (ec && !fs::exists(cache_path)) {
+      std::cerr << "kinglet: cannot install embedded compiler: " << ec.message() << "\n";
+      fs::remove(tmp_path, ec);
+      return 74;
+    }
+  }
+
+  std::vector<char *> exec_argv;
+  exec_argv.push_back(const_cast<char *>(cache.c_str()));
+  for (int i = 2; i < argc; ++i) {
+    exec_argv.push_back(argv[i]);
+  }
+  exec_argv.push_back(nullptr);
+  ::execv(cache.c_str(), exec_argv.data());
+  std::cerr << "kinglet: exec failed for " << cache << "\n";
+  return 71;
+#endif
+}
+#endif // KINGLET_HAVE_EMBEDDED_COMPILER
 
 enum class Mode {
   Run,
@@ -55,7 +124,8 @@ void print_usage(std::ostream &out) {
       << "By default, compiles and runs main().\n"
       << "With --run, loads and executes a pre-compiled .kbc file.\n"
       << "With --native -g, emits DWARF debug info from KIR line tables.\n"
-      << "With --save-bytecode --strip-debug, omits debug info for smaller output.\n";
+      << "With --save-bytecode --strip-debug, omits debug info for smaller output.\n"
+      << "With selfhost <args...>, runs the embedded native compiler (if built in).\n";
 }
 
 std::string read_stdin() {
@@ -123,6 +193,16 @@ void print_token(const kinglet::Token &token) {
 } // namespace
 
 int main(int argc, char **argv) {
+  if (argc >= 2 && std::string_view(argv[1]) == "selfhost") {
+#ifdef KINGLET_HAVE_EMBEDDED_COMPILER
+    return run_embedded_compiler(argc, argv);
+#else
+    std::cerr << "kinglet: selfhost compiler not embedded "
+                 "(rebuild with embed_compiler_path=\"/path/to/compiler\")\n";
+    return 78;
+#endif
+  }
+
   std::string input_path;
   std::string save_bytecode_path;
   std::string native_out_path;

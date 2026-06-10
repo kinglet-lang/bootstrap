@@ -1,3 +1,4 @@
+import("//build/embed.gni")
 import("//build/llvm.gni")
 
 group("default") {
@@ -9,6 +10,18 @@ group("default") {
   ]
   if (enable_llvm) {
     deps += [ "//src/codegen/llvm:llvm_codegen" ]
+  }
+}
+
+if (embed_compiler_path != "") {
+  action("embedded_compiler_cc") {
+    script = "//build/scripts/embed_binary.py"
+    inputs = [ embed_compiler_path ]
+    outputs = [ "$target_gen_dir/embedded_compiler.cc" ]
+    args = [
+      rebase_path(embed_compiler_path, root_build_dir),
+      rebase_path("$target_gen_dir/embedded_compiler.cc", root_build_dir),
+    ]
   }
 }
 
@@ -33,6 +46,12 @@ executable("kinglet") {
       "//src/codegen/llvm:llvm_codegen",
     ]
     configs += [ "//src/codegen/llvm:llvm" ]
+  }
+
+  if (embed_compiler_path != "") {
+    sources += [ "$target_gen_dir/embedded_compiler.cc" ]
+    deps += [ ":embedded_compiler_cc" ]
+    defines = [ "KINGLET_HAVE_EMBEDDED_COMPILER=1" ]
   }
 
   include_dirs = [

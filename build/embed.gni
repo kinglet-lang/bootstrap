@@ -1,0 +1,11 @@
+# Optional embedded self-host compiler (ADR 0015 L5-2).
+#
+# Point at a natively built toolchain compiler (kinglet-self
+# `.kinglet/out/compiler`) to link it into the kinglet binary:
+#   gn gen out/Default --args='embed_compiler_path="/abs/path/to/compiler"'
+# `kinglet selfhost <args...>` then runs the embedded compiler without any
+# external compiler.kbc or compiler binary.
+
+declare_args() {
+  embed_compiler_path = ""
+}
