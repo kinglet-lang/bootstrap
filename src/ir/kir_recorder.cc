@@ -183,6 +183,10 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     bb_.instrs.push_back(
         rec(KirOpcode::FieldGet, {static_cast<int32_t>(operand)}, location));
     break;
+  case OpCode::FieldSet:
+    bb_.instrs.push_back(
+        rec(KirOpcode::FieldSet, {static_cast<int32_t>(operand)}, location));
+    break;
   case OpCode::ArrayNew:
     bb_.instrs.push_back(
         rec(KirOpcode::ArrayNew, {static_cast<int32_t>(operand)}, location));
@@ -192,6 +196,9 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     break;
   case OpCode::ArrayLen:
     bb_.instrs.push_back(rec(KirOpcode::ArrayLen, {}, location));
+    break;
+  case OpCode::ArraySlice:
+    bb_.instrs.push_back(rec(KirOpcode::ArraySlice, {}, location));
     break;
   case OpCode::EnumVariant:
     bb_.instrs.push_back(

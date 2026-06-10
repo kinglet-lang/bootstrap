@@ -88,6 +88,8 @@ struct RtFns {
   llvm::Function *struct_new = nullptr;
   llvm::Function *struct_type_index = nullptr;
   llvm::Function *struct_field_at = nullptr;
+  llvm::Function *struct_field_set = nullptr;
+  llvm::Function *slice = nullptr;
   llvm::Function *enum_new = nullptr;
   llvm::Function *enum_new_payload = nullptr;
   llvm::Function *enum_payload_at = nullptr;
@@ -135,6 +137,11 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.struct_field_at = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
                                               llvm::Function::ExternalLinkage,
                                               "kl_struct_field_at", module);
+  rt.struct_field_set = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i64}, false),
+                                               llvm::Function::ExternalLinkage,
+                                               "kl_struct_field_set", module);
+  rt.slice = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64, i64}, false),
+                                      llvm::Function::ExternalLinkage, "kl_slice", module);
   rt.enum_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32}, false),
                                        llvm::Function::ExternalLinkage, "kl_enum_new", module);
   rt.enum_new_payload = llvm::Function::Create(
@@ -855,6 +862,32 @@ public:
         temps[i] = value;
         break;
       }
+      case KirOpcode::FieldSet: {
+        const int pool_idx = instr->operands[0];
+        if (pool_idx < 0 ||
+            static_cast<std::size_t>(pool_idx) >= kir_module_.constant_strings.size()) {
+          *error = "field_set pool index out of range";
+          return false;
+        }
+        llvm::Value *value = pop_value(&stack, error);
+        if (value == nullptr) {
+          return false;
+        }
+        llvm::Value *obj = pop_value(&stack, error);
+        if (obj == nullptr) {
+          return false;
+        }
+        const std::string &field_name =
+            kir_module_.constant_strings[static_cast<std::size_t>(pool_idx)];
+        llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
+        llvm::Value *field_idx =
+            resolve_field_index(builder, type_idx, kir_module_, field_name);
+        llvm::Value *updated =
+            builder.CreateCall(rt_.struct_field_set, {obj, field_idx, value});
+        push(updated);
+        temps[i] = updated;
+        break;
+      }
       case KirOpcode::ArrayNew: {
         const int element_count = instr->operands[0];
         if (element_count < 0) {
@@ -902,6 +935,24 @@ public:
         llvm::Value *len64 = builder.CreateSExt(len32, i64);
         push(len64);
         temps[i] = len64;
+        break;
+      }
+      case KirOpcode::ArraySlice: {
+        llvm::Value *end = pop_value(&stack, error);
+        if (end == nullptr) {
+          return false;
+        }
+        llvm::Value *start = pop_value(&stack, error);
+        if (start == nullptr) {
+          return false;
+        }
+        llvm::Value *obj = pop_value(&stack, error);
+        if (obj == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.slice, {obj, start, end});
+        push(result);
+        temps[i] = result;
         break;
       }
       case KirOpcode::INeg: {

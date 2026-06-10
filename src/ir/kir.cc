@@ -68,12 +68,16 @@ const char *kir_opcode_name(KirOpcode op) {
     return "struct_new";
   case KirOpcode::FieldGet:
     return "field_get";
+  case KirOpcode::FieldSet:
+    return "field_set";
   case KirOpcode::ArrayNew:
     return "array_new";
   case KirOpcode::IndexGet:
     return "index_get";
   case KirOpcode::ArrayLen:
     return "array_len";
+  case KirOpcode::ArraySlice:
+    return "array_slice";
   case KirOpcode::EnumVariant:
     return "enum_variant";
   case KirOpcode::EnumVariantPayload:

@@ -101,4 +101,58 @@ kl_h kl_struct_field_at(kl_h object, int32_t field_index) {
   return obj->fields[static_cast<std::size_t>(field_index)];
 }
 
+kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value) {
+  if (!kl_is_heap(object) || field_index < 0) {
+    return object;
+  }
+  auto *obj = static_cast<KlStruct *>(kl_unbox_ptr(object));
+  if (static_cast<std::size_t>(field_index) >= obj->fields.size()) {
+    return object;
+  }
+  obj->fields[static_cast<std::size_t>(field_index)] = value;
+  return object;
+}
+
+kl_h kl_slice(kl_h value, int64_t start, int64_t end) {
+  if (!kl_is_heap(value)) {
+    return kl_string_new("", 0);
+  }
+  void *ptr = kl_unbox_ptr(value);
+  auto *hdr = static_cast<KlHeader *>(ptr);
+  if (hdr->kind == KlKind::String) {
+    const char *data = nullptr;
+    int32_t len = 0;
+    if (!kl_string_view(value, &data, &len)) {
+      return kl_string_new("", 0);
+    }
+    int64_t slen = len;
+    if (start < 0) {
+      start = 0;
+    }
+    if (end > slen) {
+      end = slen;
+    }
+    if (start >= end) {
+      return kl_string_new("", 0);
+    }
+    return kl_string_new(data + start, static_cast<int32_t>(end - start));
+  }
+  if (hdr->kind == KlKind::Array) {
+    auto *arr = static_cast<KlArray *>(ptr);
+    int64_t alen = static_cast<int64_t>(arr->elements.size());
+    if (start < 0) {
+      start = 0;
+    }
+    if (end > alen) {
+      end = alen;
+    }
+    if (start >= end) {
+      return kl_array_new(0, nullptr);
+    }
+    const int32_t count = static_cast<int32_t>(end - start);
+    return kl_array_new(count, arr->elements.data() + start);
+  }
+  return kl_string_new("", 0);
+}
+
 } // extern "C"
