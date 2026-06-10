@@ -50,6 +50,18 @@ static inline kl_h kl_box_ptr(void *ptr) {
 
 kl_h kl_string_new(const char *data, int32_t len);
 int32_t kl_string_len(kl_h value);
+int32_t kl_string_view(kl_h value, const char **data, int32_t *len);
+
+void kl_set_program_args(int32_t argc, const char **argv);
+
+kl_h kl_native_out(int32_t argc, const kl_h *args);
+kl_h kl_native_out_ln(int32_t argc, const kl_h *args);
+kl_h kl_native_err(int32_t argc, const kl_h *args);
+kl_h kl_native_err_ln(int32_t argc, const kl_h *args);
+kl_h kl_native_in(int32_t argc, const kl_h *args, int32_t secret);
+kl_h kl_native_fs_read(kl_h path);
+kl_h kl_native_fs_write(kl_h path, kl_h content);
+kl_h kl_native_sys_args(void);
 int32_t kl_value_len(kl_h value);
 
 kl_h kl_array_new(int32_t count, const kl_h *elements);
