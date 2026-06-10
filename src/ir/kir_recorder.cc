@@ -44,6 +44,8 @@ std::size_t KirRecorder::record_jump(OpCode op, ast::SourceLocation location) {
   KirOpcode kir_op = KirOpcode::Br;
   if (op == OpCode::JmpFalse) {
     kir_op = KirOpcode::CondBr;
+  } else if (op == OpCode::JmpIfErr) {
+    kir_op = KirOpcode::JmpIfErr;
   }
   bb_.instrs.push_back(rec(kir_op, {0}, location));
   return bb_.instrs.size() - 1;
@@ -54,6 +56,17 @@ void KirRecorder::patch_jump(std::size_t jump_instr_index, int32_t relative_offs
     return;
   }
   bb_.instrs[jump_instr_index].operands[0] = relative_offset;
+}
+
+void KirRecorder::patch_operand(std::size_t instr_index, int32_t operand) {
+  if (!active_ || instr_index >= bb_.instrs.size()) {
+    return;
+  }
+  if (bb_.instrs[instr_index].operands.empty()) {
+    bb_.instrs[instr_index].operands.push_back(operand);
+  } else {
+    bb_.instrs[instr_index].operands[0] = operand;
+  }
 }
 
 void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
@@ -138,6 +151,15 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     break;
   case OpCode::Return:
     bb_.instrs.push_back(rec(KirOpcode::Ret, {}, location));
+    break;
+  case OpCode::PushHandler:
+    bb_.instrs.push_back(rec(KirOpcode::PushHandler, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::PopHandler:
+    bb_.instrs.push_back(rec(KirOpcode::PopHandler, {}, location));
+    break;
+  case OpCode::PropagateErr:
+    bb_.instrs.push_back(rec(KirOpcode::PropagateErr, {}, location));
     break;
   case OpCode::StructNew:
     bb_.instrs.push_back(

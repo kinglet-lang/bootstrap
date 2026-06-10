@@ -715,6 +715,10 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     // Patch the PushHandler operand to be the relative offset.
     const int32_t handler_offset = static_cast<int32_t>(catch_pc - (handler_idx + 1));
     chunk_.patch_operand(handler_idx, handler_offset);
+    const auto handler_kir = kir_instr_at_bc_.find(handler_idx);
+    if (handler_kir != kir_instr_at_bc_.end()) {
+      kir_recorder_.patch_operand(handler_kir->second, handler_offset);
+    }
 
     // The error value is on the stack (left by `?` stub: Pop + Null + Return
     // in function-level mode; inside try the `?` stub will instead Jmp here

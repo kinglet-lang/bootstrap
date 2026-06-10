@@ -54,6 +54,14 @@ const char *kir_opcode_name(KirOpcode op) {
     return "br";
   case KirOpcode::CondBr:
     return "cond_br";
+  case KirOpcode::JmpIfErr:
+    return "jmp_if_err";
+  case KirOpcode::PushHandler:
+    return "push_handler";
+  case KirOpcode::PopHandler:
+    return "pop_handler";
+  case KirOpcode::PropagateErr:
+    return "propagate_err";
   case KirOpcode::Switch:
     return "switch";
   case KirOpcode::StructNew:
