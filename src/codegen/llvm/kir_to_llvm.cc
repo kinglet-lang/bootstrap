@@ -70,8 +70,36 @@ llvm::Value *pop_value(std::vector<llvm::Value *> *stack, std::string *error) {
   return value;
 }
 
-llvm::Value *bool_to_i32(llvm::IRBuilder<> &builder, llvm::Value *cond) {
-  return builder.CreateZExt(cond, builder.getInt32Ty());
+struct RtFns {
+  llvm::Function *string_new = nullptr;
+  llvm::Function *array_new = nullptr;
+  llvm::Function *array_get = nullptr;
+  llvm::Function *value_len = nullptr;
+};
+
+RtFns declare_runtime(llvm::Module *module) {
+  llvm::LLVMContext &ctx = module->getContext();
+  llvm::Type *i32 = llvm::Type::getInt32Ty(ctx);
+  llvm::Type *i64 = llvm::Type::getInt64Ty(ctx);
+  llvm::Type *i8p = llvm::PointerType::getUnqual(llvm::Type::getInt8Ty(ctx));
+  llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
+
+  RtFns rt;
+  rt.string_new = llvm::Function::Create(
+      llvm::FunctionType::get(i64, {i8p, i32}, false), llvm::Function::ExternalLinkage,
+      "kl_string_new", module);
+  rt.array_new = llvm::Function::Create(
+      llvm::FunctionType::get(i64, {i32, i64p}, false), llvm::Function::ExternalLinkage,
+      "kl_array_new", module);
+  rt.array_get = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
+                                        llvm::Function::ExternalLinkage, "kl_array_get", module);
+  rt.value_len = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_value_len", module);
+  return rt;
+}
+
+llvm::Value *bool_to_i64(llvm::IRBuilder<> &builder, llvm::Value *cond) {
+  return builder.CreateZExt(cond, builder.getInt64Ty());
 }
 
 llvm::Value *binop(llvm::IRBuilder<> &builder, KirOpcode op, llvm::Value *left,
@@ -172,17 +200,18 @@ bool link_executable(const std::string &obj_path, const std::string &rt_lib_path
 
 class FunctionLowerer {
 public:
-  FunctionLowerer(llvm::LLVMContext *context, const KirModule &kir_module,
-                  llvm::Function *llvm_fn)
-      : context_(context), kir_module_(kir_module), llvm_fn_(llvm_fn) {}
+  FunctionLowerer(llvm::LLVMContext *context, const KirModule &kir_module, llvm::Function *llvm_fn,
+                  const RtFns &rt)
+      : context_(context), kir_module_(kir_module), llvm_fn_(llvm_fn), rt_(rt) {}
 
   bool lower(const KirFunction &fn, std::string *error) {
     llvm::Type *i32 = llvm::Type::getInt32Ty(*context_);
+    llvm::Type *i64 = llvm::Type::getInt64Ty(*context_);
     linear_ = linear_instrs(fn);
     if (linear_.empty()) {
       llvm::BasicBlock *entry = llvm::BasicBlock::Create(*context_, "entry", llvm_fn_);
       llvm::IRBuilder<> ret_builder(entry);
-      ret_builder.CreateRet(llvm::ConstantInt::get(i32, 0));
+      ret_builder.CreateRet(llvm::ConstantInt::get(i64, 0));
       return true;
     }
 
@@ -242,7 +271,7 @@ public:
     local_slots_.resize(static_cast<std::size_t>(locals));
     for (int i = 0; i < locals; ++i) {
       local_slots_[static_cast<std::size_t>(i)] =
-          alloca_builder.CreateAlloca(i32, nullptr, "local" + std::to_string(i));
+          alloca_builder.CreateAlloca(i64, nullptr, "local" + std::to_string(i));
     }
     for (int i = 0; i < fn.param_count; ++i) {
       alloca_builder.CreateStore(llvm_fn_->getArg(static_cast<unsigned>(i)),
@@ -281,7 +310,7 @@ public:
         if (lhs == nullptr || rhs == nullptr) {
           return false;
         }
-        llvm::Value *result = bool_to_i32(builder, icmp(builder, op, lhs, rhs));
+        llvm::Value *result = bool_to_i64(builder, icmp(builder, op, lhs, rhs));
         push(result);
         temps[i] = result;
         return true;
@@ -289,24 +318,40 @@ public:
 
       switch (instr->op) {
       case KirOpcode::ConstInt:
-        push(llvm::ConstantInt::get(i32, instr->operands[0]));
+        push(llvm::ConstantInt::get(i64, instr->operands[0]));
         temps[i] = stack.back();
         break;
       case KirOpcode::ConstBool:
-        push(llvm::ConstantInt::get(i32, instr->operands.empty() ? 0 : instr->operands[0]));
+        push(llvm::ConstantInt::get(i64, instr->operands.empty() ? 0 : instr->operands[0]));
         temps[i] = stack.back();
         break;
       case KirOpcode::ConstNull:
-        push(llvm::ConstantInt::get(i32, 0));
+        push(llvm::ConstantInt::get(i64, 0));
         temps[i] = stack.back();
         break;
+      case KirOpcode::ConstString: {
+        const int pool_idx = instr->operands[0];
+        if (pool_idx < 0 ||
+            static_cast<std::size_t>(pool_idx) >= kir_module_.constant_strings.size()) {
+          *error = "const_string pool index out of range";
+          return false;
+        }
+        const std::string &text = kir_module_.constant_strings[static_cast<std::size_t>(pool_idx)];
+        llvm::Value *data = builder.CreateGlobalString(text);
+        llvm::Value *len =
+            llvm::ConstantInt::get(i32, static_cast<int>(text.size()));
+        llvm::Value *handle = builder.CreateCall(rt_.string_new, {data, len});
+        push(handle);
+        temps[i] = handle;
+        break;
+      }
       case KirOpcode::ConstFn: {
         const int fn_index = instr->operands[0];
         if (fn_index < 0 || static_cast<std::size_t>(fn_index) >= kir_module_.functions.size()) {
           *error = "const_fn index out of range";
           return false;
         }
-        push(llvm::ConstantInt::get(i32, fn_index));
+        push(llvm::ConstantInt::get(i64, fn_index));
         temps[i] = stack.back();
         break;
       }
@@ -316,7 +361,7 @@ public:
           *error = "load_local slot out of range";
           return false;
         }
-        llvm::Value *loaded = builder.CreateLoad(i32, local_slots_[static_cast<std::size_t>(slot)]);
+        llvm::Value *loaded = builder.CreateLoad(i64, local_slots_[static_cast<std::size_t>(slot)]);
         push(loaded);
         temps[i] = loaded;
         break;
@@ -414,11 +459,60 @@ public:
         temps[i] = result;
         break;
       }
+      case KirOpcode::ArrayNew: {
+        const int element_count = instr->operands[0];
+        if (element_count < 0) {
+          *error = "array_new element count invalid";
+          return false;
+        }
+        llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
+        llvm::AllocaInst *elements = builder.CreateAlloca(
+            i64, llvm::ConstantInt::get(i32, element_count), "array_elems");
+        for (int ei = element_count - 1; ei >= 0; --ei) {
+          llvm::Value *elem = pop_value(&stack, error);
+          if (elem == nullptr) {
+            return false;
+          }
+          llvm::Value *slot =
+              builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ei));
+          builder.CreateStore(elem, slot);
+        }
+        llvm::Value *arr = builder.CreateCall(
+            rt_.array_new,
+            {llvm::ConstantInt::get(i32, element_count),
+             builder.CreateBitCast(elements, i64p)});
+        push(arr);
+        temps[i] = arr;
+        break;
+      }
+      case KirOpcode::IndexGet: {
+        llvm::Value *index = pop_value(&stack, error);
+        llvm::Value *array = pop_value(&stack, error);
+        if (index == nullptr || array == nullptr) {
+          return false;
+        }
+        llvm::Value *idx32 = builder.CreateTrunc(index, i32);
+        llvm::Value *value = builder.CreateCall(rt_.array_get, {array, idx32});
+        push(value);
+        temps[i] = value;
+        break;
+      }
+      case KirOpcode::ArrayLen: {
+        llvm::Value *obj = pop_value(&stack, error);
+        if (obj == nullptr) {
+          return false;
+        }
+        llvm::Value *len32 = builder.CreateCall(rt_.value_len, {obj});
+        llvm::Value *len64 = builder.CreateSExt(len32, i64);
+        push(len64);
+        temps[i] = len64;
+        break;
+      }
       case KirOpcode::Ret: {
         if (bb->getTerminator() != nullptr) {
           break;
         }
-        llvm::Value *retv = llvm::ConstantInt::get(i32, 0);
+        llvm::Value *retv = llvm::ConstantInt::get(i64, 0);
         if (!instr->operands.empty()) {
           const int idx = instr->operands[0];
           if (idx >= 0 && static_cast<std::size_t>(idx) < i) {
@@ -443,11 +537,11 @@ public:
         if (bb->getTerminator() != nullptr) {
           break;
         }
-        llvm::Value *cond_i32 = pop_value(&stack, error);
-        if (cond_i32 == nullptr) {
+        llvm::Value *cond_i64 = pop_value(&stack, error);
+        if (cond_i64 == nullptr) {
           return false;
         }
-        llvm::Value *cond = builder.CreateICmpNE(cond_i32, llvm::ConstantInt::get(i32, 0));
+        llvm::Value *cond = builder.CreateICmpNE(cond_i64, llvm::ConstantInt::get(i64, 0));
         const int rel = instr->operands[0];
         const std::size_t false_target = i + 1 + static_cast<std::size_t>(rel);
         const std::size_t true_target = i + 1;
@@ -471,7 +565,7 @@ public:
     for (llvm::BasicBlock *bb : blocks) {
       if (bb->getTerminator() == nullptr) {
         llvm::IRBuilder<> builder(bb);
-        builder.CreateRet(llvm::ConstantInt::get(i32, 0));
+        builder.CreateRet(llvm::ConstantInt::get(i64, 0));
       }
     }
     return true;
@@ -481,6 +575,7 @@ private:
   llvm::LLVMContext *context_;
   const KirModule &kir_module_;
   llvm::Function *llvm_fn_;
+  const RtFns &rt_;
   std::vector<llvm::AllocaInst *> local_slots_;
   std::vector<const KirInstr *> linear_;
 };
@@ -488,16 +583,18 @@ private:
 bool lower_module(llvm::Module *module, const KirModule &kir_module, std::string *error) {
   llvm::LLVMContext &context = module->getContext();
   llvm::Type *i32 = llvm::Type::getInt32Ty(context);
+  llvm::Type *i64 = llvm::Type::getInt64Ty(context);
+  const RtFns rt = declare_runtime(module);
 
   for (const KirFunction &fn : kir_module.functions) {
-    std::vector<llvm::Type *> param_types(static_cast<std::size_t>(fn.param_count), i32);
-    auto *fn_type = llvm::FunctionType::get(i32, param_types, false);
+    std::vector<llvm::Type *> param_types(static_cast<std::size_t>(fn.param_count), i64);
+    auto *fn_type = llvm::FunctionType::get(i64, param_types, false);
     llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage, fn_symbol(fn.name), module);
   }
 
   for (const KirFunction &fn : kir_module.functions) {
     llvm::Function *llvm_fn = module->getFunction(fn_symbol(fn.name));
-    FunctionLowerer lowerer(&context, kir_module, llvm_fn);
+    FunctionLowerer lowerer(&context, kir_module, llvm_fn, rt);
     if (!lowerer.lower(fn, error)) {
       return false;
     }
@@ -513,7 +610,8 @@ bool lower_module(llvm::Module *module, const KirModule &kir_module, std::string
     *error = "KIR module missing main";
     return false;
   }
-  builder.CreateRet(builder.CreateCall(user_main, {}));
+  llvm::Value *exit_code = builder.CreateTrunc(builder.CreateCall(user_main, {}), i32);
+  builder.CreateRet(exit_code);
   return true;
 }
 
