@@ -38,6 +38,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
   struct_indices_.clear();
   enum_indices_.clear();
   processed_modules_.clear();
+  namespace_source_paths_.clear();
   concept_registry_.clear();
   func_first_param_.clear();
   global_const_inits_.clear();
@@ -322,6 +323,23 @@ void Compiler::attach_kir_metadata() {
     km.field_names = meta.field_names;
     kir_module_.struct_metas.push_back(std::move(km));
   }
+  kir_module_.enum_metas.clear();
+  kir_module_.function_names.clear();
+  kir_module_.function_param_counts.clear();
+  for (const FunctionInfo &fn : chunk_.functions()) {
+    kir_module_.function_names.push_back(fn.name);
+    kir_module_.function_param_counts.push_back(static_cast<int32_t>(fn.param_count));
+  }
+  for (const EnumMeta &meta : chunk_.enum_metas()) {
+    KirEnumMeta km;
+    km.name = meta.name;
+    km.variants = meta.variants;
+    km.variant_param_counts.reserve(meta.variant_param_counts.size());
+    for (int count : meta.variant_param_counts) {
+      km.variant_param_counts.push_back(static_cast<int32_t>(count));
+    }
+    kir_module_.enum_metas.push_back(std::move(km));
+  }
   const std::vector<Value> &constants = chunk_.constants();
   kir_module_.constant_strings.resize(constants.size());
   for (std::size_t i = 0; i < constants.size(); ++i) {
@@ -465,8 +483,19 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     }
   }
 
-  kir_recorder_.begin_function(function.name,
-                               static_cast<int>(function.params.size()));
+  std::string fn_source = entry_source_path_;
+  if (!lookup_name.empty()) {
+    const auto sep = lookup_name.find("::");
+    if (sep != std::string::npos) {
+      const std::string ns = lookup_name.substr(0, sep);
+      const auto src_it = namespace_source_paths_.find(ns);
+      if (src_it != namespace_source_paths_.end()) {
+        fn_source = src_it->second;
+      }
+    }
+  }
+  kir_recorder_.begin_function(function.name, static_cast<int>(function.params.size()),
+                               fn_source);
   kir_instr_at_bc_.clear();
   bool body_returned = false;
   if (body && !body->statements.empty()) {
@@ -2092,6 +2121,7 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
   std::string ns = import_decl.alias.empty() ? mod.namespace_name : import_decl.alias;
 
   imported_namespaces_.insert(ns);
+  namespace_source_paths_[ns] = mod.resolved_path;
 
   for (const auto *func : mod.public_functions) {
     if (!import_decl.selected_symbols.empty()) {

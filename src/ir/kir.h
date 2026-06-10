@@ -42,6 +42,9 @@ enum class KirOpcode {
   IndexGet,
   ArrayLen,
   EnumVariant,
+  EnumVariantPayload,
+  EnumPayloadGet,
+  CastTo,
   INeg,
   Unreachable,
   Nop,
@@ -50,6 +53,12 @@ enum class KirOpcode {
 struct KirStructMeta {
   std::string name;
   std::vector<std::string> field_names;
+};
+
+struct KirEnumMeta {
+  std::string name;
+  std::vector<std::string> variants;
+  std::vector<int32_t> variant_param_counts;
 };
 
 struct KirInstr {
@@ -66,6 +75,7 @@ struct KirBasicBlock {
 
 struct KirFunction {
   std::string name;
+  std::string source_path;
   int param_count = 0;
   std::vector<std::string> param_names;
   std::vector<KirBasicBlock> blocks;
@@ -76,6 +86,10 @@ struct KirModule {
   // Parallel to compile-time constant pool indices (string entries used by FieldGet).
   std::vector<std::string> constant_strings;
   std::vector<KirStructMeta> struct_metas;
+  std::vector<KirEnumMeta> enum_metas;
+  // Chunk function pool indices (ConstFn operands) → symbol names.
+  std::vector<std::string> function_names;
+  std::vector<int32_t> function_param_counts;
 };
 
 const char *kir_opcode_name(KirOpcode op);

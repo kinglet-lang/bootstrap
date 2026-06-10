@@ -37,6 +37,7 @@ public:
   CompileResult compile(const ast::Program &program);
   CompileResult compile_module(const ast::Program &program);
   void set_module_loader(ModuleLoader *loader) { module_loader_ = loader; }
+  void set_entry_source_path(std::string path) { entry_source_path_ = std::move(path); }
 
 private:
   struct Local {
@@ -108,6 +109,8 @@ private:
   // module reached through several import paths (diamond deps) is registered
   // and compiled exactly once.
   std::unordered_set<std::string> processed_modules_;
+  std::unordered_map<std::string, std::string> namespace_source_paths_;
+  std::string entry_source_path_;
   std::unordered_map<std::string, std::string> local_types_;
   std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
   std::unordered_map<std::string, std::string> method_return_types_;

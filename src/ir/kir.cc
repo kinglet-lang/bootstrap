@@ -76,6 +76,12 @@ const char *kir_opcode_name(KirOpcode op) {
     return "array_len";
   case KirOpcode::EnumVariant:
     return "enum_variant";
+  case KirOpcode::EnumVariantPayload:
+    return "enum_variant_payload";
+  case KirOpcode::EnumPayloadGet:
+    return "enum_payload_get";
+  case KirOpcode::CastTo:
+    return "cast_to";
   case KirOpcode::INeg:
     return "ineg";
   case KirOpcode::Unreachable:

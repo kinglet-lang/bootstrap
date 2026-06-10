@@ -15,9 +15,11 @@ KirInstr rec(KirOpcode op, std::vector<int32_t> operands, ast::SourceLocation lo
 
 } // namespace
 
-void KirRecorder::begin_function(const std::string &name, int param_count) {
+void KirRecorder::begin_function(const std::string &name, int param_count,
+                                 const std::string &source_path) {
   fn_ = KirFunction{};
   fn_.name = name;
+  fn_.source_path = source_path;
   fn_.param_count = param_count;
   bb_ = KirBasicBlock{};
   bb_.label = "bb0";
@@ -182,6 +184,17 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
   case OpCode::EnumVariant:
     bb_.instrs.push_back(
         rec(KirOpcode::EnumVariant, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::EnumVariantPayload:
+    bb_.instrs.push_back(
+        rec(KirOpcode::EnumVariantPayload, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::EnumPayloadGet:
+    bb_.instrs.push_back(
+        rec(KirOpcode::EnumPayloadGet, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::CastTo:
+    bb_.instrs.push_back(rec(KirOpcode::CastTo, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::Negate:
     bb_.instrs.push_back(rec(KirOpcode::INeg, {}, location));

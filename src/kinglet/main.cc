@@ -479,6 +479,13 @@ int main(int argc, char **argv) {
 
   kinglet::Compiler compiler;
   compiler.set_module_loader(&module_loader);
+  if (!input_path.empty()) {
+    const std::filesystem::path entry_path =
+        std::filesystem::path(input_path).is_absolute()
+            ? std::filesystem::path(input_path)
+            : std::filesystem::current_path() / input_path;
+    compiler.set_entry_source_path(entry_path.string());
+  }
   kinglet::CompileResult compile_result = compiler.compile(*result.program);
   for (const kinglet::CompileError &error : compile_result.errors) {
     std::cerr << error.location.line << ':' << error.location.column
