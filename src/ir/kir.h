@@ -38,6 +38,7 @@ enum class KirOpcode {
   IndexGet,
   ArrayLen,
   EnumVariant,
+  INeg,
   Unreachable,
   Nop,
 };

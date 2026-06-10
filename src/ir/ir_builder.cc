@@ -19,7 +19,10 @@ bool IrBuilder::build_expr_into(KirFunction *fn, KirBasicBlock *bb, const ast::E
                                 int *out_value) const {
   if (const auto *lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
     bb->instrs.push_back(
-        make_instr(KirOpcode::ConstInt, {static_cast<int32_t>(lit->value)}, expr.location));
+        make_instr(KirOpcode::ConstInt,
+                    {static_cast<int32_t>(lit->value),
+                     static_cast<int32_t>(static_cast<uint64_t>(lit->value) >> 32)},
+                    expr.location));
     *out_value = static_cast<int>(bb->instrs.size()) - 1;
     return true;
   }

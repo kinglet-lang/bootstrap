@@ -62,8 +62,11 @@ void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
     return;
   }
   if (value.type == ValueType::Int || value.type == ValueType::Char) {
-    bb_.instrs.push_back(
-        rec(KirOpcode::ConstInt, {static_cast<int32_t>(value.as_int)}, location));
+    const int64_t v = value.as_int;
+    bb_.instrs.push_back(rec(KirOpcode::ConstInt,
+                             {static_cast<int32_t>(v),
+                              static_cast<int32_t>(static_cast<uint64_t>(v) >> 32)},
+                             location));
   } else if (value.type == ValueType::Bool) {
     bb_.instrs.push_back(rec(KirOpcode::ConstBool, {value.as_bool ? 1 : 0}, location));
   } else if (value.type == ValueType::Null) {
@@ -158,7 +161,11 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     bb_.instrs.push_back(
         rec(KirOpcode::EnumVariant, {static_cast<int32_t>(operand)}, location));
     break;
+  case OpCode::Negate:
+    bb_.instrs.push_back(rec(KirOpcode::INeg, {}, location));
+    break;
   default:
+    bb_.instrs.push_back(rec(KirOpcode::Nop, {}, location));
     break;
   }
 }
