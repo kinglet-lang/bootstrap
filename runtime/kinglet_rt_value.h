@@ -62,6 +62,7 @@ kl_h kl_struct_field_at(kl_h object, int32_t field_index);
 
 kl_h kl_enum_new(int32_t type_index, int32_t variant_index);
 int32_t kl_value_eq(kl_h left, kl_h right);
+int32_t kl_value_is_err(kl_h value);
 int32_t kl_exit_code(kl_h value);
 
 #ifdef __cplusplus
