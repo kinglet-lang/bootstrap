@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <sstream>
 #include <string>
+#include <algorithm>
 #include <map>
 #include <set>
 #include <unordered_map>
@@ -78,6 +79,9 @@ struct RtFns {
   llvm::Function *struct_new = nullptr;
   llvm::Function *struct_type_index = nullptr;
   llvm::Function *struct_field_at = nullptr;
+  llvm::Function *enum_new = nullptr;
+  llvm::Function *value_eq = nullptr;
+  llvm::Function *exit_code = nullptr;
 };
 
 RtFns declare_runtime(llvm::Module *module) {
@@ -107,7 +111,25 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.struct_field_at = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
                                               llvm::Function::ExternalLinkage,
                                               "kl_struct_field_at", module);
+  rt.enum_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32}, false),
+                                       llvm::Function::ExternalLinkage, "kl_enum_new", module);
+  rt.value_eq = llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
+                                       llvm::Function::ExternalLinkage, "kl_value_eq", module);
+  rt.exit_code = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_exit_code", module);
   return rt;
+}
+
+llvm::Value *const_i64(llvm::IRBuilder<> &builder, const KirInstr *instr) {
+  llvm::Type *i32 = builder.getInt32Ty();
+  llvm::Type *i64 = builder.getInt64Ty();
+  const int32_t low = instr->operands[0];
+  const int32_t high = instr->operands.size() > 1 ? instr->operands[1] : (low < 0 ? -1 : 0);
+  llvm::Value *lo = builder.CreateZExt(llvm::ConstantInt::get(i32, static_cast<uint32_t>(low)), i64);
+  llvm::Value *hi =
+      builder.CreateShl(builder.CreateZExt(llvm::ConstantInt::get(i32, static_cast<uint32_t>(high)), i64),
+                        llvm::ConstantInt::get(i64, 32));
+  return builder.CreateOr(lo, hi);
 }
 
 llvm::Value *bool_to_i64(llvm::IRBuilder<> &builder, llvm::Value *cond) {
@@ -318,10 +340,111 @@ public:
 
     std::vector<llvm::Value *> temps(linear_.size(), nullptr);
     std::vector<llvm::Value *> stack;
+    std::map<llvm::BasicBlock *, std::vector<llvm::Value *>> exit_stacks;
+
+    auto merge_stack_at_leader = [&](std::size_t leader_pc) -> bool {
+      if (leader_pc == 0) {
+        stack.clear();
+        return true;
+      }
+      llvm::BasicBlock *bb = block_for_leader[leader_pc];
+      std::vector<llvm::BasicBlock *> preds;
+      auto add_pred = [&](llvm::BasicBlock *pred) {
+        if (std::find(preds.begin(), preds.end(), pred) == preds.end()) {
+          preds.push_back(pred);
+        }
+      };
+      for (std::size_t j = 0; j < linear_.size(); ++j) {
+        const KirInstr *jump = linear_[j];
+        if (jump->op == KirOpcode::Br) {
+          if (j + 1 + static_cast<std::size_t>(jump->operands[0]) == leader_pc) {
+            add_pred(block_index(j));
+          }
+        } else if (jump->op == KirOpcode::CondBr) {
+          if (j + 1 == leader_pc) {
+            add_pred(block_index(j));
+          }
+          if (j + 1 + static_cast<std::size_t>(jump->operands[0]) == leader_pc) {
+            add_pred(block_index(j));
+          }
+        }
+      }
+      auto prev_it = leaders.lower_bound(leader_pc);
+      if (prev_it != leaders.begin()) {
+        --prev_it;
+        const std::size_t prev_leader = *prev_it;
+        if (prev_leader < leader_pc) {
+          bool can_fallthrough = true;
+          for (std::size_t j = prev_leader; j < leader_pc; ++j) {
+            const KirInstr *instr = linear_[j];
+            if (instr->op == KirOpcode::Br || instr->op == KirOpcode::Ret) {
+              can_fallthrough = false;
+              break;
+            }
+          }
+          if (can_fallthrough) {
+            add_pred(block_for_leader[prev_leader]);
+          }
+        }
+      }
+      if (preds.empty()) {
+        stack.clear();
+        return true;
+      }
+      if (preds.size() == 1) {
+        llvm::BasicBlock *pred = preds.front();
+        if (pred == entry_bb) {
+          stack.clear();
+          return true;
+        }
+        const auto it = exit_stacks.find(pred);
+        if (it == exit_stacks.end()) {
+          *error = "native lowering missing stack state for predecessor block";
+          return false;
+        }
+        stack = it->second;
+        return true;
+      }
+      std::size_t max_depth = 0;
+      for (llvm::BasicBlock *pred : preds) {
+        const auto it = exit_stacks.find(pred);
+        if (it != exit_stacks.end()) {
+          max_depth = std::max(max_depth, it->second.size());
+        }
+      }
+      stack.assign(max_depth, nullptr);
+      llvm::IRBuilder<> phi_builder(bb);
+      phi_builder.SetInsertPoint(bb, bb->getFirstInsertionPt());
+      for (std::size_t d = 0; d < max_depth; ++d) {
+        llvm::PHINode *phi = phi_builder.CreatePHI(i64, static_cast<unsigned>(preds.size()),
+                                                     "stk" + std::to_string(d));
+        for (llvm::BasicBlock *pred : preds) {
+          llvm::Value *incoming = llvm::UndefValue::get(i64);
+          const auto it = exit_stacks.find(pred);
+          if (it != exit_stacks.end() && d < it->second.size()) {
+            incoming = it->second[d];
+          }
+          phi->addIncoming(incoming, pred);
+        }
+        stack[d] = phi;
+      }
+      return true;
+    };
 
     for (std::size_t i = 0; i < linear_.size(); ++i) {
       const KirInstr *instr = linear_[i];
       llvm::BasicBlock *bb = block_index(i);
+      if (leaders.count(i) > 0) {
+        if (i > 0) {
+          llvm::BasicBlock *prev_bb = block_index(i - 1);
+          if (prev_bb != bb && prev_bb->getTerminator() == nullptr) {
+            exit_stacks[prev_bb] = stack;
+          }
+        }
+        if (!merge_stack_at_leader(i)) {
+          return false;
+        }
+      }
       llvm::IRBuilder<> builder(bb);
       auto push = [&](llvm::Value *v) { stack.push_back(v); };
 
@@ -347,17 +470,29 @@ public:
         if (lhs == nullptr || rhs == nullptr) {
           return false;
         }
-        llvm::Value *result = bool_to_i64(builder, icmp(builder, op, lhs, rhs));
+        llvm::Value *result = nullptr;
+        if (op == KirOpcode::ICmpEq || op == KirOpcode::ICmpNeq) {
+          llvm::Value *eq =
+              builder.CreateCall(rt_.value_eq, {lhs, rhs});
+          if (op == KirOpcode::ICmpNeq) {
+            eq = builder.CreateXor(eq, llvm::ConstantInt::get(builder.getInt32Ty(), 1));
+          }
+          result = bool_to_i64(builder, builder.CreateICmpNE(eq, llvm::ConstantInt::get(i32, 0)));
+        } else {
+          result = bool_to_i64(builder, icmp(builder, op, lhs, rhs));
+        }
         push(result);
         temps[i] = result;
         return true;
       };
 
       switch (instr->op) {
-      case KirOpcode::ConstInt:
-        push(llvm::ConstantInt::get(i64, instr->operands[0]));
-        temps[i] = stack.back();
+      case KirOpcode::ConstInt: {
+        llvm::Value *value = const_i64(builder, instr);
+        push(value);
+        temps[i] = value;
         break;
+      }
       case KirOpcode::ConstBool:
         push(llvm::ConstantInt::get(i64, instr->operands.empty() ? 0 : instr->operands[0]));
         temps[i] = stack.back();
@@ -594,11 +729,28 @@ public:
         temps[i] = len64;
         break;
       }
+      case KirOpcode::INeg: {
+        llvm::Value *v = pop_value(&stack, error);
+        if (v == nullptr) {
+          return false;
+        }
+        llvm::Value *neg = builder.CreateSub(llvm::ConstantInt::get(i64, 0), v);
+        push(neg);
+        temps[i] = neg;
+        break;
+      }
+      case KirOpcode::Nop:
+        break;
       case KirOpcode::EnumVariant: {
         const int packed = instr->operands[0];
+        const int type_idx = packed >> 16;
         const int variant_idx = packed & 0xFFFF;
-        push(llvm::ConstantInt::get(i64, variant_idx));
-        temps[i] = stack.back();
+        const uint64_t wire = (0xFFFDULL << 48) |
+                            (static_cast<uint64_t>(type_idx & 0xFFFF) << 16) |
+                            static_cast<uint64_t>(variant_idx & 0xFFFF);
+        llvm::Value *value = llvm::ConstantInt::get(i64, wire);
+        push(value);
+        temps[i] = value;
         break;
       }
       case KirOpcode::Ret: {
@@ -615,6 +767,7 @@ public:
           retv = stack.back();
         }
         builder.CreateRet(retv);
+        exit_stacks[bb] = stack;
         break;
       }
       case KirOpcode::Br: {
@@ -624,6 +777,7 @@ public:
         const int rel = instr->operands[0];
         const std::size_t target = i + 1 + static_cast<std::size_t>(rel);
         builder.CreateBr(block_index(target));
+        exit_stacks[bb] = stack;
         break;
       }
       case KirOpcode::CondBr: {
@@ -639,6 +793,7 @@ public:
         const std::size_t false_target = i + 1 + static_cast<std::size_t>(rel);
         const std::size_t true_target = i + 1;
         builder.CreateCondBr(cond, block_index(true_target), block_index(false_target));
+        exit_stacks[bb] = stack;
         break;
       }
       default:
@@ -703,7 +858,8 @@ bool lower_module(llvm::Module *module, const KirModule &kir_module, std::string
     *error = "KIR module missing main";
     return false;
   }
-  llvm::Value *exit_code = builder.CreateTrunc(builder.CreateCall(user_main, {}), i32);
+  llvm::Value *raw_result = builder.CreateCall(user_main, {});
+  llvm::Value *exit_code = builder.CreateCall(rt.exit_code, {raw_result});
   builder.CreateRet(exit_code);
   return true;
 }
