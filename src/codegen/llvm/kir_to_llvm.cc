@@ -12,8 +12,10 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/MC/TargetRegistry.h>
+#include <llvm/ADT/StringExtras.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/SHA256.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
@@ -1774,6 +1776,79 @@ std::string temp_object_path(const std::string &tag, const std::string &out_path
       .string();
 }
 
+// Canonical per-shard fingerprint for the object cache. Pool indices are
+// resolved to their values (strings, function symbols) so that edits in one
+// module which shift the shared constant pool do not invalidate other
+// modules' cached objects. Struct and enum metadata stay global because
+// lowering embeds module-wide type and field indices.
+std::string shard_fingerprint_text(const KirModule &shard, const KirModule &full,
+                                   const NativeCompileOptions &options) {
+  std::ostringstream out;
+  out << "salt:" << options.cache_salt << '\n';
+  out << "triple:" << llvm::sys::getDefaultTargetTriple() << '\n';
+  out << "debug:" << (options.debug_info ? 1 : 0) << '\n';
+  for (const KirStructMeta &meta : full.struct_metas) {
+    out << "struct:" << meta.name;
+    for (const std::string &field : meta.field_names) {
+      out << ',' << field;
+    }
+    out << '\n';
+  }
+  for (const KirEnumMeta &meta : full.enum_metas) {
+    out << "enum:" << meta.name;
+    for (std::size_t v = 0; v < meta.variants.size(); ++v) {
+      out << ',' << meta.variants[v] << '/'
+          << (v < meta.variant_param_counts.size() ? meta.variant_param_counts[v] : 0);
+    }
+    out << '\n';
+  }
+  for (const KirFunction &fn : shard.functions) {
+    out << "fn:" << fn_symbol(fn.name, fn.source_path) << ':' << fn.param_count << '\n';
+    for (const KirBasicBlock &bb : fn.blocks) {
+      for (const KirInstr &instr : bb.instrs) {
+        out << kir_opcode_name(instr.op);
+        const bool string_pool_op = instr.op == KirOpcode::ConstString ||
+                                    instr.op == KirOpcode::FieldGet ||
+                                    instr.op == KirOpcode::FieldSet;
+        if (string_pool_op && !instr.operands.empty()) {
+          const int idx = instr.operands[0];
+          if (idx >= 0 && static_cast<std::size_t>(idx) < full.constant_strings.size()) {
+            out << " s\"" << full.constant_strings[static_cast<std::size_t>(idx)] << '"';
+          } else {
+            out << " s?" << idx;
+          }
+        } else if (instr.op == KirOpcode::ConstFn && !instr.operands.empty()) {
+          const int idx = instr.operands[0];
+          if (idx >= 0 && static_cast<std::size_t>(idx) < full.function_symbols.size()) {
+            out << " f" << full.function_symbols[static_cast<std::size_t>(idx)] << '/'
+                << (static_cast<std::size_t>(idx) < full.function_param_counts.size()
+                        ? full.function_param_counts[static_cast<std::size_t>(idx)]
+                        : -1);
+          } else {
+            out << " f?" << idx;
+          }
+        } else {
+          for (int32_t operand : instr.operands) {
+            out << ' ' << operand;
+          }
+        }
+        out << '@' << instr.line << ':' << instr.col << '\n';
+      }
+    }
+  }
+  return out.str();
+}
+
+std::string shard_stamp(const KirModule &shard, const KirModule &full,
+                        const NativeCompileOptions &options) {
+  llvm::SHA256 hasher;
+  const std::string text = shard_fingerprint_text(shard, full, options);
+  hasher.update(text);
+  const auto digest = hasher.final();
+  return llvm::toHex(llvm::ArrayRef<uint8_t>(digest.data(), digest.size()),
+                     /*LowerCase=*/true);
+}
+
 } // namespace
 
 NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
@@ -1790,10 +1865,38 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     return {.ok = false, .error = "KIR module has no functions"};
   }
 
+  const bool use_cache = !options.object_cache_dir.empty();
+  if (use_cache) {
+    std::error_code cache_ec;
+    std::filesystem::create_directories(options.object_cache_dir, cache_ec);
+    if (cache_ec) {
+      return {.ok = false,
+              .error = "cannot create object cache dir " + options.object_cache_dir +
+                       ": " + cache_ec.message()};
+    }
+  }
+
   std::vector<std::string> obj_paths;
+  // Only freshly emitted (non-cached) objects are removed after linking.
+  std::vector<std::string> temp_objs;
   std::size_t shard_idx = 0;
   for (auto &[key, shard] : shards) {
     copy_kir_metadata(&shard, module);
+
+    std::string obj_path;
+    if (use_cache) {
+      const std::string stamp = shard_stamp(shard, module, options);
+      obj_path = (std::filesystem::path(options.object_cache_dir) / (stamp + ".o")).string();
+      if (std::filesystem::exists(obj_path)) {
+        obj_paths.push_back(obj_path);
+        ++shard_idx;
+        continue;
+      }
+    } else {
+      obj_path = temp_object_path(key, out_path);
+      temp_objs.push_back(obj_path);
+    }
+
     llvm::LLVMContext context;
     llvm::Module llvm_module("kinglet_mod_" + std::to_string(shard_idx++), context);
     if (!lower_user_functions(&llvm_module, shard, module, options.debug_info, &error)) {
@@ -1802,8 +1905,20 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     if (llvm::verifyModule(llvm_module, &llvm::errs())) {
       return {.ok = false, .error = "invalid LLVM module after lowering"};
     }
-    const std::string obj_path = temp_object_path(key, out_path);
-    if (!emit_object(llvm_module, obj_path, &error)) {
+    if (use_cache) {
+      // Emit to a private temp and rename so concurrent builds see either a
+      // complete object or none.
+      const std::string tmp_path = obj_path + ".tmp";
+      if (!emit_object(llvm_module, tmp_path, &error)) {
+        return {.ok = false, .error = error};
+      }
+      std::error_code rename_ec;
+      std::filesystem::rename(tmp_path, obj_path, rename_ec);
+      if (rename_ec) {
+        return {.ok = false,
+                .error = "cannot move object into cache: " + rename_ec.message()};
+      }
+    } else if (!emit_object(llvm_module, obj_path, &error)) {
       return {.ok = false, .error = error};
     }
     obj_paths.push_back(obj_path);
@@ -1822,10 +1937,11 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     return {.ok = false, .error = error};
   }
   obj_paths.push_back(entry_obj);
+  temp_objs.push_back(entry_obj);
 
   if (!link_objects(obj_paths, rt_lib_path, out_path, &error)) {
     std::error_code ec;
-    for (const std::string &obj_path : obj_paths) {
+    for (const std::string &obj_path : temp_objs) {
       std::filesystem::remove(obj_path, ec);
     }
     return {.ok = false, .error = error};
@@ -1838,7 +1954,7 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     const std::string dsym_cmd = "dsymutil \"" + out_path + "\"";
     if (std::system(dsym_cmd.c_str()) != 0) {
       std::error_code ec;
-      for (const std::string &obj_path : obj_paths) {
+      for (const std::string &obj_path : temp_objs) {
         std::filesystem::remove(obj_path, ec);
       }
       return {.ok = false, .error = "dsymutil failed for " + out_path};
@@ -1847,7 +1963,7 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
 #endif
 
   std::error_code ec;
-  for (const std::string &obj_path : obj_paths) {
+  for (const std::string &obj_path : temp_objs) {
     std::filesystem::remove(obj_path, ec);
   }
   return {.ok = true};

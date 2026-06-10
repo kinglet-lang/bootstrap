@@ -12,8 +12,14 @@ struct NativeCompileResult {
 };
 
 struct NativeCompileOptions {
-  // Emit DWARF debug info derived from KIR line tables (L5-1).
+  // Emit DWARF debug info derived from KIR line tables.
   bool debug_info = false;
+  // When set, per-module object files are cached here keyed by a content
+  // stamp; unchanged modules skip LLVM lowering and codegen on rebuilds.
+  std::string object_cache_dir;
+  // Compiler identity mixed into every stamp (e.g. a hash of the kinglet
+  // binary) so codegen changes invalidate cached objects.
+  std::string cache_salt;
 };
 
 class KirToLlvm {

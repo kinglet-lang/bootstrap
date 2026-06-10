@@ -115,15 +115,34 @@ std::string resolve_rt_lib(const char *argv0) {
   }
   return (dir / "obj/runtime/libkinglet_rt.a").string();
 }
+
+// FNV-1a content hash of this compiler binary; mixed into object cache
+// stamps so a rebuilt compiler invalidates previously cached objects.
+std::string compiler_identity(const char *argv0) {
+  std::ifstream file(std::filesystem::absolute(argv0), std::ios::binary);
+  uint64_t hash = 1469598103934665603ull;
+  char buffer[65536];
+  while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
+    const std::streamsize n = file.gcount();
+    for (std::streamsize i = 0; i < n; ++i) {
+      hash ^= static_cast<unsigned char>(buffer[i]);
+      hash *= 1099511628211ull;
+    }
+  }
+  std::ostringstream out;
+  out << std::hex << hash;
+  return out.str();
+}
 #endif
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] | --backend native -o <out> | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache <dir>] | --backend native -o <out> | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles and runs main().\n"
       << "With --run, loads and executes a pre-compiled .kbc file.\n"
       << "With --native -g, emits DWARF debug info from KIR line tables.\n"
+      << "With --obj-cache, caches per-module objects by content stamp for incremental rebuilds.\n"
       << "With --save-bytecode --strip-debug, omits debug info for smaller output.\n"
       << "With selfhost <args...>, runs the embedded native compiler (if built in).\n";
 }
@@ -206,6 +225,7 @@ int main(int argc, char **argv) {
   std::string input_path;
   std::string save_bytecode_path;
   std::string native_out_path;
+  std::string native_obj_cache_dir;
   std::string run_bytecode_path;
   Mode mode = Mode::Run;
   bool strip_debug = false;
@@ -306,6 +326,16 @@ int main(int argc, char **argv) {
     }
     if (arg == "-g") {
       native_debug_info = true;
+      continue;
+    }
+    if (arg == "--obj-cache") {
+      if (i + 1 < argc) {
+        ++i;
+        native_obj_cache_dir = argv[i];
+      } else {
+        std::cerr << "kinglet: --obj-cache requires a directory\n";
+        return 64;
+      }
       continue;
     }
     if (arg == "--run") {
@@ -608,6 +638,10 @@ int main(int argc, char **argv) {
 #else
     kinglet::NativeCompileOptions native_options;
     native_options.debug_info = native_debug_info;
+    if (!native_obj_cache_dir.empty()) {
+      native_options.object_cache_dir = native_obj_cache_dir;
+      native_options.cache_salt = compiler_identity(argv[0]);
+    }
     kinglet::NativeCompileResult native = kinglet::KirToLlvm::compile_executable(
         compile_result.kir, native_out_path, resolve_rt_lib(argv[0]), native_options);
     if (!native.ok) {
