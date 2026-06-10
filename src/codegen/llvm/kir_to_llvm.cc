@@ -1,5 +1,7 @@
 #include "codegen/llvm/kir_to_llvm.h"
 
+#include "ir/kir_typing.h"
+
 #include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
@@ -21,6 +23,7 @@
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/TargetParser/Host.h>
 
+#include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
@@ -72,7 +75,8 @@ int max_local_slot(const KirFunction &fn) {
 
 std::string g_lower_context;
 
-llvm::Value *pop_value(std::vector<llvm::Value *> *stack, std::string *error) {
+llvm::Value *pop_value(std::vector<llvm::Value *> *stack, std::string *error,
+                       std::vector<KirType> *type_stack = nullptr) {
   if (stack->empty()) {
     if (g_lower_context.empty()) {
       *error = "native lowering stack underflow";
@@ -83,8 +87,30 @@ llvm::Value *pop_value(std::vector<llvm::Value *> *stack, std::string *error) {
   }
   llvm::Value *value = stack->back();
   stack->pop_back();
+  if (type_stack != nullptr && !type_stack->empty()) {
+    type_stack->pop_back();
+  }
   return value;
 }
+
+llvm::Type *stack_llvm_type(llvm::LLVMContext &ctx, KirType type) {
+  return type == KirType::Float ? llvm::Type::getDoubleTy(ctx) : llvm::Type::getInt64Ty(ctx);
+}
+
+llvm::Value *const_double(llvm::IRBuilder<> &builder, const KirInstr *instr) {
+  int64_t bits = 0;
+  const int32_t low = instr->operands[0];
+  const int32_t high = instr->operands.size() > 1 ? instr->operands[1] : (low < 0 ? -1 : 0);
+  bits = (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
+         static_cast<uint32_t>(low);
+  double value = 0.0;
+  std::memcpy(&value, &bits, sizeof(value));
+  return llvm::ConstantFP::get(builder.getDoubleTy(), value);
+}
+
+struct RtFns;
+llvm::Value *to_wire_i64(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Value *value,
+                         KirType type);
 
 struct RtFns {
   llvm::Function *string_new = nullptr;
@@ -115,7 +141,11 @@ struct RtFns {
   llvm::Function *value_is_err = nullptr;
   llvm::Function *exit_code = nullptr;
   llvm::Function *float_from_bits = nullptr;
+  llvm::Function *float_new = nullptr;
+  llvm::Function *float_get = nullptr;
   llvm::Function *float_to_bits = nullptr;
+  llvm::Function *bool_to_string = nullptr;
+  llvm::Function *null_to_string = nullptr;
   llvm::Function *value_add = nullptr;
   llvm::Function *value_sub = nullptr;
   llvm::Function *value_mul = nullptr;
@@ -227,6 +257,17 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.float_to_bits = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                                             llvm::Function::ExternalLinkage,
                                             "kl_float_to_bits", module);
+  llvm::Type *f64 = llvm::Type::getDoubleTy(ctx);
+  rt.float_new = llvm::Function::Create(llvm::FunctionType::get(i64, {f64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_float_new", module);
+  rt.float_get = llvm::Function::Create(llvm::FunctionType::get(f64, {i64}, false),
+                                         llvm::Function::ExternalLinkage, "kl_float_get", module);
+  rt.bool_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                              llvm::Function::ExternalLinkage, "kl_bool_to_string",
+                                              module);
+  rt.null_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {}, false),
+                                              llvm::Function::ExternalLinkage, "kl_null_to_string",
+                                              module);
   rt.value_add = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_value_add", module);
   rt.value_sub = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
@@ -340,6 +381,67 @@ llvm::Value *binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op,
   default:
     return nullptr;
   }
+}
+
+llvm::Value *to_wire_i64(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Value *value,
+                         KirType type) {
+  llvm::Type *i64 = builder.getInt64Ty();
+  if (type == KirType::Float && value->getType()->isDoubleTy()) {
+    return builder.CreateCall(rt.float_new, {value});
+  }
+  if (value->getType()->isIntegerTy(64)) {
+    return value;
+  }
+  if (value->getType()->isDoubleTy()) {
+    return builder.CreateCall(rt.float_new, {value});
+  }
+  return llvm::ConstantInt::get(i64, 0);
+}
+
+llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op,
+                         llvm::Value *lhs, llvm::Value *rhs, KirType lhs_ty, KirType rhs_ty) {
+  if (lhs_ty == KirType::Int && rhs_ty == KirType::Int) {
+    switch (op) {
+    case KirOpcode::IAdd:
+      return builder.CreateAdd(lhs, rhs);
+    case KirOpcode::ISub:
+      return builder.CreateSub(lhs, rhs);
+    case KirOpcode::IMul:
+      return builder.CreateMul(lhs, rhs);
+    case KirOpcode::IDiv:
+      return builder.CreateSDiv(lhs, rhs);
+    case KirOpcode::IMod:
+      return builder.CreateSRem(lhs, rhs);
+    default:
+      break;
+    }
+  }
+  if (lhs_ty == KirType::Float || rhs_ty == KirType::Float) {
+    llvm::Type *f64 = builder.getDoubleTy();
+    llvm::Value *l = lhs->getType()->isDoubleTy() ? lhs : builder.CreateCall(rt.float_get, {lhs});
+    llvm::Value *r = rhs->getType()->isDoubleTy() ? rhs : builder.CreateCall(rt.float_get, {rhs});
+    if (lhs_ty == KirType::Int) {
+      l = builder.CreateSIToFP(lhs, f64);
+    }
+    if (rhs_ty == KirType::Int) {
+      r = builder.CreateSIToFP(rhs, f64);
+    }
+    switch (op) {
+    case KirOpcode::IAdd:
+      return builder.CreateFAdd(l, r);
+    case KirOpcode::ISub:
+      return builder.CreateFSub(l, r);
+    case KirOpcode::IMul:
+      return builder.CreateFMul(l, r);
+    case KirOpcode::IDiv:
+      return builder.CreateFDiv(l, r);
+    default:
+      break;
+    }
+  }
+  llvm::Value *wl = lhs->getType()->isDoubleTy() ? builder.CreateCall(rt.float_new, {lhs}) : lhs;
+  llvm::Value *wr = rhs->getType()->isDoubleTy() ? builder.CreateCall(rt.float_new, {rhs}) : rhs;
+  return binop(builder, rt, op, wl, wr);
 }
 
 // Relational compares go through kl_value_cmp so strings and boxed floats
@@ -561,8 +663,11 @@ public:
     alloca_builder.CreateBr(code_bb);
 
     std::vector<llvm::Value *> temps(linear_.size(), nullptr);
+    std::vector<KirType> temp_types(linear_.size(), KirType::Void);
     std::vector<llvm::Value *> stack;
+    std::vector<KirType> type_stack;
     std::map<llvm::BasicBlock *, std::vector<llvm::Value *>> exit_stacks;
+    std::map<llvm::BasicBlock *, std::vector<KirType>> exit_type_stacks;
     std::vector<std::size_t> handler_pcs;
     std::set<std::size_t> handler_landings;
     for (std::size_t i = 0; i < linear_.size(); ++i) {
@@ -636,9 +741,11 @@ public:
       }
       if (preds.empty()) {
         stack.clear();
+        type_stack.clear();
         if (handler_landings.count(leader_pc) > 0) {
           // Unreachable in success-only paths; keep stack depth for catch binding.
           stack.push_back(llvm::UndefValue::get(i64));
+          type_stack.push_back(KirType::Any);
         }
         return true;
       }
@@ -646,6 +753,7 @@ public:
         llvm::BasicBlock *pred = preds.front();
         if (pred == entry_bb) {
           stack.clear();
+          type_stack.clear();
           return true;
         }
         const auto it = exit_stacks.find(pred);
@@ -654,6 +762,8 @@ public:
           return false;
         }
         stack = it->second;
+        const auto tit = exit_type_stacks.find(pred);
+        type_stack = tit != exit_type_stacks.end() ? tit->second : std::vector<KirType>{};
         return true;
       }
       std::size_t max_depth = 0;
@@ -664,6 +774,7 @@ public:
         }
       }
       stack.assign(max_depth, nullptr);
+      type_stack.assign(max_depth, KirType::Any);
       llvm::IRBuilder<> phi_builder(bb);
       phi_builder.SetInsertPoint(bb, bb->getFirstInsertionPt());
       for (std::size_t d = 0; d < max_depth; ++d) {
@@ -692,6 +803,7 @@ public:
           llvm::BasicBlock *prev_bb = block_index(i - 1);
           if (prev_bb != bb && prev_bb->getTerminator() == nullptr) {
             exit_stacks[prev_bb] = stack;
+            exit_type_stacks[prev_bb] = type_stack;
           }
         }
         if (!merge_stack_at_leader(i)) {
@@ -704,7 +816,14 @@ public:
             *context_, instr->line > 0 ? static_cast<unsigned>(instr->line) : 1,
             instr->col > 0 ? static_cast<unsigned>(instr->col) : 0, di_subprogram_));
       }
-      auto push = [&](llvm::Value *v) { stack.push_back(v); };
+      auto push = [&](llvm::Value *v) {
+        stack.push_back(v);
+        KirType ty = KirType::Any;
+        if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
+          ty = fn.instr_types[i];
+        }
+        type_stack.push_back(ty);
+      };
 
       auto pop_args_array = [&](int argc) -> llvm::Value * {
         if (argc <= 0) {
@@ -713,7 +832,7 @@ public:
         llvm::AllocaInst *elements =
             builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, argc), "native_args");
         for (int ai = argc - 1; ai >= 0; --ai) {
-          llvm::Value *elem = pop_value(&stack, error);
+          llvm::Value *elem = pop_value(&stack, error, &type_stack);
           if (elem == nullptr) {
             return nullptr;
           }
@@ -725,24 +844,38 @@ public:
       };
 
       auto pop_binop = [&](KirOpcode op) -> bool {
-        llvm::Value *rhs = pop_value(&stack, error);
-        llvm::Value *lhs = pop_value(&stack, error);
-        if (lhs == nullptr || rhs == nullptr) {
+        if (stack.size() < 2 || type_stack.size() < 2) {
+          *error = "native lowering stack underflow in " + g_lower_context;
           return false;
         }
-        llvm::Value *result = binop(builder, rt_, op, lhs, rhs);
+        llvm::Value *rhs = stack.back();
+        KirType rhs_ty = type_stack.back();
+        stack.pop_back();
+        type_stack.pop_back();
+        llvm::Value *lhs = stack.back();
+        KirType lhs_ty = type_stack.back();
+        stack.pop_back();
+        type_stack.pop_back();
+        llvm::Value *result = typed_binop(builder, rt_, op, lhs, rhs, lhs_ty, rhs_ty);
         if (result == nullptr) {
           *error = "unsupported binop";
           return false;
         }
-        push(result);
+        const KirType result_ty =
+            static_cast<std::size_t>(i) < fn.instr_types.size() ? fn.instr_types[i] : KirType::Any;
         temps[i] = result;
+        temp_types[i] = result_ty;
+        if (result->getType()->isDoubleTy()) {
+          push(builder.CreateCall(rt_.float_new, {result}));
+        } else {
+          push(result);
+        }
         return true;
       };
 
       auto pop_icmp = [&](KirOpcode op) -> bool {
-        llvm::Value *rhs = pop_value(&stack, error);
-        llvm::Value *lhs = pop_value(&stack, error);
+        llvm::Value *rhs = pop_value(&stack, error, &type_stack);
+        llvm::Value *lhs = pop_value(&stack, error, &type_stack);
         if (lhs == nullptr || rhs == nullptr) {
           return false;
         }
@@ -770,10 +903,19 @@ public:
         break;
       }
       case KirOpcode::ConstFloat: {
-        llvm::Value *value =
-            builder.CreateCall(rt_.float_from_bits, {const_i64(builder, instr)});
-        push(value);
-        temps[i] = value;
+        if (static_cast<std::size_t>(i) < fn.instr_types.size() &&
+            fn.instr_types[i] == KirType::Float) {
+          llvm::Value *dbl = const_double(builder, instr);
+          temps[i] = dbl;
+          temp_types[i] = KirType::Float;
+          push(builder.CreateCall(rt_.float_new, {dbl}));
+        } else {
+          llvm::Value *value =
+              builder.CreateCall(rt_.float_from_bits, {const_i64(builder, instr)});
+          push(value);
+          temps[i] = value;
+          temp_types[i] = KirType::Float;
+        }
         break;
       }
       case KirOpcode::ConstBool:
@@ -839,7 +981,7 @@ public:
         break;
       }
       case KirOpcode::Pop:
-        if (pop_value(&stack, error) == nullptr) {
+        if (pop_value(&stack, error, &type_stack) == nullptr) {
           return false;
         }
         break;
@@ -858,13 +1000,23 @@ public:
           }
           llvm::Value *lhs = temps[static_cast<std::size_t>(lhs_i)];
           llvm::Value *rhs = temps[static_cast<std::size_t>(rhs_i)];
-          llvm::Value *result = binop(builder, rt_, instr->op, lhs, rhs);
+          const KirType lhs_ty = temp_types[static_cast<std::size_t>(lhs_i)];
+          const KirType rhs_ty = temp_types[static_cast<std::size_t>(rhs_i)];
+          llvm::Value *result =
+              typed_binop(builder, rt_, instr->op, lhs, rhs, lhs_ty, rhs_ty);
           if (result == nullptr) {
             *error = "unsupported indexed binop";
             return false;
           }
-          push(result);
+          const KirType result_ty =
+              static_cast<std::size_t>(i) < fn.instr_types.size() ? fn.instr_types[i] : KirType::Any;
           temps[i] = result;
+          temp_types[i] = result_ty;
+          if (result->getType()->isDoubleTy()) {
+            push(builder.CreateCall(rt_.float_new, {result}));
+          } else {
+            push(result);
+          }
         } else if (!pop_binop(instr->op)) {
           return false;
         }
@@ -880,7 +1032,7 @@ public:
         }
         break;
       case KirOpcode::Not: {
-        llvm::Value *v = pop_value(&stack, error);
+        llvm::Value *v = pop_value(&stack, error, &type_stack);
         if (v == nullptr) {
           return false;
         }
@@ -891,7 +1043,7 @@ public:
         break;
       }
       case KirOpcode::BitNot: {
-        llvm::Value *v = pop_value(&stack, error);
+        llvm::Value *v = pop_value(&stack, error, &type_stack);
         if (v == nullptr) {
           return false;
         }
@@ -903,8 +1055,8 @@ public:
       case KirOpcode::BitAnd:
       case KirOpcode::BitOr:
       case KirOpcode::BitXor: {
-        llvm::Value *rhs = pop_value(&stack, error);
-        llvm::Value *lhs = pop_value(&stack, error);
+        llvm::Value *rhs = pop_value(&stack, error, &type_stack);
+        llvm::Value *lhs = pop_value(&stack, error, &type_stack);
         if (lhs == nullptr || rhs == nullptr) {
           return false;
         }
@@ -922,8 +1074,8 @@ public:
       }
       case KirOpcode::Shl:
       case KirOpcode::Shr: {
-        llvm::Value *rhs = pop_value(&stack, error);
-        llvm::Value *lhs = pop_value(&stack, error);
+        llvm::Value *rhs = pop_value(&stack, error, &type_stack);
+        llvm::Value *lhs = pop_value(&stack, error, &type_stack);
         if (lhs == nullptr || rhs == nullptr) {
           return false;
         }
@@ -947,13 +1099,13 @@ public:
           *error = "call arg count invalid";
           return false;
         }
-        llvm::Value *callee_tag = pop_value(&stack, error);
+        llvm::Value *callee_tag = pop_value(&stack, error, &type_stack);
         if (callee_tag == nullptr) {
           return false;
         }
         std::vector<llvm::Value *> args(static_cast<std::size_t>(argc));
         for (int arg = argc - 1; arg >= 0; --arg) {
-          args[static_cast<std::size_t>(arg)] = pop_value(&stack, error);
+          args[static_cast<std::size_t>(arg)] = pop_value(&stack, error, &type_stack);
           if (args[static_cast<std::size_t>(arg)] == nullptr) {
             return false;
           }
@@ -998,7 +1150,7 @@ public:
         llvm::AllocaInst *fields =
             builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, field_count), "struct_fields");
         for (int fi = field_count - 1; fi >= 0; --fi) {
-          llvm::Value *field = pop_value(&stack, error);
+          llvm::Value *field = pop_value(&stack, error, &type_stack);
           if (field == nullptr) {
             return false;
           }
@@ -1021,7 +1173,7 @@ public:
           *error = "field_get pool index out of range";
           return false;
         }
-        llvm::Value *obj = pop_value(&stack, error);
+        llvm::Value *obj = pop_value(&stack, error, &type_stack);
         if (obj == nullptr) {
           return false;
         }
@@ -1042,11 +1194,11 @@ public:
           *error = "field_set pool index out of range";
           return false;
         }
-        llvm::Value *value = pop_value(&stack, error);
+        llvm::Value *value = pop_value(&stack, error, &type_stack);
         if (value == nullptr) {
           return false;
         }
-        llvm::Value *obj = pop_value(&stack, error);
+        llvm::Value *obj = pop_value(&stack, error, &type_stack);
         if (obj == nullptr) {
           return false;
         }
@@ -1071,7 +1223,7 @@ public:
         llvm::AllocaInst *elements = builder.CreateAlloca(
             i64, llvm::ConstantInt::get(i32, element_count), "array_elems");
         for (int ei = element_count - 1; ei >= 0; --ei) {
-          llvm::Value *elem = pop_value(&stack, error);
+          llvm::Value *elem = pop_value(&stack, error, &type_stack);
           if (elem == nullptr) {
             return false;
           }
@@ -1088,8 +1240,8 @@ public:
         break;
       }
       case KirOpcode::IndexGet: {
-        llvm::Value *index = pop_value(&stack, error);
-        llvm::Value *array = pop_value(&stack, error);
+        llvm::Value *index = pop_value(&stack, error, &type_stack);
+        llvm::Value *array = pop_value(&stack, error, &type_stack);
         if (index == nullptr || array == nullptr) {
           return false;
         }
@@ -1099,9 +1251,9 @@ public:
         break;
       }
       case KirOpcode::IndexSet: {
-        llvm::Value *value = pop_value(&stack, error);
-        llvm::Value *index = pop_value(&stack, error);
-        llvm::Value *object = pop_value(&stack, error);
+        llvm::Value *value = pop_value(&stack, error, &type_stack);
+        llvm::Value *index = pop_value(&stack, error, &type_stack);
+        llvm::Value *object = pop_value(&stack, error, &type_stack);
         if (value == nullptr || index == nullptr || object == nullptr) {
           return false;
         }
@@ -1112,8 +1264,8 @@ public:
         break;
       }
       case KirOpcode::ArrayPush: {
-        llvm::Value *value = pop_value(&stack, error);
-        llvm::Value *array = pop_value(&stack, error);
+        llvm::Value *value = pop_value(&stack, error, &type_stack);
+        llvm::Value *array = pop_value(&stack, error, &type_stack);
         if (value == nullptr || array == nullptr) {
           return false;
         }
@@ -1123,9 +1275,9 @@ public:
         break;
       }
       case KirOpcode::ArrayResize: {
-        llvm::Value *default_value = pop_value(&stack, error);
-        llvm::Value *count = pop_value(&stack, error);
-        llvm::Value *array = pop_value(&stack, error);
+        llvm::Value *default_value = pop_value(&stack, error, &type_stack);
+        llvm::Value *count = pop_value(&stack, error, &type_stack);
+        llvm::Value *array = pop_value(&stack, error, &type_stack);
         if (default_value == nullptr || count == nullptr || array == nullptr) {
           return false;
         }
@@ -1136,7 +1288,7 @@ public:
         break;
       }
       case KirOpcode::ArrayPop: {
-        llvm::Value *array = pop_value(&stack, error);
+        llvm::Value *array = pop_value(&stack, error, &type_stack);
         if (array == nullptr) {
           return false;
         }
@@ -1146,8 +1298,8 @@ public:
         break;
       }
       case KirOpcode::ArrayRemove: {
-        llvm::Value *key = pop_value(&stack, error);
-        llvm::Value *object = pop_value(&stack, error);
+        llvm::Value *key = pop_value(&stack, error, &type_stack);
+        llvm::Value *object = pop_value(&stack, error, &type_stack);
         if (key == nullptr || object == nullptr) {
           return false;
         }
@@ -1157,8 +1309,8 @@ public:
         break;
       }
       case KirOpcode::ArrayContains: {
-        llvm::Value *needle = pop_value(&stack, error);
-        llvm::Value *object = pop_value(&stack, error);
+        llvm::Value *needle = pop_value(&stack, error, &type_stack);
+        llvm::Value *object = pop_value(&stack, error, &type_stack);
         if (needle == nullptr || object == nullptr) {
           return false;
         }
@@ -1169,7 +1321,7 @@ public:
         break;
       }
       case KirOpcode::ArrayClear: {
-        llvm::Value *array = pop_value(&stack, error);
+        llvm::Value *array = pop_value(&stack, error, &type_stack);
         if (array == nullptr) {
           return false;
         }
@@ -1179,9 +1331,9 @@ public:
         break;
       }
       case KirOpcode::ArrayInsert: {
-        llvm::Value *value = pop_value(&stack, error);
-        llvm::Value *index = pop_value(&stack, error);
-        llvm::Value *array = pop_value(&stack, error);
+        llvm::Value *value = pop_value(&stack, error, &type_stack);
+        llvm::Value *index = pop_value(&stack, error, &type_stack);
+        llvm::Value *array = pop_value(&stack, error, &type_stack);
         if (value == nullptr || index == nullptr || array == nullptr) {
           return false;
         }
@@ -1192,8 +1344,8 @@ public:
         break;
       }
       case KirOpcode::ArrayIndexOf: {
-        llvm::Value *needle = pop_value(&stack, error);
-        llvm::Value *object = pop_value(&stack, error);
+        llvm::Value *needle = pop_value(&stack, error, &type_stack);
+        llvm::Value *object = pop_value(&stack, error, &type_stack);
         if (needle == nullptr || object == nullptr) {
           return false;
         }
@@ -1203,7 +1355,7 @@ public:
         break;
       }
       case KirOpcode::ArrayReverse: {
-        llvm::Value *array = pop_value(&stack, error);
+        llvm::Value *array = pop_value(&stack, error, &type_stack);
         if (array == nullptr) {
           return false;
         }
@@ -1214,8 +1366,8 @@ public:
       }
       case KirOpcode::StrStartsWith:
       case KirOpcode::StrEndsWith: {
-        llvm::Value *needle = pop_value(&stack, error);
-        llvm::Value *str = pop_value(&stack, error);
+        llvm::Value *needle = pop_value(&stack, error, &type_stack);
+        llvm::Value *str = pop_value(&stack, error, &type_stack);
         if (needle == nullptr || str == nullptr) {
           return false;
         }
@@ -1229,9 +1381,9 @@ public:
         break;
       }
       case KirOpcode::StrReplace: {
-        llvm::Value *new_str = pop_value(&stack, error);
-        llvm::Value *old_str = pop_value(&stack, error);
-        llvm::Value *str = pop_value(&stack, error);
+        llvm::Value *new_str = pop_value(&stack, error, &type_stack);
+        llvm::Value *old_str = pop_value(&stack, error, &type_stack);
+        llvm::Value *str = pop_value(&stack, error, &type_stack);
         if (new_str == nullptr || old_str == nullptr || str == nullptr) {
           return false;
         }
@@ -1242,8 +1394,8 @@ public:
         break;
       }
       case KirOpcode::StrSplit: {
-        llvm::Value *delim = pop_value(&stack, error);
-        llvm::Value *str = pop_value(&stack, error);
+        llvm::Value *delim = pop_value(&stack, error, &type_stack);
+        llvm::Value *str = pop_value(&stack, error, &type_stack);
         if (delim == nullptr || str == nullptr) {
           return false;
         }
@@ -1255,7 +1407,7 @@ public:
       case KirOpcode::StrTrim:
       case KirOpcode::StrToUpper:
       case KirOpcode::StrToLower: {
-        llvm::Value *str = pop_value(&stack, error);
+        llvm::Value *str = pop_value(&stack, error, &type_stack);
         if (str == nullptr) {
           return false;
         }
@@ -1280,8 +1432,8 @@ public:
         llvm::AllocaInst *pairs = builder.CreateAlloca(
             i64, llvm::ConstantInt::get(i32, pair_count * 2), "map_pairs");
         for (int pi = pair_count - 1; pi >= 0; --pi) {
-          llvm::Value *value = pop_value(&stack, error);
-          llvm::Value *key = pop_value(&stack, error);
+          llvm::Value *value = pop_value(&stack, error, &type_stack);
+          llvm::Value *key = pop_value(&stack, error, &type_stack);
           if (value == nullptr || key == nullptr) {
             return false;
           }
@@ -1300,8 +1452,8 @@ public:
         break;
       }
       case KirOpcode::MapHas: {
-        llvm::Value *key = pop_value(&stack, error);
-        llvm::Value *map = pop_value(&stack, error);
+        llvm::Value *key = pop_value(&stack, error, &type_stack);
+        llvm::Value *map = pop_value(&stack, error, &type_stack);
         if (key == nullptr || map == nullptr) {
           return false;
         }
@@ -1312,7 +1464,7 @@ public:
         break;
       }
       case KirOpcode::MapKeys: {
-        llvm::Value *map = pop_value(&stack, error);
+        llvm::Value *map = pop_value(&stack, error, &type_stack);
         if (map == nullptr) {
           return false;
         }
@@ -1322,7 +1474,7 @@ public:
         break;
       }
       case KirOpcode::ArrayLen: {
-        llvm::Value *obj = pop_value(&stack, error);
+        llvm::Value *obj = pop_value(&stack, error, &type_stack);
         if (obj == nullptr) {
           return false;
         }
@@ -1333,15 +1485,15 @@ public:
         break;
       }
       case KirOpcode::ArraySlice: {
-        llvm::Value *end = pop_value(&stack, error);
+        llvm::Value *end = pop_value(&stack, error, &type_stack);
         if (end == nullptr) {
           return false;
         }
-        llvm::Value *start = pop_value(&stack, error);
+        llvm::Value *start = pop_value(&stack, error, &type_stack);
         if (start == nullptr) {
           return false;
         }
-        llvm::Value *obj = pop_value(&stack, error);
+        llvm::Value *obj = pop_value(&stack, error, &type_stack);
         if (obj == nullptr) {
           return false;
         }
@@ -1351,7 +1503,7 @@ public:
         break;
       }
       case KirOpcode::INeg: {
-        llvm::Value *v = pop_value(&stack, error);
+        llvm::Value *v = pop_value(&stack, error, &type_stack);
         if (v == nullptr) {
           return false;
         }
@@ -1362,7 +1514,7 @@ public:
         break;
       }
       case KirOpcode::FloatToBits: {
-        llvm::Value *v = pop_value(&stack, error);
+        llvm::Value *v = pop_value(&stack, error, &type_stack);
         if (v == nullptr) {
           return false;
         }
@@ -1410,7 +1562,7 @@ public:
           elements = builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, param_count),
                                           "enum_payload");
           for (int pi = param_count - 1; pi >= 0; --pi) {
-            llvm::Value *elem = pop_value(&stack, error);
+            llvm::Value *elem = pop_value(&stack, error, &type_stack);
             if (elem == nullptr) {
               return false;
             }
@@ -1433,7 +1585,7 @@ public:
       }
       case KirOpcode::EnumPayloadGet: {
         const int payload_idx = instr->operands[0];
-        llvm::Value *enum_val = pop_value(&stack, error);
+        llvm::Value *enum_val = pop_value(&stack, error, &type_stack);
         if (enum_val == nullptr) {
           return false;
         }
@@ -1446,26 +1598,46 @@ public:
       }
       case KirOpcode::CastTo: {
         const int kind = instr->operands[0];
-        llvm::Value *src = pop_value(&stack, error);
-        if (src == nullptr) {
+        if (stack.empty()) {
+          *error = "cast stack underflow";
           return false;
         }
-        llvm::Function *cast_fn = nullptr;
+        llvm::Value *src = stack.back();
+        KirType src_ty = type_stack.empty() ? KirType::Any : type_stack.back();
+        stack.pop_back();
+        if (!type_stack.empty()) {
+          type_stack.pop_back();
+        }
+        llvm::Value *result = nullptr;
         if (kind == 0) {
-          cast_fn = rt_.cast_to_int;
+          result = builder.CreateCall(rt_.cast_to_int, {to_wire_i64(builder, rt_, src, src_ty)});
         } else if (kind == 1) {
-          cast_fn = rt_.cast_to_float;
+          if (src_ty == KirType::Float && src->getType()->isDoubleTy()) {
+            result = builder.CreateCall(rt_.float_new, {src});
+          } else {
+            result = builder.CreateCall(rt_.cast_to_float,
+                                        {to_wire_i64(builder, rt_, src, src_ty)});
+          }
         } else if (kind == 2) {
-          cast_fn = rt_.cast_to_string;
+          if (src_ty == KirType::Bool) {
+            result = builder.CreateCall(rt_.bool_to_string,
+                                        {to_wire_i64(builder, rt_, src, src_ty)});
+          } else if (src_ty == KirType::Null) {
+            result = builder.CreateCall(rt_.null_to_string, {});
+          } else {
+            result = builder.CreateCall(rt_.cast_to_string,
+                                        {to_wire_i64(builder, rt_, src, src_ty)});
+          }
         } else if (kind == 3) {
-          cast_fn = rt_.cast_to_char;
+          result = builder.CreateCall(rt_.cast_to_char,
+                                      {to_wire_i64(builder, rt_, src, src_ty)});
         } else {
           *error = "unsupported CastTo target kind in native lowering";
           return false;
         }
-        llvm::Value *result = builder.CreateCall(cast_fn, {src});
         push(result);
         temps[i] = result;
+        temp_types[i] = kir_cast_target_type(kind);
         break;
       }
       case KirOpcode::NativeOut:
@@ -1512,7 +1684,7 @@ public:
           *error = "native_fs_read expects exactly one argument";
           return false;
         }
-        llvm::Value *path = pop_value(&stack, error);
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
         if (path == nullptr) {
           return false;
         }
@@ -1527,8 +1699,8 @@ public:
           *error = "native_fs_write expects exactly two arguments";
           return false;
         }
-        llvm::Value *content = pop_value(&stack, error);
-        llvm::Value *path = pop_value(&stack, error);
+        llvm::Value *content = pop_value(&stack, error, &type_stack);
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
         if (path == nullptr || content == nullptr) {
           return false;
         }
@@ -1548,16 +1720,24 @@ public:
           break;
         }
         llvm::Value *retv = llvm::ConstantInt::get(i64, 0);
+        KirType ret_ty = fn.return_type;
         if (!instr->operands.empty()) {
           const int idx = instr->operands[0];
           if (idx >= 0 && static_cast<std::size_t>(idx) < i) {
             retv = temps[static_cast<std::size_t>(idx)];
+            ret_ty = temp_types[static_cast<std::size_t>(idx)];
+            if (ret_ty == KirType::Void &&
+                static_cast<std::size_t>(idx) < fn.instr_types.size()) {
+              ret_ty = fn.instr_types[static_cast<std::size_t>(idx)];
+            }
           }
         } else if (!stack.empty()) {
           retv = stack.back();
+          ret_ty = type_stack.back();
         }
-        builder.CreateRet(retv);
+        builder.CreateRet(to_wire_i64(builder, rt_, retv, ret_ty));
         exit_stacks[bb] = stack;
+        exit_type_stacks[bb] = type_stack;
         break;
       }
       case KirOpcode::Br: {
@@ -1568,13 +1748,14 @@ public:
         const std::size_t target = i + 1 + static_cast<std::size_t>(rel);
         builder.CreateBr(block_index(target));
         exit_stacks[bb] = stack;
+        exit_type_stacks[bb] = type_stack;
         break;
       }
       case KirOpcode::CondBr: {
         if (bb->getTerminator() != nullptr) {
           break;
         }
-        llvm::Value *cond_i64 = pop_value(&stack, error);
+        llvm::Value *cond_i64 = pop_value(&stack, error, &type_stack);
         if (cond_i64 == nullptr) {
           return false;
         }
@@ -1584,6 +1765,7 @@ public:
         const std::size_t true_target = i + 1;
         builder.CreateCondBr(cond, block_index(true_target), block_index(false_target));
         exit_stacks[bb] = stack;
+        exit_type_stacks[bb] = type_stack;
         break;
       }
       case KirOpcode::JmpIfErr: {
@@ -1603,6 +1785,7 @@ public:
         const std::size_t ok_target = i + 1;
         builder.CreateCondBr(cond, block_index(err_target), block_index(ok_target));
         exit_stacks[bb] = stack;
+        exit_type_stacks[bb] = type_stack;
         break;
       }
       case KirOpcode::PushHandler: {
@@ -1638,6 +1821,7 @@ public:
         const std::size_t ok_target = i + 1;
         builder.CreateCondBr(cond, block_index(catch_target), block_index(ok_target));
         exit_stacks[bb] = stack;
+        exit_type_stacks[bb] = type_stack;
         break;
       }
       default:
@@ -1681,6 +1865,7 @@ void copy_kir_metadata(KirModule *dst, const KirModule &src) {
   dst->function_names = src.function_names;
   dst->function_symbols = src.function_symbols;
   dst->function_param_counts = src.function_param_counts;
+  dst->function_signatures = src.function_signatures;
 }
 
 int first_instr_line(const KirFunction &fn) {
@@ -1856,8 +2041,11 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
                                                   const std::string &rt_lib_path,
                                                   const NativeCompileOptions &options) {
   std::string error;
+  KirModule typed_module = module;
+  infer_kir_types(&typed_module);
+  const KirModule &module_ref = typed_module;
   std::map<std::string, KirModule> shards;
-  for (const KirFunction &fn : module.functions) {
+  for (const KirFunction &fn : module_ref.functions) {
     const std::string key = fn.source_path.empty() ? "__entry__" : fn.source_path;
     shards[key].functions.push_back(fn);
   }
@@ -1881,11 +2069,11 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
   std::vector<std::string> temp_objs;
   std::size_t shard_idx = 0;
   for (auto &[key, shard] : shards) {
-    copy_kir_metadata(&shard, module);
+    copy_kir_metadata(&shard, module_ref);
 
     std::string obj_path;
     if (use_cache) {
-      const std::string stamp = shard_stamp(shard, module, options);
+      const std::string stamp = shard_stamp(shard, module_ref, options);
       obj_path = (std::filesystem::path(options.object_cache_dir) / (stamp + ".o")).string();
       if (std::filesystem::exists(obj_path)) {
         obj_paths.push_back(obj_path);
@@ -1899,7 +2087,7 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
 
     llvm::LLVMContext context;
     llvm::Module llvm_module("kinglet_mod_" + std::to_string(shard_idx++), context);
-    if (!lower_user_functions(&llvm_module, shard, module, options.debug_info, &error)) {
+    if (!lower_user_functions(&llvm_module, shard, module_ref, options.debug_info, &error)) {
       return {.ok = false, .error = error};
     }
     if (llvm::verifyModule(llvm_module, &llvm::errs())) {

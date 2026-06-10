@@ -100,8 +100,11 @@ kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value);
 kl_h kl_slice(kl_h value, int64_t start, int64_t end);
 
 kl_h kl_float_new(double value);
+double kl_float_get(kl_h value);
 kl_h kl_float_from_bits(int64_t bits);
 int64_t kl_float_to_bits(kl_h value);
+kl_h kl_bool_to_string(kl_h value);
+kl_h kl_null_to_string(void);
 
 // Polymorphic arithmetic mirroring the VM's tag dispatch: string concat for
 // `+`, IEEE double math when either side is a boxed float, int64 otherwise.
