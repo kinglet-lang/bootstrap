@@ -235,6 +235,7 @@ run_case "fixed_width_types" "run" 0 $'42 42 255\n' ""
 run_case "fixed_width_narrowing" "--check" 65 "" $'2:3: error: Cannot assign int to variable of type int32.\n'
 run_contains_case "fixed_width_kir" "--ir" "const_i32" "const_i64" "iadd32" ": int32"
 run_case "fixed_width_i32_wrap" "run" 0 $'-2147483648\n' ""
+run_contains_case "container_array_index" "--ir" "index_get" ": int32"
 
 # --- File system (fs) + system args (sys) ---
 # Roundtrip: write then read back the same content. Pass $TMP_DIR so the

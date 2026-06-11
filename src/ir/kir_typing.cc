@@ -1,5 +1,6 @@
 #include "ir/kir_typing.h"
 
+#include "ir/kir_container.h"
 #include "ir/kir_numeric.h"
 
 #include <algorithm>
@@ -35,10 +36,40 @@ int max_local_slot(const KirFunction &fn) {
 
 struct FlowState {
   std::vector<KirType> stack;
+  std::vector<KirContainerType> container_stack;
   std::vector<KirType> locals;
+  std::vector<KirContainerType> local_containers;
 };
 
-KirType pop_type(FlowState *state) {
+KirContainerType array_container(KirType element_type) {
+  KirContainerType out;
+  out.shape = KirContainerShape::Array;
+  out.element_type = element_type;
+  return out;
+}
+
+KirContainerType map_container(KirType key_type, KirType value_type) {
+  KirContainerType out;
+  out.shape = KirContainerShape::Map;
+  out.key_type = key_type;
+  out.element_type = value_type;
+  return out;
+}
+
+void push_typed(FlowState *state, KirType type, KirContainerType container = {}) {
+  state->stack.push_back(type);
+  state->container_stack.push_back(container);
+}
+
+KirType pop_type(FlowState *state, KirContainerType *container_out = nullptr) {
+  KirContainerType container;
+  if (!state->container_stack.empty()) {
+    container = state->container_stack.back();
+    state->container_stack.pop_back();
+  }
+  if (container_out != nullptr) {
+    *container_out = container;
+  }
   if (state->stack.empty()) {
     return KirType::Any;
   }
@@ -74,14 +105,22 @@ void infer_function(KirFunction *fn, const KirModule &module) {
   const std::vector<const KirInstr *> linear = linear_instrs(*fn);
   fn->instr_types.assign(linear.size(), KirType::Void);
   fn->local_types.assign(static_cast<std::size_t>(max_local_slot(*fn) + 1), KirType::Any);
+  fn->slot_containers.assign(fn->local_types.size(), KirContainerType{});
   for (int i = 0; i < fn->param_count; ++i) {
     if (static_cast<std::size_t>(i) < fn->param_types.size()) {
       fn->local_types[static_cast<std::size_t>(i)] = fn->param_types[static_cast<std::size_t>(i)];
+    }
+    if (static_cast<std::size_t>(i) < fn->slot_containers.size()) {
+      // slot_containers may already be filled from checker for params.
     }
   }
 
   FlowState state;
   state.locals = fn->local_types;
+  state.local_containers = fn->slot_containers;
+  if (state.local_containers.size() < state.locals.size()) {
+    state.local_containers.resize(state.locals.size(), KirContainerType{});
+  }
 
   for (std::size_t i = 0; i < linear.size(); ++i) {
     const KirInstr *instr = linear[i];
@@ -95,45 +134,63 @@ void infer_function(KirFunction *fn, const KirModule &module) {
     case KirOpcode::ConstF32:
     case KirOpcode::ConstF64:
       result = kir_const_opcode_result_type(instr->op);
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::ConstFloat:
       result = KirType::Float;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::ConstBool:
       result = KirType::Bool;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::ConstNull:
       result = KirType::Null;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::ConstString:
       result = KirType::String;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::ConstFn:
       result = KirType::Fn;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::LoadLocal: {
       const int slot = instr->operands[0];
-      result = (slot >= 0 && static_cast<std::size_t>(slot) < state.locals.size())
-                   ? state.locals[static_cast<std::size_t>(slot)]
-                   : KirType::Any;
-      state.stack.push_back(result);
+      KirContainerType container;
+      result = KirType::Any;
+      if (slot >= 0 && static_cast<std::size_t>(slot) < state.locals.size()) {
+        result = state.locals[static_cast<std::size_t>(slot)];
+        if (static_cast<std::size_t>(slot) < state.local_containers.size()) {
+          container = state.local_containers[static_cast<std::size_t>(slot)];
+        }
+      }
+      push_typed(&state, result, container);
       break;
     }
     case KirOpcode::StoreLocal: {
       const int slot = instr->operands[0];
-      const KirType value = pop_type(&state);
+      const KirType value = state.stack.empty() ? KirType::Any : state.stack.back();
+      const KirContainerType container =
+          state.container_stack.empty() ? KirContainerType{} : state.container_stack.back();
       if (slot >= 0) {
         if (static_cast<std::size_t>(slot) >= state.locals.size()) {
           state.locals.resize(static_cast<std::size_t>(slot) + 1, KirType::Any);
         }
-        state.locals[static_cast<std::size_t>(slot)] =
-            kir_type_join(state.locals[static_cast<std::size_t>(slot)], value);
+        if (static_cast<std::size_t>(slot) >= state.local_containers.size()) {
+          state.local_containers.resize(static_cast<std::size_t>(slot) + 1, KirContainerType{});
+        }
+        if (state.locals[static_cast<std::size_t>(slot)] == KirType::Any) {
+          state.locals[static_cast<std::size_t>(slot)] = value;
+        } else {
+          state.locals[static_cast<std::size_t>(slot)] =
+              kir_type_join(state.locals[static_cast<std::size_t>(slot)], value);
+        }
+        if (state.local_containers[static_cast<std::size_t>(slot)].shape ==
+            KirContainerShape::None) {
+          state.local_containers[static_cast<std::size_t>(slot)] = container;
+        }
       }
       break;
     }
@@ -180,7 +237,7 @@ void infer_function(KirFunction *fn, const KirModule &module) {
           result = spec.width;
         }
       }
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     }
     case KirOpcode::ICmpEq:
@@ -192,12 +249,12 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       pop_type(&state);
       pop_type(&state);
       result = KirType::Bool;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::Not:
       pop_type(&state);
       result = KirType::Bool;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::BitNot:
     case KirOpcode::BitAnd:
@@ -210,7 +267,7 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         pop_type(&state);
       }
       result = KirType::Int;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::INeg: {
       const KirType inner = pop_type(&state);
@@ -218,7 +275,7 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       if (inner == KirType::Any) {
         result = KirType::Any;
       }
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     }
     case KirOpcode::Call: {
@@ -228,13 +285,13 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       }
       pop_type(&state);
       result = KirType::Any;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     }
     case KirOpcode::StructNew:
       pop_type(&state);
       result = KirType::Struct;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::FieldGet: {
       pop_type(&state);
@@ -254,7 +311,7 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       if (result == KirType::Void) {
         result = KirType::Any;
       }
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     }
     case KirOpcode::FieldSet:
@@ -279,21 +336,47 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         break;
       }
       if (instr->op == KirOpcode::ArrayNew) {
-        pop_type(&state);
+        const int element_count = instr->operands.empty() ? 0 : instr->operands[0];
+        KirType element_type = KirType::Any;
+        for (int ei = 0; ei < element_count; ++ei) {
+          const KirType elem = pop_type(&state);
+          if (element_type == KirType::Any) {
+            element_type = elem;
+          } else {
+            element_type = kir_type_join(element_type, elem);
+          }
+        }
         result = KirType::Array;
-        state.stack.push_back(result);
+        push_typed(&state, result, array_container(element_type));
       } else if (instr->op == KirOpcode::MapNew) {
-        pop_type(&state);
+        const int entry_count = instr->operands.empty() ? 0 : instr->operands[0];
+        KirType key_type = KirType::Any;
+        KirType value_type = KirType::Any;
+        for (int ei = 0; ei < entry_count; ++ei) {
+          const KirType value = pop_type(&state);
+          const KirType key = pop_type(&state);
+          if (key_type == KirType::Any) {
+            key_type = key;
+          } else {
+            key_type = kir_type_join(key_type, key);
+          }
+          if (value_type == KirType::Any) {
+            value_type = value;
+          } else {
+            value_type = kir_type_join(value_type, value);
+          }
+        }
         result = KirType::Map;
-        state.stack.push_back(result);
+        push_typed(&state, result, map_container(key_type, value_type));
       } else if (instr->op == KirOpcode::ArrayPop || instr->op == KirOpcode::ArrayRemove) {
-        pop_type(&state);
-        result = KirType::Any;
-        state.stack.push_back(result);
+        KirContainerType container;
+        pop_type(&state, &container);
+        result = kir_container_is_array(container) ? container.element_type : KirType::Any;
+        push_typed(&state, result);
       } else if (instr->op == KirOpcode::MapKeys) {
         pop_type(&state);
         result = KirType::Array;
-        state.stack.push_back(result);
+        push_typed(&state, result);
       } else {
         pop_type(&state);
         if (instr->op == KirOpcode::IndexSet) {
@@ -303,14 +386,23 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       }
       break;
     case KirOpcode::IndexGet: {
-      const KirType key = pop_type(&state);
-      const KirType object = pop_type(&state);
-      if (object == KirType::String && key == KirType::Int) {
-        result = KirType::Int;
+      KirContainerType key_container;
+      const KirType key = pop_type(&state, &key_container);
+      KirContainerType object_container;
+      const KirType object = pop_type(&state, &object_container);
+      if (kir_container_is_array(object_container) &&
+          object_container.element_type != KirType::Any) {
+        result = object_container.element_type;
+      } else if (kir_container_is_map(object_container) &&
+                 object_container.element_type != KirType::Any) {
+        result = object_container.element_type;
+      } else if (object == KirType::String &&
+                 (key == KirType::Int || key == KirType::Int32 || key == KirType::Char)) {
+        result = KirType::Int8;
       } else {
         result = KirType::Any;
       }
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     }
     case KirOpcode::ArrayLen:
@@ -330,7 +422,7 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       if (instr->op == KirOpcode::ArrayIndexOf) {
         result = KirType::Int;
       }
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::StrReplace:
     case KirOpcode::StrSplit:
@@ -340,34 +432,34 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         pop_type(&state);
       }
       result = instr->op == KirOpcode::StrSplit ? KirType::Array : KirType::String;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::StrTrim:
     case KirOpcode::StrToUpper:
     case KirOpcode::StrToLower:
       pop_type(&state);
       result = KirType::String;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::EnumVariant:
       result = KirType::Enum;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::EnumVariantPayload:
     case KirOpcode::EnumPayloadGet:
       pop_type(&state);
       result = KirType::Any;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::CastTo:
       pop_type(&state);
       result = kir_cast_target_type(instr->operands.empty() ? -1 : instr->operands[0]);
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::FloatToBits:
       pop_type(&state);
       result = KirType::Int;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::NativeOut:
     case KirOpcode::NativeOutLn:
@@ -378,7 +470,7 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         pop_type(&state);
       }
       result = KirType::Null;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     }
     case KirOpcode::NativeIn:
@@ -388,23 +480,23 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         pop_type(&state);
       }
       result = KirType::String;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     }
     case KirOpcode::NativeFsRead:
       pop_type(&state);
       result = KirType::String;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::NativeFsWrite:
       pop_type(&state);
       pop_type(&state);
       result = KirType::Null;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::NativeSysArgs:
       result = KirType::Array;
-      state.stack.push_back(result);
+      push_typed(&state, result);
       break;
     case KirOpcode::CondBr:
       pop_type(&state);
@@ -425,6 +517,7 @@ void infer_function(KirFunction *fn, const KirModule &module) {
   }
 
   fn->local_types = std::move(state.locals);
+  fn->slot_containers = std::move(state.local_containers);
 }
 
 } // namespace
