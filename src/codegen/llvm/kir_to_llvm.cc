@@ -400,6 +400,59 @@ llvm::Value *to_wire_i64(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Valu
   return llvm::ConstantInt::get(i64, 0);
 }
 
+KirType kir_field_type_for_name(const KirModule &module, const std::string &field_name) {
+  for (const KirStructMeta &meta : module.struct_metas) {
+    for (std::size_t fi = 0; fi < meta.field_names.size(); ++fi) {
+      if (meta.field_names[fi] == field_name && fi < meta.field_types.size()) {
+        return meta.field_types[fi];
+      }
+    }
+  }
+  return KirType::Any;
+}
+
+KirType kir_local_type(const KirFunction &fn, int slot) {
+  if (slot >= 0 && static_cast<std::size_t>(slot) < fn.local_types.size() &&
+      fn.local_types[static_cast<std::size_t>(slot)] != KirType::Any) {
+    return fn.local_types[static_cast<std::size_t>(slot)];
+  }
+  if (slot >= 0 && static_cast<std::size_t>(slot) < fn.param_types.size()) {
+    return fn.param_types[static_cast<std::size_t>(slot)];
+  }
+  return KirType::Any;
+}
+
+struct UnboxedScalar {
+  llvm::Value *value = nullptr;
+  KirType type = KirType::Any;
+  bool is_double = false;
+};
+
+UnboxedScalar unbox_wire_scalar(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Value *wire,
+                                KirType type, llvm::Type *i64, llvm::Type *i32) {
+  UnboxedScalar out;
+  out.type = type;
+  const KirType width = kir_type_normalize(type);
+  if (width == KirType::Int32 || width == KirType::UInt32) {
+    out.value = builder.CreateSExt(builder.CreateTrunc(wire, i32), i64);
+    out.type = width;
+    return out;
+  }
+  if (kir_type_is_integer(width)) {
+    out.value = wire;
+    out.type = width;
+    return out;
+  }
+  if (kir_type_is_float(width)) {
+    out.value = builder.CreateCall(rt.float_get, {wire});
+    out.type = width;
+    out.is_double = true;
+    return out;
+  }
+  out.value = wire;
+  return out;
+}
+
 llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op,
                          llvm::Value *lhs, llvm::Value *rhs, KirType lhs_ty, KirType rhs_ty) {
   const KirBinopSpec spec = kir_binop_spec(op);
@@ -1040,8 +1093,18 @@ public:
           return false;
         }
         llvm::Value *loaded = builder.CreateLoad(i64, local_slots_[static_cast<std::size_t>(slot)]);
-        push(loaded);
-        temps[i] = loaded;
+        const KirType local_ty = kir_local_type(fn, slot);
+        const UnboxedScalar scalar =
+            unbox_wire_scalar(builder, rt_, loaded, local_ty, i64, i32);
+        if (scalar.is_double) {
+          push(builder.CreateCall(rt_.float_new, {scalar.value}));
+          temps[i] = stack.back();
+          temp_types[i] = scalar.type;
+        } else {
+          push(scalar.value);
+          temps[i] = scalar.value;
+          temp_types[i] = scalar.type == KirType::Any ? KirType::Any : scalar.type;
+        }
         break;
       }
       case KirOpcode::StoreLocal: {
@@ -1278,9 +1341,20 @@ public:
         llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
         llvm::Value *field_idx =
             resolve_field_index(builder, type_idx, kir_module_, field_name);
-        llvm::Value *value = builder.CreateCall(rt_.struct_field_at, {obj, field_idx});
-        push(value);
-        temps[i] = value;
+        const KirType field_ty =
+            kir_field_type_for_name(kir_module_, field_name);
+        llvm::Value *wire = builder.CreateCall(rt_.struct_field_at, {obj, field_idx});
+        const UnboxedScalar scalar =
+            unbox_wire_scalar(builder, rt_, wire, field_ty, i64, i32);
+        if (scalar.is_double) {
+          push(builder.CreateCall(rt_.float_new, {scalar.value}));
+          temps[i] = stack.back();
+          temp_types[i] = scalar.type;
+        } else {
+          push(scalar.value);
+          temps[i] = scalar.value;
+          temp_types[i] = scalar.type == KirType::Any ? KirType::Any : scalar.type;
+        }
         break;
       }
       case KirOpcode::FieldSet: {
