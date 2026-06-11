@@ -132,6 +132,15 @@ Type TypeChecker::resolve_type_name(const std::string &name) const {
 }
 
 Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocation loc) {
+  if (expr.name == "Nullable") {
+    if (expr.type_args.size() != 1) {
+      if (loc.line > 0) {
+        error_at(loc, "Nullable type requires one inner type.");
+      }
+      return int_type();
+    }
+    return resolve_type_expr(expr.type_args[0], loc);
+  }
   if (expr.name == "Array") {
     if (expr.type_args.size() != 1) {
       if (loc.line > 0) {

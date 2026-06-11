@@ -16,6 +16,16 @@ bool is_assignment_operator(TokenType type) {
          type == TokenType::SLASH_EQUAL;
 }
 
+void skip_array_and_nullable_suffix(const std::vector<Token> &tokens, size_t &pos) {
+  while (pos + 1 < tokens.size() && tokens[pos].type == TokenType::LEFT_BRACKET &&
+         tokens[pos + 1].type == TokenType::RIGHT_BRACKET) {
+    pos += 2;
+  }
+  if (pos < tokens.size() && tokens[pos].type == TokenType::QUESTION) {
+    ++pos;
+  }
+}
+
 ast::AssignOp token_to_assign_op(TokenType type) {
   switch (type) {
   case TokenType::EQUAL:
@@ -657,6 +667,7 @@ ast::StmtPtr Parser::var_declaration() {
         else if (tokens_[pos].type == TokenType::RIGHT_BRACE) --depth;
         ++pos;
       }
+      skip_array_and_nullable_suffix(tokens_, pos);
       has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
     } else if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
       int depth = 1;
@@ -667,16 +678,10 @@ ast::StmtPtr Parser::var_declaration() {
         else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
         ++pos;
       }
-      while (pos + 1 < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
-             tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
-        pos += 2;
-      }
+      skip_array_and_nullable_suffix(tokens_, pos);
       has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
     } else {
-      while (pos + 1 < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
-             tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
-        pos += 2;
-      }
+      skip_array_and_nullable_suffix(tokens_, pos);
       has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
     }
   }
@@ -1470,10 +1475,7 @@ bool Parser::is_declaration_start() const {
       ++pos;
     }
   }
-  while (pos + 1 < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
-         tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
-    pos += 2;
-  }
+  skip_array_and_nullable_suffix(tokens_, pos);
   return pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
 }
 
@@ -1502,6 +1504,7 @@ bool Parser::looks_like_map_var_decl() const {
     ++pos;
   }
   if (!saw_top_level_colon) return false;
+  skip_array_and_nullable_suffix(tokens_, pos);
   return pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
 }
 
@@ -1519,14 +1522,7 @@ bool Parser::is_function_declaration_start() const {
       ++pos;
     }
   }
-  while (pos + 1 < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
-         tokens_[pos + 1].type == TokenType::RIGHT_BRACKET) {
-    pos += 2;
-  }
-  // Optional nullable suffix `T?` in function return types.
-  if (pos < tokens_.size() && tokens_[pos].type == TokenType::QUESTION) {
-    ++pos;
-  }
+  skip_array_and_nullable_suffix(tokens_, pos);
   if (pos >= tokens_.size() || tokens_[pos].type != TokenType::IDENTIFIER) return false;
   ++pos; // skip function name
   // Function may have type params: name<T>(...)
@@ -1599,13 +1595,14 @@ ast::TypeExpr Parser::parse_type_expr() {
     name = "Array";
     type_args = std::move(array_arg);
   }
-  // Optional nullable suffix `T?`. The bs type system has no dedicated
-  // nullable bit yet — we accept the syntax (per the error-handling design)
-  // but drop it; nullability is tracked at the value layer for now.
+  ast::TypeExpr result{std::move(name), std::move(type_args)};
   if (check(TokenType::QUESTION)) {
     advance();
+    std::vector<ast::TypeExpr> inner;
+    inner.push_back(std::move(result));
+    return ast::TypeExpr{"Nullable", std::move(inner)};
   }
-  return ast::TypeExpr{std::move(name), std::move(type_args)};
+  return result;
 }
 
 void Parser::synchronize() {

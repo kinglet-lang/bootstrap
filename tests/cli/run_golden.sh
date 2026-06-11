@@ -201,6 +201,10 @@ run_case "string_ops" "run" 0 $'hello world\ntrue\ntrue\ntrue\ntrue\ntrue\ne\n5\
 # --- Error: missing using io ---
 run_case "error_missing_using_io" "run" 65 "" $'2:3: error: Module \'io\' is not imported. Add \'using io;\' at the top of the file.\n'
 
+# --- Nullable types (T? → Nullable<T> in AST) ---
+run_contains_case "nullable_type" "--ast" "(function Nullable<int> pick" "type=Nullable<int> name=v"
+run_case "nullable_type" "run" 0 "" ""
+
 # --- Try / Catch (builtin + CastError error types) ---
 run_case "try_catch" "run" 0 $'7\n-99\n' $'9:3: warning: Unused variable \'e\'.\n18:3: warning: Unused variable \'e\'.\n'
 
