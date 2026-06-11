@@ -66,8 +66,6 @@ const char *token_type_name(TokenType type) {
     return "ENUM";
   case TokenType::CONCEPT:
     return "CONCEPT";
-  case TokenType::WHERE:
-    return "WHERE";
   case TokenType::SPAWN:
     return "SPAWN";
   case TokenType::SELECT:
@@ -128,8 +126,6 @@ const char *token_type_name(TokenType type) {
     return "FAT_ARROW";
   case TokenType::QUESTION:
     return "QUESTION";
-  case TokenType::QUESTION_QUESTION:
-    return "QUESTION_QUESTION";
   case TokenType::QUESTION_COLON:
     return "QUESTION_COLON";
   case TokenType::COLON_COLON:

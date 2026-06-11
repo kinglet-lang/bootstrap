@@ -112,9 +112,10 @@ Token Scanner::scan_token() {
   case ':':
     return make_token(match(':') ? TokenType::COLON_COLON : TokenType::COLON);
   case '?':
-    return make_token(match('?') ? TokenType::QUESTION_QUESTION
-                                 : match(':') ? TokenType::QUESTION_COLON
-                                              : TokenType::QUESTION);
+    if (match('?')) {
+      return make_error("Use '?:' for null/error coalescing; '?' '?' is not supported.");
+    }
+    return make_token(match(':') ? TokenType::QUESTION_COLON : TokenType::QUESTION);
   case '.':
     if (match('.')) {
       return make_token(match('.') ? TokenType::DOT_DOT_DOT : TokenType::DOT_DOT);
@@ -387,7 +388,6 @@ TokenType Scanner::identifier_type() const {
       {"struct", TokenType::STRUCT},
       {"enum", TokenType::ENUM},
       {"concept", TokenType::CONCEPT},
-      {"where", TokenType::WHERE},
       {"spawn", TokenType::SPAWN},
       {"select", TokenType::SELECT},
       {"true", TokenType::TRUE},

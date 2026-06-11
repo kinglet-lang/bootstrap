@@ -812,9 +812,6 @@ ast::ExprPtr Parser::coalesce() {
     expr = std::make_unique<ast::NullCoalesceExpr>(loc, std::move(expr), std::move(err_binding),
                                                    std::move(rhs));
   }
-  if (match(TokenType::QUESTION_QUESTION)) {
-    error_at(previous(), "Use '?:' instead of '??' for null/error coalescing.");
-  }
   return expr;
 }
 
