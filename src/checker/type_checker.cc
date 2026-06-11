@@ -2137,6 +2137,31 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       if (auto err = check_enum_arms_exhaustive(match_expr->arms, value_type)) {
         error_at(match_expr->location, *err);
       }
+    } else if (value_type.kind == TypeKind::Int || value_type.kind == TypeKind::Char ||
+               value_type.kind == TypeKind::Float) {
+      bool covered = false;
+      for (const ast::MatchArm &arm : match_expr->arms) {
+        if (match_arm_is_catchall(arm)) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) {
+        error_at(match_expr->location,
+                 "Non-exhaustive match on int. Add a catch-all pattern (`_` or `let x`).");
+      }
+    } else if (value_type.kind == TypeKind::String) {
+      bool covered = false;
+      for (const ast::MatchArm &arm : match_expr->arms) {
+        if (match_arm_is_catchall(arm)) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) {
+        error_at(match_expr->location,
+                 "Non-exhaustive match on string. Add a catch-all pattern (`_` or `let x`).");
+      }
     }
 
     return result_type;
