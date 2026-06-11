@@ -1905,7 +1905,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             missing += v;
           }
         }
-        warn_at(match_expr->location, "Non-exhaustive match. Missing variant(s): " + missing + ".");
+        error_at(match_expr->location, "Non-exhaustive match. Missing variant(s): " + missing + ".");
       }
     }
 

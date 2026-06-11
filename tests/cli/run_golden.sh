@@ -2,7 +2,13 @@
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-KINGLET="$ROOT/out/Debug/kinglet"
+if [[ -x "$ROOT/out/Default/kinglet" ]]; then
+  KINGLET="$ROOT/out/Default/kinglet"
+elif [[ -x "$ROOT/out/Debug/kinglet" ]]; then
+  KINGLET="$ROOT/out/Debug/kinglet"
+else
+  KINGLET="$ROOT/out/Default/kinglet"
+fi
 TMP_DIR="$(mktemp -d)"
 FAILURES=0
 
@@ -217,7 +223,7 @@ run_case "enum_guard_test" "run" 0 $'big\nnone\n' $'14:22: warning: Unused varia
 run_case "match_enum_destruct" "run" 0 $'42\n-1\n' ""
 
 # --- Match Exhaustiveness ---
-run_case "match_exhaustive_warn" "run" 0 $'red\n' $'11:16: warning: Non-exhaustive match. Missing variant(s): Blue.\n'
+run_case "match_exhaustive_warn" "--check" 65 "" $'11:16: error: Non-exhaustive match. Missing variant(s): Blue.\n'
 run_case "match_exhaustive_ok" "run" 0 $'up\nup\n' ""
 
 # --- File system (fs) + system args (sys) ---
