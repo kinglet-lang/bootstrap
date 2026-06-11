@@ -19,11 +19,6 @@ enum class OpCode : uint8_t {
   Multiply,
   Divide,
   Modulo,
-  AddI32,
-  SubtractI32,
-  MultiplyI32,
-  DivideI32,
-  ModuloI32,
   Negate,
   Not,
   BitNot,
@@ -95,6 +90,19 @@ enum class OpCode : uint8_t {
   PopHandler,
   PropagateErr,
   IsNull,
+  // Appended after the original VM opcode order (kept in lockstep with the
+  // self-host backend/vm/chunk.h and compiler/bytecode.kl). New opcodes must be
+  // appended here, never inserted mid-enum: kbc serializes opcodes as raw enum
+  // ordinals, so a mid-enum insert renumbers every later opcode.
+  StringToInt,
+  StringToFloat,
+  StringCode,
+  StringCodeAt,
+  AddI32,
+  SubtractI32,
+  MultiplyI32,
+  DivideI32,
+  ModuloI32,
 };
 
 struct Instruction {

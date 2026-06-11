@@ -1531,6 +1531,55 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       push(Value::string_value(std::move(result)));
       break;
     }
+    // String/char opcodes kept in lockstep with self-host backend/vm.
+    case OpCode::StringToInt: {
+      Value str = pop();
+      if (str.type != ValueType::String)
+        return runtime_error("to_int() requires a string.");
+      try {
+        push(Value::int_value(std::stoll(str.string_val())));
+      } catch (...) {
+        push(Value::null_value());
+      }
+      break;
+    }
+    case OpCode::StringToFloat: {
+      Value str = pop();
+      if (str.type != ValueType::String)
+        return runtime_error("to_float() requires a string.");
+      try {
+        push(Value::double_value(std::stod(str.string_val())));
+      } catch (...) {
+        push(Value::null_value());
+      }
+      break;
+    }
+    case OpCode::StringCode: {
+      Value str = pop();
+      if (str.type != ValueType::String)
+        return runtime_error("code() requires a string.");
+      if (str.string_val().empty()) {
+        push(Value::null_value());
+      } else {
+        push(Value::int_value(
+            static_cast<unsigned char>(str.string_val()[0])));
+      }
+      break;
+    }
+    case OpCode::StringCodeAt: {
+      Value index = pop();
+      Value str = pop();
+      if (str.type != ValueType::String || index.type != ValueType::Int)
+        return runtime_error("code_at() requires string and int arguments.");
+      if (index.as_int < 0 ||
+          static_cast<std::size_t>(index.as_int) >= str.string_val().size()) {
+        push(Value::null_value());
+      } else {
+        push(Value::int_value(static_cast<unsigned char>(
+            str.string_val()[static_cast<std::size_t>(index.as_int)])));
+      }
+      break;
+    }
     }
   }
 
