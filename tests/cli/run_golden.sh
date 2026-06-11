@@ -229,6 +229,7 @@ run_case "match_bool_non_exhaustive" "--check" 65 "" $'2:12: error: Non-exhausti
 run_case "match_nullable_missing_null" "--check" 65 "" $'7:12: error: Non-exhaustive match on nullable type. Missing case: null.\n'
 run_case "match_enum_payload_partial" "--check" 65 "" $'5:12: error: Non-exhaustive payload pattern for variant(s): Some.\n'
 run_case "match_int_non_exhaustive" "--check" 65 "" $'2:12: error: Non-exhaustive match on int. Add a catch-all pattern (`_` or `let x`).\n'
+run_case "match_struct_partial" "--check" 65 "" $'5:12: error: Non-exhaustive struct pattern for \'Point\'.\n'
 
 # --- File system (fs) + system args (sys) ---
 # Roundtrip: write then read back the same content. Pass $TMP_DIR so the

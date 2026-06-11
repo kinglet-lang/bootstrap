@@ -186,6 +186,70 @@ std::optional<std::string> check_enum_arms_exhaustive(const std::vector<ast::Mat
   return std::nullopt;
 }
 
+Type struct_field_type(const Type &struct_type, const ast::StructPatternField &field,
+                       std::size_t positional_index) {
+  std::size_t field_idx = positional_index;
+  if (!field.name.empty()) {
+    field_idx = struct_type.fields.size();
+    for (std::size_t j = 0; j < struct_type.fields.size(); ++j) {
+      if (struct_type.fields[j].name == field.name) {
+        field_idx = j;
+        break;
+      }
+    }
+    if (field_idx >= struct_type.fields.size()) {
+      return void_type();
+    }
+  } else if (field_idx >= struct_type.fields.size()) {
+    return void_type();
+  }
+  const FieldInfo &fi = struct_type.fields[field_idx];
+  if (fi.type) {
+    return *fi.type;
+  }
+  Type t(fi.type_kind);
+  t.name = fi.type_name;
+  return t;
+}
+
+bool struct_pattern_is_exhaustive(const ast::StructPattern *sp, const Type &struct_type) {
+  if (sp == nullptr || struct_type.kind != TypeKind::Struct || sp->fields.size() != struct_type.fields.size()) {
+    return false;
+  }
+  for (std::size_t i = 0; i < sp->fields.size(); ++i) {
+    Type field_type = struct_field_type(struct_type, sp->fields[i], i);
+    if (!payload_pattern_is_exhaustive(sp->fields[i].pattern.get(), field_type)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+std::optional<std::string> check_struct_arms_exhaustive(const std::vector<ast::MatchArm> &arms,
+                                                        const Type &struct_type) {
+  for (const auto &arm : arms) {
+    if (match_arm_is_catchall(arm)) {
+      return std::nullopt;
+    }
+  }
+  bool saw_partial = false;
+  for (const auto &arm : arms) {
+    const auto *sp = dynamic_cast<const ast::StructPattern *>(arm.pattern.get());
+    if (!sp || sp->struct_name != struct_type.name) {
+      continue;
+    }
+    if (struct_pattern_is_exhaustive(sp, struct_type)) {
+      return std::nullopt;
+    }
+    saw_partial = true;
+  }
+  if (saw_partial) {
+    return "Non-exhaustive struct pattern for '" + struct_type.name + "'.";
+  }
+  return "Non-exhaustive match on struct " + struct_type.name +
+         ". Add a catch-all or destructure all fields with binding/wildcard patterns.";
+}
+
 std::optional<std::string> check_nullable_arms_exhaustive(const std::vector<ast::MatchArm> &arms,
                                                           const Type &nullable_type) {
   for (const auto &arm : arms) {
@@ -2214,6 +2278,10 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       if (!covered) {
         error_at(match_expr->location,
                  "Non-exhaustive match on string. Add a catch-all pattern (`_` or `let x`).");
+      }
+    } else if (value_type.kind == TypeKind::Struct) {
+      if (auto err = check_struct_arms_exhaustive(match_expr->arms, value_type)) {
+        error_at(match_expr->location, *err);
       }
     }
 
