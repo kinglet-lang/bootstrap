@@ -4,12 +4,15 @@ static_library("compiler") {
     "bytecode_emitter.h",
     "compiler.cc",
     "compiler.h",
+    "expr_width.cc",
+    "expr_width.h",
   ]
 
   deps = [
     "//src/ast",
     "//src/ir",
     "//src/module",
+    "//src/types",
     "//src/vm",
   ]
 

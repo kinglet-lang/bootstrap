@@ -2,6 +2,8 @@ static_library("vm") {
   sources = [
     "chunk.cc",
     "chunk.h",
+    "numeric.cc",
+    "numeric.h",
     "cow.cc",
     "cow.h",
     "value.cc",

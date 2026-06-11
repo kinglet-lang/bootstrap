@@ -1,5 +1,7 @@
 #include "vm/vm.h"
 
+#include "vm/numeric.h"
+
 #include "vm/cow.h"
 
 #include <algorithm>
@@ -104,7 +106,12 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
     case OpCode::Subtract:
     case OpCode::Multiply:
     case OpCode::Divide:
-    case OpCode::Modulo: {
+    case OpCode::Modulo:
+    case OpCode::AddI32:
+    case OpCode::SubtractI32:
+    case OpCode::MultiplyI32:
+    case OpCode::DivideI32:
+    case OpCode::ModuloI32: {
       if (instruction.op == OpCode::Add && stack_.size() >= 2 &&
           (stack_[stack_.size() - 1].type == ValueType::String ||
            stack_[stack_.size() - 2].type == ValueType::String)) {
@@ -1562,29 +1569,38 @@ bool Vm::binary_numeric(OpCode op, std::string *error) {
   const bool both_int =
       left.type == ValueType::Int && right.type == ValueType::Int;
   if (both_int) {
+    const bool i32_op = vm_opcode_is_i32_arithmetic(static_cast<uint8_t>(op));
+    auto apply_i32 = [&](int64_t result) {
+      push(Value::int_value(i32_op ? vm_truncate_i32(result) : result));
+    };
     switch (op) {
     case OpCode::Add:
-      push(Value::int_value(left.as_int + right.as_int));
+    case OpCode::AddI32:
+      apply_i32(left.as_int + right.as_int);
       return true;
     case OpCode::Subtract:
-      push(Value::int_value(left.as_int - right.as_int));
+    case OpCode::SubtractI32:
+      apply_i32(left.as_int - right.as_int);
       return true;
     case OpCode::Multiply:
-      push(Value::int_value(left.as_int * right.as_int));
+    case OpCode::MultiplyI32:
+      apply_i32(left.as_int * right.as_int);
       return true;
     case OpCode::Divide:
+    case OpCode::DivideI32:
       if (right.as_int == 0) {
         *error = "Division by zero.";
         return false;
       }
-      push(Value::int_value(left.as_int / right.as_int));
+      apply_i32(left.as_int / right.as_int);
       return true;
     case OpCode::Modulo:
+    case OpCode::ModuloI32:
       if (right.as_int == 0) {
         *error = "Modulo by zero.";
         return false;
       }
-      push(Value::int_value(left.as_int % right.as_int));
+      apply_i32(left.as_int % right.as_int);
       return true;
     default:
       break;

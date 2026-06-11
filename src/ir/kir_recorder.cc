@@ -162,17 +162,32 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
   case OpCode::Add:
     bb_.instrs.push_back(rec(KirOpcode::IAdd, {}, location));
     break;
+  case OpCode::AddI32:
+    bb_.instrs.push_back(rec(KirOpcode::IAdd32, {}, location));
+    break;
   case OpCode::Subtract:
     bb_.instrs.push_back(rec(KirOpcode::ISub, {}, location));
+    break;
+  case OpCode::SubtractI32:
+    bb_.instrs.push_back(rec(KirOpcode::ISub32, {}, location));
     break;
   case OpCode::Multiply:
     bb_.instrs.push_back(rec(KirOpcode::IMul, {}, location));
     break;
+  case OpCode::MultiplyI32:
+    bb_.instrs.push_back(rec(KirOpcode::IMul32, {}, location));
+    break;
   case OpCode::Divide:
     bb_.instrs.push_back(rec(KirOpcode::IDiv, {}, location));
     break;
+  case OpCode::DivideI32:
+    bb_.instrs.push_back(rec(KirOpcode::IDiv32, {}, location));
+    break;
   case OpCode::Modulo:
     bb_.instrs.push_back(rec(KirOpcode::IMod, {}, location));
+    break;
+  case OpCode::ModuloI32:
+    bb_.instrs.push_back(rec(KirOpcode::IMod32, {}, location));
     break;
   case OpCode::Not:
     bb_.instrs.push_back(rec(KirOpcode::Not, {}, location));

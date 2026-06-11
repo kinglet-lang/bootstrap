@@ -198,6 +198,16 @@ const char *opcode_name(OpCode op) {
     return "Divide";
   case OpCode::Modulo:
     return "Modulo";
+  case OpCode::AddI32:
+    return "AddI32";
+  case OpCode::SubtractI32:
+    return "SubtractI32";
+  case OpCode::MultiplyI32:
+    return "MultiplyI32";
+  case OpCode::DivideI32:
+    return "DivideI32";
+  case OpCode::ModuloI32:
+    return "ModuloI32";
   case OpCode::Negate:
     return "Negate";
   case OpCode::Not:

@@ -1,5 +1,6 @@
 #include "compiler/compiler.h"
 
+#include "compiler/expr_width.h"
 #include "ir/ir_builder.h"
 #include "ir/kir_numeric.h"
 
@@ -942,21 +943,14 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     }
     compile_expr(*binary->left);
     compile_expr(*binary->right);
+    const std::string width = infer_expr_type_name(*binary, local_types_);
     switch (binary->op) {
     case ast::BinaryOp::Add:
-      emit(OpCode::Add, binary->location);
-      break;
     case ast::BinaryOp::Sub:
-      emit(OpCode::Subtract, binary->location);
-      break;
     case ast::BinaryOp::Mul:
-      emit(OpCode::Multiply, binary->location);
-      break;
     case ast::BinaryOp::Div:
-      emit(OpCode::Divide, binary->location);
-      break;
     case ast::BinaryOp::Mod:
-      emit(OpCode::Modulo, binary->location);
+      emit(width_arithmetic_opcode(binary->op, width), binary->location);
       break;
     case ast::BinaryOp::Eq:
       emit(OpCode::Eq, binary->location);
