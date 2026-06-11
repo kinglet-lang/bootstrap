@@ -74,6 +74,8 @@ private:
   ast::ExprPtr primary();
   ast::ExprPtr match_expression(ast::ExprPtr value);
   ast::ExprPtr parse_array_pattern();
+  ast::ExprPtr parse_struct_pattern(const Token &struct_token);
+  ast::ExprPtr parse_match_pattern();
 
   ast::ExprPtr condition_expression();
   std::vector<ast::Parameter> parameters();

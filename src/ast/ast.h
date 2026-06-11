@@ -243,6 +243,20 @@ struct EnumPattern final : Expr {
   std::vector<ExprPtr> fields;
 };
 
+struct StructPatternField {
+  std::string name;
+  ExprPtr pattern;
+};
+
+struct StructPattern final : Expr {
+  StructPattern(SourceLocation location, std::string struct_name,
+                std::vector<StructPatternField> fields);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string struct_name;
+  std::vector<StructPatternField> fields;
+};
+
 struct MatchArm {
   ExprPtr pattern;
   ExprPtr guard;

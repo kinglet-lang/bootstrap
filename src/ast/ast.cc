@@ -322,6 +322,25 @@ void EnumPattern::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+StructPattern::StructPattern(SourceLocation location, std::string struct_name,
+                             std::vector<StructPatternField> fields)
+    : Expr(location), struct_name(std::move(struct_name)), fields(std::move(fields)) {}
+
+void StructPattern::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(struct-pattern " << struct_name << " {";
+  for (std::size_t i = 0; i < fields.size(); ++i) {
+    if (i > 0) {
+      out << ", ";
+    }
+    if (!fields[i].name.empty()) {
+      out << fields[i].name << ": ";
+    }
+    fields[i].pattern->print(out, 0);
+  }
+  out << "})";
+}
+
 MatchExpr::MatchExpr(SourceLocation location, ExprPtr value, std::vector<MatchArm> arms)
     : Expr(location), value(std::move(value)), arms(std::move(arms)) {}
 
