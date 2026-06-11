@@ -1433,25 +1433,35 @@ public:
         break;
       }
       case KirOpcode::IndexSet: {
+        KirType value_ty = KirType::Any;
+        if (!type_stack.empty()) {
+          value_ty = type_stack.back();
+        }
         llvm::Value *value = pop_value(&stack, error, &type_stack);
         llvm::Value *index = pop_value(&stack, error, &type_stack);
         llvm::Value *object = pop_value(&stack, error, &type_stack);
         if (value == nullptr || index == nullptr || object == nullptr) {
           return false;
         }
+        llvm::Value *wire_value = to_wire_i64(builder, rt_, value, value_ty);
         llvm::Value *result =
-            builder.CreateCall(rt_.index_set, {object, index, value});
+            builder.CreateCall(rt_.index_set, {object, index, wire_value});
         push(result);
         temps[i] = result;
         break;
       }
       case KirOpcode::ArrayPush: {
+        KirType value_ty = KirType::Any;
+        if (!type_stack.empty()) {
+          value_ty = type_stack.back();
+        }
         llvm::Value *value = pop_value(&stack, error, &type_stack);
         llvm::Value *array = pop_value(&stack, error, &type_stack);
         if (value == nullptr || array == nullptr) {
           return false;
         }
-        llvm::Value *result = builder.CreateCall(rt_.array_push, {array, value});
+        llvm::Value *wire_value = to_wire_i64(builder, rt_, value, value_ty);
+        llvm::Value *result = builder.CreateCall(rt_.array_push, {array, wire_value});
         push(result);
         temps[i] = result;
         break;
