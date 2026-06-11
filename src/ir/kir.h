@@ -34,9 +34,23 @@ enum class KirType : uint8_t {
   Fn,
 };
 
+enum class KirContainerShape : uint8_t {
+  None,
+  Array,
+  Map,
+};
+
+struct KirContainerType {
+  KirContainerShape shape = KirContainerShape::None;
+  KirType element_type = KirType::Any; // Array element or Map value
+  KirType key_type = KirType::Any;     // Map key
+};
+
 struct KirFunctionSig {
   std::vector<KirType> param_types;
+  std::vector<KirContainerType> param_containers;
   KirType return_type = KirType::Any;
+  KirContainerType return_container;
 };
 
 enum class KirOpcode {
@@ -176,6 +190,7 @@ struct KirFunction {
   std::vector<std::string> param_names;
   std::vector<KirType> param_types;
   KirType return_type = KirType::Any;
+  std::vector<KirContainerType> slot_containers;
   std::vector<KirType> local_types;
   std::vector<KirType> instr_types;
   std::vector<KirBasicBlock> blocks;

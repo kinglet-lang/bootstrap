@@ -1,5 +1,6 @@
 #include "checker/type_checker.h"
 
+#include "ir/kir_container.h"
 #include "ir/kir_numeric.h"
 #include "module/module_loader.h"
 #include "types/numeric.h"
@@ -461,9 +462,11 @@ KirFunctionSig kir_sig_from(const Type &func_type) {
   KirFunctionSig sig;
   for (const Type &param : func_type.param_types) {
     sig.param_types.push_back(kir_type_from(param));
+    sig.param_containers.push_back(kir_container_from_surface_type(param));
   }
   if (func_type.return_type) {
     sig.return_type = kir_type_from(*func_type.return_type);
+    sig.return_container = kir_container_from_surface_type(*func_type.return_type);
   }
   return sig;
 }
@@ -2967,20 +2970,32 @@ void TypeChecker::populate_kir_types(KirModule *module) const {
   }
 
   for (KirFunction &fn : module->functions) {
+    const KirFunctionSig *sig = nullptr;
     auto it = kir_function_sigs_.find(fn.name);
-    if (it == kir_function_sigs_.end()) {
-      for (const auto &[key, sig] : kir_function_sigs_) {
+    if (it != kir_function_sigs_.end()) {
+      sig = &it->second;
+    } else {
+      for (const auto &[key, candidate] : kir_function_sigs_) {
         const auto pos = key.rfind("::");
         if (pos != std::string::npos && key.substr(pos + 2) == fn.name) {
-          fn.param_types = sig.param_types;
-          fn.return_type = sig.return_type;
+          sig = &candidate;
           break;
         }
       }
+    }
+    if (sig == nullptr) {
       continue;
     }
-    fn.param_types = it->second.param_types;
-    fn.return_type = it->second.return_type;
+    fn.param_types = sig->param_types;
+    fn.return_type = sig->return_type;
+    fn.slot_containers.assign(static_cast<std::size_t>(std::max(fn.param_count, 0)),
+                              KirContainerType{});
+    for (int i = 0; i < fn.param_count; ++i) {
+      if (static_cast<std::size_t>(i) < sig->param_containers.size()) {
+        fn.slot_containers[static_cast<std::size_t>(i)] =
+            sig->param_containers[static_cast<std::size_t>(i)];
+      }
+    }
   }
 }
 

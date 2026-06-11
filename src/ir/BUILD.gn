@@ -10,6 +10,8 @@ static_library("ir") {
     "kir_typing.h",
     "kir_numeric.cc",
     "kir_numeric.h",
+    "kir_container.cc",
+    "kir_container.h",
     "kir_specialize.cc",
     "kir_specialize.h",
   ]
