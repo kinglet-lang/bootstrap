@@ -2285,6 +2285,36 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
+    bool past_catchall = false;
+    std::unordered_set<std::string> seen_enum_arms;
+    bool seen_null_arm = false;
+    for (const ast::MatchArm &arm : match_expr->arms) {
+      if (past_catchall) {
+        warn_at(arm.pattern->location, "Unreachable match arm.");
+        continue;
+      }
+      if (match_arm_is_catchall(arm)) {
+        past_catchall = true;
+        continue;
+      }
+      if (!arm.guard) {
+        if (pattern_is_null_literal(arm.pattern.get())) {
+          if (seen_null_arm) {
+            warn_at(arm.pattern->location, "Duplicate match arm for 'null'.");
+          }
+          seen_null_arm = true;
+        }
+        if (const auto *ep = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get())) {
+          const std::string key = ep->enum_name + "::" + ep->variant_name;
+          if (seen_enum_arms.count(key)) {
+            warn_at(ep->location, "Duplicate match arm for variant '" + ep->variant_name + "'.");
+          } else {
+            seen_enum_arms.insert(key);
+          }
+        }
+      }
+    }
+
     return result_type;
   }
 

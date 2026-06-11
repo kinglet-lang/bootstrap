@@ -230,6 +230,7 @@ run_case "match_nullable_missing_null" "--check" 65 "" $'7:12: error: Non-exhaus
 run_case "match_enum_payload_partial" "--check" 65 "" $'5:12: error: Non-exhaustive payload pattern for variant(s): Some.\n'
 run_case "match_int_non_exhaustive" "--check" 65 "" $'2:12: error: Non-exhaustive match on int. Add a catch-all pattern (`_` or `let x`).\n'
 run_case "match_struct_partial" "--check" 65 "" $'5:12: error: Non-exhaustive struct pattern for \'Point\'.\n'
+run_case "match_duplicate_enum_warn" "--check" 0 "" $'6:5: warning: Duplicate match arm for variant \'Red\'.\n'
 
 # --- File system (fs) + system args (sys) ---
 # Roundtrip: write then read back the same content. Pass $TMP_DIR so the
