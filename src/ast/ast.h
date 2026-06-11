@@ -82,10 +82,11 @@ struct TypeExpr {
 };
 
 struct IntLiteralExpr final : Expr {
-  IntLiteralExpr(SourceLocation location, int64_t value);
+  IntLiteralExpr(SourceLocation location, int64_t value, std::string width_suffix = {});
   void print(std::ostream &out, int indent = 0) const override;
 
   int64_t value;
+  std::string width_suffix;
 };
 
 struct CharLiteralExpr final : Expr {
@@ -96,10 +97,11 @@ struct CharLiteralExpr final : Expr {
 };
 
 struct FloatLiteralExpr final : Expr {
-  FloatLiteralExpr(SourceLocation location, double value);
+  FloatLiteralExpr(SourceLocation location, double value, std::string width_suffix = {});
   void print(std::ostream &out, int indent = 0) const override;
 
   double value;
+  std::string width_suffix;
 };
 
 struct StringLiteralExpr final : Expr {

@@ -1,5 +1,7 @@
 #include "types/types.h"
 
+#include "types/numeric.h"
+
 #include <utility>
 
 namespace kinglet {
@@ -31,11 +33,21 @@ Type &Type::operator=(const Type &other) {
 }
 
 bool Type::is_numeric() const {
-  return kind == TypeKind::Int || kind == TypeKind::Float;
+  return is_integer_type(*this) || is_float_type(*this);
 }
 
 bool Type::is_compatible_with(const Type &other) const {
   if (kind == other.kind) {
+    if (kind == TypeKind::Int) {
+      return name == other.name;
+    }
+    if (kind == TypeKind::Float) {
+      return name == other.name || name == "float32" || other.name == "float32";
+    }
+    if (kind == TypeKind::Char) {
+      return other.kind == TypeKind::Char ||
+             (other.kind == TypeKind::Int && other.name == "int8");
+    }
     if (kind == TypeKind::Struct || kind == TypeKind::Enum) {
       return name == other.name;
     }
@@ -64,8 +76,11 @@ bool Type::is_compatible_with(const Type &other) const {
     }
     return true;
   }
-  if (is_numeric() && other.is_numeric()) {
-    return true;
+  if (kind == TypeKind::Int && other.kind == TypeKind::Char) {
+    return name == "int8";
+  }
+  if (kind == TypeKind::Char && other.kind == TypeKind::Int) {
+    return other.name == "int8";
   }
   if (kind == TypeKind::Null || other.kind == TypeKind::Null) {
     return true;
@@ -75,15 +90,25 @@ bool Type::is_compatible_with(const Type &other) const {
 
 Type Type::promote(const Type &a, const Type &b) {
   if (a.kind == TypeKind::Float || b.kind == TypeKind::Float) {
-    return float_type();
+    return promote_float_binary(a, b);
+  }
+  if (a.kind == TypeKind::Int && b.kind == TypeKind::Int) {
+    if (a.name == b.name) return a;
+    return make_int_type("int64");
   }
   return a;
 }
 
-static const Type INT_INSTANCE{TypeKind::Int};
-static const Type FLOAT_INSTANCE{TypeKind::Float};
+static const Type INT_INSTANCE = make_int_type("int64");
+static const Type FLOAT_INSTANCE = make_float_type("float32");
+static const Type DOUBLE_INSTANCE = make_float_type("float64");
 static const Type BOOL_INSTANCE{TypeKind::Bool};
-static const Type CHAR_INSTANCE{TypeKind::Char};
+static const Type CHAR_INSTANCE = [] {
+  Type t(TypeKind::Char);
+  t.name = "int8";
+  return t;
+}();
+static const Type BYTE_INSTANCE = make_int_type("uint8");
 static const Type STRING_INSTANCE{TypeKind::String};
 static const Type VOID_INSTANCE{TypeKind::Void};
 static const Type NULL_INSTANCE{TypeKind::Null};
@@ -96,12 +121,20 @@ const Type &float_type() {
   return FLOAT_INSTANCE;
 }
 
+const Type &double_type() {
+  return DOUBLE_INSTANCE;
+}
+
 const Type &bool_type() {
   return BOOL_INSTANCE;
 }
 
 const Type &char_type() {
   return CHAR_INSTANCE;
+}
+
+const Type &byte_type() {
+  return BYTE_INSTANCE;
 }
 
 const Type &string_type() {

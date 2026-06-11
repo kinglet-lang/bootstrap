@@ -231,6 +231,8 @@ run_case "match_enum_payload_partial" "--check" 65 "" $'5:12: error: Non-exhaust
 run_case "match_int_non_exhaustive" "--check" 65 "" $'2:12: error: Non-exhaustive match on int. Add a catch-all pattern (`_` or `let x`).\n'
 run_case "match_struct_partial" "--check" 65 "" $'5:12: error: Non-exhaustive struct pattern for \'Point\'.\n'
 run_case "match_duplicate_enum_warn" "--check" 0 "" $'6:5: warning: Duplicate match arm for variant \'Red\'.\n'
+run_case "fixed_width_types" "run" 0 $'42 42 255\n' ""
+run_case "fixed_width_narrowing" "--check" 65 "" $'2:3: error: Cannot assign int to variable of type int32.\n'
 
 # --- File system (fs) + system args (sys) ---
 # Roundtrip: write then read back the same content. Pass $TMP_DIR so the

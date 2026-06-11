@@ -58,8 +58,10 @@ struct Type {
 
 const Type &int_type();
 const Type &float_type();
+const Type &double_type();
 const Type &bool_type();
 const Type &char_type();
+const Type &byte_type();
 const Type &string_type();
 const Type &void_type();
 const Type &null_type();

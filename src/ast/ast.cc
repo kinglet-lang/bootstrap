@@ -106,8 +106,8 @@ void print_child(std::ostream &out, const Node &node, int indent) {
 
 Node::Node(SourceLocation location) : location(location) {}
 
-IntLiteralExpr::IntLiteralExpr(SourceLocation location, int64_t value)
-    : Expr(location), value(value) {}
+IntLiteralExpr::IntLiteralExpr(SourceLocation location, int64_t value, std::string width_suffix)
+    : Expr(location), value(value), width_suffix(std::move(width_suffix)) {}
 
 void IntLiteralExpr::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
@@ -122,8 +122,8 @@ void CharLiteralExpr::print(std::ostream &out, int indent) const {
   out << "(char-literal '" << static_cast<char>(value) << "')";
 }
 
-FloatLiteralExpr::FloatLiteralExpr(SourceLocation location, double value)
-    : Expr(location), value(value) {}
+FloatLiteralExpr::FloatLiteralExpr(SourceLocation location, double value, std::string width_suffix)
+    : Expr(location), value(value), width_suffix(std::move(width_suffix)) {}
 
 void FloatLiteralExpr::print(std::ostream &out, int indent) const {
   write_indent(out, indent);

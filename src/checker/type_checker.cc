@@ -1,6 +1,7 @@
 #include "checker/type_checker.h"
 
 #include "module/module_loader.h"
+#include "types/numeric.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -308,12 +309,94 @@ std::optional<std::string> check_nullable_arms_exhaustive(const std::vector<ast:
   return "Non-exhaustive match on nullable type. Missing non-null case.";
 }
 
+Type widen_for_generic_inference(const Type &t) {
+  if (t.kind == TypeKind::Int && t.name == "int32") {
+    return int_type();
+  }
+  if (t.kind == TypeKind::Float && t.name == "float32") {
+    return float_type();
+  }
+  return t;
+}
+
+std::string normalize_generic_mangle(std::string name) {
+  for (const std::pair<std::string, std::string> rep :
+       {std::pair{"__int32", "__int"}, std::pair{"__float32", "__float"}}) {
+    std::size_t pos = 0;
+    while ((pos = name.find(rep.first, pos)) != std::string::npos) {
+      name.replace(pos, rep.first.size(), rep.second);
+      pos += rep.second.size();
+    }
+  }
+  return name;
+}
+
+bool types_assignable(const Type &from, const Type &to) {
+  if (from.kind == TypeKind::Int && to.kind == TypeKind::Int) {
+    return integer_assignable(from, to);
+  }
+  if (from.kind == TypeKind::Float && to.kind == TypeKind::Float) {
+    return float_assignable(from, to);
+  }
+  if (from.kind == TypeKind::Char && to.kind == TypeKind::Char) {
+    return true;
+  }
+  if (from.kind == TypeKind::Char && to.kind == TypeKind::Int && to.name == "int8") {
+    return true;
+  }
+  if (from.kind == TypeKind::Int && from.name == "int8" && to.kind == TypeKind::Char) {
+    return true;
+  }
+  if (from.kind == TypeKind::Map && to.kind == TypeKind::Map) {
+    if (!from.key_type || !to.key_type || !from.element_type || !to.element_type) {
+      return true;
+    }
+    const bool key_ok = types_assignable(*from.key_type, *to.key_type);
+    const bool val_ok = types_assignable(*from.element_type, *to.element_type);
+    return key_ok && val_ok;
+  }
+  if (from.kind == TypeKind::Array && to.kind == TypeKind::Array) {
+    if (!from.element_type || !to.element_type) {
+      return true;
+    }
+    return types_assignable(*from.element_type, *to.element_type);
+  }
+  if (from.kind == TypeKind::Struct && to.kind == TypeKind::Struct) {
+    if (from.name == to.name) {
+      return true;
+    }
+    return normalize_generic_mangle(from.name) == normalize_generic_mangle(to.name);
+  }
+  return from.is_compatible_with(to);
+}
+
 std::string type_to_string(const Type &type) {
   if (type.kind == TypeKind::Struct || type.kind == TypeKind::Enum) {
     return type.name;
   }
   if (type.kind == TypeKind::Array && type.element_type) {
     return type_to_string(*type.element_type) + "[]";
+  }
+  if (type.kind == TypeKind::Int) {
+    return integer_type_display_name(type);
+  }
+  if (type.kind == TypeKind::Float) {
+    return float_type_display_name(type);
+  }
+  if (type.kind == TypeKind::Char) {
+    return "char";
+  }
+  if (type.kind == TypeKind::Bool) {
+    return "bool";
+  }
+  if (type.kind == TypeKind::String) {
+    return "string";
+  }
+  if (type.kind == TypeKind::Void) {
+    return "void";
+  }
+  if (type.kind == TypeKind::Null) {
+    return "null";
   }
   std::ostringstream oss;
   oss << type.kind;
@@ -347,12 +430,24 @@ ast::TypeExpr substitute_type_params(
 ast::TypeExpr type_to_type_expr(const Type &t) {
   ast::TypeExpr te;
   switch (t.kind) {
-    case TypeKind::Int: te.name = "int"; break;
-    case TypeKind::Float: te.name = "float"; break;
-    case TypeKind::Bool: te.name = "bool"; break;
-    case TypeKind::Char: te.name = "char"; break;
-    case TypeKind::String: te.name = "string"; break;
-    default: te.name = t.name; break;
+    case TypeKind::Int:
+      te.name = integer_type_display_name(t);
+      break;
+    case TypeKind::Float:
+      te.name = float_type_display_name(t);
+      break;
+    case TypeKind::Bool:
+      te.name = "bool";
+      break;
+    case TypeKind::Char:
+      te.name = "char";
+      break;
+    case TypeKind::String:
+      te.name = "string";
+      break;
+    default:
+      te.name = t.name;
+      break;
   }
   return te;
 }
@@ -401,20 +496,26 @@ KirFunctionSig kir_sig_from(const Type &func_type) {
 } // namespace
 
 Type TypeChecker::resolve_type_name(const std::string &name) const {
-  if (name == "int" || name == "auto") {
+  if (name == "auto") {
     return int_type();
   }
-  if (name == "float" || name == "double") {
-    return float_type();
+  if (name == "char") {
+    return char_type();
+  }
+  if (name == "byte") {
+    return byte_type();
+  }
+  if (auto canonical = canonical_int_type_name(name)) {
+    return make_int_type(*canonical);
+  }
+  if (auto canonical = canonical_float_type_name(name)) {
+    return make_float_type(*canonical);
   }
   if (name == "bool") {
     return bool_type();
   }
   if (name == "string") {
     return string_type();
-  }
-  if (name == "char" || name == "byte") {
-    return char_type();
   }
   if (name == "void") {
     return void_type();
@@ -1099,7 +1200,7 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
   if (const auto *return_stmt = dynamic_cast<const ast::ReturnStmt *>(&stmt)) {
     if (return_stmt->value) {
       Type value_type = check_expr(*return_stmt->value);
-      if (!value_type.is_compatible_with(expected_return)) {
+      if (!types_assignable(value_type, expected_return)) {
         error_at(return_stmt->location,
                  "Cannot return " + type_to_string(value_type) + " from function returning " +
                      type_to_string(expected_return) + ".");
@@ -1116,7 +1217,7 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
       Type init_type = check_expr(*var_decl->init);
       if (var_decl->type.name == "auto") {
         var_type = init_type;
-      } else if (!init_type.is_compatible_with(var_type)) {
+      } else if (!types_assignable(init_type, var_type)) {
         error_at(var_decl->location,
                  "Cannot assign " + type_to_string(init_type) + " to variable of type " +
                      type_to_string(var_type) + ".");
@@ -1283,16 +1384,21 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
 }
 
 Type TypeChecker::check_expr(const ast::Expr &expr) {
-  if (dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
-    return int_type();
+  if (const auto *lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
+    Type t = int_literal_type_from_suffix(lit->width_suffix, lit->value);
+    if (!integer_fits_width(lit->value, int_width_info(t))) {
+      error_at(lit->location, "Integer literal out of range for type '" +
+                                   integer_type_display_name(t) + "'.");
+    }
+    return t;
   }
 
   if (dynamic_cast<const ast::CharLiteralExpr *>(&expr)) {
     return char_type();
   }
 
-  if (dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) {
-    return float_type();
+  if (const auto *lit = dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) {
+    return float_literal_type_from_suffix(lit->width_suffix);
   }
 
   if (dynamic_cast<const ast::StringLiteralExpr *>(&expr)) {
@@ -1449,10 +1555,10 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     case ast::UnaryOp::Not:
       return bool_type();
     case ast::UnaryOp::BitNot:
-      if (right_type.kind != TypeKind::Int) {
+      if (!is_integer_type(right_type)) {
         error_at(unary->location, "Bitwise NOT requires an integer operand.");
       }
-      return int_type();
+      return right_type;
     default:
       error_at(unary->location, "Unsupported unary operator.");
       return int_type();
@@ -1473,23 +1579,48 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     case ast::BinaryOp::Mul:
     case ast::BinaryOp::Div:
     case ast::BinaryOp::Mod:
+    {
       if (!left_type.is_numeric() || !right_type.is_numeric()) {
         error_at(binary->location, "Arithmetic operands must be numeric.");
         return int_type();
       }
-      return Type::promote(left_type, right_type);
+      if (is_float_type(left_type) || is_float_type(right_type)) {
+        if (is_integer_type(left_type) || is_integer_type(right_type)) {
+          error_at(binary->location, "Cannot mix integer and floating-point operands.");
+          return int_type();
+        }
+        return promote_float_binary(left_type, right_type);
+      }
+      const bool left_int_lit =
+          dynamic_cast<const ast::IntLiteralExpr *>(binary->left.get()) != nullptr;
+      const bool right_int_lit =
+          dynamic_cast<const ast::IntLiteralExpr *>(binary->right.get()) != nullptr;
+      if (auto promoted =
+              try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit)) {
+        return *promoted;
+      }
+      error_at(binary->location, "Arithmetic operands must have the same integer width.");
+      return int_type();
+    }
 
     case ast::BinaryOp::Eq:
     case ast::BinaryOp::Neq:
     case ast::BinaryOp::Lt:
     case ast::BinaryOp::Gt:
     case ast::BinaryOp::Le:
-    case ast::BinaryOp::Ge:
-      if (!left_type.is_compatible_with(right_type)) {
+    case ast::BinaryOp::Ge: {
+      const bool left_int_lit =
+          dynamic_cast<const ast::IntLiteralExpr *>(binary->left.get()) != nullptr;
+      const bool right_int_lit =
+          dynamic_cast<const ast::IntLiteralExpr *>(binary->right.get()) != nullptr;
+      const bool int_ok =
+          try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit).has_value();
+      if (!left_type.is_compatible_with(right_type) && !int_ok) {
         error_at(binary->location, "Cannot compare " + type_to_string(left_type) + " and " +
                                        type_to_string(right_type) + ".");
       }
       return bool_type();
+    }
 
     case ast::BinaryOp::And:
     case ast::BinaryOp::Or:
@@ -1499,11 +1630,22 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     case ast::BinaryOp::BitOr:
     case ast::BinaryOp::BitXor:
     case ast::BinaryOp::Shl:
-    case ast::BinaryOp::Shr:
-      if (left_type.kind != TypeKind::Int || right_type.kind != TypeKind::Int) {
+    case ast::BinaryOp::Shr: {
+      if (!is_integer_type(left_type) || !is_integer_type(right_type)) {
         error_at(binary->location, "Bitwise operators require integer operands.");
+        return int_type();
       }
-      return int_type();
+      const bool left_int_lit =
+          dynamic_cast<const ast::IntLiteralExpr *>(binary->left.get()) != nullptr;
+      const bool right_int_lit =
+          dynamic_cast<const ast::IntLiteralExpr *>(binary->right.get()) != nullptr;
+      if (auto promoted =
+              try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit)) {
+        return *promoted;
+      }
+      error_at(binary->location, "Bitwise operands must have the same integer width.");
+      return left_type;
+    }
     }
   }
 
@@ -1514,7 +1656,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       return int_type();
     }
     Type value_type = check_expr(*assign->value);
-    if (!value_type.is_compatible_with(var_type.value())) {
+    if (!types_assignable(value_type, var_type.value())) {
       error_at(assign->location, "Cannot assign " + type_to_string(value_type) + " to " +
                                      type_to_string(var_type.value()) + ".");
     }
@@ -1680,7 +1822,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
       for (std::size_t i = 0; i < call_expr->args.size(); ++i) {
         Type at = check_expr(*call_expr->args[i]);
-        if (!at.is_compatible_with(fn_ty->param_types[i])) {
+        if (!types_assignable(at, fn_ty->param_types[i])) {
           error_at(call_expr->args[i]->location, "Argument type mismatch.");
         }
       }
@@ -1752,7 +1894,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             error_at(call_expr->location, method + "() takes exactly 1 argument (key).");
           } else {
             Type k = check_expr(*call_expr->args[0]);
-            if (obj_type.key_type && !k.is_compatible_with(*obj_type.key_type)) {
+            if (obj_type.key_type && !types_assignable(k, *obj_type.key_type)) {
               error_at(call_expr->args[0]->location,
                        method + "() key must be " + type_to_string(*obj_type.key_type) +
                            ", got " + type_to_string(k) + ".");
@@ -1782,7 +1924,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             error_at(call_expr->location, "push() takes exactly 1 argument.");
           } else if (obj_type.element_type) {
             Type arg_type = check_expr(*call_expr->args[0]);
-            if (!arg_type.is_compatible_with(*obj_type.element_type)) {
+            if (!types_assignable(arg_type, *obj_type.element_type)) {
               error_at(call_expr->args[0]->location,
                        "push() expects " + type_to_string(*obj_type.element_type) +
                            ", got " + type_to_string(arg_type) + ".");
@@ -1800,7 +1942,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             }
             Type default_type = check_expr(*call_expr->args[1]);
             if (obj_type.element_type &&
-                !default_type.is_compatible_with(*obj_type.element_type)) {
+                !types_assignable(default_type, *obj_type.element_type)) {
               error_at(call_expr->args[1]->location,
                        "resize() default expects " + type_to_string(*obj_type.element_type) +
                            ", got " + type_to_string(default_type) + ".");
@@ -1973,7 +2115,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           for (std::size_t i = 0; i < call_expr->args.size(); ++i) {
             Type arg_type = check_expr(*call_expr->args[i]);
             Type param_type = resolve_type_expr(decl->params[i + 1].type);
-            if (!arg_type.is_compatible_with(param_type)) {
+            if (!types_assignable(arg_type, param_type)) {
               error_at(call_expr->args[i]->location, "Argument type mismatch.");
             }
           }
@@ -2008,7 +2150,8 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
               if (!pt.type_args.empty() || inferred.count(pt.name)) continue;
               if (std::find(decl->type_params.begin(), decl->type_params.end(), pt.name) !=
                   decl->type_params.end()) {
-                inferred[pt.name] = type_to_type_expr(arg_types[i]);
+                inferred[pt.name] =
+                    type_to_type_expr(widen_for_generic_inference(arg_types[i]));
               }
             }
             for (const std::string &tp : decl->type_params) {
@@ -2044,7 +2187,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             return ret;
           }
           for (size_t i = 0; i < arg_types.size(); ++i) {
-            if (!arg_types[i].is_compatible_with(param_types[i])) {
+            if (!types_assignable(arg_types[i], param_types[i])) {
               error_at(call_expr->args[i]->location,
                        "Expected " + type_to_string(param_types[i]) + ", got " +
                            type_to_string(arg_types[i]) + ".");
@@ -2084,7 +2227,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     }
     for (std::size_t i = 0; i < call_expr->args.size(); ++i) {
       Type arg_type = check_expr(*call_expr->args[i]);
-      if (!arg_type.is_compatible_with(callee_type.param_types[i])) {
+      if (!types_assignable(arg_type, callee_type.param_types[i])) {
         error_at(call_expr->args[i]->location,
                  "Expected " + type_to_string(callee_type.param_types[i]) + ", got " +
                      type_to_string(arg_type) + ".");
@@ -2198,7 +2341,10 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
               continue;
             } else {
               Type pattern_type = check_expr(*pf.pattern);
-              if (pattern_type.kind != TypeKind::Null && !pattern_type.is_compatible_with(field_type)) {
+              if (pattern_type.kind != TypeKind::Null &&
+                  !types_assignable(pattern_type, field_type) &&
+                  !types_assignable(field_type, pattern_type) &&
+                  !pattern_type.is_compatible_with(field_type)) {
                 error_at(pf.pattern->location, "Pattern type " + type_to_string(pattern_type) +
                                                     " does not match field type " +
                                                     type_to_string(field_type) + ".");
@@ -2209,7 +2355,10 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
       if (!binding && !arr_pat && !enum_pat && !struct_pat) {
         Type pattern_type = check_expr(*arm.pattern);
-        if (pattern_type.kind != TypeKind::Null && !pattern_type.is_compatible_with(value_type)) {
+        if (pattern_type.kind != TypeKind::Null &&
+            !types_assignable(pattern_type, value_type) &&
+            !types_assignable(value_type, pattern_type) &&
+            !pattern_type.is_compatible_with(value_type)) {
           error_at(arm.pattern->location, "Pattern type " + type_to_string(pattern_type) +
                                               " does not match value type " +
                                               type_to_string(value_type) + ".");
@@ -2334,7 +2483,8 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           if (!ft.type_args.empty() || inferred.count(ft.name)) continue;
           if (std::find(decl->type_params.begin(), decl->type_params.end(), ft.name) !=
               decl->type_params.end()) {
-            inferred[ft.name] = type_to_type_expr(check_expr(*struct_lit->fields[i].value));
+            inferred[ft.name] = type_to_type_expr(
+                widen_for_generic_inference(check_expr(*struct_lit->fields[i].value)));
           }
         }
         std::vector<ast::TypeExpr> targs;
@@ -2371,7 +2521,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       } else if (fields_def[i].type) {
         expected = *fields_def[i].type;
       }
-      if (!val_type.is_compatible_with(expected)) {
+      if (!types_assignable(val_type, expected)) {
         error_at(struct_lit->fields[i].value->location,
                  "Field '" + fields_def[i].name + "' expects " + type_to_string(expected) +
                      ", got " + type_to_string(val_type) + ".");
@@ -2533,7 +2683,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         } else if (f.type) {
           field_type = *f.type;
         }
-        if (!value_type.is_compatible_with(field_type)) {
+        if (!types_assignable(value_type, field_type)) {
           error_at(field_assign->location,
                    "Cannot assign " + type_to_string(value_type) + " to field '" +
                        f.name + "' of type " + type_to_string(field_type) + ".");
@@ -2556,12 +2706,15 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         has_element_type = true;
         continue;
       }
-      if (!current.is_compatible_with(element_type)) {
-        error_at(element->location, "Array elements must have compatible types.");
+      if (types_assignable(current, element_type)) {
         continue;
       }
-      if (current.is_numeric() && element_type.is_numeric()) {
-        element_type = Type::promote(element_type, current);
+      if (types_assignable(element_type, current)) {
+        element_type = current;
+        continue;
+      }
+      if (!current.is_compatible_with(element_type)) {
+        error_at(element->location, "Array elements must have compatible types.");
       }
     }
     return array_type(has_element_type ? element_type : null_type());
@@ -2585,7 +2738,8 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         if (!k.is_compatible_with(key_type)) {
           error_at(map_lit->keys[i]->location, "Map keys must have compatible types.");
         }
-        if (!v.is_compatible_with(val_type)) {
+        if (!types_assignable(v, val_type) && !types_assignable(val_type, v) &&
+            !v.is_compatible_with(val_type)) {
           error_at(map_lit->values[i]->location, "Map values must have compatible types.");
         }
       }
@@ -2599,15 +2753,15 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     // Map subscript: key type must match; value returned (null on missing key
     // at runtime, so the static type is the declared value type).
     if (object_type.kind == TypeKind::Map) {
-      if (object_type.key_type && !index_type.is_compatible_with(*object_type.key_type)) {
+      if (object_type.key_type && !types_assignable(index_type, *object_type.key_type)) {
         error_at(index_expr->index->location,
                  "Map key must be " + type_to_string(*object_type.key_type) + ", got " +
                      type_to_string(index_type) + ".");
       }
       return object_type.element_type ? *object_type.element_type : null_type();
     }
-    if (index_type.kind != TypeKind::Int) {
-      error_at(index_expr->index->location, "Array index must be an Int.");
+    if (!is_integer_type(index_type)) {
+      error_at(index_expr->index->location, "Array index must be an integer.");
     }
     if (object_type.kind == TypeKind::String) {
       return char_type();
@@ -2624,14 +2778,14 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     const std::string &target = cast->target_type.name;
     TypeKind src_k = src.kind;
     auto src_is = [&](TypeKind k) { return src_k == k; };
-    if (target == "int") {
+    if (auto int_target = canonical_int_type_name(target)) {
       if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
           src_is(TypeKind::Char) || src_is(TypeKind::Enum)) {
-        return int_type();
+        return make_int_type(*int_target);
       }
-    } else if (target == "float") {
+    } else if (auto float_target = canonical_float_type_name(target)) {
       if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
-        return float_type();
+        return make_float_type(*float_target);
       }
     } else if (target == "string") {
       if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
@@ -2661,7 +2815,8 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     }
     Type then_type = check_expr(*ternary->then_expr);
     Type else_type = check_expr(*ternary->else_expr);
-    if (!then_type.is_compatible_with(else_type)) {
+    if (!types_assignable(then_type, else_type) && !types_assignable(else_type, then_type) &&
+        !then_type.is_compatible_with(else_type)) {
       error_at(ternary->location,
                "Ternary branches have incompatible types: " + type_to_string(then_type) +
                    " vs " + type_to_string(else_type) + ".");
@@ -2684,7 +2839,8 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         declare_var(null_coalesce->err_binding, err_ty, false, null_coalesce->location);
         Type right_type = check_expr(*null_coalesce->right);
         pop_scope();
-        if (!right_type.is_compatible_with(left_type)) {
+        if (!types_assignable(right_type, left_type) &&
+            !right_type.is_compatible_with(left_type)) {
           error_at(null_coalesce->right->location,
                    "?: fallback type " + type_to_string(right_type) +
                        " does not match left-hand type " + type_to_string(left_type) + ".");
@@ -2693,7 +2849,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
     Type right_type = check_expr(*null_coalesce->right);
-    if (!right_type.is_compatible_with(left_type)) {
+    if (!types_assignable(right_type, left_type) && !right_type.is_compatible_with(left_type)) {
       error_at(null_coalesce->right->location,
                "?: fallback type " + type_to_string(right_type) +
                    " does not match left-hand type " + type_to_string(left_type) + ".");
@@ -2712,12 +2868,12 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     Type value_type = check_expr(*index_assign->value);
     // Map insert/update: key must match key type, value must match value type.
     if (object_type.kind == TypeKind::Map) {
-      if (object_type.key_type && !index_type.is_compatible_with(*object_type.key_type)) {
+      if (object_type.key_type && !types_assignable(index_type, *object_type.key_type)) {
         error_at(index_assign->index->location,
                  "Map key must be " + type_to_string(*object_type.key_type) + ", got " +
                      type_to_string(index_type) + ".");
       }
-      if (object_type.element_type && !value_type.is_compatible_with(*object_type.element_type)) {
+      if (object_type.element_type && !types_assignable(value_type, *object_type.element_type)) {
         error_at(index_assign->value->location,
                  "Cannot assign " + type_to_string(value_type) + " to map value of type " +
                      type_to_string(*object_type.element_type) + ".");
@@ -2731,7 +2887,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       error_at(index_assign->location, "Cannot assign indexed value on non-array type.");
       return value_type;
     }
-    if (!value_type.is_compatible_with(*object_type.element_type)) {
+    if (!types_assignable(value_type, *object_type.element_type)) {
       error_at(index_assign->value->location,
                "Cannot assign " + type_to_string(value_type) + " to array element of type " +
                    type_to_string(*object_type.element_type) + ".");

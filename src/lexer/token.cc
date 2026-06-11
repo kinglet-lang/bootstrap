@@ -8,8 +8,28 @@ const char *token_type_name(TokenType type) {
     return "AUTO";
   case TokenType::INT:
     return "INT";
+  case TokenType::INT8:
+    return "INT8";
+  case TokenType::INT16:
+    return "INT16";
+  case TokenType::INT32:
+    return "INT32";
+  case TokenType::INT64:
+    return "INT64";
+  case TokenType::UINT8:
+    return "UINT8";
+  case TokenType::UINT16:
+    return "UINT16";
+  case TokenType::UINT32:
+    return "UINT32";
+  case TokenType::UINT64:
+    return "UINT64";
   case TokenType::FLOAT:
     return "FLOAT";
+  case TokenType::FLOAT32:
+    return "FLOAT32";
+  case TokenType::FLOAT64:
+    return "FLOAT64";
   case TokenType::DOUBLE:
     return "DOUBLE";
   case TokenType::BOOL:

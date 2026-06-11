@@ -1077,11 +1077,13 @@ ast::ExprPtr Parser::primary() {
   }
   if (match(TokenType::INTEGER)) {
     const Token &literal = previous();
-    return std::make_unique<ast::IntLiteralExpr>(location_of(literal), literal.int_value);
+    return std::make_unique<ast::IntLiteralExpr>(location_of(literal), literal.int_value,
+                                                 literal.suffix);
   }
   if (match(TokenType::FLOAT_LIT)) {
     const Token &literal = previous();
-    return std::make_unique<ast::FloatLiteralExpr>(location_of(literal), literal.float_value);
+    return std::make_unique<ast::FloatLiteralExpr>(location_of(literal), literal.float_value,
+                                                   literal.suffix);
   }
   if (match(TokenType::STRING_LIT)) {
     const Token &literal = previous();
@@ -1464,7 +1466,17 @@ bool Parser::is_type_start(TokenType type) const {
   switch (type) {
   case TokenType::AUTO:
   case TokenType::INT:
+  case TokenType::INT8:
+  case TokenType::INT16:
+  case TokenType::INT32:
+  case TokenType::INT64:
+  case TokenType::UINT8:
+  case TokenType::UINT16:
+  case TokenType::UINT32:
+  case TokenType::UINT64:
   case TokenType::FLOAT:
+  case TokenType::FLOAT32:
+  case TokenType::FLOAT64:
   case TokenType::DOUBLE:
   case TokenType::BOOL:
   case TokenType::STRING:

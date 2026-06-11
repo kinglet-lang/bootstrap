@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace kinglet {
@@ -10,7 +11,8 @@ enum class TokenType {
   /* clang-format off */
   
   // Keywords
-  AUTO, INT, FLOAT, DOUBLE, BOOL, STRING, VOID, BYTE, CHAR, 
+  AUTO, INT, INT8, INT16, INT32, INT64, UINT8, UINT16, UINT32, UINT64,
+  FLOAT, FLOAT32, FLOAT64, DOUBLE, BOOL, STRING, VOID, BYTE, CHAR,
   CONST,
   RETURN, IF, ELSE, FOR, WHILE, BREAK, CONTINUE, GUARD,
   MATCH, LET, WHEN,
@@ -60,6 +62,8 @@ struct Token {
     int64_t int_value;
     double float_value;
   };
+  // Width suffix without leading dot, e.g. "i32", "u8", "f64".
+  std::string suffix;
 };
 
 const char *token_type_name(TokenType type);

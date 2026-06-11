@@ -233,6 +233,54 @@ Token Scanner::identifier() {
   return make_token(identifier_type());
 }
 
+namespace {
+
+bool is_int_suffix(std::string_view s) {
+  return s == "i8" || s == "i16" || s == "i32" || s == "i64" || s == "u8" || s == "u16" ||
+         s == "u32" || s == "u64";
+}
+
+bool is_float_suffix(std::string_view s) { return s == "f32" || s == "f64"; }
+
+} // namespace
+
+std::string Scanner::scan_int_suffix() {
+  if (peek() != 'i' && peek() != 'u') {
+    return {};
+  }
+  const std::size_t saved = current_;
+  std::string suffix;
+  suffix.push_back(advance());
+  while (is_digit(peek())) {
+    suffix.push_back(advance());
+  }
+  if (!is_int_suffix(suffix)) {
+    current_ = saved;
+    return {};
+  }
+  return suffix;
+}
+
+std::string Scanner::scan_float_suffix() {
+  if (peek() != 'f') {
+    return {};
+  }
+  const std::size_t saved = current_;
+  advance();
+  if (peek() == '3' && peek_next() == '2') {
+    advance();
+    advance();
+    return "f32";
+  }
+  if (peek() == '6' && peek_next() == '4') {
+    advance();
+    advance();
+    return "f64";
+  }
+  current_ = saved;
+  return {};
+}
+
 Token Scanner::number() {
   TokenType type = TokenType::INTEGER;
 
@@ -248,6 +296,7 @@ Token Scanner::number() {
     Token token = make_token(TokenType::INTEGER);
     const std::string value = current_lexeme_without_separators();
     token.int_value = static_cast<int64_t>(std::strtoll(value.c_str(), nullptr, 16));
+    token.suffix = scan_int_suffix();
     return token;
   }
 
@@ -263,6 +312,7 @@ Token Scanner::number() {
     Token token = make_token(TokenType::INTEGER);
     const std::string value = current_lexeme_without_separators();
     token.int_value = static_cast<int64_t>(std::strtoll(value.c_str() + 2, nullptr, 2));
+    token.suffix = scan_int_suffix();
     return token;
   }
 
@@ -296,8 +346,10 @@ Token Scanner::number() {
   const std::string value = current_lexeme_without_separators();
   if (type == TokenType::FLOAT_LIT) {
     token.float_value = std::strtod(value.c_str(), nullptr);
+    token.suffix = scan_float_suffix();
   } else {
     token.int_value = static_cast<int64_t>(std::strtoll(value.c_str(), nullptr, 10));
+    token.suffix = scan_int_suffix();
   }
   return token;
 }
@@ -359,7 +411,17 @@ TokenType Scanner::identifier_type() const {
   static const std::unordered_map<std::string_view, TokenType> keywords = {
       {"auto", TokenType::AUTO},
       {"int", TokenType::INT},
+      {"int8", TokenType::INT8},
+      {"int16", TokenType::INT16},
+      {"int32", TokenType::INT32},
+      {"int64", TokenType::INT64},
+      {"uint8", TokenType::UINT8},
+      {"uint16", TokenType::UINT16},
+      {"uint32", TokenType::UINT32},
+      {"uint64", TokenType::UINT64},
       {"float", TokenType::FLOAT},
+      {"float32", TokenType::FLOAT32},
+      {"float64", TokenType::FLOAT64},
       {"double", TokenType::DOUBLE},
       {"bool", TokenType::BOOL},
       {"string", TokenType::STRING},

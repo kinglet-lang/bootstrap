@@ -28,6 +28,9 @@ private:
   Token string_literal();
   Token char_literal();
 
+  std::string scan_int_suffix();
+  std::string scan_float_suffix();
+
   TokenType identifier_type() const;
   std::string current_lexeme_without_separators() const;
 
