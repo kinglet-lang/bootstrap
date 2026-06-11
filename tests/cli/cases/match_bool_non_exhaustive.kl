@@ -1,0 +1,9 @@
+bool flip(bool b) {
+  return b match {
+    true => true,
+  };
+}
+
+int main() {
+  return flip(true) ? 1 : 0;
+}

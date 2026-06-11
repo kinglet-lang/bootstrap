@@ -11,6 +11,17 @@ namespace kinglet {
 
 namespace {
 
+bool match_arm_is_catchall(const ast::MatchArm &arm) {
+  if (arm.guard) {
+    return false;
+  }
+  if (dynamic_cast<const ast::BindingPattern *>(arm.pattern.get())) {
+    return true;
+  }
+  const auto *id = dynamic_cast<const ast::IdentifierExpr *>(arm.pattern.get());
+  return id && id->name == "_";
+}
+
 std::string type_to_string(const Type &type) {
   if (type.kind == TypeKind::Struct || type.kind == TypeKind::Enum) {
     return type.name;
@@ -1878,17 +1889,40 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
-    // Exhaustiveness check for enum types
-    if (value_type.kind == TypeKind::Enum && !value_type.variants.empty()) {
-      std::unordered_set<std::string> uncovered(value_type.variants.begin(), value_type.variants.end());
+    // Exhaustiveness: bool literals and enum variant names (guarded enum arms still count).
+    if (value_type.kind == TypeKind::Bool) {
+      bool has_true = false;
+      bool has_false = false;
       for (const ast::MatchArm &arm : match_expr->arms) {
-        if (arm.guard) continue;
-        const auto *id = dynamic_cast<const ast::IdentifierExpr *>(arm.pattern.get());
-        if (id && id->name == "_") {
-          uncovered.clear();
+        if (match_arm_is_catchall(arm)) {
+          has_true = has_false = true;
           break;
         }
-        if (dynamic_cast<const ast::BindingPattern *>(arm.pattern.get())) {
+        if (const auto *bl = dynamic_cast<const ast::BoolLiteralExpr *>(arm.pattern.get())) {
+          if (bl->value) {
+            has_true = true;
+          } else {
+            has_false = true;
+          }
+        }
+      }
+      if (!has_true || !has_false) {
+        std::string missing;
+        if (!has_true) {
+          missing = "true";
+        }
+        if (!has_false) {
+          if (!missing.empty()) {
+            missing += ", ";
+          }
+          missing += "false";
+        }
+        error_at(match_expr->location, "Non-exhaustive match on bool. Missing case(s): " + missing + ".");
+      }
+    } else if (value_type.kind == TypeKind::Enum && !value_type.variants.empty()) {
+      std::unordered_set<std::string> uncovered(value_type.variants.begin(), value_type.variants.end());
+      for (const ast::MatchArm &arm : match_expr->arms) {
+        if (match_arm_is_catchall(arm)) {
           uncovered.clear();
           break;
         }
