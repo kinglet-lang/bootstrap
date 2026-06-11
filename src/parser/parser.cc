@@ -1620,7 +1620,23 @@ ast::TypeExpr Parser::parse_type_expr() {
     std::vector<ast::TypeExpr> map_args;
     map_args.push_back(std::move(key));
     map_args.push_back(std::move(value));
-    return ast::TypeExpr{"Map", std::move(map_args)};
+    std::string name = "Map";
+    std::vector<ast::TypeExpr> type_args = std::move(map_args);
+    while (match(TokenType::LEFT_BRACKET)) {
+      consume(TokenType::RIGHT_BRACKET, "Expected ']' after array type suffix.");
+      std::vector<ast::TypeExpr> array_arg;
+      array_arg.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
+      name = "Array";
+      type_args = std::move(array_arg);
+    }
+    ast::TypeExpr result{std::move(name), std::move(type_args)};
+    if (check(TokenType::QUESTION)) {
+      advance();
+      std::vector<ast::TypeExpr> inner;
+      inner.push_back(std::move(result));
+      return ast::TypeExpr{"Nullable", std::move(inner)};
+    }
+    return result;
   }
   std::string name = token_text(advance());
   std::vector<ast::TypeExpr> type_args;
