@@ -1611,6 +1611,63 @@ void Compiler::compile_expr(const ast::Expr &expr) {
         for (std::size_t j = 0; j < bind_slots.size(); ++j) {
           locals_.pop_back();
         }
+      } else if (const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(arm.pattern.get())) {
+        auto struct_it = struct_indices_.find(struct_pat->struct_name);
+        if (struct_it == struct_indices_.end()) {
+          error_at(struct_pat->location, "Unknown struct type '" + struct_pat->struct_name + "'.");
+          return;
+        }
+        const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(struct_it->second)];
+        std::vector<std::size_t> fail_jumps;
+        std::vector<uint32_t> bind_slots;
+        for (std::size_t i = 0; i < struct_pat->fields.size(); ++i) {
+          const auto &pf = struct_pat->fields[i];
+          std::string field_name;
+          if (!pf.name.empty()) {
+            field_name = pf.name;
+          } else if (i < meta.field_names.size()) {
+            field_name = meta.field_names[i];
+          } else {
+            error_at(struct_pat->location, "Struct pattern has too many fields.");
+            return;
+          }
+          const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(pf.pattern.get());
+          const auto *field_wildcard = dynamic_cast<const ast::IdentifierExpr *>(pf.pattern.get());
+          if (field_binding) {
+            const uint32_t slot = static_cast<uint32_t>(locals_.size());
+            locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
+            emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
+            uint32_t field_const = chunk_.add_constant(Value::string_value(field_name));
+            emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
+            emit_operand(OpCode::StoreLocal, slot, struct_pat->location);
+            emit(OpCode::Pop, struct_pat->location);
+            bind_slots.push_back(slot);
+          } else if (field_wildcard && field_wildcard->name == "_") {
+            continue;
+          } else {
+            emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
+            uint32_t field_const = chunk_.add_constant(Value::string_value(field_name));
+            emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
+            compile_expr(*pf.pattern);
+            emit(OpCode::Eq, struct_pat->location);
+            fail_jumps.push_back(emit_jump(OpCode::JmpFalse, struct_pat->location));
+          }
+        }
+        if (arm.guard) {
+          compile_expr(*arm.guard);
+          fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr->location));
+          emit(OpCode::Pop, match_expr->location);
+        } else {
+          emit(OpCode::Pop, match_expr->location);
+        }
+        compile_expr(*arm.body);
+        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
+        for (std::size_t fj : fail_jumps) {
+          patch_jump(fj);
+        }
+        for (std::size_t j = 0; j < bind_slots.size(); ++j) {
+          locals_.pop_back();
+        }
       } else {
         emit_operand(OpCode::LoadLocal, temp_slot, match_expr->location);
         compile_expr(*arm.pattern);

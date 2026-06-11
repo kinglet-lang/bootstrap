@@ -2039,6 +2039,11 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     return null_type();
   }
 
+  if (const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(&expr)) {
+    (void)struct_pat;
+    return null_type();
+  }
+
   if (const auto *match_expr = dynamic_cast<const ast::MatchExpr *>(&expr)) {
     Type value_type = check_expr(*match_expr->value);
     Type element_type = (value_type.kind == TypeKind::Array && value_type.element_type)
@@ -2049,6 +2054,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       const auto *binding = dynamic_cast<const ast::BindingPattern *>(arm.pattern.get());
       const auto *arr_pat = dynamic_cast<const ast::ArrayPattern *>(arm.pattern.get());
       const auto *enum_pat = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get());
+      const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(arm.pattern.get());
       if (binding) {
         push_scope();
         declare_var(binding->name, value_type, false, binding->location);
@@ -2089,8 +2095,55 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             }
           }
         }
+      } else if (struct_pat) {
+        push_scope();
+        if (value_type.kind != TypeKind::Struct || value_type.name != struct_pat->struct_name) {
+          error_at(struct_pat->location, "Struct pattern '" + struct_pat->struct_name +
+                                              "' does not match scrutinee type " +
+                                              type_to_string(value_type) + ".");
+        } else {
+          for (std::size_t i = 0; i < struct_pat->fields.size(); ++i) {
+            const auto &pf = struct_pat->fields[i];
+            std::size_t field_idx = i;
+            if (!pf.name.empty()) {
+              field_idx = value_type.fields.size();
+              for (std::size_t j = 0; j < value_type.fields.size(); ++j) {
+                if (value_type.fields[j].name == pf.name) {
+                  field_idx = j;
+                  break;
+                }
+              }
+              if (field_idx >= value_type.fields.size()) {
+                error_at(struct_pat->location, "Struct '" + struct_pat->struct_name + "' has no field '" +
+                                                    pf.name + "'.");
+                continue;
+              }
+            } else if (field_idx >= value_type.fields.size()) {
+              error_at(struct_pat->location, "Struct pattern has too many fields for '" +
+                                                  struct_pat->struct_name + "'.");
+              continue;
+            }
+            Type field_type = value_type.fields[field_idx].type
+                                  ? *value_type.fields[field_idx].type
+                                  : resolve_type_name(value_type.fields[field_idx].type_name);
+            const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(pf.pattern.get());
+            const auto *field_wildcard = dynamic_cast<const ast::IdentifierExpr *>(pf.pattern.get());
+            if (field_binding) {
+              declare_var(field_binding->name, field_type, false, field_binding->location);
+            } else if (field_wildcard && field_wildcard->name == "_") {
+              continue;
+            } else {
+              Type pattern_type = check_expr(*pf.pattern);
+              if (pattern_type.kind != TypeKind::Null && !pattern_type.is_compatible_with(field_type)) {
+                error_at(pf.pattern->location, "Pattern type " + type_to_string(pattern_type) +
+                                                    " does not match field type " +
+                                                    type_to_string(field_type) + ".");
+              }
+            }
+          }
+        }
       }
-      if (!binding && !arr_pat && !enum_pat) {
+      if (!binding && !arr_pat && !enum_pat && !struct_pat) {
         Type pattern_type = check_expr(*arm.pattern);
         if (pattern_type.kind != TypeKind::Null && !pattern_type.is_compatible_with(value_type)) {
           error_at(arm.pattern->location, "Pattern type " + type_to_string(pattern_type) +
@@ -2105,7 +2158,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         }
       }
       Type body_type = check_expr(*arm.body);
-      if (binding || arr_pat || enum_pat) {
+      if (binding || arr_pat || enum_pat || struct_pat) {
         pop_scope();
       }
       if (result_type.kind == TypeKind::Null) {
