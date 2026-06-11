@@ -1,5 +1,7 @@
 #include "ir/ir_builder.h"
 
+#include "ir/kir_numeric.h"
+
 namespace kinglet {
 
 namespace {
@@ -18,11 +20,19 @@ KirInstr make_instr(KirOpcode op, std::vector<int32_t> operands, ast::SourceLoca
 bool IrBuilder::build_expr_into(KirFunction *fn, KirBasicBlock *bb, const ast::Expr &expr,
                                 int *out_value) const {
   if (const auto *lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
-    bb->instrs.push_back(
-        make_instr(KirOpcode::ConstInt,
-                    {static_cast<int32_t>(lit->value),
-                     static_cast<int32_t>(static_cast<uint64_t>(lit->value) >> 32)},
-                    expr.location));
+    const KirType width =
+        kir_type_from_int_literal_suffix(lit->width_suffix, lit->value);
+    KirOpcode op = KirOpcode::ConstInt;
+    std::vector<int32_t> operands;
+    if (kir_type_normalize(width) == KirType::Int32) {
+      op = KirOpcode::ConstI32;
+      operands = {static_cast<int32_t>(lit->value)};
+    } else {
+      op = KirOpcode::ConstI64;
+      operands = {static_cast<int32_t>(lit->value),
+                  static_cast<int32_t>(static_cast<uint64_t>(lit->value) >> 32)};
+    }
+    bb->instrs.push_back(make_instr(op, std::move(operands), expr.location));
     *out_value = static_cast<int>(bb->instrs.size()) - 1;
     return true;
   }

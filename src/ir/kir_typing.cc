@@ -1,5 +1,7 @@
 #include "ir/kir_typing.h"
 
+#include "ir/kir_numeric.h"
+
 #include <algorithm>
 #include <vector>
 
@@ -56,14 +58,14 @@ KirType arithmetic_type(KirOpcode op, KirType lhs, KirType rhs) {
   if (op == KirOpcode::IAdd && (lhs == KirType::String || rhs == KirType::String)) {
     return KirType::String;
   }
-  if (lhs == KirType::Float || rhs == KirType::Float) {
-    return KirType::Float;
+  if (kir_type_is_float(lhs) || kir_type_is_float(rhs)) {
+    return kir_type_join_numeric(lhs, rhs);
   }
-  if (lhs == KirType::Int && rhs == KirType::Int) {
-    return KirType::Int;
-  }
-  if (lhs == KirType::Char && rhs == KirType::Char && op != KirOpcode::IAdd) {
-    return KirType::Int;
+  if (kir_type_is_integer(lhs) && kir_type_is_integer(rhs)) {
+    if (lhs == KirType::Char && rhs == KirType::Char && op != KirOpcode::IAdd) {
+      return KirType::Int;
+    }
+    return kir_type_join_numeric(lhs, rhs);
   }
   return KirType::Any;
 }
@@ -87,7 +89,12 @@ void infer_function(KirFunction *fn, const KirModule &module) {
 
     switch (instr->op) {
     case KirOpcode::ConstInt:
-      result = KirType::Int;
+    case KirOpcode::ConstI32:
+    case KirOpcode::ConstI64:
+    case KirOpcode::ConstU8:
+    case KirOpcode::ConstF32:
+    case KirOpcode::ConstF64:
+      result = kir_const_opcode_result_type(instr->op);
       state.stack.push_back(result);
       break;
     case KirOpcode::ConstFloat:

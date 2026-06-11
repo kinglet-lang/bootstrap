@@ -896,10 +896,49 @@ public:
       };
 
       switch (instr->op) {
-      case KirOpcode::ConstInt: {
+      case KirOpcode::ConstInt:
+      case KirOpcode::ConstI64: {
         llvm::Value *value = const_i64(builder, instr);
         push(value);
         temps[i] = value;
+        if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
+          temp_types[i] = fn.instr_types[i];
+        }
+        break;
+      }
+      case KirOpcode::ConstI32: {
+        llvm::Value *value = builder.CreateSExt(
+            llvm::ConstantInt::get(i32, static_cast<uint32_t>(instr->operands[0])), i64);
+        push(value);
+        temps[i] = value;
+        temp_types[i] = KirType::Int32;
+        break;
+      }
+      case KirOpcode::ConstU8: {
+        llvm::Value *value = builder.CreateZExt(
+            llvm::ConstantInt::get(builder.getInt8Ty(),
+                                   static_cast<uint8_t>(instr->operands[0] & 0xff)),
+            i64);
+        push(value);
+        temps[i] = value;
+        temp_types[i] = KirType::UInt8;
+        break;
+      }
+      case KirOpcode::ConstF32: {
+        uint32_t bits = static_cast<uint32_t>(instr->operands[0]);
+        float f = 0.0f;
+        std::memcpy(&f, &bits, sizeof(f));
+        llvm::Value *dbl = llvm::ConstantFP::get(builder.getDoubleTy(), static_cast<double>(f));
+        push(builder.CreateCall(rt_.float_new, {dbl}));
+        temps[i] = stack.back();
+        temp_types[i] = KirType::Float32;
+        break;
+      }
+      case KirOpcode::ConstF64: {
+        llvm::Value *dbl = const_double(builder, instr);
+        push(builder.CreateCall(rt_.float_new, {dbl}));
+        temps[i] = stack.back();
+        temp_types[i] = KirType::Float64;
         break;
       }
       case KirOpcode::ConstFloat: {

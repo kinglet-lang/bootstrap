@@ -1,6 +1,7 @@
 #include "compiler/compiler.h"
 
 #include "ir/ir_builder.h"
+#include "ir/kir_numeric.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -813,17 +814,20 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
 
 void Compiler::compile_expr(const ast::Expr &expr) {
   if (const auto *int_lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
-    emit_constant(Value::int_value(int_lit->value), int_lit->location);
+    const KirType width =
+        kir_type_from_int_literal_suffix(int_lit->width_suffix, int_lit->value);
+    emit_constant(Value::int_value(int_lit->value), int_lit->location, width);
     return;
   }
 
   if (const auto *char_lit = dynamic_cast<const ast::CharLiteralExpr *>(&expr)) {
-    emit_constant(Value::char_value(char_lit->value), char_lit->location);
+    emit_constant(Value::char_value(char_lit->value), char_lit->location, KirType::Int8);
     return;
   }
 
   if (const auto *float_lit = dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) {
-    emit_constant(Value::double_value(float_lit->value), float_lit->location);
+    const KirType width = kir_type_from_float_literal_suffix(float_lit->width_suffix);
+    emit_constant(Value::double_value(float_lit->value), float_lit->location, width);
     return;
   }
 
@@ -2035,11 +2039,11 @@ void Compiler::emit_operand(OpCode op, uint32_t operand, ast::SourceLocation loc
   emitter_.emit_operand(op, operand, location);
 }
 
-void Compiler::emit_constant(Value value, ast::SourceLocation location) {
+void Compiler::emit_constant(Value value, ast::SourceLocation location, KirType numeric_type) {
   kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
   const uint32_t pool_index = chunk_.add_constant(value);
   emitter_.emit_operand(OpCode::Constant, pool_index, location);
-  kir_recorder_.on_constant(value, pool_index, location);
+  kir_recorder_.on_constant(value, pool_index, location, numeric_type);
 }
 
 std::size_t Compiler::emit_jump(OpCode op, ast::SourceLocation location) {

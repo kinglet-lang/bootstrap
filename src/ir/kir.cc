@@ -1,5 +1,7 @@
 #include "ir/kir.h"
 
+#include "ir/kir_numeric.h"
+
 #include <sstream>
 
 namespace kinglet {
@@ -8,6 +10,16 @@ const char *kir_opcode_name(KirOpcode op) {
   switch (op) {
   case KirOpcode::ConstInt:
     return "const_int";
+  case KirOpcode::ConstI32:
+    return "const_i32";
+  case KirOpcode::ConstI64:
+    return "const_i64";
+  case KirOpcode::ConstU8:
+    return "const_u8";
+  case KirOpcode::ConstF32:
+    return "const_f32";
+  case KirOpcode::ConstF64:
+    return "const_f64";
   case KirOpcode::ConstFloat:
     return "const_float";
   case KirOpcode::ConstBool:
@@ -180,6 +192,26 @@ const char *kir_type_name(KirType type) {
     return "int";
   case KirType::Float:
     return "float";
+  case KirType::Int8:
+    return "int8";
+  case KirType::Int16:
+    return "int16";
+  case KirType::Int32:
+    return "int32";
+  case KirType::Int64:
+    return "int64";
+  case KirType::UInt8:
+    return "uint8";
+  case KirType::UInt16:
+    return "uint16";
+  case KirType::UInt32:
+    return "uint32";
+  case KirType::UInt64:
+    return "uint64";
+  case KirType::Float32:
+    return "float32";
+  case KirType::Float64:
+    return "float64";
   case KirType::Bool:
     return "bool";
   case KirType::Null:
@@ -215,23 +247,23 @@ KirType kir_type_join(KirType a, KirType b) {
   if (a == KirType::Any || b == KirType::Any) {
     return KirType::Any;
   }
-  if ((a == KirType::Int && b == KirType::Char) || (a == KirType::Char && b == KirType::Int)) {
-    return KirType::Int;
+  if ((kir_type_is_integer(a) && b == KirType::Char) ||
+      (a == KirType::Char && kir_type_is_integer(b))) {
+    return kir_type_join_numeric(kir_type_normalize(a == KirType::Char ? KirType::Int8 : a),
+                                 kir_type_normalize(b == KirType::Char ? KirType::Int8 : b));
+  }
+  if (kir_type_is_integer(a) && kir_type_is_integer(b)) {
+    return kir_type_join_numeric(a, b);
+  }
+  if (kir_type_is_float(a) && kir_type_is_float(b)) {
+    return kir_type_join_numeric(a, b);
   }
   return KirType::Any;
 }
 
 bool kir_type_is_scalar(KirType type) {
-  switch (type) {
-  case KirType::Int:
-  case KirType::Float:
-  case KirType::Bool:
-  case KirType::Null:
-  case KirType::Char:
-    return true;
-  default:
-    return false;
-  }
+  return kir_type_is_integer(type) || kir_type_is_float(type) || type == KirType::Bool ||
+         type == KirType::Null || type == KirType::Char;
 }
 
 KirType kir_cast_target_type(int kind) {
@@ -297,6 +329,11 @@ std::string dump_kir_function(const KirFunction &function) {
     int temp = 0;
     for (const KirInstr &instr : bb.instrs) {
       const bool has_result = instr.op == KirOpcode::ConstInt ||
+                              instr.op == KirOpcode::ConstI32 ||
+                              instr.op == KirOpcode::ConstI64 ||
+                              instr.op == KirOpcode::ConstU8 ||
+                              instr.op == KirOpcode::ConstF32 ||
+                              instr.op == KirOpcode::ConstF64 ||
                               instr.op == KirOpcode::ConstFloat ||
                               instr.op == KirOpcode::ConstBool ||
                               instr.op == KirOpcode::ConstNull ||

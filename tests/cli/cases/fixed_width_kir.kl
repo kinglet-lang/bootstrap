@@ -1,0 +1,8 @@
+using io;
+
+int main() {
+  int32 a = 42i32;
+  int64 b = 100i64;
+  io::out.line("{} {}", a, b);
+  return 0;
+}

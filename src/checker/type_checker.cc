@@ -1,5 +1,6 @@
 #include "checker/type_checker.h"
 
+#include "ir/kir_numeric.h"
 #include "module/module_loader.h"
 #include "types/numeric.h"
 
@@ -453,33 +454,7 @@ ast::TypeExpr type_to_type_expr(const Type &t) {
 }
 
 KirType kir_type_from(const Type &type) {
-  switch (type.kind) {
-  case TypeKind::Int:
-    return KirType::Int;
-  case TypeKind::Float:
-    return KirType::Float;
-  case TypeKind::Bool:
-    return KirType::Bool;
-  case TypeKind::Null:
-    return KirType::Null;
-  case TypeKind::Char:
-    return KirType::Char;
-  case TypeKind::String:
-    return KirType::String;
-  case TypeKind::Void:
-    return KirType::Void;
-  case TypeKind::Array:
-    return KirType::Array;
-  case TypeKind::Map:
-    return KirType::Map;
-  case TypeKind::Struct:
-    return KirType::Struct;
-  case TypeKind::Enum:
-    return KirType::Enum;
-  case TypeKind::Function:
-    return KirType::Fn;
-  }
-  return KirType::Any;
+  return kir_type_from_surface_type(type);
 }
 
 KirFunctionSig kir_sig_from(const Type &func_type) {

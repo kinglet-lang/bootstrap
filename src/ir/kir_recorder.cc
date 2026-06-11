@@ -1,5 +1,7 @@
 #include "ir/kir_recorder.h"
 
+#include "ir/kir_numeric.h"
+
 #include <cstring>
 
 namespace kinglet {
@@ -13,6 +15,23 @@ KirInstr rec(KirOpcode op, std::vector<int32_t> operands, ast::SourceLocation lo
   instr.line = loc.line;
   instr.col = loc.column;
   return instr;
+}
+
+std::vector<int32_t> encode_i64_operands(int64_t value) {
+  return {static_cast<int32_t>(value),
+          static_cast<int32_t>(static_cast<uint64_t>(value) >> 32)};
+}
+
+std::vector<int32_t> encode_f32_operands(float value) {
+  uint32_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  return {static_cast<int32_t>(bits)};
+}
+
+std::vector<int32_t> encode_f64_operands(double value) {
+  int64_t bits = 0;
+  std::memcpy(&bits, &value, sizeof(bits));
+  return encode_i64_operands(bits);
 }
 
 } // namespace
@@ -74,25 +93,50 @@ void KirRecorder::patch_operand(std::size_t instr_index, int32_t operand) {
 }
 
 void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
-                              ast::SourceLocation location) {
+                              ast::SourceLocation location, KirType numeric_type) {
   if (!active_) {
     return;
   }
   if (value.type == ValueType::Int || value.type == ValueType::Char) {
     const int64_t v = value.as_int;
-    bb_.instrs.push_back(rec(KirOpcode::ConstInt,
-                             {static_cast<int32_t>(v),
-                              static_cast<int32_t>(static_cast<uint64_t>(v) >> 32)},
-                             location));
+    KirType width = numeric_type;
+    if (width == KirType::Any) {
+      width = value.type == ValueType::Char ? KirType::Int8 : KirType::Int64;
+    }
+    switch (kir_type_normalize(width)) {
+    case KirType::Int8:
+    case KirType::UInt8:
+      bb_.instrs.push_back(
+          rec(KirOpcode::ConstU8, {static_cast<int32_t>(v & 0xff)}, location));
+      break;
+    case KirType::Int32:
+    case KirType::UInt32:
+      bb_.instrs.push_back(
+          rec(KirOpcode::ConstI32, {static_cast<int32_t>(v)}, location));
+      break;
+    case KirType::Int64:
+    case KirType::UInt64:
+      bb_.instrs.push_back(rec(KirOpcode::ConstI64, encode_i64_operands(v), location));
+      break;
+    default:
+      bb_.instrs.push_back(rec(KirOpcode::ConstInt, encode_i64_operands(v), location));
+      break;
+    }
   } else if (value.type == ValueType::Bool) {
     bb_.instrs.push_back(rec(KirOpcode::ConstBool, {value.as_bool ? 1 : 0}, location));
   } else if (value.type == ValueType::Double) {
-    int64_t bits = 0;
-    std::memcpy(&bits, &value.as_double_storage, sizeof(bits));
-    bb_.instrs.push_back(rec(KirOpcode::ConstFloat,
-                             {static_cast<int32_t>(bits),
-                              static_cast<int32_t>(static_cast<uint64_t>(bits) >> 32)},
-                             location));
+    KirType width = numeric_type;
+    if (width == KirType::Any) {
+      width = KirType::Float32;
+    }
+    if (kir_type_normalize(width) == KirType::Float64) {
+      bb_.instrs.push_back(
+          rec(KirOpcode::ConstF64, encode_f64_operands(value.as_double_storage), location));
+    } else {
+      bb_.instrs.push_back(rec(
+          KirOpcode::ConstF32,
+          encode_f32_operands(static_cast<float>(value.as_double_storage)), location));
+    }
   } else if (value.type == ValueType::Null) {
     bb_.instrs.push_back(rec(KirOpcode::ConstNull, {}, location));
   } else if (value.type == ValueType::String) {

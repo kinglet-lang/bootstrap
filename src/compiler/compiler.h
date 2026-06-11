@@ -60,7 +60,8 @@ private:
 
   void emit(OpCode op, ast::SourceLocation location);
   void emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location);
-  void emit_constant(Value value, ast::SourceLocation location);
+  void emit_constant(Value value, ast::SourceLocation location,
+                     KirType numeric_type = KirType::Any);
   std::size_t emit_jump(OpCode op, ast::SourceLocation location);
   void patch_jump(std::size_t offset);
   void patch_jump_to(std::size_t offset, std::size_t target);

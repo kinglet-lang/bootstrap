@@ -233,6 +233,7 @@ run_case "match_struct_partial" "--check" 65 "" $'5:12: error: Non-exhaustive st
 run_case "match_duplicate_enum_warn" "--check" 0 "" $'6:5: warning: Duplicate match arm for variant \'Red\'.\n'
 run_case "fixed_width_types" "run" 0 $'42 42 255\n' ""
 run_case "fixed_width_narrowing" "--check" 65 "" $'2:3: error: Cannot assign int to variable of type int32.\n'
+run_contains_case "fixed_width_kir" "--ir" "const_i32" "const_i64" ": int32"
 
 # --- File system (fs) + system args (sys) ---
 # Roundtrip: write then read back the same content. Pass $TMP_DIR so the

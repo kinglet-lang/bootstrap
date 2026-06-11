@@ -11,8 +11,18 @@ namespace kinglet {
 enum class KirType : uint8_t {
   Void,
   Any,
-  Int,
-  Float,
+  Int, // alias: Int64
+  Float, // alias: Float32
+  Int8,
+  Int16,
+  Int32,
+  Int64,
+  UInt8,
+  UInt16,
+  UInt32,
+  UInt64,
+  Float32,
+  Float64,
   Bool,
   Null,
   Char,
@@ -31,6 +41,11 @@ struct KirFunctionSig {
 
 enum class KirOpcode {
   ConstInt,
+  ConstI32,
+  ConstI64,
+  ConstU8,
+  ConstF32,
+  ConstF64,
   ConstFloat,
   ConstBool,
   ConstNull,

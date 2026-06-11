@@ -1,8 +1,27 @@
 #include "compiler/bytecode_emitter.h"
 
 #include <cstdint>
+#include <cstring>
 
 namespace kinglet {
+
+namespace {
+
+int64_t decode_i64_operands(const KirInstr &instr) {
+  const int32_t low = instr.operands[0];
+  const int32_t high = instr.operands.size() > 1 ? instr.operands[1] : (low < 0 ? -1 : 0);
+  return (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
+         static_cast<uint32_t>(low);
+}
+
+double decode_f64_operands(const KirInstr &instr) {
+  int64_t bits = decode_i64_operands(instr);
+  double value = 0.0;
+  std::memcpy(&value, &bits, sizeof(value));
+  return value;
+}
+
+} // namespace
 
 void BytecodeEmitter::emit(OpCode op, ast::SourceLocation location) {
   chunk_->write(op, location.line, location.column);
@@ -37,7 +56,19 @@ void BytecodeEmitter::lower(const KirFunction &function) {
       ast::SourceLocation loc{instr.line, instr.col};
       switch (instr.op) {
       case KirOpcode::ConstInt:
+      case KirOpcode::ConstI64:
+        emit_constant(Value::int_value(decode_i64_operands(instr)), loc);
+        break;
+      case KirOpcode::ConstI32:
         emit_constant(Value::int_value(instr.operands[0]), loc);
+        break;
+      case KirOpcode::ConstU8:
+        emit_constant(Value::int_value(instr.operands[0] & 0xff), loc);
+        break;
+      case KirOpcode::ConstF32:
+      case KirOpcode::ConstF64:
+      case KirOpcode::ConstFloat:
+        emit_constant(Value::double_value(decode_f64_operands(instr)), loc);
         break;
       case KirOpcode::IAdd:
         emit(OpCode::Add, loc);
