@@ -1415,9 +1415,21 @@ public:
         if (index == nullptr || array == nullptr) {
           return false;
         }
-        llvm::Value *value = builder.CreateCall(rt_.index_get, {array, index});
-        push(value);
-        temps[i] = value;
+        llvm::Value *wire = builder.CreateCall(rt_.index_get, {array, index});
+        const KirType element_ty =
+            static_cast<std::size_t>(i) < fn.instr_types.size() ? fn.instr_types[i]
+                                                                 : KirType::Any;
+        const UnboxedScalar scalar =
+            unbox_wire_scalar(builder, rt_, wire, element_ty, i64, i32);
+        if (scalar.is_double) {
+          push(builder.CreateCall(rt_.float_new, {scalar.value}));
+          temps[i] = stack.back();
+          temp_types[i] = scalar.type;
+        } else {
+          push(scalar.value);
+          temps[i] = scalar.value;
+          temp_types[i] = scalar.type == KirType::Any ? KirType::Any : scalar.type;
+        }
         break;
       }
       case KirOpcode::IndexSet: {
