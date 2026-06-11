@@ -1,5 +1,7 @@
 #include "codegen/llvm/kir_to_llvm.h"
 
+#include "ir/kir_numeric.h"
+#include "ir/kir_specialize.h"
 #include "ir/kir_typing.h"
 
 #include <llvm/BinaryFormat/Dwarf.h>
@@ -400,7 +402,44 @@ llvm::Value *to_wire_i64(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Valu
 
 llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op,
                          llvm::Value *lhs, llvm::Value *rhs, KirType lhs_ty, KirType rhs_ty) {
-  if (lhs_ty == KirType::Int && rhs_ty == KirType::Int) {
+  const KirBinopSpec spec = kir_binop_spec(op);
+  if (spec.specialized) {
+    op = spec.generic;
+    lhs_ty = spec.width;
+    rhs_ty = spec.width;
+  }
+  if ((lhs_ty == KirType::Int32 && rhs_ty == KirType::Int32) ||
+      (lhs_ty == KirType::UInt32 && rhs_ty == KirType::UInt32)) {
+    llvm::Type *i32 = builder.getInt32Ty();
+    llvm::Type *i64 = builder.getInt64Ty();
+    llvm::Value *l = builder.CreateTrunc(lhs, i32);
+    llvm::Value *r = builder.CreateTrunc(rhs, i32);
+    llvm::Value *result = nullptr;
+    switch (op) {
+    case KirOpcode::IAdd:
+      result = builder.CreateAdd(l, r);
+      break;
+    case KirOpcode::ISub:
+      result = builder.CreateSub(l, r);
+      break;
+    case KirOpcode::IMul:
+      result = builder.CreateMul(l, r);
+      break;
+    case KirOpcode::IDiv:
+      result = builder.CreateSDiv(l, r);
+      break;
+    case KirOpcode::IMod:
+      result = builder.CreateSRem(l, r);
+      break;
+    default:
+      break;
+    }
+    if (result != nullptr) {
+      return builder.CreateSExt(result, i64);
+    }
+  }
+  if ((lhs_ty == KirType::Int || lhs_ty == KirType::Int64) &&
+      (rhs_ty == KirType::Int || rhs_ty == KirType::Int64)) {
     switch (op) {
     case KirOpcode::IAdd:
       return builder.CreateAdd(lhs, rhs);
@@ -416,7 +455,7 @@ llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode 
       break;
     }
   }
-  if (lhs_ty == KirType::Float || rhs_ty == KirType::Float) {
+  if (kir_type_is_float(lhs_ty) || kir_type_is_float(rhs_ty)) {
     llvm::Type *f64 = builder.getDoubleTy();
     llvm::Value *l = lhs->getType()->isDoubleTy() ? lhs : builder.CreateCall(rt.float_get, {lhs});
     llvm::Value *r = rhs->getType()->isDoubleTy() ? rhs : builder.CreateCall(rt.float_get, {rhs});
@@ -1029,6 +1068,24 @@ public:
       case KirOpcode::IMul:
       case KirOpcode::IDiv:
       case KirOpcode::IMod:
+      case KirOpcode::IAdd32:
+      case KirOpcode::IAdd64:
+      case KirOpcode::ISub32:
+      case KirOpcode::ISub64:
+      case KirOpcode::IMul32:
+      case KirOpcode::IMul64:
+      case KirOpcode::IDiv32:
+      case KirOpcode::IDiv64:
+      case KirOpcode::IMod32:
+      case KirOpcode::IMod64:
+      case KirOpcode::FAdd32:
+      case KirOpcode::FAdd64:
+      case KirOpcode::FSub32:
+      case KirOpcode::FSub64:
+      case KirOpcode::FMul32:
+      case KirOpcode::FMul64:
+      case KirOpcode::FDiv32:
+      case KirOpcode::FDiv64:
         if (instr->operands.size() >= 2) {
           const int lhs_i = instr->operands[0];
           const int rhs_i = instr->operands[1];
@@ -2082,6 +2139,7 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
   std::string error;
   KirModule typed_module = module;
   infer_kir_types(&typed_module);
+  specialize_kir_arithmetic(&typed_module);
   const KirModule &module_ref = typed_module;
   std::map<std::string, KirModule> shards;
   for (const KirFunction &fn : module_ref.functions) {

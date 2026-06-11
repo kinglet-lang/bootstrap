@@ -101,6 +101,120 @@ KirType kir_const_opcode_result_type(KirOpcode op) {
   }
 }
 
+KirBinopSpec kir_binop_spec(KirOpcode op) {
+  KirBinopSpec spec;
+  spec.specialized = true;
+  switch (op) {
+  case KirOpcode::IAdd32:
+    spec.generic = KirOpcode::IAdd;
+    spec.width = KirType::Int32;
+    return spec;
+  case KirOpcode::IAdd64:
+    spec.generic = KirOpcode::IAdd;
+    spec.width = KirType::Int64;
+    return spec;
+  case KirOpcode::ISub32:
+    spec.generic = KirOpcode::ISub;
+    spec.width = KirType::Int32;
+    return spec;
+  case KirOpcode::ISub64:
+    spec.generic = KirOpcode::ISub;
+    spec.width = KirType::Int64;
+    return spec;
+  case KirOpcode::IMul32:
+    spec.generic = KirOpcode::IMul;
+    spec.width = KirType::Int32;
+    return spec;
+  case KirOpcode::IMul64:
+    spec.generic = KirOpcode::IMul;
+    spec.width = KirType::Int64;
+    return spec;
+  case KirOpcode::IDiv32:
+    spec.generic = KirOpcode::IDiv;
+    spec.width = KirType::Int32;
+    return spec;
+  case KirOpcode::IDiv64:
+    spec.generic = KirOpcode::IDiv;
+    spec.width = KirType::Int64;
+    return spec;
+  case KirOpcode::IMod32:
+    spec.generic = KirOpcode::IMod;
+    spec.width = KirType::Int32;
+    return spec;
+  case KirOpcode::IMod64:
+    spec.generic = KirOpcode::IMod;
+    spec.width = KirType::Int64;
+    return spec;
+  case KirOpcode::FAdd32:
+    spec.generic = KirOpcode::IAdd;
+    spec.width = KirType::Float32;
+    return spec;
+  case KirOpcode::FAdd64:
+    spec.generic = KirOpcode::IAdd;
+    spec.width = KirType::Float64;
+    return spec;
+  case KirOpcode::FSub32:
+    spec.generic = KirOpcode::ISub;
+    spec.width = KirType::Float32;
+    return spec;
+  case KirOpcode::FSub64:
+    spec.generic = KirOpcode::ISub;
+    spec.width = KirType::Float64;
+    return spec;
+  case KirOpcode::FMul32:
+    spec.generic = KirOpcode::IMul;
+    spec.width = KirType::Float32;
+    return spec;
+  case KirOpcode::FMul64:
+    spec.generic = KirOpcode::IMul;
+    spec.width = KirType::Float64;
+    return spec;
+  case KirOpcode::FDiv32:
+    spec.generic = KirOpcode::IDiv;
+    spec.width = KirType::Float32;
+    return spec;
+  case KirOpcode::FDiv64:
+    spec.generic = KirOpcode::IDiv;
+    spec.width = KirType::Float64;
+    return spec;
+  default:
+    spec.specialized = false;
+    spec.generic = op;
+    return spec;
+  }
+}
+
+bool kir_opcode_is_arithmetic(KirOpcode op) {
+  switch (op) {
+  case KirOpcode::IAdd:
+  case KirOpcode::ISub:
+  case KirOpcode::IMul:
+  case KirOpcode::IDiv:
+  case KirOpcode::IMod:
+  case KirOpcode::IAdd32:
+  case KirOpcode::IAdd64:
+  case KirOpcode::ISub32:
+  case KirOpcode::ISub64:
+  case KirOpcode::IMul32:
+  case KirOpcode::IMul64:
+  case KirOpcode::IDiv32:
+  case KirOpcode::IDiv64:
+  case KirOpcode::IMod32:
+  case KirOpcode::IMod64:
+  case KirOpcode::FAdd32:
+  case KirOpcode::FAdd64:
+  case KirOpcode::FSub32:
+  case KirOpcode::FSub64:
+  case KirOpcode::FMul32:
+  case KirOpcode::FMul64:
+  case KirOpcode::FDiv32:
+  case KirOpcode::FDiv64:
+    return true;
+  default:
+    return false;
+  }
+}
+
 bool kir_type_is_integer(KirType type) {
   switch (type) {
   case KirType::Int:

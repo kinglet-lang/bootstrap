@@ -144,7 +144,25 @@ void infer_function(KirFunction *fn, const KirModule &module) {
     case KirOpcode::ISub:
     case KirOpcode::IMul:
     case KirOpcode::IDiv:
-    case KirOpcode::IMod: {
+    case KirOpcode::IMod:
+    case KirOpcode::IAdd32:
+    case KirOpcode::IAdd64:
+    case KirOpcode::ISub32:
+    case KirOpcode::ISub64:
+    case KirOpcode::IMul32:
+    case KirOpcode::IMul64:
+    case KirOpcode::IDiv32:
+    case KirOpcode::IDiv64:
+    case KirOpcode::IMod32:
+    case KirOpcode::IMod64:
+    case KirOpcode::FAdd32:
+    case KirOpcode::FAdd64:
+    case KirOpcode::FSub32:
+    case KirOpcode::FSub64:
+    case KirOpcode::FMul32:
+    case KirOpcode::FMul64:
+    case KirOpcode::FDiv32:
+    case KirOpcode::FDiv64: {
       KirType rhs;
       KirType lhs;
       if (instr->operands.size() >= 2) {
@@ -154,7 +172,14 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         rhs = pop_type(&state);
         lhs = pop_type(&state);
       }
-      result = arithmetic_type(instr->op, lhs, rhs);
+      {
+        const KirBinopSpec spec = kir_binop_spec(instr->op);
+        const KirOpcode generic = spec.specialized ? spec.generic : instr->op;
+        result = arithmetic_type(generic, lhs, rhs);
+        if (spec.specialized && result == KirType::Any) {
+          result = spec.width;
+        }
+      }
       state.stack.push_back(result);
       break;
     }

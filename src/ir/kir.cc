@@ -44,6 +44,42 @@ const char *kir_opcode_name(KirOpcode op) {
     return "idiv";
   case KirOpcode::IMod:
     return "imod";
+  case KirOpcode::IAdd32:
+    return "iadd32";
+  case KirOpcode::IAdd64:
+    return "iadd64";
+  case KirOpcode::ISub32:
+    return "isub32";
+  case KirOpcode::ISub64:
+    return "isub64";
+  case KirOpcode::IMul32:
+    return "imul32";
+  case KirOpcode::IMul64:
+    return "imul64";
+  case KirOpcode::IDiv32:
+    return "idiv32";
+  case KirOpcode::IDiv64:
+    return "idiv64";
+  case KirOpcode::IMod32:
+    return "imod32";
+  case KirOpcode::IMod64:
+    return "imod64";
+  case KirOpcode::FAdd32:
+    return "fadd32";
+  case KirOpcode::FAdd64:
+    return "fadd64";
+  case KirOpcode::FSub32:
+    return "fsub32";
+  case KirOpcode::FSub64:
+    return "fsub64";
+  case KirOpcode::FMul32:
+    return "fmul32";
+  case KirOpcode::FMul64:
+    return "fmul64";
+  case KirOpcode::FDiv32:
+    return "fdiv32";
+  case KirOpcode::FDiv64:
+    return "fdiv64";
   case KirOpcode::Not:
     return "not";
   case KirOpcode::BitNot:
@@ -341,7 +377,16 @@ std::string dump_kir_function(const KirFunction &function) {
                               instr.op == KirOpcode::LoadLocal ||
                               instr.op == KirOpcode::IAdd || instr.op == KirOpcode::ISub ||
                               instr.op == KirOpcode::IMul || instr.op == KirOpcode::IDiv ||
-                              instr.op == KirOpcode::IMod || instr.op == KirOpcode::ICmpEq ||
+                              instr.op == KirOpcode::IMod || instr.op == KirOpcode::IAdd32 ||
+                              instr.op == KirOpcode::IAdd64 || instr.op == KirOpcode::ISub32 ||
+                              instr.op == KirOpcode::ISub64 || instr.op == KirOpcode::IMul32 ||
+                              instr.op == KirOpcode::IMul64 || instr.op == KirOpcode::IDiv32 ||
+                              instr.op == KirOpcode::IDiv64 || instr.op == KirOpcode::IMod32 ||
+                              instr.op == KirOpcode::IMod64 || instr.op == KirOpcode::FAdd32 ||
+                              instr.op == KirOpcode::FAdd64 || instr.op == KirOpcode::FSub32 ||
+                              instr.op == KirOpcode::FSub64 || instr.op == KirOpcode::FMul32 ||
+                              instr.op == KirOpcode::FMul64 || instr.op == KirOpcode::FDiv32 ||
+                              instr.op == KirOpcode::FDiv64 || instr.op == KirOpcode::ICmpEq ||
                               instr.op == KirOpcode::ICmpNeq || instr.op == KirOpcode::ICmpLt ||
                               instr.op == KirOpcode::ICmpGt || instr.op == KirOpcode::ICmpLe ||
                               instr.op == KirOpcode::ICmpGe || instr.op == KirOpcode::ConstFn ||

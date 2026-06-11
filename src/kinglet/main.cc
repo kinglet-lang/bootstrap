@@ -4,6 +4,7 @@
 #include "codegen/llvm/kir_to_llvm.h"
 #endif
 #include "ir/kir.h"
+#include "ir/kir_specialize.h"
 #include "ir/kir_typing.h"
 #include "module/module_loader.h"
 #include "lexer/scanner.h"
@@ -620,6 +621,7 @@ int main(int argc, char **argv) {
 
   checker.populate_kir_types(&compile_result.kir);
   infer_kir_types(&compile_result.kir);
+  specialize_kir_arithmetic(&compile_result.kir);
 
   if (mode == Mode::Bytecode) {
     compile_result.chunk.disassemble(std::cout);

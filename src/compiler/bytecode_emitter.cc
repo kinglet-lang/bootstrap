@@ -71,18 +71,36 @@ void BytecodeEmitter::lower(const KirFunction &function) {
         emit_constant(Value::double_value(decode_f64_operands(instr)), loc);
         break;
       case KirOpcode::IAdd:
+      case KirOpcode::IAdd32:
+      case KirOpcode::IAdd64:
+      case KirOpcode::FAdd32:
+      case KirOpcode::FAdd64:
         emit(OpCode::Add, loc);
         break;
       case KirOpcode::ISub:
+      case KirOpcode::ISub32:
+      case KirOpcode::ISub64:
+      case KirOpcode::FSub32:
+      case KirOpcode::FSub64:
         emit(OpCode::Subtract, loc);
         break;
       case KirOpcode::IMul:
+      case KirOpcode::IMul32:
+      case KirOpcode::IMul64:
+      case KirOpcode::FMul32:
+      case KirOpcode::FMul64:
         emit(OpCode::Multiply, loc);
         break;
       case KirOpcode::IDiv:
+      case KirOpcode::IDiv32:
+      case KirOpcode::IDiv64:
+      case KirOpcode::FDiv32:
+      case KirOpcode::FDiv64:
         emit(OpCode::Divide, loc);
         break;
       case KirOpcode::IMod:
+      case KirOpcode::IMod32:
+      case KirOpcode::IMod64:
         emit(OpCode::Modulo, loc);
         break;
       case KirOpcode::LoadLocal:
