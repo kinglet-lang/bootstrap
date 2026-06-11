@@ -12,7 +12,7 @@ Type::Type(const Type &other)
       element_type(other.element_type ? std::make_shared<Type>(*other.element_type) : nullptr),
       key_type(other.key_type ? std::make_shared<Type>(*other.key_type) : nullptr),
       fields(other.fields), variants(other.variants),
-      variant_param_types(other.variant_param_types) {}
+      variant_param_types(other.variant_param_types), nullable(other.nullable) {}
 
 Type &Type::operator=(const Type &other) {
   if (this != &other) {
@@ -25,6 +25,7 @@ Type &Type::operator=(const Type &other) {
     fields = other.fields;
     variants = other.variants;
     variant_param_types = other.variant_param_types;
+    nullable = other.nullable;
   }
   return *this;
 }

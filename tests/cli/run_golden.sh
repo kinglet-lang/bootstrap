@@ -226,6 +226,8 @@ run_case "match_enum_destruct" "run" 0 $'42\n-1\n' ""
 run_case "match_exhaustive_warn" "--check" 65 "" $'11:16: error: Non-exhaustive match. Missing variant(s): Blue.\n'
 run_case "match_exhaustive_ok" "run" 0 $'up\nup\n' ""
 run_case "match_bool_non_exhaustive" "--check" 65 "" $'2:12: error: Non-exhaustive match on bool. Missing case(s): false.\n'
+run_case "match_nullable_missing_null" "--check" 65 "" $'7:12: error: Non-exhaustive match on nullable type. Missing case: null.\n'
+run_case "match_enum_payload_partial" "--check" 65 "" $'5:12: error: Non-exhaustive payload pattern for variant(s): Some.\n'
 
 # --- File system (fs) + system args (sys) ---
 # Roundtrip: write then read back the same content. Pass $TMP_DIR so the

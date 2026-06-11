@@ -53,6 +53,7 @@ struct Type {
   std::vector<FieldInfo> fields;
   std::vector<std::string> variants;
   std::vector<std::vector<Type>> variant_param_types;
+  bool nullable = false;
 };
 
 const Type &int_type();

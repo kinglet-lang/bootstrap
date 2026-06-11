@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <optional>
 #include <sstream>
+#include <unordered_set>
 #include <utility>
 
 namespace kinglet {
@@ -20,6 +22,226 @@ bool match_arm_is_catchall(const ast::MatchArm &arm) {
   }
   const auto *id = dynamic_cast<const ast::IdentifierExpr *>(arm.pattern.get());
   return id && id->name == "_";
+}
+
+bool pattern_is_null_literal(const ast::Expr *pattern) {
+  return pattern && dynamic_cast<const ast::NullLiteralExpr *>(pattern);
+}
+
+bool pattern_is_binding_or_wildcard(const ast::Expr *pattern) {
+  if (!pattern) {
+    return false;
+  }
+  if (dynamic_cast<const ast::BindingPattern *>(pattern)) {
+    return true;
+  }
+  const auto *id = dynamic_cast<const ast::IdentifierExpr *>(pattern);
+  return id && id->name == "_";
+}
+
+bool payload_pattern_is_exhaustive(const ast::Expr *pattern, const Type &payload_type) {
+  if (!pattern) {
+    return false;
+  }
+  if (pattern_is_binding_or_wildcard(pattern)) {
+    return true;
+  }
+  if (payload_type.kind == TypeKind::Bool || payload_type.kind == TypeKind::Int ||
+      payload_type.kind == TypeKind::Float || payload_type.kind == TypeKind::Char ||
+      payload_type.kind == TypeKind::String) {
+    return false;
+  }
+  if (payload_type.kind == TypeKind::Enum) {
+    const auto *ep = dynamic_cast<const ast::EnumPattern *>(pattern);
+    if (!ep || ep->enum_name != payload_type.name) {
+      return false;
+    }
+    int variant_idx = -1;
+    for (std::size_t i = 0; i < payload_type.variants.size(); ++i) {
+      if (payload_type.variants[i] == ep->variant_name) {
+        variant_idx = static_cast<int>(i);
+        break;
+      }
+    }
+    if (variant_idx < 0) {
+      return false;
+    }
+    const auto &params = payload_type.variant_param_types[static_cast<std::size_t>(variant_idx)];
+    if (params.empty()) {
+      return true;
+    }
+    if (ep->fields.size() != params.size()) {
+      return false;
+    }
+    for (std::size_t i = 0; i < params.size(); ++i) {
+      if (!payload_pattern_is_exhaustive(ep->fields[i].get(), params[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+std::string join_csv(const std::vector<std::string> &items) {
+  std::string out;
+  for (const auto &item : items) {
+    if (!out.empty()) {
+      out += ", ";
+    }
+    out += item;
+  }
+  return out;
+}
+
+bool arms_cover_bool(const std::vector<ast::MatchArm> &arms, bool &missing_true, bool &missing_false,
+                     bool skip_null_patterns = false) {
+  missing_true = missing_false = false;
+  bool has_true = false;
+  bool has_false = false;
+  for (const auto &arm : arms) {
+    if (skip_null_patterns && pattern_is_null_literal(arm.pattern.get())) {
+      continue;
+    }
+    if (match_arm_is_catchall(arm)) {
+      return true;
+    }
+    if (const auto *bl = dynamic_cast<const ast::BoolLiteralExpr *>(arm.pattern.get())) {
+      if (bl->value) {
+        has_true = true;
+      } else {
+        has_false = true;
+      }
+    }
+  }
+  missing_true = !has_true;
+  missing_false = !has_false;
+  return has_true && has_false;
+}
+
+std::optional<std::string> check_enum_arms_exhaustive(const std::vector<ast::MatchArm> &arms,
+                                                      const Type &enum_type,
+                                                      bool skip_null_patterns = false) {
+  if (enum_type.variants.empty()) {
+    return std::nullopt;
+  }
+  std::unordered_set<std::string> uncovered(enum_type.variants.begin(), enum_type.variants.end());
+  std::vector<std::string> partial_payload;
+  for (const auto &arm : arms) {
+    if (skip_null_patterns && pattern_is_null_literal(arm.pattern.get())) {
+      continue;
+    }
+    if (match_arm_is_catchall(arm)) {
+      uncovered.clear();
+      break;
+    }
+    const auto *ep = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get());
+    if (!ep) {
+      continue;
+    }
+    int variant_idx = -1;
+    for (std::size_t i = 0; i < enum_type.variants.size(); ++i) {
+      if (enum_type.variants[i] == ep->variant_name) {
+        variant_idx = static_cast<int>(i);
+        break;
+      }
+    }
+    if (variant_idx < 0) {
+      continue;
+    }
+    const auto &params = enum_type.variant_param_types[static_cast<std::size_t>(variant_idx)];
+    if (params.empty()) {
+      uncovered.erase(ep->variant_name);
+      continue;
+    }
+    if (ep->fields.size() != params.size()) {
+      partial_payload.push_back(ep->variant_name);
+      continue;
+    }
+    bool all_exhaustive = true;
+    for (std::size_t i = 0; i < params.size(); ++i) {
+      if (!payload_pattern_is_exhaustive(ep->fields[i].get(), params[i])) {
+        all_exhaustive = false;
+        break;
+      }
+    }
+    if (all_exhaustive) {
+      uncovered.erase(ep->variant_name);
+    } else {
+      partial_payload.push_back(ep->variant_name);
+    }
+  }
+  if (!partial_payload.empty()) {
+    return "Non-exhaustive payload pattern for variant(s): " + join_csv(partial_payload) + ".";
+  }
+  if (!uncovered.empty()) {
+    std::vector<std::string> missing;
+    for (const auto &v : enum_type.variants) {
+      if (uncovered.count(v)) {
+        missing.push_back(v);
+      }
+    }
+    return "Non-exhaustive match. Missing variant(s): " + join_csv(missing) + ".";
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> check_nullable_arms_exhaustive(const std::vector<ast::MatchArm> &arms,
+                                                          const Type &nullable_type) {
+  for (const auto &arm : arms) {
+    if (match_arm_is_catchall(arm)) {
+      return std::nullopt;
+    }
+  }
+  bool has_null = false;
+  bool has_non_null_binding = false;
+  bool has_non_null_arm = false;
+  for (const auto &arm : arms) {
+    if (pattern_is_null_literal(arm.pattern.get())) {
+      has_null = true;
+      continue;
+    }
+    has_non_null_arm = true;
+    if (pattern_is_binding_or_wildcard(arm.pattern.get()) && !arm.guard) {
+      has_non_null_binding = true;
+    }
+  }
+  if (!has_null) {
+    return "Non-exhaustive match on nullable type. Missing case: null.";
+  }
+  if (has_non_null_binding) {
+    return std::nullopt;
+  }
+  if (!has_non_null_arm) {
+    return "Non-exhaustive match on nullable type. Missing non-null case.";
+  }
+  Type inner = nullable_type;
+  inner.nullable = false;
+  if (inner.kind == TypeKind::Bool) {
+    bool missing_true = false;
+    bool missing_false = false;
+    if (!arms_cover_bool(arms, missing_true, missing_false, true)) {
+      std::string missing;
+      if (missing_true) {
+        missing = "true";
+      }
+      if (missing_false) {
+        if (!missing.empty()) {
+          missing += ", ";
+        }
+        missing += "false";
+      }
+      return "Non-exhaustive match on nullable type. Missing non-null case(s): " + missing + ".";
+    }
+    return std::nullopt;
+  }
+  if (inner.kind == TypeKind::Enum) {
+    if (auto err = check_enum_arms_exhaustive(arms, inner, true)) {
+      return "Non-exhaustive match on nullable type. " + *err;
+    }
+    return std::nullopt;
+  }
+  return "Non-exhaustive match on nullable type. Missing non-null case.";
 }
 
 std::string type_to_string(const Type &type) {
@@ -150,7 +372,9 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
       }
       return int_type();
     }
-    return resolve_type_expr(expr.type_args[0], loc);
+    Type inner = resolve_type_expr(expr.type_args[0], loc);
+    inner.nullable = true;
+    return inner;
   }
   if (expr.name == "Array") {
     if (expr.type_args.size() != 1) {
@@ -1889,29 +2113,19 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
-    // Exhaustiveness: bool literals and enum variant names (guarded enum arms still count).
-    if (value_type.kind == TypeKind::Bool) {
-      bool has_true = false;
-      bool has_false = false;
-      for (const ast::MatchArm &arm : match_expr->arms) {
-        if (match_arm_is_catchall(arm)) {
-          has_true = has_false = true;
-          break;
-        }
-        if (const auto *bl = dynamic_cast<const ast::BoolLiteralExpr *>(arm.pattern.get())) {
-          if (bl->value) {
-            has_true = true;
-          } else {
-            has_false = true;
-          }
-        }
+    if (value_type.nullable) {
+      if (auto err = check_nullable_arms_exhaustive(match_expr->arms, value_type)) {
+        error_at(match_expr->location, *err);
       }
-      if (!has_true || !has_false) {
+    } else if (value_type.kind == TypeKind::Bool) {
+      bool missing_true = false;
+      bool missing_false = false;
+      if (!arms_cover_bool(match_expr->arms, missing_true, missing_false)) {
         std::string missing;
-        if (!has_true) {
+        if (missing_true) {
           missing = "true";
         }
-        if (!has_false) {
+        if (missing_false) {
           if (!missing.empty()) {
             missing += ", ";
           }
@@ -1919,27 +2133,9 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         }
         error_at(match_expr->location, "Non-exhaustive match on bool. Missing case(s): " + missing + ".");
       }
-    } else if (value_type.kind == TypeKind::Enum && !value_type.variants.empty()) {
-      std::unordered_set<std::string> uncovered(value_type.variants.begin(), value_type.variants.end());
-      for (const ast::MatchArm &arm : match_expr->arms) {
-        if (match_arm_is_catchall(arm)) {
-          uncovered.clear();
-          break;
-        }
-        const auto *ep = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get());
-        if (ep) {
-          uncovered.erase(ep->variant_name);
-        }
-      }
-      if (!uncovered.empty()) {
-        std::string missing;
-        for (const auto &v : value_type.variants) {
-          if (uncovered.count(v)) {
-            if (!missing.empty()) missing += ", ";
-            missing += v;
-          }
-        }
-        error_at(match_expr->location, "Non-exhaustive match. Missing variant(s): " + missing + ".");
+    } else if (value_type.kind == TypeKind::Enum) {
+      if (auto err = check_enum_arms_exhaustive(match_expr->arms, value_type)) {
+        error_at(match_expr->location, *err);
       }
     }
 
