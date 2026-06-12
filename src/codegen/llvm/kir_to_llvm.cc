@@ -1,5 +1,6 @@
 #include "codegen/llvm/kir_to_llvm.h"
 
+#include "ir/kir.h"
 #include "ir/kir_numeric.h"
 #include "ir/kir_specialize.h"
 #include "ir/kir_typing.h"
@@ -1419,16 +1420,22 @@ public:
         const KirType element_ty =
             static_cast<std::size_t>(i) < fn.instr_types.size() ? fn.instr_types[i]
                                                                  : KirType::Any;
-        const UnboxedScalar scalar =
-            unbox_wire_scalar(builder, rt_, wire, element_ty, i64, i32);
-        if (scalar.is_double) {
-          push(builder.CreateCall(rt_.float_new, {scalar.value}));
-          temps[i] = stack.back();
-          temp_types[i] = scalar.type;
+        if (kir_type_is_scalar(element_ty)) {
+          const UnboxedScalar scalar =
+              unbox_wire_scalar(builder, rt_, wire, element_ty, i64, i32);
+          if (scalar.is_double) {
+            push(builder.CreateCall(rt_.float_new, {scalar.value}));
+            temps[i] = stack.back();
+            temp_types[i] = scalar.type;
+          } else {
+            push(scalar.value);
+            temps[i] = scalar.value;
+            temp_types[i] = scalar.type == KirType::Any ? KirType::Any : scalar.type;
+          }
         } else {
-          push(scalar.value);
-          temps[i] = scalar.value;
-          temp_types[i] = scalar.type == KirType::Any ? KirType::Any : scalar.type;
+          push(wire);
+          temps[i] = wire;
+          temp_types[i] = element_ty;
         }
         break;
       }
