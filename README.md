@@ -2,7 +2,7 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/kinglet-brand.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/kinglet-brand-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="assets/kinglet-brand.svg">
     <img src="assets/kinglet-brand.svg" width="420" alt="Kinglet">
   </picture>
