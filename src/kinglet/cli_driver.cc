@@ -53,8 +53,7 @@ void print_cli_help(std::ostream &out) {
       << "  --save-bytecode <out.kbc>, --run <program.kbc>\n"
       << "  --native <out> | --backend native -o <out>  (requires LLVM build)\n"
       << "  --repl\n"
-      << "\n"
-      << "Shadow parity (kinglet-lang/kinglet repo): ./kinglet prove\n";
+      << "\n";
 }
 
 bool ensure_dir(const fs::path &path) {

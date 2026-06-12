@@ -33,7 +33,7 @@ Extract and add the directory to your `PATH`:
 
 ```bash
 tar xzf kinglet-<platform>.tar.gz
-# Move kinglet and kinglet-lsp to a directory on your PATH
+# Move kinglet to a directory on your PATH
 ```
 
 Editor extensions live in [kinglet-lang/lsp](https://github.com/kinglet-lang/lsp) (planned separate repo).

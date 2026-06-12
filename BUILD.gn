@@ -6,7 +6,6 @@ _kinglet_defines = [ "KINGLET_VERSION=\"${kinglet_version}\"" ]
 group("default") {
   deps = [
     ":kinglet",
-    ":kinglet-lsp",
     ":kinglet-vm",
     "//runtime:kinglet_rt",
   ]
@@ -58,23 +57,6 @@ executable("kinglet") {
     deps += [ ":embedded_compiler_cc" ]
     defines = [ "KINGLET_HAVE_EMBEDDED_COMPILER=1" ]
   }
-
-  include_dirs = [
-    "//src",
-  ]
-}
-
-executable("kinglet-lsp") {
-  sources = [
-    "src/lsp_server/main.cc",
-  ]
-
-  deps = [
-    "//src/checker",
-    "//src/lexer",
-    "//src/lsp",
-    "//src/parser",
-  ]
 
   include_dirs = [
     "//src",
