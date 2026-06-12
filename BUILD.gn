@@ -1,6 +1,8 @@
 import("//build/embed.gni")
 import("//build/llvm.gni")
 
+_kinglet_defines = [ "KINGLET_VERSION=\"${kinglet_version}\"" ]
+
 group("default") {
   deps = [
     ":kinglet",
@@ -27,8 +29,11 @@ if (embed_compiler_path != "") {
 
 executable("kinglet") {
   sources = [
+    "src/kinglet/cli_driver.cc",
     "src/kinglet/main.cc",
   ]
+
+  defines = _kinglet_defines
 
   deps = [
     "//src/checker",

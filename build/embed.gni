@@ -8,4 +8,5 @@
 
 declare_args() {
   embed_compiler_path = ""
+  kinglet_version = "0.1.0-dev"
 }

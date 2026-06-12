@@ -1,3 +1,4 @@
+#include "kinglet/cli_driver.h"
 #include "checker/type_checker.h"
 #include "compiler/compiler.h"
 #ifdef KINGLET_HAVE_LLVM
@@ -214,6 +215,13 @@ void print_token(const kinglet::Token &token) {
 } // namespace
 
 int main(int argc, char **argv) {
+  if (argc >= 2) {
+    const int sub_rc = kinglet::run_cli_subcommand(argc, argv);
+    if (sub_rc >= 0) {
+      return sub_rc;
+    }
+  }
+
   if (argc >= 2 && std::string_view(argv[1]) == "selfhost") {
 #ifdef KINGLET_HAVE_EMBEDDED_COMPILER
     return run_embedded_compiler(argc, argv);

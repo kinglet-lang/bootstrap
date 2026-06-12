@@ -55,6 +55,12 @@ std::optional<ProjectConfig> find_project_config(const std::string &start_dir) {
         if (current_section == "project") {
           if (key == "name") config.name = value;
           else if (key == "version") config.version = value;
+        } else if (current_section == "build") {
+          if (key == "root") config.build_root = value;
+          else if (key == "cache_dir") config.cache_dir = value;
+          else if (key == "out_dir") config.out_dir = value;
+        } else if (current_section == "build.compiler" || current_section == "compiler") {
+          if (key == "default_backend") config.default_backend = value;
         } else if (current_section == "dependencies") {
           // Parse inline table: name = { path = "..." }
           auto brace_start = value.find('{');
