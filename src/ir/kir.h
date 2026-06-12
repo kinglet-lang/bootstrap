@@ -44,6 +44,10 @@ struct KirContainerType {
   KirContainerShape shape = KirContainerShape::None;
   KirType element_type = KirType::Any; // Array element or Map value
   KirType key_type = KirType::Any;     // Map key
+  // Element container metadata (Array<Array<T>>, Map<K, Array<T>>, etc.)
+  KirContainerShape nested_shape = KirContainerShape::None;
+  KirType nested_element_type = KirType::Any;
+  KirType nested_key_type = KirType::Any;
 };
 
 struct KirFunctionSig {

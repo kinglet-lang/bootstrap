@@ -41,10 +41,19 @@ struct FlowState {
   std::vector<KirContainerType> local_containers;
 };
 
-KirContainerType array_container(KirType element_type) {
+bool kir_type_is_container(KirType type) {
+  return type == KirType::Array || type == KirType::Map;
+}
+
+KirContainerType array_container(KirType element_type, const KirContainerType *inner = nullptr) {
   KirContainerType out;
   out.shape = KirContainerShape::Array;
   out.element_type = element_type;
+  if (inner != nullptr && kir_type_is_container(element_type)) {
+    out.nested_shape = inner->shape;
+    out.nested_element_type = inner->element_type;
+    out.nested_key_type = inner->key_type;
+  }
   return out;
 }
 
@@ -338,22 +347,29 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       if (instr->op == KirOpcode::ArrayNew) {
         const int element_count = instr->operands.empty() ? 0 : instr->operands[0];
         KirType element_type = KirType::Any;
+        const KirContainerType *element_container = nullptr;
+        KirContainerType first_elem_container;
         for (int ei = 0; ei < element_count; ++ei) {
-          const KirType elem = pop_type(&state);
+          KirContainerType elem_container;
+          const KirType elem = pop_type(&state, &elem_container);
           if (element_type == KirType::Any) {
             element_type = elem;
+            first_elem_container = elem_container;
+            element_container = &first_elem_container;
           } else {
             element_type = kir_type_join(element_type, elem);
           }
         }
         result = KirType::Array;
-        push_typed(&state, result, array_container(element_type));
+        push_typed(&state, result, array_container(element_type, element_container));
       } else if (instr->op == KirOpcode::MapNew) {
         const int entry_count = instr->operands.empty() ? 0 : instr->operands[0];
         KirType key_type = KirType::Any;
         KirType value_type = KirType::Any;
+        KirContainerType first_value_container;
         for (int ei = 0; ei < entry_count; ++ei) {
-          const KirType value = pop_type(&state);
+          KirContainerType val_container;
+          const KirType value = pop_type(&state, &val_container);
           const KirType key = pop_type(&state);
           if (key_type == KirType::Any) {
             key_type = key;
@@ -362,12 +378,19 @@ void infer_function(KirFunction *fn, const KirModule &module) {
           }
           if (value_type == KirType::Any) {
             value_type = value;
+            first_value_container = val_container;
           } else {
             value_type = kir_type_join(value_type, value);
           }
         }
         result = KirType::Map;
-        push_typed(&state, result, map_container(key_type, value_type));
+        KirContainerType map_cont = map_container(key_type, value_type);
+        if (value_type != KirType::Any && kir_type_is_container(value_type)) {
+          map_cont.nested_shape = first_value_container.shape;
+          map_cont.nested_element_type = first_value_container.element_type;
+          map_cont.nested_key_type = first_value_container.key_type;
+        }
+        push_typed(&state, result, map_cont);
       } else if (instr->op == KirOpcode::ArrayPop || instr->op == KirOpcode::ArrayRemove) {
         KirContainerType container;
         pop_type(&state, &container);
@@ -390,19 +413,32 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       const KirType key = pop_type(&state, &key_container);
       KirContainerType object_container;
       const KirType object = pop_type(&state, &object_container);
+      KirContainerType result_container;
       if (kir_container_is_array(object_container) &&
           object_container.element_type != KirType::Any) {
         result = object_container.element_type;
+        if (kir_type_is_container(result) && object_container.nested_shape != KirContainerShape::None) {
+          result_container = kir_container_peel_element(object_container);
+        }
       } else if (kir_container_is_map(object_container) &&
                  object_container.element_type != KirType::Any) {
         result = object_container.element_type;
+        if (kir_type_is_container(result) && object_container.nested_shape != KirContainerShape::None) {
+          result_container = kir_container_peel_element(object_container);
+        }
       } else if (object == KirType::String &&
                  (key == KirType::Int || key == KirType::Int32 || key == KirType::Char)) {
         result = KirType::Int8;
       } else {
         result = KirType::Any;
       }
-      push_typed(&state, result);
+      if (kir_type_is_container(result) && result_container.shape != KirContainerShape::None) {
+        push_typed(&state, result, result_container);
+      } else if (kir_type_is_container(result)) {
+        push_typed(&state, result);
+      } else {
+        push_typed(&state, result);
+      }
       break;
     }
     case KirOpcode::ArrayLen:
