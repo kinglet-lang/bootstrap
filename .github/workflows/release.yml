@@ -70,40 +70,8 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}.tar.gz
 
-  package-vsix:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Set version from tag
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Update package.json version
-        working-directory: editors/vscode
-        run: npm version "$VERSION" --no-git-tag-version --allow-same-version
-
-      - name: Install dependencies
-        working-directory: editors/vscode
-        run: npm install
-
-      - name: Package extension
-        working-directory: editors/vscode
-        run: npx @vscode/vsce package
-
-      - name: Upload VSIX
-        uses: actions/upload-artifact@v4
-        with:
-          name: kinglet-vsix
-          path: editors/vscode/*.vsix
-
   release:
-    needs: [build, package-vsix]
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -133,4 +101,3 @@ jobs:
             artifacts/kinglet-windows-x64/*.tar.gz
             artifacts/kinglet-linux-x64/*.tar.gz
             artifacts/kinglet-macos-arm64/*.tar.gz
-            artifacts/kinglet-vsix/*.vsix

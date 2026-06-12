@@ -4,6 +4,5 @@ out/
 .opencode/
 .vscode/
 .DS_Store
-test.kl
 node_modules/
 *.lock

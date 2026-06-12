@@ -36,15 +36,7 @@ tar xzf kinglet-<platform>.tar.gz
 # Move kinglet and kinglet-lsp to a directory on your PATH
 ```
 
-### VSCode Extension
-
-Install the `.vsix` from the same release page:
-
-```bash
-code --install-extension kinglet-0.0.2.vsix
-```
-
-Or build from source — see below.
+Editor extensions live in [kinglet-lang/lsp](https://github.com/kinglet-lang/lsp) (planned separate repo).
 
 ## Build
 

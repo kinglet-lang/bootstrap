@@ -13,9 +13,9 @@ ninja -C out/Debug # incremental build
 
 Run:
 ```bash
-./out/Debug/kinglet test.kl                                  # compile + run
-./out/Debug/kinglet --ast test.kl                            # dump AST
-./out/Debug/kinglet --bytecode test.kl                       # dump bytecode
+./out/Debug/kinglet tests/cli/cases/operators_arithmetic.kl    # compile + run
+./out/Debug/kinglet --ast tests/cli/cases/operators_arithmetic.kl
+./out/Debug/kinglet --bytecode tests/cli/cases/operators_arithmetic.kl
 ./out/Debug/kinglet --repl                                   # interactive REPL
 ```
 
@@ -32,9 +32,7 @@ src/
 ├── types/       Type system (TypeKind, Type)
 └── vm/          Bytecode VM (Value, Chunk, Vm)
 
-editors/
-├── vscode/      VSCode extension (TextMate grammar)
-└── tree-sitter/ Tree-sitter grammar + highlight queries
+runtime/         libkinglet_rt — C ABI runtime linked into native executables
 ```
 
 ## Code Conventions
