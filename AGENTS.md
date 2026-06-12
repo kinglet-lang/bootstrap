@@ -1,61 +1,76 @@
-# Kinglet — Agent Instructions
+# Kinglet Bootstrap — Agent Instructions
 
 ## Project Overview
 
-A systems programming language implemented in C++20. Compiler pipeline: Scanner → Parser → TypeChecker → Compiler → Bytecode VM.
+C++20 **reference compiler** (stage0) for Kinglet: lexer → parser → checker →
+compiler → KIR → VM bytecode and (optional) LLVM native. Language semantics and
+self-host parity are defined in [kinglet-lang/kinglet](https://github.com/kinglet-lang/kinglet).
+
+This repo is **not** the language spec repo. No editor extensions or LSP server
+here — those belong in a separate `lsp` repo.
 
 ## Build
 
 ```bash
-gn gen out/Debug   # regenerate if BUILD.gn changed
-ninja -C out/Debug # incremental build
+gn gen out/Debug
+ninja -C out/Debug
+
+# Native backend (LLVM):
+gn gen out/Default --args='enable_llvm=true llvm_config="/opt/homebrew/opt/llvm/bin/llvm-config"'
+ninja -C out/Default kinglet kinglet_rt
 ```
 
 Run:
+
 ```bash
-./out/Debug/kinglet tests/cli/cases/operators_arithmetic.kl    # compile + run
-./out/Debug/kinglet --ast tests/cli/cases/operators_arithmetic.kl
-./out/Debug/kinglet --bytecode tests/cli/cases/operators_arithmetic.kl
-./out/Debug/kinglet --repl                                   # interactive REPL
+./out/Debug/kinglet tests/cli/cases/operators_arithmetic.kl
+./out/Debug/kinglet --check --ir path/to/file.kl
+./out/Debug/kinglet build              # project build (needs kinglet.toml)
+./out/Debug/kinglet init
+./out/Debug/kinglet --repl
 ```
+
+CLI golden tests: `bash tests/cli/run_golden.sh`
 
 ## Directory Structure
 
+See [src/README.md](src/README.md) for the pipeline diagram and GN deps.
+
 ```
 src/
-├── ast/         AST node definitions (ast.h)
-├── checker/     TypeChecker (type inference + error reporting)
-├── compiler/    AST → bytecode compiler
-├── kinglet/     CLI entry point (main.cc)
-├── lexer/       Scanner + Token definitions
-├── parser/      Recursive descent parser
-├── types/       Type system (TypeKind, Type)
-└── vm/          Bytecode VM (Value, Chunk, Vm)
+├── lexer/ parser/ ast/ types/    # frontend
+├── checker/ module/              # semantics + imports + kinglet.toml
+├── ir/                           # KIR (shared backend IR)
+├── compiler/                     # AST → KIR + VM bytecode
+├── vm/                           # bytecode interpreter
+├── codegen/llvm/                 # KIR → native (optional)
+└── kinglet/                      # main, cli_driver, vm_main
 
-runtime/         libkinglet_rt — C ABI runtime linked into native executables
+runtime/                          # libkinglet_rt (user program native RT)
+build/                            # GN toolchains, llvm.gni, embed.gni
+tests/cli/                        # Ref compiler regression
 ```
 
 ## Code Conventions
 
-- C++20, GN + ninja build, system clang on macOS (`/usr/bin/clang++`)
+- C++20, GN + ninja; system clang on macOS
 - `-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion`
-- Use `dynamic_cast` for AST node dispatch (no visitor pattern yet)
-- Namespace: `kinglet` (core), `kinglet::ast` (AST nodes)
-- Prefer enum class over string-based dispatch
-- New files need a `BUILD.gn` library target, and deps added to root `BUILD.gn`
+- Namespace: `kinglet`, `kinglet::ast`
+- `dynamic_cast` for AST dispatch (no visitor yet)
+- Each module: `src/<name>/BUILD.gn` static_library; wire new libs in root `BUILD.gn`
+- `include_dirs = ["//src"]` — includes are `"lexer/scanner.h"` style
 
-## Completed
+## Ref vs Shadow
 
-- **P1**: AST operator enums, CallFrame, JMP/JMP_FALSE, if/while/for/break/continue, inspect (pattern matching), REPL
-- **P1.5**: Typed LiteralExpr, TypeChecker, `using io;` / `using namespace io;`
-- **I/O**: NativeOut/NativeErr/NativeIn/NativePrint opcodes, `print()`, `io::out/err/in()`, `{}` format strings
+| | Bootstrap (this repo) | kinglet-self |
+|--|----------------------|--------------|
+| Role | Ref, fast, authoritative for `kinglet build` | Shadow, `kinglet prove` |
+| Sources | C++ | Kinglet `.kl` under `core/`, `compiler/`, … |
+| Parity | — | Bytecode identity `compiler.kbc == S3` (ADR 0013) |
 
-## Known Gaps
+## Large Files (split when touching)
 
-- Multi-function calls (VM CallFrame exists, compiler only calls `main()`)
-- Closures / lambda
-- Array/Map literals
-- Generics
-- import/export semantics
-- `dynamic_cast` — consider visitor pattern
-- `Scanner::identifier_type()` rebuilds unordered_map every call
+- `checker/type_checker.cc`
+- `compiler/compiler.cc`
+- `codegen/llvm/kir_to_llvm.cc`
+- `parser/parser.cc`
