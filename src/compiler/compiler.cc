@@ -1,4 +1,5 @@
 #include "compiler/compiler.h"
+#include "compiler/dense_array_lit.h"
 
 #include "compiler/expr_width.h"
 #include "ir/ir_builder.h"
@@ -1880,6 +1881,19 @@ void Compiler::compile_expr(const ast::Expr &expr) {
   }
 
   if (const auto *array_lit = dynamic_cast<const ast::ArrayLiteralExpr *>(&expr)) {
+    DenseArrayLit2D dense_shape;
+    if (analyze_dense_array_literal_2d(*array_lit, &dense_shape)) {
+      for (const ast::ExprPtr &row_expr : array_lit->elements) {
+        const auto *row_lit = dynamic_cast<const ast::ArrayLiteralExpr *>(row_expr.get());
+        for (const ast::ExprPtr &cell : row_lit->elements) {
+          compile_expr(*cell);
+        }
+      }
+      emit_operand(OpCode::DenseArrayNew,
+                   pack_dense2d_shape(dense_shape.rows, dense_shape.cols),
+                   array_lit->location);
+      return;
+    }
     for (const ast::ExprPtr &element : array_lit->elements) {
       compile_expr(*element);
     }
