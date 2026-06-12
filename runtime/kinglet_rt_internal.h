@@ -32,6 +32,8 @@ struct KlString {
 struct KlArray {
   KlHeader hdr{KlKind::Array};
   std::vector<kl_h> elements;
+  // Non-empty => row-major flat storage; rank = dense_dims.size().
+  std::vector<int32_t> dense_dims;
 };
 
 struct KlStruct {
@@ -71,6 +73,9 @@ inline KlKind kl_heap_kind(kl_h value) {
 inline bool kl_is_kind(kl_h value, KlKind kind) {
   return kl_is_heap(value) && kl_heap_kind(value) == kind;
 }
+
+// Convert dense storage to nested row arrays when a mutating API is used.
+void kl_array_ensure_jagged(KlArray *arr);
 
 // Unbox a numeric value to double: boxed float as-is, plain integer widened.
 inline double kl_as_double(kl_h value) {

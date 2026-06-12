@@ -83,6 +83,9 @@ kl_h kl_index_set(kl_h object, kl_h key, kl_h value) {
   }
   if (kl_is_kind(object, KlKind::Array)) {
     auto *arr = static_cast<KlArray *>(kl_unbox_ptr(object));
+    if (!arr->dense_dims.empty()) {
+      kl_array_ensure_jagged(arr);
+    }
     const int64_t idx = kl_to_int(key);
     if (idx >= 0 && static_cast<std::size_t>(idx) < arr->elements.size()) {
       arr->elements[static_cast<std::size_t>(idx)] = value;

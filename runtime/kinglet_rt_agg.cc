@@ -2,6 +2,36 @@
 
 #include <vector>
 
+namespace {
+
+bool kl_array_is_dense(const KlArray *arr) {
+  return arr != nullptr && !arr->dense_dims.empty();
+}
+
+} // namespace
+
+void kl_array_ensure_jagged(KlArray *arr) {
+  if (arr == nullptr || arr->dense_dims.empty()) {
+    return;
+  }
+  if (arr->dense_dims.size() == 2) {
+    const int32_t rows = arr->dense_dims[0];
+    const int32_t cols = arr->dense_dims[1];
+    std::vector<kl_h> row_handles;
+    row_handles.reserve(static_cast<std::size_t>(rows));
+    for (int32_t row = 0; row < rows; ++row) {
+      const std::size_t base = static_cast<std::size_t>(row) * static_cast<std::size_t>(cols);
+      row_handles.push_back(
+          kl_array_new(cols, arr->elements.data() + static_cast<std::ptrdiff_t>(base)));
+    }
+    arr->dense_dims.clear();
+    arr->elements = std::move(row_handles);
+    return;
+  }
+  arr->dense_dims.clear();
+  arr->elements.clear();
+}
+
 extern "C" {
 
 kl_h kl_array_new(int32_t count, const kl_h *elements) {
@@ -10,6 +40,34 @@ kl_h kl_array_new(int32_t count, const kl_h *elements) {
     obj->elements.assign(elements, elements + count);
   }
   return kl_box_ptr(obj);
+}
+
+kl_h kl_dense_array_new(int32_t rows, int32_t cols, const kl_h *elements) {
+  auto *obj = new KlArray();
+  if (rows > 0 && cols > 0 && elements != nullptr) {
+    obj->dense_dims = {rows, cols};
+    obj->elements.assign(elements,
+                         elements + static_cast<std::size_t>(rows) * static_cast<std::size_t>(cols));
+  }
+  return kl_box_ptr(obj);
+}
+
+kl_h kl_dense2d_get(kl_h grid, int32_t row, int32_t col) {
+  if (!kl_is_kind(grid, KlKind::Array)) {
+    return kl_from_int(0);
+  }
+  auto *obj = static_cast<KlArray *>(kl_unbox_ptr(grid));
+  if (obj->dense_dims.size() != 2 || row < 0 || col < 0) {
+    return kl_from_int(0);
+  }
+  const int32_t rows = obj->dense_dims[0];
+  const int32_t cols = obj->dense_dims[1];
+  if (row >= rows || col >= cols) {
+    return kl_from_int(0);
+  }
+  const std::size_t idx =
+      static_cast<std::size_t>(row) * static_cast<std::size_t>(cols) + static_cast<std::size_t>(col);
+  return obj->elements[idx];
 }
 
 kl_h kl_array_get(kl_h array, int32_t index) {
@@ -31,6 +89,19 @@ kl_h kl_array_get(kl_h array, int32_t index) {
     return kl_from_int(0);
   }
   auto *obj = static_cast<KlArray *>(ptr);
+  if (kl_array_is_dense(obj)) {
+    if (obj->dense_dims.size() == 2) {
+      const int32_t rows = obj->dense_dims[0];
+      const int32_t cols = obj->dense_dims[1];
+      if (index >= rows) {
+        return kl_from_int(0);
+      }
+      const std::size_t base =
+          static_cast<std::size_t>(index) * static_cast<std::size_t>(cols);
+      return kl_array_new(cols, obj->elements.data() + static_cast<std::ptrdiff_t>(base));
+    }
+    return kl_from_int(0);
+  }
   if (static_cast<std::size_t>(index) >= obj->elements.size()) {
     return kl_from_int(0);
   }
@@ -41,8 +112,11 @@ int32_t kl_array_len(kl_h array) {
   if (!kl_is_heap(array)) {
     return 0;
   }
-  return static_cast<int32_t>(
-      static_cast<KlArray *>(kl_unbox_ptr(array))->elements.size());
+  auto *obj = static_cast<KlArray *>(kl_unbox_ptr(array));
+  if (kl_array_is_dense(obj)) {
+    return obj->dense_dims[0];
+  }
+  return static_cast<int32_t>(obj->elements.size());
 }
 
 kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields) {
@@ -64,7 +138,7 @@ int32_t kl_value_len(kl_h value) {
     return kl_string_len(value);
   }
   if (hdr->kind == KlKind::Array) {
-    return static_cast<int32_t>(static_cast<KlArray *>(ptr)->elements.size());
+    return kl_array_len(value);
   }
   if (hdr->kind == KlKind::Map) {
     return static_cast<int32_t>(static_cast<KlMap *>(ptr)->order.size());
@@ -74,7 +148,11 @@ int32_t kl_value_len(kl_h value) {
 
 kl_h kl_array_push(kl_h array, kl_h value) {
   if (kl_is_kind(array, KlKind::Array)) {
-    static_cast<KlArray *>(kl_unbox_ptr(array))->elements.push_back(value);
+    auto *obj = static_cast<KlArray *>(kl_unbox_ptr(array));
+    if (!obj->dense_dims.empty()) {
+      kl_array_ensure_jagged(obj);
+    }
+    obj->elements.push_back(value);
   }
   return 0;
 }

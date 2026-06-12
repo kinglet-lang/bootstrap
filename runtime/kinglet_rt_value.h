@@ -65,6 +65,9 @@ kl_h kl_native_sys_args(void);
 int32_t kl_value_len(kl_h value);
 
 kl_h kl_array_new(int32_t count, const kl_h *elements);
+// Row-major grid; elements length must be rows * cols.
+kl_h kl_dense_array_new(int32_t rows, int32_t cols, const kl_h *elements);
+kl_h kl_dense2d_get(kl_h grid, int32_t row, int32_t col);
 kl_h kl_array_get(kl_h array, int32_t index);
 int32_t kl_array_len(kl_h array);
 kl_h kl_array_push(kl_h array, kl_h value);
