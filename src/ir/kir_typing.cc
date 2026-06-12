@@ -4,6 +4,8 @@
 #include "ir/kir_numeric.h"
 
 #include <algorithm>
+#include <map>
+#include <set>
 #include <vector>
 
 namespace kinglet {
@@ -94,6 +96,174 @@ KirType operand_type(const FlowState &state, const std::vector<KirType> &instr_t
   return instr_types[static_cast<std::size_t>(idx)];
 }
 
+KirContainerType join_container(KirContainerType a, KirContainerType b) {
+  if (a.shape == KirContainerShape::None) {
+    return b;
+  }
+  if (b.shape == KirContainerShape::None) {
+    return a;
+  }
+  if (a.shape != b.shape) {
+    KirContainerType out = a;
+    out.element_type = KirType::Any;
+    out.key_type = KirType::Any;
+    out.nested_shape = KirContainerShape::None;
+    out.nested_element_type = KirType::Any;
+    out.nested_key_type = KirType::Any;
+    return out;
+  }
+  KirContainerType out = a;
+  out.element_type = kir_type_join(a.element_type, b.element_type);
+  out.key_type = kir_type_join(a.key_type, b.key_type);
+  if (a.nested_shape != KirContainerShape::None && b.nested_shape != KirContainerShape::None &&
+      a.nested_shape == b.nested_shape) {
+    out.nested_element_type = kir_type_join(a.nested_element_type, b.nested_element_type);
+    out.nested_key_type = kir_type_join(a.nested_key_type, b.nested_key_type);
+  } else if (a.nested_shape != KirContainerShape::None || b.nested_shape != KirContainerShape::None) {
+    out.nested_shape = KirContainerShape::None;
+    out.nested_element_type = KirType::Any;
+    out.nested_key_type = KirType::Any;
+  }
+  return out;
+}
+
+void merge_slot_types(std::vector<KirType> *dst, const std::vector<KirType> &src) {
+  if (dst->size() < src.size()) {
+    dst->resize(src.size(), KirType::Any);
+  }
+  for (std::size_t i = 0; i < src.size(); ++i) {
+    if (i >= dst->size()) {
+      dst->push_back(src[i]);
+    } else if ((*dst)[i] == KirType::Any) {
+      (*dst)[i] = src[i];
+    } else {
+      (*dst)[i] = kir_type_join((*dst)[i], src[i]);
+    }
+  }
+}
+
+void merge_slot_containers(std::vector<KirContainerType> *dst,
+                           const std::vector<KirContainerType> &src) {
+  if (dst->size() < src.size()) {
+    dst->resize(src.size(), KirContainerType{});
+  }
+  for (std::size_t i = 0; i < src.size(); ++i) {
+    if (i >= dst->size()) {
+      dst->push_back(src[i]);
+    } else {
+      (*dst)[i] = join_container((*dst)[i], src[i]);
+    }
+  }
+}
+
+void merge_stack_types(std::vector<KirType> *dst, const std::vector<KirType> &src) {
+  const std::size_t depth = std::max(dst->size(), src.size());
+  dst->resize(depth, KirType::Any);
+  for (std::size_t d = 0; d < depth; ++d) {
+    const KirType rhs = d < src.size() ? src[d] : KirType::Any;
+    if ((*dst)[d] == KirType::Any) {
+      (*dst)[d] = rhs;
+    } else {
+      (*dst)[d] = kir_type_join((*dst)[d], rhs);
+    }
+  }
+}
+
+void merge_stack_containers(std::vector<KirContainerType> *dst,
+                            const std::vector<KirContainerType> &src) {
+  const std::size_t depth = std::max(dst->size(), src.size());
+  dst->resize(depth, KirContainerType{});
+  for (std::size_t d = 0; d < depth; ++d) {
+    const KirContainerType rhs = d < src.size() ? src[d] : KirContainerType{};
+    (*dst)[d] = join_container((*dst)[d], rhs);
+  }
+}
+
+void merge_flow_into(FlowState *dst, const FlowState &src) {
+  merge_slot_types(&dst->locals, src.locals);
+  merge_slot_containers(&dst->local_containers, src.local_containers);
+  merge_stack_types(&dst->stack, src.stack);
+  merge_stack_containers(&dst->container_stack, src.container_stack);
+}
+
+std::size_t block_start_pc(std::size_t pc, const std::set<std::size_t> &leaders) {
+  auto it = leaders.upper_bound(pc);
+  if (it == leaders.begin()) {
+    return 0;
+  }
+  --it;
+  return *it;
+}
+
+std::vector<std::size_t> predecessor_blocks(std::size_t leader_pc,
+                                            const std::vector<const KirInstr *> &linear,
+                                            const std::set<std::size_t> &leaders) {
+  std::vector<std::size_t> preds;
+  auto add_pred = [&](std::size_t block_pc) {
+    if (std::find(preds.begin(), preds.end(), block_pc) == preds.end()) {
+      preds.push_back(block_pc);
+    }
+  };
+
+  std::vector<std::size_t> sim_handlers;
+  for (std::size_t j = 0; j < linear.size(); ++j) {
+    const KirInstr *jump = linear[j];
+    if (jump->op == KirOpcode::PushHandler) {
+      sim_handlers.push_back(j + 1 + static_cast<std::size_t>(jump->operands[0]));
+    } else if (jump->op == KirOpcode::PopHandler) {
+      if (!sim_handlers.empty()) {
+        sim_handlers.pop_back();
+      }
+    }
+    if (jump->op == KirOpcode::Br) {
+      if (j + 1 + static_cast<std::size_t>(jump->operands[0]) == leader_pc) {
+        add_pred(block_start_pc(j, leaders));
+      }
+    } else if (jump->op == KirOpcode::CondBr || jump->op == KirOpcode::JmpIfErr) {
+      if (j + 1 == leader_pc) {
+        add_pred(block_start_pc(j, leaders));
+      }
+      if (j + 1 + static_cast<std::size_t>(jump->operands[0]) == leader_pc) {
+        add_pred(block_start_pc(j, leaders));
+      }
+    } else if (jump->op == KirOpcode::PropagateErr) {
+      if (j + 1 == leader_pc) {
+        add_pred(block_start_pc(j, leaders));
+      }
+      if (!sim_handlers.empty() && sim_handlers.back() == leader_pc) {
+        add_pred(block_start_pc(j, leaders));
+      }
+    }
+  }
+
+  auto prev_it = leaders.lower_bound(leader_pc);
+  if (prev_it != leaders.begin()) {
+    --prev_it;
+    const std::size_t prev_leader = *prev_it;
+    if (prev_leader < leader_pc) {
+      bool can_fallthrough = true;
+      for (std::size_t j = prev_leader; j < leader_pc; ++j) {
+        const KirInstr *instr = linear[j];
+        if (instr->op == KirOpcode::Br || instr->op == KirOpcode::Ret ||
+            instr->op == KirOpcode::CondBr || instr->op == KirOpcode::JmpIfErr ||
+            instr->op == KirOpcode::PropagateErr) {
+          can_fallthrough = false;
+          break;
+        }
+      }
+      if (can_fallthrough) {
+        add_pred(prev_leader);
+      }
+    }
+  }
+  return preds;
+}
+
+bool is_block_terminator(KirOpcode op) {
+  return op == KirOpcode::Br || op == KirOpcode::Ret || op == KirOpcode::CondBr ||
+         op == KirOpcode::JmpIfErr || op == KirOpcode::PropagateErr;
+}
+
 KirType arithmetic_type(KirOpcode op, KirType lhs, KirType rhs) {
   if (op == KirOpcode::IAdd && (lhs == KirType::String || rhs == KirType::String)) {
     return KirType::String;
@@ -124,15 +294,88 @@ void infer_function(KirFunction *fn, const KirModule &module) {
     }
   }
 
-  FlowState state;
-  state.locals = fn->local_types;
-  state.local_containers = fn->slot_containers;
-  if (state.local_containers.size() < state.locals.size()) {
-    state.local_containers.resize(state.locals.size(), KirContainerType{});
+  FlowState entry_state;
+  entry_state.locals = fn->local_types;
+  entry_state.local_containers = fn->slot_containers;
+  if (entry_state.local_containers.size() < entry_state.locals.size()) {
+    entry_state.local_containers.resize(entry_state.locals.size(), KirContainerType{});
   }
+
+  std::set<std::size_t> leaders;
+  leaders.insert(0);
+  for (std::size_t i = 0; i < linear.size(); ++i) {
+    const KirInstr *instr = linear[i];
+    if (instr->op == KirOpcode::PushHandler) {
+      if (!instr->operands.empty()) {
+        leaders.insert(i + 1 + static_cast<std::size_t>(instr->operands[0]));
+      }
+    } else if (instr->op == KirOpcode::Br || instr->op == KirOpcode::CondBr ||
+               instr->op == KirOpcode::JmpIfErr) {
+      if (!instr->operands.empty()) {
+        const int rel = instr->operands[0];
+        const int target = static_cast<int>(i) + 1 + rel;
+        if (target >= 0 && static_cast<std::size_t>(target) <= linear.size()) {
+          leaders.insert(static_cast<std::size_t>(target));
+        }
+        if (instr->op == KirOpcode::CondBr || instr->op == KirOpcode::JmpIfErr) {
+          leaders.insert(i + 1);
+        }
+      }
+    } else if (instr->op == KirOpcode::PropagateErr) {
+      leaders.insert(i + 1);
+    }
+  }
+
+  std::map<std::size_t, FlowState> exit_states;
+  FlowState state = entry_state;
+
+  auto merge_at_leader = [&](std::size_t leader_pc) {
+    if (leader_pc == 0) {
+      state = entry_state;
+      state.stack.clear();
+      state.container_stack.clear();
+      return;
+    }
+    const std::vector<std::size_t> preds = predecessor_blocks(leader_pc, linear, leaders);
+    if (preds.empty()) {
+      state.stack.clear();
+      state.container_stack.clear();
+      return;
+    }
+    bool have_state = false;
+    FlowState merged;
+    for (std::size_t pred : preds) {
+      const auto it = exit_states.find(pred);
+      if (it == exit_states.end()) {
+        continue;
+      }
+      if (!have_state) {
+        merged = it->second;
+        have_state = true;
+      } else {
+        merge_flow_into(&merged, it->second);
+      }
+    }
+    if (!have_state) {
+      state.stack.clear();
+      state.container_stack.clear();
+      return;
+    }
+    state = std::move(merged);
+  };
 
   for (std::size_t i = 0; i < linear.size(); ++i) {
     const KirInstr *instr = linear[i];
+    const std::size_t current_block = block_start_pc(i, leaders);
+    if (leaders.count(i) > 0) {
+      if (i > 0) {
+        const std::size_t prev_block = block_start_pc(i - 1, leaders);
+        if (prev_block != current_block && !is_block_terminator(linear[i - 1]->op)) {
+          exit_states[prev_block] = state;
+        }
+      }
+      merge_at_leader(i);
+    }
     KirType result = KirType::Void;
 
     switch (instr->op) {
@@ -196,10 +439,8 @@ void infer_function(KirFunction *fn, const KirModule &module) {
           state.locals[static_cast<std::size_t>(slot)] =
               kir_type_join(state.locals[static_cast<std::size_t>(slot)], value);
         }
-        if (state.local_containers[static_cast<std::size_t>(slot)].shape ==
-            KirContainerShape::None) {
-          state.local_containers[static_cast<std::size_t>(slot)] = container;
-        }
+        state.local_containers[static_cast<std::size_t>(slot)] = join_container(
+            state.local_containers[static_cast<std::size_t>(slot)], container);
       }
       break;
     }
@@ -550,10 +791,18 @@ void infer_function(KirFunction *fn, const KirModule &module) {
     }
 
     fn->instr_types[i] = result;
+
+    if (is_block_terminator(instr->op)) {
+      exit_states[current_block] = state;
+    }
   }
 
-  fn->local_types = std::move(state.locals);
-  fn->slot_containers = std::move(state.local_containers);
+  for (const auto &[block_pc, exit_state] : exit_states) {
+    (void)block_pc;
+    merge_flow_into(&entry_state, exit_state);
+  }
+  fn->local_types = std::move(entry_state.locals);
+  fn->slot_containers = std::move(entry_state.local_containers);
 }
 
 } // namespace
