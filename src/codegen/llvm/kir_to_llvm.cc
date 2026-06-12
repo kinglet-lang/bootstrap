@@ -436,6 +436,18 @@ struct UnboxedScalar {
   bool is_double = false;
 };
 
+llvm::Value *wire_for_string_display(llvm::IRBuilder<> &builder, const RtFns &rt,
+                                     llvm::Value *wire, KirType type) {
+  switch (type) {
+  case KirType::Bool:
+    return builder.CreateCall(rt.bool_to_string, {wire});
+  case KirType::Null:
+    return builder.CreateCall(rt.null_to_string, {});
+  default:
+    return wire;
+  }
+}
+
 UnboxedScalar unbox_wire_scalar(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Value *wire,
                                 KirType type, llvm::Type *i64, llvm::Type *i32) {
   UnboxedScalar out;
@@ -538,6 +550,12 @@ llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode 
     default:
       break;
     }
+  }
+  if (op == KirOpcode::IAdd &&
+      (lhs_ty == KirType::String || rhs_ty == KirType::String)) {
+    llvm::Value *wl = wire_for_string_display(builder, rt, lhs, lhs_ty);
+    llvm::Value *wr = wire_for_string_display(builder, rt, rhs, rhs_ty);
+    return builder.CreateCall(rt.value_add, {wl, wr});
   }
   llvm::Value *wl = lhs->getType()->isDoubleTy() ? builder.CreateCall(rt.float_new, {lhs}) : lhs;
   llvm::Value *wr = rhs->getType()->isDoubleTy() ? builder.CreateCall(rt.float_new, {rhs}) : rhs;
@@ -932,10 +950,15 @@ public:
         llvm::AllocaInst *elements =
             builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, argc), "native_args");
         for (int ai = argc - 1; ai >= 0; --ai) {
-          llvm::Value *elem = pop_value(&stack, error, &type_stack);
-          if (elem == nullptr) {
+          if (stack.empty() || type_stack.empty()) {
+            *error = "native lowering stack underflow in " + g_lower_context;
             return nullptr;
           }
+          llvm::Value *elem = stack.back();
+          const KirType elem_ty = type_stack.back();
+          stack.pop_back();
+          type_stack.pop_back();
+          elem = wire_for_string_display(builder, rt_, elem, elem_ty);
           llvm::Value *slot =
               builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ai));
           builder.CreateStore(elem, slot);
