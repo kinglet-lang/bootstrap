@@ -35,6 +35,9 @@ Value value_deep_clone(const Value &value) {
   }
   case ValueType::Array: {
     auto *old = static_cast<const HeapArray *>(value.heap.ptr);
+    if (!old->dense_dims.empty()) {
+      return Value::dense_array_value(clone_fields(old->elements), old->dense_dims);
+    }
     return Value::array_value(clone_fields(old->elements));
   }
   case ValueType::Map: {

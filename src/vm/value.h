@@ -107,6 +107,7 @@ struct Value {
   static Value enum_value_with_payload(int type_index, int variant_index,
                                         std::vector<Value> payload);
   static Value array_value(std::vector<Value> elements);
+  static Value dense_array_value(std::vector<Value> flat, std::vector<int32_t> dims);
   static Value map_value();
 
   bool is_number() const;
@@ -149,6 +150,7 @@ struct HeapStruct final : HeapObj {
 
 struct HeapArray final : HeapObj {
   std::vector<Value> elements;
+  std::vector<int32_t> dense_dims;
   explicit HeapArray(std::vector<Value> e) : elements(std::move(e)) {
     tag = ValueType::Array;
   }

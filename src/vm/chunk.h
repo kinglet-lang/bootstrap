@@ -9,6 +9,16 @@
 
 namespace kinglet {
 
+inline uint32_t pack_dense2d_shape(int rows, int cols) {
+  return (static_cast<uint32_t>(rows) << 16) |
+         (static_cast<uint32_t>(cols) & 0xFFFFu);
+}
+
+inline void unpack_dense2d_shape(uint32_t packed, int *rows, int *cols) {
+  *rows = static_cast<int>(packed >> 16);
+  *cols = static_cast<int>(packed & 0xFFFFu);
+}
+
 enum class OpCode : uint8_t {
   Constant,
   Null,
@@ -103,6 +113,7 @@ enum class OpCode : uint8_t {
   MultiplyI32,
   DivideI32,
   ModuloI32,
+  DenseArrayNew,
 };
 
 struct Instruction {

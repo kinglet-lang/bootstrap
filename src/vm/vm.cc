@@ -52,6 +52,30 @@ inline HeapArray *as_array(Value &v) {
 inline const HeapArray *as_array(const Value &v) {
   return static_cast<const HeapArray *>(v.heap.ptr);
 }
+
+void ensure_jagged_array(HeapArray *arr) {
+  if (arr == nullptr || arr->dense_dims.empty()) {
+    return;
+  }
+  if (arr->dense_dims.size() == 2) {
+    const int32_t rows = arr->dense_dims[0];
+    const int32_t cols = arr->dense_dims[1];
+    std::vector<Value> row_handles;
+    row_handles.reserve(static_cast<std::size_t>(rows));
+    for (int32_t row = 0; row < rows; ++row) {
+      const std::size_t base =
+          static_cast<std::size_t>(row) * static_cast<std::size_t>(cols);
+      row_handles.push_back(Value::array_value(std::vector<Value>(
+          arr->elements.begin() + static_cast<std::ptrdiff_t>(base),
+          arr->elements.begin() + static_cast<std::ptrdiff_t>(base + cols))));
+    }
+    arr->dense_dims.clear();
+    arr->elements = std::move(row_handles);
+    return;
+  }
+  arr->dense_dims.clear();
+  arr->elements.clear();
+}
 inline HeapEnum *as_enum(Value &v) {
   return static_cast<HeapEnum *>(v.heap.ptr);
 }
@@ -967,6 +991,24 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       push(Value::array_value(std::move(elements)));
       break;
     }
+    case OpCode::DenseArrayNew: {
+      int rows = 0;
+      int cols = 0;
+      unpack_dense2d_shape(static_cast<uint32_t>(instruction.operand), &rows, &cols);
+      if (rows <= 0 || cols <= 0) {
+        return runtime_error("DenseArrayNew requires positive rows and cols.");
+      }
+      const uint32_t element_count = static_cast<uint32_t>(rows) * static_cast<uint32_t>(cols);
+      if (stack_.size() < element_count) {
+        return runtime_error("Stack underflow for dense array creation.");
+      }
+      std::vector<Value> elements(element_count);
+      for (uint32_t i = 0; i < element_count; ++i) {
+        elements[element_count - 1 - i] = pop();
+      }
+      push(Value::dense_array_value(std::move(elements), {rows, cols}));
+      break;
+    }
     case OpCode::IndexGet: {
       if (stack_.size() < 2)
         return runtime_error("Stack underflow for array indexing.");
@@ -1001,12 +1043,28 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         return runtime_error("Cannot index non-array value.");
       if (index.type != ValueType::Int)
         return runtime_error("Array index must be an integer.");
+      HeapArray *arr = as_array(object);
+      if (!arr->dense_dims.empty()) {
+        if (arr->dense_dims.size() != 2) {
+          return runtime_error("Unsupported dense array rank.");
+        }
+        const int32_t rows = arr->dense_dims[0];
+        const int32_t cols = arr->dense_dims[1];
+        if (index.as_int < 0 || index.as_int >= rows) {
+          return runtime_error("Array index out of bounds.");
+        }
+        const std::size_t base =
+            static_cast<std::size_t>(index.as_int) * static_cast<std::size_t>(cols);
+        std::vector<Value> row(arr->elements.begin() + static_cast<std::ptrdiff_t>(base),
+                               arr->elements.begin() + static_cast<std::ptrdiff_t>(base + cols));
+        push(Value::array_value(std::move(row)));
+        break;
+      }
       if (index.as_int < 0 ||
-          static_cast<std::size_t>(index.as_int) >=
-              as_array(object)->elements.size()) {
+          static_cast<std::size_t>(index.as_int) >= arr->elements.size()) {
         return runtime_error("Array index out of bounds.");
       }
-      push(as_array(object)->elements[static_cast<std::size_t>(index.as_int)]);
+      push(arr->elements[static_cast<std::size_t>(index.as_int)]);
       break;
     }
     case OpCode::IndexSet: {
@@ -1031,13 +1089,15 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
         return runtime_error("Cannot assign indexed value on non-array value.");
       if (index.type != ValueType::Int)
         return runtime_error("Array index must be an integer.");
+      HeapArray *arr = as_array(array);
+      if (!arr->dense_dims.empty()) {
+        ensure_jagged_array(arr);
+      }
       if (index.as_int < 0 ||
-          static_cast<std::size_t>(index.as_int) >=
-              as_array(array)->elements.size()) {
+          static_cast<std::size_t>(index.as_int) >= arr->elements.size()) {
         return runtime_error("Array index out of bounds.");
       }
-      as_array(array)->elements[static_cast<std::size_t>(index.as_int)] =
-          std::move(value);
+      arr->elements[static_cast<std::size_t>(index.as_int)] = std::move(value);
       push(value);
       break;
     }
@@ -1055,8 +1115,12 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
       }
       if (obj.type != ValueType::Array || !obj.heap)
         return runtime_error("Cannot call len() on non-array value.");
-      push(Value::int_value(
-          static_cast<int64_t>(as_array(obj)->elements.size())));
+      HeapArray *arr = as_array(obj);
+      if (!arr->dense_dims.empty()) {
+        push(Value::int_value(static_cast<int64_t>(arr->dense_dims[0])));
+        break;
+      }
+      push(Value::int_value(static_cast<int64_t>(arr->elements.size())));
       break;
     }
     case OpCode::ArrayPush: {

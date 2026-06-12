@@ -101,6 +101,15 @@ Value Value::array_value(std::vector<Value> elements) {
   return result;
 }
 
+Value Value::dense_array_value(std::vector<Value> flat, std::vector<int32_t> dims) {
+  Value result;
+  result.type = ValueType::Array;
+  auto *arr = new HeapArray(std::move(flat));
+  arr->dense_dims = std::move(dims);
+  result.heap = RcPtr<HeapObj>{arr};
+  return result;
+}
+
 Value Value::map_value() {
   Value result;
   result.type = ValueType::Map;

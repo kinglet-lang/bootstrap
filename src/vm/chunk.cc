@@ -167,6 +167,11 @@ void Chunk::disassemble(std::ostream &out) const {
       out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::ArrayNew) {
       out << " count=" << instruction.operand;
+    } else if (instruction.op == OpCode::DenseArrayNew) {
+      int rows = 0;
+      int cols = 0;
+      unpack_dense2d_shape(static_cast<uint32_t>(instruction.operand), &rows, &cols);
+      out << " rows=" << rows << " cols=" << cols;
     } else if (instruction.op == OpCode::MapNew) {
       out << " pairs=" << instruction.operand;
     }
@@ -360,6 +365,8 @@ const char *opcode_name(OpCode op) {
     return "DivideI32";
   case OpCode::ModuloI32:
     return "ModuloI32";
+  case OpCode::DenseArrayNew:
+    return "DenseArrayNew";
   }
   return "Unknown";
 }
