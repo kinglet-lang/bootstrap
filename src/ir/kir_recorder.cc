@@ -1,6 +1,7 @@
 #include "ir/kir_recorder.h"
 
 #include "ir/kir_numeric.h"
+#include "vm/chunk.h"
 
 #include <cstring>
 
@@ -271,6 +272,14 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     bb_.instrs.push_back(
         rec(KirOpcode::ArrayNew, {static_cast<int32_t>(operand)}, location));
     break;
+  case OpCode::DenseArrayNew: {
+    int rows = 0;
+    int cols = 0;
+    unpack_dense2d_shape(static_cast<uint32_t>(operand), &rows, &cols);
+    bb_.instrs.push_back(
+        rec(KirOpcode::DenseArrayNew, {rows, cols}, location));
+    break;
+  }
   case OpCode::IndexGet:
     bb_.instrs.push_back(rec(KirOpcode::IndexGet, {}, location));
     break;

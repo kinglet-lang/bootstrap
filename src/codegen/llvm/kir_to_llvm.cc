@@ -118,6 +118,8 @@ llvm::Value *to_wire_i64(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Valu
 struct RtFns {
   llvm::Function *string_new = nullptr;
   llvm::Function *array_new = nullptr;
+  llvm::Function *dense_array_new = nullptr;
+  llvm::Function *dense2d_get = nullptr;
   llvm::Function *array_get = nullptr;
   llvm::Function *value_len = nullptr;
   llvm::Function *struct_new = nullptr;
@@ -192,6 +194,11 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.array_new = llvm::Function::Create(
       llvm::FunctionType::get(i64, {i32, i64p}, false), llvm::Function::ExternalLinkage,
       "kl_array_new", module);
+  rt.dense_array_new = llvm::Function::Create(
+      llvm::FunctionType::get(i64, {i32, i32, i64p}, false), llvm::Function::ExternalLinkage,
+      "kl_dense_array_new", module);
+  rt.dense2d_get = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i32}, false),
+                                          llvm::Function::ExternalLinkage, "kl_dense2d_get", module);
   rt.array_get = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
                                         llvm::Function::ExternalLinkage, "kl_array_get", module);
   rt.value_len = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
@@ -1405,6 +1412,38 @@ public:
         llvm::Value *arr = builder.CreateCall(
             rt_.array_new,
             {llvm::ConstantInt::get(i32, element_count),
+             builder.CreateBitCast(elements, i64p)});
+        push(arr);
+        temps[i] = arr;
+        break;
+      }
+      case KirOpcode::DenseArrayNew: {
+        if (instr->operands.size() < 2) {
+          *error = "dense_array_new missing shape operands";
+          return false;
+        }
+        const int rows = instr->operands[0];
+        const int cols = instr->operands[1];
+        if (rows <= 0 || cols <= 0) {
+          *error = "dense_array_new shape invalid";
+          return false;
+        }
+        const int element_count = rows * cols;
+        llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
+        llvm::AllocaInst *elements = builder.CreateAlloca(
+            i64, llvm::ConstantInt::get(i32, element_count), "dense_elems");
+        for (int ei = element_count - 1; ei >= 0; --ei) {
+          llvm::Value *elem = pop_value(&stack, error, &type_stack);
+          if (elem == nullptr) {
+            return false;
+          }
+          llvm::Value *slot =
+              builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ei));
+          builder.CreateStore(elem, slot);
+        }
+        llvm::Value *arr = builder.CreateCall(
+            rt_.dense_array_new,
+            {llvm::ConstantInt::get(i32, rows), llvm::ConstantInt::get(i32, cols),
              builder.CreateBitCast(elements, i64p)});
         push(arr);
         temps[i] = arr;

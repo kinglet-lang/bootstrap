@@ -214,6 +214,8 @@ const char *kir_opcode_name(KirOpcode op) {
     return "unreachable";
   case KirOpcode::Nop:
     return "nop";
+  case KirOpcode::DenseArrayNew:
+    return "dense_array_new";
   }
   return "unknown";
 }

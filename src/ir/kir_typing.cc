@@ -570,6 +570,7 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       pop_type(&state);
       break;
     case KirOpcode::ArrayNew:
+    case KirOpcode::DenseArrayNew:
     case KirOpcode::ArraySlice:
     case KirOpcode::ArrayPush:
     case KirOpcode::ArrayResize:
@@ -603,6 +604,25 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         }
         result = KirType::Array;
         push_typed(&state, result, array_container(element_type, element_container));
+      } else if (instr->op == KirOpcode::DenseArrayNew) {
+        const int rows = instr->operands.size() > 0 ? instr->operands[0] : 0;
+        const int cols = instr->operands.size() > 1 ? instr->operands[1] : 0;
+        const int element_count = rows > 0 && cols > 0 ? rows * cols : 0;
+        KirType element_type = KirType::Any;
+        KirContainerType first_elem_container;
+        for (int ei = 0; ei < element_count; ++ei) {
+          KirContainerType elem_container;
+          const KirType elem = pop_type(&state, &elem_container);
+          if (element_type == KirType::Any) {
+            element_type = elem;
+            first_elem_container = elem_container;
+          } else {
+            element_type = kir_type_join(element_type, elem);
+          }
+        }
+        KirContainerType inner = array_container(element_type, nullptr);
+        result = KirType::Array;
+        push_typed(&state, result, array_container(KirType::Array, &inner));
       } else if (instr->op == KirOpcode::MapNew) {
         const int entry_count = instr->operands.empty() ? 0 : instr->operands[0];
         KirType key_type = KirType::Any;

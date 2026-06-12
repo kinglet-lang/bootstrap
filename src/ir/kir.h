@@ -161,6 +161,7 @@ enum class KirOpcode {
   INeg,
   Unreachable,
   Nop,
+  DenseArrayNew,
 };
 
 struct KirStructMeta {
