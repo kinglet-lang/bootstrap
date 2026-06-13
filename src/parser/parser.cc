@@ -104,9 +104,64 @@ ast::UnaryOp token_to_unary_op(TokenType type) {
 
 Parser::Parser(const std::vector<Token> &tokens) : tokens_(tokens) {}
 
+Parser::Parser(const std::vector<Token> &tokens, std::size_t completion_index)
+    : tokens_(tokens), completion_mode_(true), completion_index_(completion_index) {}
+
+bool Parser::at_completion() const {
+  return completion_mode_ && current_ == completion_index_;
+}
+
+bool Parser::completion_after_dangling_access() const {
+  if (current_ == 0) return false;
+  switch (previous().type) {
+  case TokenType::DOT:
+  case TokenType::COLON_COLON:
+  case TokenType::COLON:
+    return true;
+  default:
+    return false;
+  }
+}
+
+void Parser::set_completion(lsp::CompletionInfo info) {
+  completion_result_ = std::move(info);
+}
+
+std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
+  if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(expr)) {
+    return id->name;
+  }
+  // io::out / io::err / io::in are built-in stream objects; expose them under a
+  // synthetic type name the resolver recognises for member completion.
+  if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(expr)) {
+    if (ns->namespace_name == "io" &&
+        (ns->member_name == "out" || ns->member_name == "err"))
+      return "$io_ostream";
+    if (ns->namespace_name == "io" && ns->member_name == "in")
+      return "$io_istream";
+  }
+  // Encode an access chain so the resolver (which owns the symbol table) can
+  // walk it to a concrete type. Segments are separated by '\x1f'; a method-call
+  // segment is suffixed with "()". E.g. `r.scale(2).` -> "r\x1fscale()".
+  if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(expr)) {
+    std::string base = infer_receiver_type(field->object.get());
+    if (base.empty()) return {};
+    return base + "\x1f" + field->field_name;
+  }
+  if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr)) {
+    if (const auto *callee =
+            dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
+      std::string base = infer_receiver_type(callee->object.get());
+      if (base.empty()) return {};
+      return base + "\x1f" + callee->field_name + "()";
+    }
+  }
+  return {};
+}
+
 ParseResult Parser::parse() {
   std::vector<ast::DeclPtr> declarations;
-  while (!is_at_end()) {
+  while (!is_at_end() && !has_completion()) {
     ast::DeclPtr decl = declaration();
     if (decl) {
       declarations.push_back(std::move(decl));
@@ -120,6 +175,19 @@ ParseResult Parser::parse() {
 }
 
 ast::DeclPtr Parser::declaration() {
+  if (at_completion()) {
+    // A member-access or type-separator operator (`.`, `::`, or a lone `:`)
+    // cannot begin a top-level declaration. If one immediately precedes the
+    // cursor here, the position is syntactically invalid, so offer no
+    // completion rather than flooding the list with every declaration keyword.
+    if (completion_after_dangling_access()) {
+      set_completion({lsp::CompletionPosition::None, {}, {}, {}, {}, {}});
+      return nullptr;
+    }
+    set_completion({lsp::CompletionPosition::TopLevelDecl, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
+
   if (match(TokenType::USING)) {
     return using_declaration();
   }
@@ -185,6 +253,10 @@ ast::DeclPtr Parser::using_declaration() {
   bool is_namespace = false;
   if (match(TokenType::NAMESPACE)) {
     is_namespace = true;
+  }
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::UsingNamespace, {}, {}, {}, {}, {}});
+    return nullptr;
   }
   const Token &name = consume(TokenType::IDENTIFIER, "Expected namespace name after 'using'.");
   std::string ns_name(token_text(name));
@@ -254,8 +326,13 @@ ast::DeclPtr Parser::struct_declaration() {
 
   std::vector<ast::FieldDef> fields;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::StructFieldDecl, {}, {}, {}, {}, {}});
+      return nullptr;
+    }
     size_t start_pos = current_;
     ast::TypeExpr type = parse_type_expr();
+    if (has_completion()) return nullptr;
     const Token &field_name = consume(TokenType::IDENTIFIER, "Expected field name.");
     consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
     fields.push_back(ast::FieldDef{std::move(type), token_text(field_name)});
@@ -276,6 +353,10 @@ ast::DeclPtr Parser::enum_declaration() {
 
   std::vector<ast::EnumVariantDecl> variants;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::EnumVariant, {}, {}, {}, {}, {}});
+      return nullptr;
+    }
     size_t start_pos = current_;
     const Token &variant = consume(TokenType::IDENTIFIER, "Expected variant name.");
     ast::EnumVariantDecl decl;
@@ -361,6 +442,16 @@ ast::DeclPtr Parser::function_declaration() {
 }
 
 ast::StmtPtr Parser::statement() {
+  if (at_completion()) {
+    // As in declaration(): a dangling `.`, `::`, or `:` cannot begin a
+    // statement, so suppress completion rather than offering every keyword.
+    if (completion_after_dangling_access()) {
+      set_completion({lsp::CompletionPosition::None, {}, {}, {}, {}, {}});
+      return nullptr;
+    }
+    set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
   // A leading '{' is normally a block, but `{K: V} name = ...` is a map
   // variable declaration. Disambiguate by lookahead before treating it as a
   // block (Kinglet has no labelled blocks, so the var-decl shape is unambiguous).
@@ -403,9 +494,10 @@ ast::StmtPtr Parser::statement() {
 ast::StmtPtr Parser::block_statement() {
   const Token &left_brace = previous();
   std::vector<ast::StmtPtr> statements;
-  while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
     statements.push_back(statement());
   }
+  if (has_completion()) return nullptr;
   consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
   return std::make_unique<ast::BlockStmt>(location_of(left_brace), std::move(statements));
 }
@@ -610,7 +702,12 @@ ast::StmtPtr Parser::var_declaration() {
     advance(); // consume '{'
     std::vector<ast::StructLiteralExpr::FieldInit> fields;
     while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+      if (at_completion()) {
+        set_completion({lsp::CompletionPosition::StructLiteral, {}, {}, {}, {}, type.name});
+        return nullptr;
+      }
       ast::ExprPtr value = expression();
+      if (has_completion()) return nullptr;
       fields.push_back(ast::StructLiteralExpr::FieldInit{"", std::move(value)});
       if (!check(TokenType::RIGHT_BRACE)) {
         consume(TokenType::COMMA, "Expected ',' between struct fields.");
@@ -627,6 +724,7 @@ ast::StmtPtr Parser::var_declaration() {
 
 ast::StmtPtr Parser::expression_statement() {
   ast::ExprPtr expr = expression();
+  if (has_completion()) return nullptr;
   const ast::SourceLocation location = expr->location;
   consume(TokenType::SEMICOLON, "Expected ';' after expression.");
   return std::make_unique<ast::ExprStmt>(location, std::move(expr));
@@ -651,6 +749,7 @@ ast::ExprPtr Parser::ternary() {
 
 ast::ExprPtr Parser::assignment() {
   ast::ExprPtr expr = ternary();
+  if (has_completion()) return expr;
   if (is_assignment_operator(peek().type)) {
     const Token &op = advance();
     ast::ExprPtr value = assignment();
@@ -868,6 +967,7 @@ ast::ExprPtr Parser::unary() {
 
 ast::ExprPtr Parser::call() {
   ast::ExprPtr expr = primary();
+  if (has_completion()) return expr;
   while (true) {
     if (check(TokenType::LESS) && dynamic_cast<const ast::IdentifierExpr *>(expr.get())) {
       size_t saved = current_;
@@ -922,6 +1022,11 @@ ast::ExprPtr Parser::call() {
       expr = std::make_unique<ast::CallExpr>(location, std::move(expr),
                                              std::vector<ast::TypeExpr>{}, std::move(args));
     } else if (match(TokenType::DOT)) {
+      if (at_completion()) {
+        std::string receiver = infer_receiver_type(expr.get());
+        set_completion({lsp::CompletionPosition::FieldAccess, {}, receiver, {}, {}, {}});
+        return expr;
+      }
       const Token &field = consume(TokenType::IDENTIFIER, "Expected field name after '.'.");
       const ast::SourceLocation location = expr->location;
       expr = std::make_unique<ast::FieldAccessExpr>(location, std::move(expr), token_text(field));
@@ -966,6 +1071,10 @@ ast::ExprPtr Parser::call() {
 }
 
 ast::ExprPtr Parser::primary() {
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::ExpressionStart, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
   if (match(TokenType::INTEGER)) {
     const Token &literal = previous();
     return std::make_unique<ast::IntLiteralExpr>(location_of(literal), literal.int_value,
@@ -1074,6 +1183,10 @@ ast::ExprPtr Parser::primary() {
   if (match(TokenType::IDENTIFIER)) {
     const Token &identifier = previous();
     if (match(TokenType::COLON_COLON)) {
+      if (at_completion()) {
+        set_completion({lsp::CompletionPosition::NamespaceAccess, {}, {}, token_text(identifier), {}, {}});
+        return std::make_unique<ast::IdentifierExpr>(location_of(identifier), token_text(identifier));
+      }
       const Token &member =
           consume(TokenType::IDENTIFIER, "Expected member name after '::'.");
       return std::make_unique<ast::NamespaceAccessExpr>(
@@ -1085,7 +1198,16 @@ ast::ExprPtr Parser::primary() {
       advance(); // consume '{'
       std::vector<ast::StructLiteralExpr::FieldInit> fields;
       while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+        if (at_completion()) {
+          set_completion({lsp::CompletionPosition::StructLiteral, {}, {}, {}, {},
+                          std::string(token_text(identifier))});
+          return std::make_unique<ast::IdentifierExpr>(location_of(identifier),
+                                                       token_text(identifier));
+        }
         ast::ExprPtr value = expression();
+        if (has_completion())
+          return std::make_unique<ast::IdentifierExpr>(location_of(identifier),
+                                                       token_text(identifier));
         fields.push_back(ast::StructLiteralExpr::FieldInit{"", std::move(value)});
         if (!check(TokenType::RIGHT_BRACE)) {
           consume(TokenType::COMMA, "Expected ',' between struct fields.");
@@ -1213,6 +1335,11 @@ ast::ExprPtr Parser::match_expression(ast::ExprPtr value) {
 
   std::vector<ast::MatchArm> arms;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::MatchArm, {},
+                      infer_receiver_type(value.get()), {}, {}, {}});
+      return value;
+    }
     ast::ExprPtr pattern = parse_match_pattern();
     ast::ExprPtr guard;
     if (match(TokenType::IF)) {
@@ -1239,6 +1366,10 @@ std::vector<ast::Parameter> Parser::parameters() {
   }
 
   do {
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {}});
+      return params;
+    }
     ast::TypeExpr type = parse_type_expr();
     const Token &name = consume(TokenType::IDENTIFIER, "Expected parameter name.");
     params.push_back(ast::Parameter{std::move(type), token_text(name)});
@@ -1256,6 +1387,7 @@ ast::StmtPtr Parser::function_body() {
       return block_statement();
     }
     ast::ExprPtr value = expression();
+    if (has_completion()) return nullptr;
     consume(TokenType::SEMICOLON, "Expected ';' after expression body.");
     const ast::SourceLocation location = value->location;
     return std::make_unique<ast::ReturnStmt>(location, std::move(value));
@@ -1470,6 +1602,10 @@ std::string Parser::token_text(const Token &token) const {
 }
 
 ast::TypeExpr Parser::parse_type_expr() {
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}});
+    return ast::TypeExpr{"<error>", {}};
+  }
   if (!is_type_start(peek().type)) {
     error_at(peek(), "Expected type name.");
     return ast::TypeExpr{"<error>", {}};
@@ -1536,9 +1672,17 @@ ast::TypeExpr Parser::parse_type_expr() {
 }
 
 void Parser::synchronize() {
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}});
+    return;
+  }
   advance();
-  while (!is_at_end()) {
+  while (!is_at_end() && !has_completion()) {
     if (previous().type == TokenType::SEMICOLON) {
+      return;
+    }
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}});
       return;
     }
     switch (peek().type) {
