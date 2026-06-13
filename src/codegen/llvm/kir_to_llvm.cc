@@ -631,9 +631,10 @@ bool emit_object(llvm::Module &module, const std::string &obj_path, std::string 
 
   std::string triple_err;
   const llvm::Triple triple(llvm::sys::getDefaultTargetTriple());
-  module.setTargetTriple(triple);
+  const std::string triple_str = triple.str();
+  module.setTargetTriple(triple_str);
 
-  const llvm::Target *target = llvm::TargetRegistry::lookupTarget(triple.str(), triple_err);
+  const llvm::Target *target = llvm::TargetRegistry::lookupTarget(triple_str, triple_err);
   if (target == nullptr) {
     *error = "LLVM target lookup failed: " + triple_err;
     return false;
@@ -642,7 +643,7 @@ bool emit_object(llvm::Module &module, const std::string &obj_path, std::string 
   llvm::TargetOptions options;
   std::string cpu = llvm::sys::getHostCPUName().str();
   llvm::TargetMachine *machine =
-      target->createTargetMachine(triple, cpu, "", options, llvm::Reloc::Model::PIC_);
+      target->createTargetMachine(triple_str, cpu, "", options, llvm::Reloc::Model::PIC_);
   if (machine == nullptr) {
     *error = "LLVM target machine creation failed";
     return false;

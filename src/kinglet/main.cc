@@ -110,13 +110,14 @@ enum class Mode {
 #ifdef KINGLET_HAVE_LLVM
 std::string resolve_rt_lib(const char *argv0) {
   const std::filesystem::path dir = std::filesystem::absolute(argv0).parent_path();
-  for (const char *rel : { "libkinglet_rt.a", "obj/runtime/libkinglet_rt.a" }) {
+  for (const char *rel : { "libkinglet_rt.a", "obj/runtime/libkinglet_rt.a",
+                           "kinglet_rt.lib", "obj/runtime/kinglet_rt.lib" }) {
     const std::filesystem::path candidate = dir / rel;
     if (std::filesystem::exists(candidate)) {
       return candidate.string();
     }
   }
-  return (dir / "obj/runtime/libkinglet_rt.a").string();
+  return (dir / "obj/runtime/kinglet_rt.lib").string();
 }
 
 // FNV-1a content hash of this compiler binary; mixed into object cache
