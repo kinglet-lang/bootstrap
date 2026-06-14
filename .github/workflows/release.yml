@@ -61,6 +61,7 @@ jobs:
         run: |
           mkdir -p dist
           cp out/Release/kinglet${{ matrix.ext }} dist/
+          cp out/Release/klet${{ matrix.ext }} dist/
           cd dist && tar czf ../${{ matrix.artifact }}.tar.gz *
 
       - name: Upload artifact
