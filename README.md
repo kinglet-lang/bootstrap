@@ -33,8 +33,10 @@ Extract and add the directory to your `PATH`:
 
 ```bash
 tar xzf kinglet-<platform>.tar.gz
-# Move kinglet to a directory on your PATH
+# Move kinglet (or klet) to a directory on your PATH
 ```
+
+`klet` is the same binary as `kinglet` — a short alias for the CLI driver (`klet build` ≡ `kinglet build`).
 
 Editor extensions live in [kinglet-lang/lsp](https://github.com/kinglet-lang/lsp) (planned separate repo).
 

@@ -17,14 +17,14 @@ ninja -C out/Debug
 
 # Native backend (LLVM):
 gn gen out/Default --args='enable_llvm=true llvm_config="/opt/homebrew/opt/llvm/bin/llvm-config"'
-ninja -C out/Default kinglet kinglet_rt
+ninja -C out/Default kinglet klet kinglet_rt
 ```
 
 Run:
 
 ```bash
 ./out/Debug/kinglet tests/cli/cases/operators_arithmetic.kl
-./out/Debug/kinglet --check --ir path/to/file.kl
+./out/Debug/klet --check --ir path/to/file.kl   # same binary as kinglet
 ./out/Debug/kinglet build              # project build (needs kinglet.toml)
 ./out/Debug/kinglet init
 ./out/Debug/kinglet --repl
