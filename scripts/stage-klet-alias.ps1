@@ -15,16 +15,15 @@ if (-not (Test-Path $kinglet)) {
 
 Remove-Item $klet, (Join-Path $Dist 'klet.cmd'), (Join-Path $Dist 'klet') -Force -ErrorAction SilentlyContinue
 
-$mklink = cmd /c "mklink /H `"$klet`" `"$kinglet`"" 2>&1
-if ($LASTEXITCODE -eq 0) {
+try {
+  New-Item -ItemType HardLink -Path $klet -Target $kinglet | Out-Null
   Write-Host 'staged klet.exe as hard link to kinglet.exe'
   exit 0
+} catch {
+  $mklink = cmd /c "mklink /H `"$klet`" `"$kinglet`"" 2>&1
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host 'staged klet.exe as hard link to kinglet.exe (mklink)'
+    exit 0
+  }
+  Write-Error "hard link failed: $($_.Exception.Message)`n$mklink`nUse kinglet.exe directly."
 }
-
-$fsutil = cmd /c "fsutil hardlink create `"$klet`" `"$kinglet`"" 2>&1
-if ($LASTEXITCODE -eq 0) {
-  Write-Host 'staged klet.exe as hard link to kinglet.exe (fsutil)'
-  exit 0
-}
-
-Write-Error "hard link failed:`n$mklink`n$fsutil`nUse kinglet.exe directly."

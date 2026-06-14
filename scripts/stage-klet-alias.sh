@@ -42,6 +42,14 @@ make_windows_hardlink() {
 }
 
 if [[ "$unix_mode" == false ]]; then
+  if command -v pwsh >/dev/null 2>&1; then
+    pwsh -NoProfile -File "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stage-klet-alias.ps1" "$DIST"
+    exit $?
+  fi
+  if command -v powershell >/dev/null 2>&1; then
+    powershell -NoProfile -File "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stage-klet-alias.ps1" "$DIST"
+    exit $?
+  fi
   if make_windows_hardlink; then
     echo "staged klet.exe as hard link to kinglet.exe"
     exit 0
