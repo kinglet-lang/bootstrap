@@ -3,9 +3,51 @@ import("//build/llvm.gni")
 
 _kinglet_defines = [ "KINGLET_VERSION=\"${kinglet_version}\"" ]
 
+_kinglet_driver_sources = [
+  "src/kinglet/cli_driver.cc",
+  "src/kinglet/main.cc",
+]
+
+_kinglet_driver_deps = [
+  "//src/checker",
+  "//src/compiler",
+  "//src/ir",
+  "//src/lexer",
+  "//src/module",
+  "//src/parser",
+  "//src/vm",
+]
+
+template("kinglet_driver") {
+  assert(invoker._alias == true)
+
+  executable(target_name) {
+    sources = _kinglet_driver_sources
+    defines = _kinglet_defines
+    deps = _kinglet_driver_deps
+
+    if (enable_llvm) {
+      deps += [
+        "//runtime:kinglet_rt",
+        "//src/codegen/llvm:llvm_codegen",
+      ]
+      configs += [ "//src/codegen/llvm:llvm" ]
+    }
+
+    if (embed_compiler_path != "") {
+      sources += [ "$target_gen_dir/embedded_compiler.cc" ]
+      deps += [ ":embedded_compiler_cc" ]
+      defines = [ "KINGLET_HAVE_EMBEDDED_COMPILER=1" ]
+    }
+
+    include_dirs = [ "//src" ]
+  }
+}
+
 group("default") {
   deps = [
     ":kinglet",
+    ":klet",
     ":kinglet-vm",
     "//runtime:kinglet_rt",
   ]
@@ -26,41 +68,12 @@ if (embed_compiler_path != "") {
   }
 }
 
-executable("kinglet") {
-  sources = [
-    "src/kinglet/cli_driver.cc",
-    "src/kinglet/main.cc",
-  ]
+kinglet_driver("kinglet") {
+  _alias = true
+}
 
-  defines = _kinglet_defines
-
-  deps = [
-    "//src/checker",
-    "//src/compiler",
-    "//src/ir",
-    "//src/lexer",
-    "//src/module",
-    "//src/parser",
-    "//src/vm",
-  ]
-
-  if (enable_llvm) {
-    deps += [
-      "//runtime:kinglet_rt",
-      "//src/codegen/llvm:llvm_codegen",
-    ]
-    configs += [ "//src/codegen/llvm:llvm" ]
-  }
-
-  if (embed_compiler_path != "") {
-    sources += [ "$target_gen_dir/embedded_compiler.cc" ]
-    deps += [ ":embedded_compiler_cc" ]
-    defines = [ "KINGLET_HAVE_EMBEDDED_COMPILER=1" ]
-  }
-
-  include_dirs = [
-    "//src",
-  ]
+kinglet_driver("klet") {
+  _alias = true
 }
 
 executable("kinglet-vm") {
