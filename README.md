@@ -36,7 +36,7 @@ tar xzf kinglet-<platform>.tar.gz
 # Add the extracted directory to PATH once (contains kinglet and a klet alias).
 ```
 
-Release archives ship **one** `kinglet` binary. `klet` is a symlink (Unix) or `klet.cmd` / hard link (Windows) to the same program — `klet build` ≡ `kinglet build`. Only one directory needs to be on `PATH`.
+Release archives ship **one** `kinglet` binary. `klet` is a hard link (Windows/macOS/Linux) or symlink (Unix) to the same file — `klet build` ≡ `kinglet build`. Only one directory needs to be on `PATH`. Do not use `klet.cmd`; if present from an older package, delete it and re-run `scripts/stage-klet-alias.ps1 dist`.
 
 Editor extensions live in [kinglet-lang/lsp](https://github.com/kinglet-lang/lsp) (planned separate repo).
 

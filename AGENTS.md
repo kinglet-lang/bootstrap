@@ -18,7 +18,9 @@ ninja -C out/Debug
 # Native backend (LLVM):
 gn gen out/Default --args='enable_llvm=true llvm_config="/opt/homebrew/opt/llvm/bin/llvm-config"'
 ninja -C out/Default kinglet kinglet_rt
-# Optional local alias (same binary): ln -s kinglet out/Default/klet
+# Optional short name (same binary, Windows: hard link — not .cmd):
+#   bash scripts/stage-klet-alias.sh out/Default
+#   pwsh -File scripts/stage-klet-alias.ps1 out/Default
 ```
 
 Run:
