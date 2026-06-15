@@ -55,7 +55,9 @@ jobs:
 
       - name: Generate build files
         shell: bash
-        run: gn gen out/Release --args="is_debug=false enable_llvm=true llvm_config=\"$LLVM_CONFIG\""
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gn gen out/Release --args="is_debug=false enable_llvm=true llvm_config=\"$LLVM_CONFIG\" kinglet_version=\"$VERSION\""
 
       - name: Build
         shell: bash
@@ -108,7 +110,9 @@ jobs:
           echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Generate build files
-        run: gn gen out/Release --args="is_debug=false enable_llvm=true llvm_config=\"/mingw64/bin/llvm-config\""
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gn gen out/Release --args="is_debug=false enable_llvm=true llvm_config=\"/mingw64/bin/llvm-config\" kinglet_version=\"$VERSION\""
 
       - name: Build
         run: ninja -C out/Release kinglet kinglet_rt
@@ -160,6 +164,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # SemVer pre-releases carry a hyphen (e.g. v0.1.0-rc.1); flag them so
+          # they do not become the "Latest" release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body_path: ${{ steps.changelog.outputs.body_path || '' }}
           generate_release_notes: ${{ steps.changelog.outputs.body_path == '' }}
           files: |
