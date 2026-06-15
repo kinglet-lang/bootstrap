@@ -170,7 +170,7 @@ void print_cli_help(std::ostream &out) {
   out << p.bold("Kinglet") << ' ' << p.dim(KINGLET_VERSION) << "\n\n";
   out << p.bold("USAGE") << "\n";
   cmd(g_prog + " <file.kl> [args...]", "Compile and run (default)");
-  cmd(g_prog + " init [name]", "Scaffold a new project (prompts)");
+  cmd(g_prog + " init [path]", "Scaffold a new project (name = last segment)");
   cmd(g_prog + " build [--backend native|vm]", "Build the project (--quiet, [root])");
   cmd(g_prog + " run [<file.kl> | args...]", "Run the built binary or a source file");
   cmd(g_prog + " prune [--all] [-n]", "Prune unreferenced Klos objects");
@@ -216,22 +216,61 @@ bool stdin_is_interactive() {
 #endif
 }
 
-std::string prompt_project_name() {
-  std::cout << "Project name [kinglet-app]: " << std::flush;
-  std::string line;
-  if (!std::getline(std::cin, line)) {
-    return "kinglet-app";
+// Redraw the just-answered prompt as a single "✓ Label · value" line, after
+// clearing the `lines` rows the question occupied (create-vue / create-tauri
+// style). Only used on a color TTY.
+void redraw_answer(const std::string &label, const std::string &value, int lines) {
+  const ui::Painter &p = ui::g_out;
+  for (int i = 0; i < lines; ++i) {
+    std::cout << "\033[1A\033[2K";
   }
-  line = trim_copy(line);
-  return line.empty() ? "kinglet-app" : line;
+  std::cout << '\r' << p.green("\u2713") << "  " << p.bold(label) << ' ' << p.dim("\u00b7") << ' '
+            << value << '\n';
 }
 
-std::string resolve_init_project_name(int argc, char **argv) {
+// A free-text question. Shows the default as a dim hint; empty input keeps it.
+std::string ask_line(const std::string &label, const std::string &def) {
+  const ui::Painter &p = ui::g_out;
+  std::cout << p.cyan("?") << "  " << p.bold(label) << ' ' << p.dim("(" + def + ")") << ' '
+            << p.dim("\u203a") << ' ' << std::flush;
+  std::string line;
+  if (!std::getline(std::cin, line)) {
+    line.clear();
+  }
+  line = trim_copy(line);
+  const std::string value = line.empty() ? def : line;
+  if (p.on) {
+    redraw_answer(label, value, 1);
+  }
+  return value;
+}
+
+// Expand a leading "~" to $HOME (the shell does not run on interactive input).
+std::string expand_tilde(const std::string &path) {
+  if (path != "~" && path.rfind("~/", 0) != 0) {
+    return path;
+  }
+  const char *home = std::getenv("HOME");
+  if (home == nullptr || *home == '\0') {
+    return path;
+  }
+  return std::string(home) + path.substr(1);
+}
+
+// Resolve where the project should be created. A positional argument wins and
+// is used as the full target path. Otherwise, on an interactive terminal, ask
+// for the project name and the parent location separately, then combine them.
+std::string resolve_init_target(int argc, char **argv) {
   if (argc >= 3) {
     return std::string(argv[2]);
   }
   if (stdin_is_interactive()) {
-    return prompt_project_name();
+    const ui::Painter &p = ui::g_out;
+    std::cout << '\n' << p.bold("Create a new Kinglet project") << "\n\n";
+    const std::string name = ask_line("Project name", "kinglet-app");
+    const std::string location = expand_tilde(ask_line("Location", "."));
+    std::cout << '\n';
+    return (fs::path(location) / name).string();
   }
   return "kinglet-app";
 }
@@ -372,13 +411,23 @@ int spawn_and_wait(const std::string &self_executable, const std::vector<std::st
 }
 
 int cmd_init(int argc, char **argv) {
-  const std::string project_name = resolve_init_project_name(argc, argv);
+  // The target may be a path (e.g. "path/to/app" or an absolute path); the
+  // project name is taken from its last segment.
+  std::string target = trim_copy(resolve_init_target(argc, argv));
+  while (target.size() > 1 && (target.back() == '/' || target.back() == '\\')) {
+    target.pop_back();
+  }
+  if (target.empty()) {
+    print_error("init", "missing project path");
+    return 64;
+  }
+  const fs::path dir = fs::absolute(fs::path(target).lexically_normal());
+  const std::string project_name = dir.filename().string();
   if (!is_valid_project_name(project_name)) {
     print_error("init", "invalid project name '" + project_name + "'");
     return 64;
   }
 
-  const fs::path dir = fs::absolute(fs::current_path() / project_name);
   const fs::path manifest = dir / "kinglet.toml";
   if (fs::exists(manifest)) {
     print_error("init", manifest.string() + " already exists");
@@ -430,8 +479,8 @@ int cmd_init(int argc, char **argv) {
   std::cout << "   " << p.cyan("kinglet.toml") << "\n";
   std::cout << "   " << p.cyan("src/main.kl") << "\n\n";
   std::cout << p.bold("   Next steps") << "\n";
-  std::cout << p.dim("     cd " + project_name) << "\n";
-  std::cout << p.dim("     kinglet build") << "\n";
+  std::cout << p.dim("     cd " + display_path(dir)) << "\n";
+  std::cout << p.dim("     " + g_prog + " build") << "\n";
   return 0;
 }
 
