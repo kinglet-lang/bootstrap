@@ -116,6 +116,22 @@ void init() {
 
 } // namespace ui
 
+// Invoked program name (kinglet or its klet alias), resolved from argv[0].
+std::string g_prog = "kinglet";
+
+std::string program_name(const char *argv0) {
+  if (argv0 == nullptr || *argv0 == '\0') {
+    return "kinglet";
+  }
+  std::string name = fs::path(argv0).filename().string();
+#if defined(_WIN32)
+  if (name.size() > 4 && name.substr(name.size() - 4) == ".exe") {
+    name = name.substr(0, name.size() - 4);
+  }
+#endif
+  return name.empty() ? "kinglet" : name;
+}
+
 // Path relative to the current directory when possible, for readable output.
 std::string display_path(const fs::path &p) {
   std::error_code ec;
@@ -129,10 +145,12 @@ std::string display_path(const fs::path &p) {
   return p.string();
 }
 
-// Consistent error line: "✗ <command>: <message>" with a red glyph on a TTY.
-void print_error(std::string_view command, std::string_view message) {
-  std::cerr << ui::g_err.red("\u2717") << " " << ui::g_err.bold(command) << ": " << message
-            << '\n';
+// Consistent error line: "✗ <prog> <subcommand>: <message>" with a red glyph on
+// a TTY. The program name follows the invoked alias (kinglet or klet).
+void print_error(std::string_view subcommand, std::string_view message) {
+  const std::string label =
+      subcommand.empty() ? g_prog : (g_prog + " " + std::string(subcommand));
+  std::cerr << ui::g_err.red("\u2717") << " " << ui::g_err.bold(label) << ": " << message << '\n';
 }
 
 void print_cli_help(std::ostream &out) {
@@ -151,13 +169,13 @@ void print_cli_help(std::ostream &out) {
 
   out << p.bold("Kinglet") << ' ' << p.dim(KINGLET_VERSION) << "\n\n";
   out << p.bold("USAGE") << "\n";
-  cmd("kinglet <file.kl> [args...]", "Compile and run (default)");
-  cmd("kinglet init [name]", "Scaffold a new project (prompts)");
-  cmd("kinglet build [--backend native|vm]", "Build the project (--quiet, [root])");
-  cmd("kinglet run [<file.kl> | args...]", "Run the built binary or a source file");
-  cmd("kinglet prune [--all] [-n]", "Prune unreferenced Klos objects");
-  cmd("kinglet -h, --help", "Show this help");
-  cmd("kinglet -v, --version", "Show version");
+  cmd(g_prog + " <file.kl> [args...]", "Compile and run (default)");
+  cmd(g_prog + " init [name]", "Scaffold a new project (prompts)");
+  cmd(g_prog + " build [--backend native|vm]", "Build the project (--quiet, [root])");
+  cmd(g_prog + " run [<file.kl> | args...]", "Run the built binary or a source file");
+  cmd(g_prog + " prune [--all] [-n]", "Prune unreferenced Klos objects");
+  cmd(g_prog + " -h, --help", "Show this help");
+  cmd(g_prog + " -v, --version", "Show version");
   out << "\n" << p.bold("COMPILER MODES") << " " << p.dim("(flags)") << "\n";
   cmd("--check, --tokens, --ast", "Diagnostics, tokens, AST");
   cmd("--bytecode, --ir", "Bytecode / KIR dump");
@@ -293,7 +311,7 @@ int spawn_reexec(const std::string &self_executable, const std::vector<std::stri
 #if defined(_WIN32)
   (void)self_executable;
   (void)args;
-  std::cerr << "kinglet: subcommand re-exec is not supported on Windows\n";
+  std::cerr << g_prog << ": subcommand re-exec is not supported on Windows\n";
   return 78;
 #else
   std::vector<char *> exec_argv;
@@ -303,7 +321,7 @@ int spawn_reexec(const std::string &self_executable, const std::vector<std::stri
   }
   exec_argv.push_back(nullptr);
   execv(self_executable.c_str(), exec_argv.data());
-  std::cerr << "kinglet: failed to re-exec " << self_executable << ": " << std::strerror(errno)
+  std::cerr << g_prog << ": failed to re-exec " << self_executable << ": " << std::strerror(errno)
             << '\n';
   return 71;
 #endif
@@ -315,7 +333,7 @@ int spawn_and_wait(const std::string &self_executable, const std::vector<std::st
 #if defined(_WIN32)
   (void)self_executable;
   (void)args;
-  print_error("kinglet build", "building is not supported on Windows yet");
+  print_error("build", "building is not supported on Windows yet");
   return 78;
 #else
   std::vector<char *> exec_argv;
@@ -327,12 +345,12 @@ int spawn_and_wait(const std::string &self_executable, const std::vector<std::st
 
   const pid_t pid = fork();
   if (pid < 0) {
-    print_error("kinglet build", std::string("fork failed: ") + std::strerror(errno));
+    print_error("build", std::string("fork failed: ") + std::strerror(errno));
     return 71;
   }
   if (pid == 0) {
     execv(self_executable.c_str(), exec_argv.data());
-    std::cerr << "kinglet build: failed to exec " << self_executable << ": "
+    std::cerr << g_prog << " build: failed to exec " << self_executable << ": "
               << std::strerror(errno) << '\n';
     _exit(71);
   }
@@ -356,24 +374,24 @@ int spawn_and_wait(const std::string &self_executable, const std::vector<std::st
 int cmd_init(int argc, char **argv) {
   const std::string project_name = resolve_init_project_name(argc, argv);
   if (!is_valid_project_name(project_name)) {
-    print_error("kinglet init", "invalid project name '" + project_name + "'");
+    print_error("init", "invalid project name '" + project_name + "'");
     return 64;
   }
 
   const fs::path dir = fs::absolute(fs::current_path() / project_name);
   const fs::path manifest = dir / "kinglet.toml";
   if (fs::exists(manifest)) {
-    print_error("kinglet init", manifest.string() + " already exists");
+    print_error("init", manifest.string() + " already exists");
     return 64;
   }
   if (!ensure_dir(dir)) {
-    print_error("kinglet init", "cannot create " + dir.string());
+    print_error("init", "cannot create " + dir.string());
     return 74;
   }
   {
     std::ofstream out(manifest);
     if (!out) {
-      print_error("kinglet init", "cannot write " + manifest.string());
+      print_error("init", "cannot write " + manifest.string());
       return 74;
     }
     out << "[project]\n"
@@ -392,13 +410,13 @@ int cmd_init(int argc, char **argv) {
   const fs::path src_dir = dir / "src";
   const fs::path main_kl = src_dir / "main.kl";
   if (!ensure_dir(src_dir)) {
-    print_error("kinglet init", "cannot create " + src_dir.string());
+    print_error("init", "cannot create " + src_dir.string());
     return 74;
   }
   if (!fs::exists(main_kl)) {
     std::ofstream out(main_kl);
     if (!out) {
-      print_error("kinglet init", "cannot write " + main_kl.string());
+      print_error("init", "cannot write " + main_kl.string());
       return 74;
     }
     out << "int main() {\n"
@@ -429,14 +447,14 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
     }
     if (arg == "--backend") {
       if (i + 1 >= argc) {
-        print_error("kinglet build", "--backend requires native or vm");
+        print_error("build", "--backend requires native or vm");
         return 64;
       }
       backend = argv[++i];
       continue;
     }
     if (arg.starts_with('-')) {
-      print_error("kinglet build", std::string("unknown option ") + std::string(arg));
+      print_error("build", std::string("unknown option ") + std::string(arg));
       return 64;
     }
     root_arg = std::string(arg);
@@ -446,20 +464,20 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   const std::string start = root_arg.empty() ? fs::current_path().string() : fs::absolute(root_arg).string();
   const auto config = find_project_config(start);
   if (!config) {
-    print_error("kinglet build", "no kinglet.toml found (run kinglet init)");
+    print_error("build", "no kinglet.toml found (run kinglet init)");
     return 2;
   }
   if (backend.empty()) {
     backend = config->default_backend;
   }
   if (backend != "native" && backend != "vm") {
-    print_error("kinglet build", "unsupported backend '" + backend + "'");
+    print_error("build", "unsupported backend '" + backend + "'");
     return 64;
   }
 
   const fs::path entry = fs::path(config->root_dir) / config->build_root;
   if (!fs::exists(entry)) {
-    print_error("kinglet build", "entry not found: " + entry.string());
+    print_error("build", "entry not found: " + entry.string());
     return 2;
   }
 
@@ -474,7 +492,7 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   std::vector<std::string> args;
   if (backend == "native") {
 #ifndef KINGLET_HAVE_LLVM
-    print_error("kinglet build", "native backend not available (rebuild with enable_llvm=true)");
+    print_error("build", "native backend not available (rebuild with enable_llvm=true)");
     return 78;
 #else
     const fs::path obj_cache = fs::path(config->root_dir) / ".kinglet/objects/native";
@@ -508,7 +526,7 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
       std::cerr << p.green("\u2713") << "  Built " << p.bold(out_name) << "  "
                 << p.dim("\u2192 " + display_path(out_path)) << "  " << p.dim(elapsed) << "\n";
     } else {
-      print_error("kinglet build", "build failed (exit " + std::to_string(rc) + ")");
+      print_error("build", "build failed (exit " + std::to_string(rc) + ")");
     }
   }
   return rc;
@@ -526,7 +544,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
 
   const auto config = find_project_config(fs::current_path().string());
   if (!config) {
-    print_error("kinglet run", "no kinglet.toml; use kinglet <file.kl> or kinglet init");
+    print_error("run", "no kinglet.toml; use kinglet <file.kl> or kinglet init");
     return 2;
   }
 
@@ -537,7 +555,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
 
   if (fs::exists(native_bin)) {
 #if defined(_WIN32)
-    print_error("kinglet run", "executing built binaries is not supported on Windows");
+    print_error("run", "executing built binaries is not supported on Windows");
     return 78;
 #else
     std::vector<char *> exec_argv;
@@ -547,7 +565,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
     }
     exec_argv.push_back(nullptr);
     execv(native_bin.c_str(), exec_argv.data());
-    print_error("kinglet run", "exec failed for " + native_bin.string());
+    print_error("run", "exec failed for " + native_bin.string());
     return 71;
 #endif
   }
@@ -559,7 +577,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
     return spawn_reexec(self_executable, args);
   }
 
-  print_error("kinglet run", "no build output in " + display_path(out_dir) + " (run kinglet build)");
+  print_error("run", "no build output in " + display_path(out_dir) + " (run kinglet build)");
   return 2;
 }
 
@@ -659,7 +677,7 @@ int cmd_prune(int argc, char **argv) {
       continue;
     }
     if (arg.starts_with('-')) {
-      print_error("kinglet prune", std::string("unknown option ") + std::string(arg));
+      print_error("prune", std::string("unknown option ") + std::string(arg));
       return 64;
     }
     root_arg = std::string(arg);
@@ -669,7 +687,7 @@ int cmd_prune(int argc, char **argv) {
   const std::string start = root_arg.empty() ? fs::current_path().string() : fs::absolute(root_arg).string();
   const auto config = find_project_config(start);
   if (!config) {
-    print_error("kinglet prune", "no kinglet.toml found");
+    print_error("prune", "no kinglet.toml found");
     return 2;
   }
 
@@ -690,7 +708,7 @@ int cmd_prune(int argc, char **argv) {
     std::error_code ec;
     const auto removed = fs::remove_all(kinglet_dir, ec);
     if (ec) {
-      print_error("kinglet prune", "cannot remove " + kinglet_dir.string() + ": " + ec.message());
+      print_error("prune", "cannot remove " + kinglet_dir.string() + ": " + ec.message());
       return 74;
     }
     std::cout << ui::g_out.green("\u2713") << "  Removed " << ui::g_out.bold(display_path(kinglet_dir))
@@ -717,13 +735,14 @@ int run_cli_subcommand(int argc, char **argv) {
     return -1;
   }
   ui::init();
+  g_prog = program_name(argv[0]);
   const std::string_view cmd(argv[1]);
   if (cmd == "-h" || cmd == "--help") {
     print_cli_help(std::cout);
     return 0;
   }
   if (cmd == "-v" || cmd == "--version") {
-    std::cout << "kinglet " << KINGLET_VERSION << '\n';
+    std::cout << g_prog << ' ' << KINGLET_VERSION << '\n';
     return 0;
   }
   if (cmd == "init") {
