@@ -104,10 +104,11 @@ jobs:
             mingw-w64-x86_64-ninja
 
       - name: Install GN
+        # Extract into /usr/bin (always on the MSYS2 PATH); GITHUB_PATH does not
+        # reliably cross into the msys2 shell environment.
         run: |
           curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
-          unzip gn.zip -d "$HOME/bin"
-          echo "$HOME/bin" >> "$GITHUB_PATH"
+          unzip -o gn.zip -d /usr/bin
 
       - name: Generate build files
         run: |
