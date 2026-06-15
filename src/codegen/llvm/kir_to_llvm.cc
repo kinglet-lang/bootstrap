@@ -18,6 +18,7 @@
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/ADT/StringExtras.h>
+#include <llvm/Config/llvm-config.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/SHA256.h>
@@ -632,7 +633,12 @@ bool emit_object(llvm::Module &module, const std::string &obj_path, std::string 
   std::string triple_err;
   const llvm::Triple triple(llvm::sys::getDefaultTargetTriple());
   const std::string triple_str = triple.str();
+  // LLVM 21 switched setTargetTriple/createTargetMachine from std::string to Triple.
+#if LLVM_VERSION_MAJOR >= 21
+  module.setTargetTriple(triple);
+#else
   module.setTargetTriple(triple_str);
+#endif
 
   const llvm::Target *target = llvm::TargetRegistry::lookupTarget(triple_str, triple_err);
   if (target == nullptr) {
@@ -643,7 +649,11 @@ bool emit_object(llvm::Module &module, const std::string &obj_path, std::string 
   llvm::TargetOptions options;
   std::string cpu = llvm::sys::getHostCPUName().str();
   llvm::TargetMachine *machine =
+#if LLVM_VERSION_MAJOR >= 21
+      target->createTargetMachine(triple, cpu, "", options, llvm::Reloc::Model::PIC_);
+#else
       target->createTargetMachine(triple_str, cpu, "", options, llvm::Reloc::Model::PIC_);
+#endif
   if (machine == nullptr) {
     *error = "LLVM target machine creation failed";
     return false;
