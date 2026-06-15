@@ -430,7 +430,7 @@ int cmd_init(int argc, char **argv) {
 
   const fs::path manifest = dir / "kinglet.toml";
   if (fs::exists(manifest)) {
-    print_error("init", manifest.string() + " already exists");
+    print_error("init", "project '" + project_name + "' already exists");
     return 64;
   }
   if (!ensure_dir(dir)) {
@@ -468,7 +468,10 @@ int cmd_init(int argc, char **argv) {
       print_error("init", "cannot write " + main_kl.string());
       return 74;
     }
-    out << "int main() {\n"
+    out << "using io;\n"
+        << "\n"
+        << "int main() {\n"
+        << "  io::out.line(\"Hello from {}!\", \"" << toml_escape(project_name) << "\");\n"
         << "  return 0;\n"
         << "}\n";
   }
