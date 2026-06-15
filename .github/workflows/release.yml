@@ -92,6 +92,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # gn ships as a native Windows binary that emits drive-letter paths, which
+      # MSYS2's python cannot open. Use a native Windows python for gn's
+      # exec_script (--script-executable) instead.
+      - name: Set up native Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Set up MSYS2
         uses: msys2/setup-msys2@v2
         with:
@@ -99,7 +107,6 @@ jobs:
           update: true
           install: >-
             unzip
-            python
             mingw-w64-x86_64-clang
             mingw-w64-x86_64-llvm
             mingw-w64-x86_64-ninja
@@ -114,7 +121,12 @@ jobs:
       - name: Generate build files
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gn gen out/Release --args="is_debug=false enable_llvm=true llvm_config=\"/mingw64/bin/llvm-config\" kinglet_version=\"$VERSION\""
+          # Native gn + native python need Windows-style paths; convert with cygpath.
+          PYW="$(cygpath -m "$pythonLocation")/python.exe"
+          LLVMW="$(cygpath -m /mingw64/bin/llvm-config.exe)"
+          gn gen out/Release \
+            --script-executable="$PYW" \
+            --args="is_debug=false enable_llvm=true llvm_config=\"$LLVMW\" kinglet_version=\"$VERSION\""
 
       - name: Build
         run: ninja -C out/Release kinglet kinglet_rt
