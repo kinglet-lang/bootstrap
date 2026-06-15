@@ -9,19 +9,17 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  # macOS + Linux: LLVM-enabled native build. The VM-only configuration is no
+  # longer published — every release archive ships the LLVM backend.
+  build-unix:
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            artifact: kinglet-windows-x64
-            ext: .exe
           - os: ubuntu-latest
             artifact: kinglet-linux-x64
-            ext: ""
           - os: macos-latest
             artifact: kinglet-macos-arm64
-            ext: ""
 
     runs-on: ${{ matrix.os }}
 
@@ -31,38 +29,48 @@ jobs:
       - name: Install GN
         shell: bash
         run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
-            unzip gn.zip -d "$HOME/bin"
-            echo "$HOME/bin" >> $GITHUB_PATH
-          elif [ "$RUNNER_OS" == "macOS" ]; then
+          if [ "$RUNNER_OS" == "macOS" ]; then
             curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/mac-arm64/+/latest"
-            unzip gn.zip -d "$HOME/bin"
-            echo "$HOME/bin" >> $GITHUB_PATH
           else
             curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest"
-            unzip gn.zip -d "$HOME/bin"
-            echo "$HOME/bin" >> $GITHUB_PATH
           fi
+          unzip gn.zip -d "$HOME/bin"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
+      - name: Install LLVM
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            brew install llvm
+            echo "LLVM_CONFIG=$(brew --prefix llvm)/bin/llvm-config" >> "$GITHUB_ENV"
+          else
+            sudo apt-get update
+            sudo apt-get install -y llvm-dev clang
+            # llvm-dev installs a versioned llvm-config under /usr/lib/llvm-*/bin.
+            echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
+          fi
+
       - name: Generate build files
         shell: bash
-        run: gn gen out/Release --args='is_debug=false'
+        run: gn gen out/Release --args="is_debug=false enable_llvm=true llvm_config=\"$LLVM_CONFIG\""
 
       - name: Build
         shell: bash
-        run: ninja -C out/Release
+        run: ninja -C out/Release kinglet kinglet_rt
 
       - name: Package binaries
         shell: bash
         run: |
           mkdir -p dist
-          cp out/Release/kinglet${{ matrix.ext }} dist/
+          cp out/Release/kinglet dist/
+          # Native backend links user programs against the static runtime; it must
+          # sit beside the kinglet binary (see resolve_rt_lib in src/kinglet/main.cc).
+          cp out/Release/obj/runtime/libkinglet_rt.a dist/
           bash scripts/stage-klet-alias.sh dist
-          cd dist && tar czf ../${{ matrix.artifact }}.tar.gz *
+          cd dist && tar czf "../${{ matrix.artifact }}.tar.gz" *
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -70,8 +78,58 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}.tar.gz
 
+  # Windows uses the MSYS2/mingw64 clang toolchain, which (unlike the official
+  # LLVM installer) ships clang++, llvm-ar, and llvm-config + dev libs together —
+  # matching build/toolchain/BUILD.gn's win toolchain.
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            unzip
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-llvm
+            mingw-w64-x86_64-ninja
+
+      - name: Install GN
+        run: |
+          curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
+          unzip gn.zip -d "$HOME/bin"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Generate build files
+        run: gn gen out/Release --args="is_debug=false enable_llvm=true llvm_config=\"/mingw64/bin/llvm-config\""
+
+      - name: Build
+        run: ninja -C out/Release kinglet kinglet_rt
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cp out/Release/kinglet.exe dist/
+          # Windows runtime archive is kinglet_rt.lib (see win alink in build/toolchain).
+          cp out/Release/obj/runtime/kinglet_rt.lib dist/
+          bash scripts/stage-klet-alias.sh dist
+          cd dist && tar czf "../kinglet-windows-x64.tar.gz" *
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kinglet-windows-x64
+          path: kinglet-windows-x64.tar.gz
+
   release:
-    needs: [build]
+    needs: [build-unix, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,6 +138,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Collect archives and checksums
+        run: |
+          mkdir -p out
+          find artifacts -name '*.tar.gz' -exec cp {} out/ \;
+          (cd out && sha256sum *.tar.gz > SHA256SUMS)
+          cat out/SHA256SUMS
 
       - name: Resolve changelog
         id: changelog
@@ -98,6 +163,7 @@ jobs:
           body_path: ${{ steps.changelog.outputs.body_path || '' }}
           generate_release_notes: ${{ steps.changelog.outputs.body_path == '' }}
           files: |
-            artifacts/kinglet-windows-x64/*.tar.gz
-            artifacts/kinglet-linux-x64/*.tar.gz
-            artifacts/kinglet-macos-arm64/*.tar.gz
+            out/kinglet-windows-x64.tar.gz
+            out/kinglet-linux-x64.tar.gz
+            out/kinglet-macos-arm64.tar.gz
+            out/SHA256SUMS
