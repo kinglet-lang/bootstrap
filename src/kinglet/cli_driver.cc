@@ -18,7 +18,9 @@
 #endif
 #if !defined(_WIN32)
 #include <unistd.h>
+#include <sys/wait.h>
 #endif
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <set>
@@ -35,25 +37,135 @@ namespace {
 
 namespace fs = std::filesystem;
 
+// ---------------------------------------------------------------------------
+// Terminal styling. Colors are emitted only when the target stream is an
+// interactive TTY and NO_COLOR is unset, so piped output and golden tests stay
+// byte-for-byte plain.
+// ---------------------------------------------------------------------------
+namespace ui {
+
+constexpr const char *kReset = "\033[0m";
+constexpr const char *kBold = "\033[1m";
+constexpr const char *kDim = "\033[2m";
+constexpr const char *kRed = "\033[31m";
+constexpr const char *kGreen = "\033[32m";
+constexpr const char *kYellow = "\033[33m";
+constexpr const char *kCyan = "\033[36m";
+
+bool fd_is_tty(int fd) {
+#if defined(_WIN32)
+  return _isatty(fd) != 0;
+#else
+  return isatty(fd) != 0;
+#endif
+}
+
+bool stream_supports_color(int fd) {
+  if (std::getenv("NO_COLOR") != nullptr) {
+    return false;
+  }
+  const char *term = std::getenv("TERM");
+  if (term != nullptr && std::string_view(term) == "dumb") {
+    return false;
+  }
+#if defined(_WIN32)
+  // Avoid garbage on legacy consoles: only colorize when a VT-capable terminal
+  // advertises itself (Windows Terminal, or a TERM provided by an emulator).
+  if (std::getenv("WT_SESSION") == nullptr && term == nullptr) {
+    return false;
+  }
+#endif
+  return fd_is_tty(fd);
+}
+
+struct Painter {
+  bool on = false;
+
+  std::string wrap(const char *code, std::string_view text) const {
+    if (!on) {
+      return std::string(text);
+    }
+    std::string r;
+    r.reserve(text.size() + 12);
+    r += code;
+    r += text;
+    r += kReset;
+    return r;
+  }
+
+  std::string bold(std::string_view t) const { return wrap(kBold, t); }
+  std::string dim(std::string_view t) const { return wrap(kDim, t); }
+  std::string red(std::string_view t) const { return wrap(kRed, t); }
+  std::string green(std::string_view t) const { return wrap(kGreen, t); }
+  std::string yellow(std::string_view t) const { return wrap(kYellow, t); }
+  std::string cyan(std::string_view t) const { return wrap(kCyan, t); }
+};
+
+Painter g_out;
+Painter g_err;
+
+void init() {
+#if defined(_WIN32)
+  g_out.on = stream_supports_color(_fileno(stdout));
+  g_err.on = stream_supports_color(_fileno(stderr));
+#else
+  g_out.on = stream_supports_color(STDOUT_FILENO);
+  g_err.on = stream_supports_color(STDERR_FILENO);
+#endif
+}
+
+} // namespace ui
+
+// Path relative to the current directory when possible, for readable output.
+std::string display_path(const fs::path &p) {
+  std::error_code ec;
+  const fs::path rel = fs::relative(p, fs::current_path(), ec);
+  if (!ec && !rel.empty() && rel.native()[0] != '.') {
+    return rel.string();
+  }
+  if (!ec && !rel.empty() && rel.string().rfind("..", 0) != 0) {
+    return rel.string();
+  }
+  return p.string();
+}
+
+// Consistent error line: "✗ <command>: <message>" with a red glyph on a TTY.
+void print_error(std::string_view command, std::string_view message) {
+  std::cerr << ui::g_err.red("\u2717") << " " << ui::g_err.bold(command) << ": " << message
+            << '\n';
+}
+
 void print_cli_help(std::ostream &out) {
-  out << "Kinglet " << KINGLET_VERSION << "\n"
-      << "\n"
-      << "Usage:\n"
-      << "  kinglet <file.kl> [args...]     Compile and run (default)\n"
-      << "  kinglet init [name]             New project dir (prompts; default kinglet-app)\n"
-      << "  kinglet build [--backend native|vm] [--quiet] [project_root]\n"
-      << "  kinglet run [<file.kl> | built binary args...]\n"
-      << "  kinglet prune [--all] [-n] [project_root]\n"
-      << "                                  Prune unreferenced Klos objects (or --all)\n"
-      << "  kinglet -h, --help              Show this help\n"
-      << "  kinglet -v, --version           Show version\n"
-      << "\n"
-      << "Developer / compiler modes (flags):\n"
-      << "  --check, --tokens, --ast, --bytecode, --ir\n"
-      << "  --save-bytecode <out.kbc>, --run <program.kbc>\n"
-      << "  --native <out> | --backend native -o <out>  (requires LLVM build)\n"
-      << "  --repl\n"
-      << "\n";
+  const ui::Painter &p = (&out == &std::cout) ? ui::g_out : ui::g_err;
+  auto cmd = [&](std::string_view name, std::string_view desc) {
+    out << "  " << p.cyan(name);
+    int pad = 36 - static_cast<int>(name.size());
+    if (pad < 1) {
+      pad = 1;
+    }
+    for (int i = 0; i < pad; ++i) {
+      out << ' ';
+    }
+    out << p.dim(desc) << '\n';
+  };
+
+  out << p.bold("Kinglet") << ' ' << p.dim(KINGLET_VERSION) << "\n\n";
+  out << p.bold("USAGE") << "\n";
+  cmd("kinglet <file.kl> [args...]", "Compile and run (default)");
+  cmd("kinglet init [name]", "Scaffold a new project (prompts)");
+  cmd("kinglet build [--backend native|vm]", "Build the project (--quiet, [root])");
+  cmd("kinglet run [<file.kl> | args...]", "Run the built binary or a source file");
+  cmd("kinglet prune [--all] [-n]", "Prune unreferenced Klos objects");
+  cmd("kinglet -h, --help", "Show this help");
+  cmd("kinglet -v, --version", "Show version");
+  out << "\n" << p.bold("COMPILER MODES") << " " << p.dim("(flags)") << "\n";
+  cmd("--check, --tokens, --ast", "Diagnostics, tokens, AST");
+  cmd("--bytecode, --ir", "Bytecode / KIR dump");
+  cmd("--save-bytecode <out.kbc>", "Compile to bytecode");
+  cmd("--run <program.kbc>", "Run compiled bytecode");
+  cmd("--native <out>", "Native executable (requires LLVM build)");
+  cmd("--repl", "Interactive REPL");
+  out << '\n';
 }
 
 bool ensure_dir(const fs::path &path) {
@@ -197,27 +309,71 @@ int spawn_reexec(const std::string &self_executable, const std::vector<std::stri
 #endif
 }
 
+// Like spawn_reexec, but waits for the child instead of replacing this process,
+// so the caller can print a completion line. Returns the child exit code.
+int spawn_and_wait(const std::string &self_executable, const std::vector<std::string> &args) {
+#if defined(_WIN32)
+  (void)self_executable;
+  (void)args;
+  print_error("kinglet build", "building is not supported on Windows yet");
+  return 78;
+#else
+  std::vector<char *> exec_argv;
+  exec_argv.push_back(const_cast<char *>(self_executable.c_str()));
+  for (const std::string &arg : args) {
+    exec_argv.push_back(const_cast<char *>(arg.c_str()));
+  }
+  exec_argv.push_back(nullptr);
+
+  const pid_t pid = fork();
+  if (pid < 0) {
+    print_error("kinglet build", std::string("fork failed: ") + std::strerror(errno));
+    return 71;
+  }
+  if (pid == 0) {
+    execv(self_executable.c_str(), exec_argv.data());
+    std::cerr << "kinglet build: failed to exec " << self_executable << ": "
+              << std::strerror(errno) << '\n';
+    _exit(71);
+  }
+  int status = 0;
+  while (waitpid(pid, &status, 0) < 0) {
+    if (errno == EINTR) {
+      continue;
+    }
+    return 71;
+  }
+  if (WIFEXITED(status)) {
+    return WEXITSTATUS(status);
+  }
+  if (WIFSIGNALED(status)) {
+    return 128 + WTERMSIG(status);
+  }
+  return 71;
+#endif
+}
+
 int cmd_init(int argc, char **argv) {
   const std::string project_name = resolve_init_project_name(argc, argv);
   if (!is_valid_project_name(project_name)) {
-    std::cerr << "kinglet init: invalid project name '" << project_name << "'\n";
+    print_error("kinglet init", "invalid project name '" + project_name + "'");
     return 64;
   }
 
   const fs::path dir = fs::absolute(fs::current_path() / project_name);
   const fs::path manifest = dir / "kinglet.toml";
   if (fs::exists(manifest)) {
-    std::cerr << "kinglet init: " << manifest << " already exists\n";
+    print_error("kinglet init", manifest.string() + " already exists");
     return 64;
   }
   if (!ensure_dir(dir)) {
-    std::cerr << "kinglet init: cannot create " << dir << '\n';
+    print_error("kinglet init", "cannot create " + dir.string());
     return 74;
   }
   {
     std::ofstream out(manifest);
     if (!out) {
-      std::cerr << "kinglet init: cannot write " << manifest << '\n';
+      print_error("kinglet init", "cannot write " + manifest.string());
       return 74;
     }
     out << "[project]\n"
@@ -236,23 +392,28 @@ int cmd_init(int argc, char **argv) {
   const fs::path src_dir = dir / "src";
   const fs::path main_kl = src_dir / "main.kl";
   if (!ensure_dir(src_dir)) {
-    std::cerr << "kinglet init: cannot create " << src_dir << '\n';
+    print_error("kinglet init", "cannot create " + src_dir.string());
     return 74;
   }
   if (!fs::exists(main_kl)) {
     std::ofstream out(main_kl);
     if (!out) {
-      std::cerr << "kinglet init: cannot write " << main_kl << '\n';
+      print_error("kinglet init", "cannot write " + main_kl.string());
       return 74;
     }
     out << "int main() {\n"
         << "  return 0;\n"
         << "}\n";
   }
-  std::cout << "Created project '" << project_name << "' at " << dir << '\n';
-  std::cout << "  " << manifest.filename().string() << '\n';
-  std::cout << "  src/main.kl\n";
-  std::cout << "\nNext: cd " << project_name << " && kinglet build\n";
+
+  const ui::Painter &p = ui::g_out;
+  std::cout << p.green("\u2713") << "  Created project " << p.bold(project_name) << "\n\n";
+  std::cout << "   " << p.dim(display_path(dir) + "/") << "\n";
+  std::cout << "   " << p.cyan("kinglet.toml") << "\n";
+  std::cout << "   " << p.cyan("src/main.kl") << "\n\n";
+  std::cout << p.bold("   Next steps") << "\n";
+  std::cout << p.dim("     cd " + project_name) << "\n";
+  std::cout << p.dim("     kinglet build") << "\n";
   return 0;
 }
 
@@ -268,14 +429,14 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
     }
     if (arg == "--backend") {
       if (i + 1 >= argc) {
-        std::cerr << "kinglet build: --backend requires native or vm\n";
+        print_error("kinglet build", "--backend requires native or vm");
         return 64;
       }
       backend = argv[++i];
       continue;
     }
     if (arg.starts_with('-')) {
-      std::cerr << "kinglet build: unknown option " << arg << '\n';
+      print_error("kinglet build", std::string("unknown option ") + std::string(arg));
       return 64;
     }
     root_arg = std::string(arg);
@@ -285,20 +446,20 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   const std::string start = root_arg.empty() ? fs::current_path().string() : fs::absolute(root_arg).string();
   const auto config = find_project_config(start);
   if (!config) {
-    std::cerr << "kinglet build: no kinglet.toml found (run kinglet init)\n";
+    print_error("kinglet build", "no kinglet.toml found (run kinglet init)");
     return 2;
   }
   if (backend.empty()) {
     backend = config->default_backend;
   }
   if (backend != "native" && backend != "vm") {
-    std::cerr << "kinglet build: unsupported backend '" << backend << "'\n";
+    print_error("kinglet build", "unsupported backend '" + backend + "'");
     return 64;
   }
 
   const fs::path entry = fs::path(config->root_dir) / config->build_root;
   if (!fs::exists(entry)) {
-    std::cerr << "kinglet build: entry not found: " << entry << '\n';
+    print_error("kinglet build", "entry not found: " + entry.string());
     return 2;
   }
 
@@ -310,14 +471,10 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   const fs::path out_path =
       backend == "native" ? out_dir / out_name : out_dir / (out_name + ".kbc");
 
-  if (!quiet) {
-    std::cerr << "kinglet build: " << backend << " → " << out_path << " from " << entry << '\n';
-  }
-
   std::vector<std::string> args;
   if (backend == "native") {
 #ifndef KINGLET_HAVE_LLVM
-    std::cerr << "kinglet build: native backend not available (rebuild with enable_llvm=true)\n";
+    print_error("kinglet build", "native backend not available (rebuild with enable_llvm=true)");
     return 78;
 #else
     const fs::path obj_cache = fs::path(config->root_dir) / ".kinglet/objects/native";
@@ -331,9 +488,28 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   if (args.empty()) {
     return 78;
   }
-  const int rc = spawn_reexec(self_executable, args);
-  if (rc == 0 && !quiet) {
-    std::cout << out_path.string() << '\n';
+
+  const ui::Painter &p = ui::g_err;
+  if (!quiet) {
+    std::cerr << p.dim("\u203a") << "  Building " << p.bold(out_name) << "  "
+              << p.dim("(" + backend + " backend)") << "\n";
+  }
+
+  const auto t0 = std::chrono::steady_clock::now();
+  const int rc = spawn_and_wait(self_executable, args);
+  const auto t1 = std::chrono::steady_clock::now();
+
+  if (!quiet) {
+    if (rc == 0) {
+      const double secs =
+          std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count();
+      char elapsed[32];
+      std::snprintf(elapsed, sizeof(elapsed), "%.2fs", secs);
+      std::cerr << p.green("\u2713") << "  Built " << p.bold(out_name) << "  "
+                << p.dim("\u2192 " + display_path(out_path)) << "  " << p.dim(elapsed) << "\n";
+    } else {
+      print_error("kinglet build", "build failed (exit " + std::to_string(rc) + ")");
+    }
   }
   return rc;
 }
@@ -350,7 +526,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
 
   const auto config = find_project_config(fs::current_path().string());
   if (!config) {
-    std::cerr << "kinglet run: no kinglet.toml; use kinglet <file.kl> or kinglet init\n";
+    print_error("kinglet run", "no kinglet.toml; use kinglet <file.kl> or kinglet init");
     return 2;
   }
 
@@ -361,7 +537,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
 
   if (fs::exists(native_bin)) {
 #if defined(_WIN32)
-    std::cerr << "kinglet run: executing built binaries is not supported on Windows\n";
+    print_error("kinglet run", "executing built binaries is not supported on Windows");
     return 78;
 #else
     std::vector<char *> exec_argv;
@@ -371,7 +547,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
     }
     exec_argv.push_back(nullptr);
     execv(native_bin.c_str(), exec_argv.data());
-    std::cerr << "kinglet run: exec failed for " << native_bin << '\n';
+    print_error("kinglet run", "exec failed for " + native_bin.string());
     return 71;
 #endif
   }
@@ -383,7 +559,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
     return spawn_reexec(self_executable, args);
   }
 
-  std::cerr << "kinglet run: no build output in " << out_dir << " (run kinglet build)\n";
+  print_error("kinglet run", "no build output in " + display_path(out_dir) + " (run kinglet build)");
   return 2;
 }
 
@@ -483,7 +659,7 @@ int cmd_prune(int argc, char **argv) {
       continue;
     }
     if (arg.starts_with('-')) {
-      std::cerr << "kinglet prune: unknown option " << arg << '\n';
+      print_error("kinglet prune", std::string("unknown option ") + std::string(arg));
       return 64;
     }
     root_arg = std::string(arg);
@@ -493,40 +669,43 @@ int cmd_prune(int argc, char **argv) {
   const std::string start = root_arg.empty() ? fs::current_path().string() : fs::absolute(root_arg).string();
   const auto config = find_project_config(start);
   if (!config) {
-    std::cerr << "kinglet prune: no kinglet.toml found\n";
+    print_error("kinglet prune", "no kinglet.toml found");
     return 2;
   }
 
   const fs::path kinglet_dir = fs::path(config->root_dir) / ".kinglet";
   if (!fs::exists(kinglet_dir)) {
     if (!dry_run) {
-      std::cout << "kinglet prune: nothing to do (" << kinglet_dir << " missing)\n";
+      std::cout << ui::g_out.dim("\u2022") << "  Nothing to do (" << display_path(kinglet_dir)
+                << " missing)\n";
     }
     return 0;
   }
 
   if (all) {
     if (dry_run) {
-      std::cout << "would remove " << kinglet_dir << '\n';
+      std::cout << ui::g_out.dim("\u2022") << "  Would remove " << display_path(kinglet_dir) << "\n";
       return 0;
     }
     std::error_code ec;
     const auto removed = fs::remove_all(kinglet_dir, ec);
     if (ec) {
-      std::cerr << "kinglet prune: cannot remove " << kinglet_dir << ": " << ec.message() << '\n';
+      print_error("kinglet prune", "cannot remove " + kinglet_dir.string() + ": " + ec.message());
       return 74;
     }
-    std::cout << "kinglet prune: removed " << kinglet_dir << " (" << removed << " entries)\n";
+    std::cout << ui::g_out.green("\u2713") << "  Removed " << ui::g_out.bold(display_path(kinglet_dir))
+              << "  " << ui::g_out.dim("(" + std::to_string(removed) + " entries)") << "\n";
     return 0;
   }
 
+  const ui::Painter &p = ui::g_out;
   const int removed = prune_unreferenced_objects(kinglet_dir / "objects", dry_run);
   if (dry_run) {
-    std::cout << "kinglet prune: " << removed << " path(s) would be removed\n";
+    std::cout << p.dim("\u2022") << "  " << removed << " path(s) would be removed\n";
   } else if (removed > 0) {
-    std::cout << "kinglet prune: removed " << removed << " unreferenced object path(s)\n";
+    std::cout << p.green("\u2713") << "  Pruned " << removed << " unreferenced object path(s)\n";
   } else {
-    std::cout << "kinglet prune: no unreferenced objects\n";
+    std::cout << p.dim("\u2022") << "  No unreferenced objects\n";
   }
   return 0;
 }
@@ -537,6 +716,7 @@ int run_cli_subcommand(int argc, char **argv) {
   if (argc < 2) {
     return -1;
   }
+  ui::init();
   const std::string_view cmd(argv[1]);
   if (cmd == "-h" || cmd == "--help") {
     print_cli_help(std::cout);
