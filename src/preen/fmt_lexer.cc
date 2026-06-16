@@ -99,15 +99,14 @@ std::vector<FmtToken> FmtLexer::scan_all() {
   return tokens;
 }
 
-std::vector<Token> FmtLexer::parse_tokens() const {
-  std::vector<Token> tokens;
-  FmtLexer copy = *this;
-  for (const FmtToken &item : copy.scan_all()) {
+std::vector<Token> FmtLexer::to_parse_tokens(const std::vector<FmtToken> &tokens) {
+  std::vector<Token> out;
+  for (const FmtToken &item : tokens) {
     if (item.kind == FmtTokenKind::Token) {
-      tokens.push_back(item.token);
+      out.push_back(item.token);
     }
   }
-  return tokens;
+  return out;
 }
 
 void FmtLexer::scan_trivia(std::vector<FmtToken> &out) {
