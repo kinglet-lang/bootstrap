@@ -1,5 +1,7 @@
 #include "module/project_config.h"
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -22,6 +24,47 @@ std::string unquote(const std::string &s) {
   return s;
 }
 
+std::vector<std::string> parse_string_array(const std::string &value) {
+  std::vector<std::string> items;
+  std::string trimmed = trim(value);
+  if (trimmed.empty() || trimmed.front() != '[' || trimmed.back() != ']') {
+    return items;
+  }
+  std::string inner = trimmed.substr(1, trimmed.size() - 2);
+  std::stringstream ss(inner);
+  std::string part;
+  while (std::getline(ss, part, ',')) {
+    std::string item = unquote(trim(part));
+    if (!item.empty()) {
+      items.push_back(item);
+    }
+  }
+  return items;
+}
+
+bool parse_bool(const std::string &value, bool &out) {
+  const std::string v = trim(value);
+  if (v == "true") {
+    out = true;
+    return true;
+  }
+  if (v == "false") {
+    out = false;
+    return true;
+  }
+  return false;
+}
+
+std::string section_name(const std::string &trimmed) {
+  if (trimmed.size() >= 4 && trimmed.rfind("[[", 0) == 0 && trimmed.substr(trimmed.size() - 2) == "]]") {
+    return trimmed.substr(2, trimmed.size() - 4);
+  }
+  if (!trimmed.empty() && trimmed.front() == '[' && trimmed.back() == ']') {
+    return trimmed.substr(1, trimmed.size() - 2);
+  }
+  return {};
+}
+
 } // namespace
 
 std::optional<ProjectConfig> find_project_config(const std::string &start_dir) {
@@ -42,7 +85,7 @@ std::optional<ProjectConfig> find_project_config(const std::string &start_dir) {
         if (trimmed.empty() || trimmed[0] == '#') continue;
 
         if (trimmed.front() == '[' && trimmed.back() == ']') {
-          current_section = trimmed.substr(1, trimmed.size() - 2);
+          current_section = section_name(trimmed);
           continue;
         }
 
@@ -61,6 +104,27 @@ std::optional<ProjectConfig> find_project_config(const std::string &start_dir) {
           else if (key == "out_dir") config.out_dir = value;
         } else if (current_section == "build.compiler" || current_section == "compiler") {
           if (key == "default_backend") config.default_backend = value;
+        } else if (current_section == "fmt") {
+          if (key == "indent") {
+            config.fmt.indent = std::stoi(value);
+          } else if (key == "max_width") {
+            config.fmt.max_width = std::stoi(value);
+          } else if (key == "newline") {
+            config.fmt.newline = value;
+          } else if (key == "trailing_comma") {
+            config.fmt.trailing_comma_set = parse_bool(value, config.fmt.trailing_comma);
+          } else if (key == "extensions") {
+            config.fmt.extensions = parse_string_array(value);
+          }
+        } else if (current_section == "fmt.extensions") {
+          if (key == "name") {
+            config.fmt.extension_entries.push_back({value, true});
+          } else if (key == "enabled" && !config.fmt.extension_entries.empty()) {
+            bool enabled = true;
+            if (parse_bool(value, enabled)) {
+              config.fmt.extension_entries.back().second = enabled;
+            }
+          }
         } else if (current_section == "dependencies") {
           // Parse inline table: name = { path = "..." }
           auto brace_start = value.find('{');
