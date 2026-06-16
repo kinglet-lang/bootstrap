@@ -1,0 +1,6 @@
+// Greet the world
+using io;
+int main() {
+  io::out.line("hi");
+  return 0;
+}
