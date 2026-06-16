@@ -183,6 +183,15 @@ struct CallExpr final : Expr {
   std::vector<ExprPtr> args;
 };
 
+// Pipeline operator: `left |> right` (right is invoked with left as the first argument).
+struct PipeExpr final : Expr {
+  PipeExpr(SourceLocation location, ExprPtr left, ExprPtr right);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  ExprPtr left;
+  ExprPtr right;
+};
+
 struct CastExpr final : Expr {
   CastExpr(SourceLocation location, TypeExpr target_type, ExprPtr value);
   void print(std::ostream &out, int indent = 0) const override;
@@ -536,5 +545,7 @@ struct Program final : Node {
 
   std::vector<DeclPtr> declarations;
 };
+
+void desugar_pipes(Program &program);
 
 } // namespace kinglet::ast

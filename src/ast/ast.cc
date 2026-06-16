@@ -236,6 +236,17 @@ void CallExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+PipeExpr::PipeExpr(SourceLocation location, ExprPtr left, ExprPtr right)
+    : Expr(location), left(std::move(left)), right(std::move(right)) {}
+
+void PipeExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(pipe";
+  print_child(out, *left, indent);
+  print_child(out, *right, indent);
+  out << ")";
+}
+
 CastExpr::CastExpr(SourceLocation location, TypeExpr target_type, ExprPtr value)
     : Expr(location), target_type(std::move(target_type)), value(std::move(value)) {}
 
