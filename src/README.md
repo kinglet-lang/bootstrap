@@ -17,8 +17,11 @@ Editor/LSP tooling is a separate repo (planned).
        └→ codegen/llvm/ link libkinglet_rt → native executable
 ```
 
-User-facing CLI: `kinglet/` (`cli_driver` for init/build/run/prune; `main` for
+User-facing CLI: `kinglet/` (`cli_driver` for init/build/run/prune/fmt; `main` for
 dev flags and REPL). Optional `kinglet-vm` runs the VM host only.
+
+Formatting: `preen/` (`kinglet::preen`) — parse-then-emit formatter used by
+`kinglet fmt` (CI/batch) and intended for in-process LSP integration.
 
 ## Directories
 
@@ -30,6 +33,7 @@ dev flags and REPL). Optional `kinglet-vm` runs the VM host only.
 | `types/` | `TypeExpr`, width helpers (`numeric`) |
 | `checker/` | `TypeChecker` — inference, match exhaustiveness, warnings |
 | `module/` | `ModuleLoader` (imports), `project_config` (`kinglet.toml`) |
+| `preen/` | `kinglet::preen` formatter (`format_string`, extensions, `[fmt]` config) |
 | `ir/` | KIR structs, record from compiler, typing/specialize passes |
 | `compiler/` | Main compile driver, bytecode emission, width/dense array helpers |
 | `vm/` | `Chunk`, opcodes, RC/COW `Value`, `Vm` interpreter |
@@ -45,6 +49,7 @@ binaries, not into the compiler itself (except LLVM link step).
 ast
 lexer → parser
 ast + lexer + parser → module
+ast + lexer + parser + module → preen
 ast + types + module + ir → checker
 ast + types + vm + module + ir → compiler
 ast + types + vm → ir
@@ -65,5 +70,7 @@ VM opcodes and KIR share representation during bootstrap.
 ## Tests
 
 Ref regression: `tests/cli/run_golden.sh` (from repo root).
+
+Formatter goldens: `tests/fmt/run_golden.sh`.
 
 Shadow parity and toolchain stamps: `kinglet-self` repo (`./kinglet prove`).
