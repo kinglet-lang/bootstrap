@@ -29,6 +29,9 @@ const ast::Expr *single_return_expr(const ast::FunctionDecl &function) {
 } // namespace
 
 CompileResult Compiler::compile(const ast::Program &program) {
+  ast::Program &mutable_program = const_cast<ast::Program &>(program);
+  ast::desugar_pipes(mutable_program);
+
   chunk_ = Chunk();
   emitter_.reset(&chunk_);
   kir_module_ = KirModule();

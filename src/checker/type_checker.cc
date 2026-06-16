@@ -643,6 +643,9 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   method_registry_.clear();
   kir_function_sigs_.clear();
 
+  ast::Program &mutable_program = const_cast<ast::Program &>(program);
+  ast::desugar_pipes(mutable_program);
+
   push_scope();
 
   // Pass 0: insert forward-declaration placeholders for every named type so
