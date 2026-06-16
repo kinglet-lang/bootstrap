@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -30,5 +31,6 @@ struct ProjectConfig {
 };
 
 std::optional<ProjectConfig> find_project_config(const std::string &start_dir);
+std::optional<ProjectConfig> load_project_config_file(const std::filesystem::path &manifest_path);
 
 } // namespace kinglet
