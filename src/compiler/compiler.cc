@@ -500,10 +500,24 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     }
   }
 
+  std::string fn_source = entry_source_path_;
+  if (!lookup_name.empty()) {
+    const auto sep = lookup_name.find("::");
+    if (sep != std::string::npos) {
+      const std::string ns = lookup_name.substr(0, sep);
+      const auto src_it = namespace_source_paths_.find(ns);
+      if (src_it != namespace_source_paths_.end()) {
+        fn_source = src_it->second;
+      }
+    }
+  }
+
   // KIR fast path: single `return <expr>` with IrBuilder-supported expression.
   if (const ast::Expr *ret_expr = single_return_expr(function)) {
     IrBuilder builder;
-    if (auto kir = builder.build_expr_function(function.name, *ret_expr)) {
+    if (auto kir = builder.build_expr_function(name, *ret_expr)) {
+      kir->source_path = fn_source;
+      kir->param_count = static_cast<int>(function.params.size());
       kir_module_.functions.push_back(*kir);
       emitter_.lower(*kir);
       implicit_return_stmt_ = nullptr;
@@ -521,19 +535,7 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     }
   }
 
-  std::string fn_source = entry_source_path_;
-  if (!lookup_name.empty()) {
-    const auto sep = lookup_name.find("::");
-    if (sep != std::string::npos) {
-      const std::string ns = lookup_name.substr(0, sep);
-      const auto src_it = namespace_source_paths_.find(ns);
-      if (src_it != namespace_source_paths_.end()) {
-        fn_source = src_it->second;
-      }
-    }
-  }
-  kir_recorder_.begin_function(function.name, static_cast<int>(function.params.size()),
-                               fn_source);
+  kir_recorder_.begin_function(name, static_cast<int>(function.params.size()), fn_source);
   kir_instr_at_bc_.clear();
   bool body_returned = false;
   if (body && !body->statements.empty()) {
