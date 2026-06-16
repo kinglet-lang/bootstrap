@@ -1,0 +1,16 @@
+static_library("preen") {
+  sources = [
+    "config.cc",
+    "config.h",
+  ]
+
+  deps = [
+    "//src/ast",
+    "//src/lexer",
+    "//src/parser",
+  ]
+
+  include_dirs = [
+    "//src",
+  ]
+}
