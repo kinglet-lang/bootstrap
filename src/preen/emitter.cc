@@ -18,10 +18,80 @@ std::string join(const std::vector<std::string> &parts, std::string_view sep) {
   return out;
 }
 
+std::string comment_suffix(std::string_view trailing) {
+  std::size_t start = std::string_view::npos;
+  for (std::size_t i = 0; i + 1 < trailing.size(); ++i) {
+    if (trailing[i] == '/' && trailing[i + 1] == '/') {
+      start = i;
+      break;
+    }
+    if (trailing[i] == '/' && trailing[i + 1] == '*') {
+      start = i;
+      break;
+    }
+  }
+  if (start == std::string_view::npos) {
+    return {};
+  }
+  std::string out(trailing.substr(start));
+  while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) {
+    out.pop_back();
+  }
+  if (out.size() >= 2 && out[0] == '/' && out[1] == '/') {
+    return " " + out;
+  }
+  return out;
+}
+
+TokenType token_for_binary_op(ast::BinaryOp op) {
+  switch (op) {
+  case ast::BinaryOp::Add:
+    return TokenType::PLUS;
+  case ast::BinaryOp::Sub:
+    return TokenType::MINUS;
+  case ast::BinaryOp::Mul:
+    return TokenType::STAR;
+  case ast::BinaryOp::Div:
+    return TokenType::SLASH;
+  case ast::BinaryOp::Mod:
+    return TokenType::PERCENT;
+  case ast::BinaryOp::Eq:
+    return TokenType::EQUAL_EQUAL;
+  case ast::BinaryOp::Neq:
+    return TokenType::BANG_EQUAL;
+  case ast::BinaryOp::Lt:
+    return TokenType::LESS;
+  case ast::BinaryOp::Gt:
+    return TokenType::GREATER;
+  case ast::BinaryOp::Le:
+    return TokenType::LESS_EQUAL;
+  case ast::BinaryOp::Ge:
+    return TokenType::GREATER_EQUAL;
+  case ast::BinaryOp::And:
+    return TokenType::AMP_AMP;
+  case ast::BinaryOp::Or:
+    return TokenType::PIPE_PIPE;
+  case ast::BinaryOp::BitAnd:
+    return TokenType::AMP;
+  case ast::BinaryOp::BitOr:
+    return TokenType::PIPE;
+  case ast::BinaryOp::BitXor:
+    return TokenType::CARET;
+  case ast::BinaryOp::Shl:
+    return TokenType::LESS_LESS;
+  case ast::BinaryOp::Shr:
+    return TokenType::GREATER_GREATER;
+  }
+  return TokenType::ERROR;
+}
+
 } // namespace
 
-Emitter::Emitter(const FmtConfig &config, const TriviaMap *trivia)
-    : config_(config), trivia_(trivia) {}
+Emitter::Emitter(const FmtConfig &config, const TriviaMap *decl_trivia,
+                 const TokenTriviaIndex *token_trivia, const SpanMap *spans,
+                 const std::vector<Token> *tokens)
+    : config_(config), decl_trivia_(decl_trivia), token_trivia_(token_trivia), spans_(spans),
+      tokens_(tokens) {}
 
 std::string Emitter::indent_str(int extra) const {
   return std::string(static_cast<std::size_t>((indent_level_ + extra) * config_.indent), ' ');
@@ -38,13 +108,83 @@ void Emitter::append_line(const std::string &text) {
 }
 
 void Emitter::append_leading_trivia(int line) {
-  if (trivia_ == nullptr) {
+  if (decl_trivia_ == nullptr) {
     return;
   }
-  const std::string leading = trivia_->leading_for_line(line);
+  const std::string leading = decl_trivia_->leading_for_line(line);
   if (!leading.empty()) {
     append(leading);
   }
+}
+
+std::string Emitter::leading_token(std::size_t index) const {
+  if (token_trivia_ == nullptr) {
+    return {};
+  }
+  return token_trivia_->at(index).leading;
+}
+
+std::string Emitter::trailing_token(std::size_t index) const {
+  if (token_trivia_ == nullptr) {
+    return {};
+  }
+  return token_trivia_->at(index).trailing;
+}
+
+std::string Emitter::gap_between(std::size_t from_after, std::size_t before,
+                                 std::string_view canonical_if_blank) const {
+  if (token_trivia_ == nullptr || before <= from_after) {
+    return std::string(canonical_if_blank);
+  }
+  std::string out = trailing_token(from_after);
+  for (std::size_t i = from_after + 1; i < before; ++i) {
+    out += leading_token(i);
+    out += trailing_token(i);
+  }
+  out += leading_token(before);
+  if (is_blank(out)) {
+    return std::string(canonical_if_blank);
+  }
+  return out;
+}
+
+bool Emitter::is_blank(const std::string &text) const {
+  return text.find_first_not_of(" \t\r\n") == std::string::npos;
+}
+
+std::size_t Emitter::find_token_between(std::size_t start, std::size_t end, TokenType type) const {
+  if (tokens_ == nullptr) {
+    return end;
+  }
+  for (std::size_t i = start; i < end && i < tokens_->size(); ++i) {
+    if ((*tokens_)[i].type == type) {
+      return i;
+    }
+  }
+  return end;
+}
+
+std::string Emitter::stmt_trailing(const ast::Stmt &stmt) const {
+  if (spans_ == nullptr || token_trivia_ == nullptr || !spans_->has(stmt)) {
+    return {};
+  }
+  const TokenSpan span = spans_->span(stmt);
+  if (span.end == 0) {
+    return {};
+  }
+  return comment_suffix(trailing_token(span.end - 1));
+}
+
+bool Emitter::is_single_line_block(const ast::BlockStmt &block, int line) const {
+  if (block.statements.empty()) {
+    return false;
+  }
+  for (const ast::StmtPtr &stmt : block.statements) {
+    if (stmt->location.line != line) {
+      return false;
+    }
+  }
+  return true;
 }
 
 std::string Emitter::emit_program(const ast::Program &program) {
@@ -178,12 +318,47 @@ std::string Emitter::emit_expr(const ast::Expr &expr) {
   if (const auto *binding = dynamic_cast<const ast::BindingPattern *>(&expr)) {
     return binding->name;
   }
+  if (const auto *pipe = dynamic_cast<const ast::PipeExpr *>(&expr)) {
+    const std::string left = emit_expr(*pipe->left);
+    const std::string right = emit_expr(*pipe->right);
+    if (spans_ != nullptr && token_trivia_ != nullptr && spans_->has(*pipe->left) &&
+        spans_->has(*pipe->right)) {
+      const TokenSpan left_span = spans_->span(*pipe->left);
+      const TokenSpan right_span = spans_->span(*pipe->right);
+      if (left_span.end > 0 && right_span.start > left_span.end) {
+        const std::size_t pipe_idx =
+            find_token_between(left_span.end, right_span.start, TokenType::PIPE_GREATER);
+        if (pipe_idx < right_span.start) {
+          std::string prefix = gap_between(left_span.end - 1, pipe_idx, " ");
+          std::string suffix = gap_between(pipe_idx, right_span.start, " ");
+          return left + prefix + "|>" + suffix + right;
+        }
+      }
+    }
+    return left + " |> " + right;
+  }
   if (const auto *unary = dynamic_cast<const ast::UnaryExpr *>(&expr)) {
     return std::string(unary_op_name(unary->op)) + emit_expr(*unary->right);
   }
   if (const auto *binary = dynamic_cast<const ast::BinaryExpr *>(&expr)) {
-    return emit_expr(*binary->left) + " " + binary_op_name(binary->op) + " " +
-           emit_expr(*binary->right);
+    const std::string left = emit_expr(*binary->left);
+    const std::string right = emit_expr(*binary->right);
+    const std::string op = binary_op_name(binary->op);
+    if (spans_ != nullptr && token_trivia_ != nullptr && spans_->has(*binary->left) &&
+        spans_->has(*binary->right)) {
+      const TokenSpan left_span = spans_->span(*binary->left);
+      const TokenSpan right_span = spans_->span(*binary->right);
+      if (left_span.end > 0 && right_span.start > left_span.end) {
+        const std::size_t op_idx = find_token_between(left_span.end, right_span.start,
+                                                      token_for_binary_op(binary->op));
+        if (op_idx < right_span.start) {
+          std::string prefix = gap_between(left_span.end - 1, op_idx, " ");
+          std::string suffix = gap_between(op_idx, right_span.start, " ");
+          return left + prefix + op + suffix + right;
+        }
+      }
+    }
+    return left + " " + op + " " + right;
   }
   if (const auto *assign = dynamic_cast<const ast::AssignExpr *>(&expr)) {
     return assign->name + " " + assign_op_name(assign->op) + " " + emit_expr(*assign->value);
@@ -328,7 +503,11 @@ std::string Emitter::emit_block_body(const ast::BlockStmt &block) {
 
 std::string Emitter::emit_stmt(const ast::Stmt &stmt, bool block_child) {
   if (const auto *expr_stmt = dynamic_cast<const ast::ExprStmt *>(&stmt)) {
-    return emit_expr(*expr_stmt->expr) + ";";
+    std::string out = emit_expr(*expr_stmt->expr) + ";";
+    if (block_child) {
+      out += stmt_trailing(stmt);
+    }
+    return out;
   }
   if (const auto *ret = dynamic_cast<const ast::ReturnStmt *>(&stmt)) {
     if (ret->value) {
@@ -337,7 +516,10 @@ std::string Emitter::emit_stmt(const ast::Stmt &stmt, bool block_child) {
     return "return;";
   }
   if (const auto *var = dynamic_cast<const ast::VarDeclStmt *>(&stmt)) {
-    std::string out = var->storage + " ";
+    std::string out;
+    if (!var->storage.empty()) {
+      out += var->storage + " ";
+    }
     if (!var->type.name.empty() || !var->type.type_args.empty()) {
       out += emit_type(var->type) + " ";
     }
@@ -345,7 +527,11 @@ std::string Emitter::emit_stmt(const ast::Stmt &stmt, bool block_child) {
     if (var->init) {
       out += " = " + emit_expr(*var->init);
     }
-    return out + ";";
+    out += ";";
+    if (block_child) {
+      out += stmt_trailing(stmt);
+    }
+    return out;
   }
   if (const auto *unpack = dynamic_cast<const ast::UnpackDeclStmt *>(&stmt)) {
     std::string out = "let ";
@@ -372,17 +558,19 @@ std::string Emitter::emit_stmt(const ast::Stmt &stmt, bool block_child) {
   }
   if (const auto *if_stmt = dynamic_cast<const ast::IfStmt *>(&stmt)) {
     std::string out = "if " + emit_expr(*if_stmt->condition) + " ";
-    out += emit_stmt(*if_stmt->then_branch);
+    out += emit_stmt(*if_stmt->then_branch, true);
     if (if_stmt->else_branch) {
-      out += " else " + emit_stmt(*if_stmt->else_branch);
+      out += " else " + emit_stmt(*if_stmt->else_branch, true);
     }
     return out;
   }
   if (const auto *guard = dynamic_cast<const ast::GuardStmt *>(&stmt)) {
-    return "guard " + emit_expr(*guard->condition) + " else " + emit_stmt(*guard->else_body);
+    return "guard " + emit_expr(*guard->condition) + " else " +
+           emit_stmt(*guard->else_body, true);
   }
   if (const auto *while_stmt = dynamic_cast<const ast::WhileStmt *>(&stmt)) {
-    return "while " + emit_expr(*while_stmt->condition) + " " + emit_stmt(*while_stmt->body);
+    return "while " + emit_expr(*while_stmt->condition) + " " +
+           emit_stmt(*while_stmt->body, true);
   }
   if (const auto *for_stmt = dynamic_cast<const ast::ForStmt *>(&stmt)) {
     std::string out = "for (";
@@ -405,7 +593,7 @@ std::string Emitter::emit_stmt(const ast::Stmt &stmt, bool block_child) {
       }
       out += step;
     }
-    out += ") " + emit_stmt(*for_stmt->body);
+    out += ") " + emit_stmt(*for_stmt->body, true);
     return out;
   }
   if (dynamic_cast<const ast::BreakStmt *>(&stmt)) {
@@ -416,13 +604,13 @@ std::string Emitter::emit_stmt(const ast::Stmt &stmt, bool block_child) {
   }
   if (const auto *try_stmt = dynamic_cast<const ast::TryCatchStmt *>(&stmt)) {
     std::ostringstream out;
-    out << "try " << emit_stmt(*try_stmt->body);
+    out << "try " << emit_stmt(*try_stmt->body, true);
     for (const ast::CatchArm &arm : try_stmt->catches) {
       out << " catch (" << emit_type(arm.error_type);
       if (!arm.binding_name.empty()) {
         out << " " << arm.binding_name;
       }
-      out << ") " << emit_stmt(*arm.body);
+      out << ") " << emit_stmt(*arm.body, true);
     }
     return out.str();
   }
@@ -469,7 +657,16 @@ std::string Emitter::emit_decl(const ast::Decl &decl, bool top_level) {
     }
     out << emit_type(fn->return_type) << " " << fn->name << emit_type_params(fn->type_params)
         << "(" << emit_parameters(fn->params) << ") ";
-    out << emit_stmt(*fn->body);
+    if (const auto *block = dynamic_cast<const ast::BlockStmt *>(fn->body.get());
+        block != nullptr && is_single_line_block(*block, fn->location.line)) {
+      std::vector<std::string> parts;
+      for (const ast::StmtPtr &stmt : block->statements) {
+        parts.push_back(emit_stmt(*stmt, true));
+      }
+      out << "{ " << join(parts, " ") << " }";
+    } else {
+      out << emit_stmt(*fn->body);
+    }
     return out.str();
   }
   if (const auto *st = dynamic_cast<const ast::StructDecl *>(&decl)) {

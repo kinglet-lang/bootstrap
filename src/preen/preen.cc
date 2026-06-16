@@ -3,6 +3,8 @@
 #include "preen/emitter.h"
 #include "preen/extension.h"
 #include "preen/fmt_lexer.h"
+#include "preen/span_map.h"
+#include "preen/token_trivia.h"
 #include "preen/trivia.h"
 #include "parser/parser.h"
 
@@ -67,7 +69,9 @@ FormatResult format_string(std::string_view source, const FmtConfig &config) {
   }
 
   TriviaMap trivia(fmt_tokens);
-  Emitter emitter(config, &trivia);
+  TokenTriviaIndex token_trivia(fmt_tokens, parse_tokens);
+  SpanMap spans(*parsed.program, parse_tokens);
+  Emitter emitter(config, &trivia, &token_trivia, &spans, &parse_tokens);
   std::string formatted = emitter.emit_program(*parsed.program);
   formatted = apply_extensions(formatted, config);
 
