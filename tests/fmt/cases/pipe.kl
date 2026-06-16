@@ -1,0 +1,8 @@
+using io;
+
+int dbl(int x) { return x * 2; }
+
+int main() {
+  io::out.line(21   |>   dbl);
+  return 0;
+}

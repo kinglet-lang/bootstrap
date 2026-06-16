@@ -1,0 +1,6 @@
+using io;
+int main() {
+  int x = 1 + /* inline */ 2; // tail
+  io::out.line("{}", x);
+  return 0;
+}
