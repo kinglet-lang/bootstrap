@@ -1,0 +1,7 @@
+struct Point {
+  int   x;
+  int32 y;
+}
+int main() {
+  return 0;
+}

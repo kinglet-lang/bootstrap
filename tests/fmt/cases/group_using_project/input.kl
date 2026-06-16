@@ -1,0 +1,6 @@
+using io;
+import { "math.kl" }
+
+int main() {
+  return 0;
+}
