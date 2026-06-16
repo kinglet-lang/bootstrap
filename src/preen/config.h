@@ -1,6 +1,9 @@
 #pragma once
 
+#include "module/project_config.h"
+
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace kinglet::preen {
@@ -28,5 +31,7 @@ struct FmtConfig {
   std::string newline_string() const;
   bool extension_enabled(std::string_view name) const;
 };
+
+FmtConfig fmt_config_from_project(const kinglet::ProjectConfig &project);
 
 } // namespace kinglet::preen
