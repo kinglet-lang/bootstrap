@@ -41,6 +41,7 @@ executable("kinglet") {
     "//src/lexer",
     "//src/module",
     "//src/parser",
+    "//src/preen",
     "//src/vm",
   ]
 
