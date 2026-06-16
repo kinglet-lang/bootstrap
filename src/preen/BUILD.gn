@@ -10,6 +10,10 @@ static_library("preen") {
     "fmt_lexer.h",
     "preen.cc",
     "preen.h",
+    "span_map.cc",
+    "span_map.h",
+    "token_trivia.cc",
+    "token_trivia.h",
     "trivia.cc",
     "trivia.h",
   ]
