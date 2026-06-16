@@ -156,6 +156,9 @@ std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
       return base + "\x1f" + callee->field_name + "()";
     }
   }
+  if (const auto *pipe = dynamic_cast<const ast::PipeExpr *>(expr)) {
+    return infer_receiver_type(pipe->right.get());
+  }
   return {};
 }
 
@@ -785,12 +788,8 @@ ast::ExprPtr Parser::assignment() {
 ast::ExprPtr Parser::pipeline() {
   ast::ExprPtr expr = logical_or();
   while (match(TokenType::PIPE_GREATER)) {
-    auto loc = location_of(previous());
     ast::ExprPtr func = logical_or();
-    std::vector<ast::ExprPtr> args;
-    args.push_back(std::move(expr));
-    std::vector<ast::TypeExpr> type_args;
-    expr = std::make_unique<ast::CallExpr>(loc, std::move(func), std::move(type_args), std::move(args));
+    expr = std::make_unique<ast::PipeExpr>(location_of(previous()), std::move(expr), std::move(func));
   }
   return expr;
 }
