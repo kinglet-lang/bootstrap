@@ -1,8 +1,6 @@
 using io;
 
-import {
-  "math.kl"
-}
+import math;
 
 using math { add, multiply };
 

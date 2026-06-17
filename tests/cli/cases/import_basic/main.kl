@@ -1,5 +1,5 @@
 using io;
-import "math.kl";
+import math;
 
 int main() {
   io::out.line("{}", math::add(3, 4));

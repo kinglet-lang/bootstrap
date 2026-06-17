@@ -1,5 +1,5 @@
 using io;
-import { "math.kl" }
+import math;
 
 int main() {
   return 0;

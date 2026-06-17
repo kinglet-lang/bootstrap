@@ -1,0 +1,5 @@
+project "fmt-using" version "0.1.0"
+
+modules {
+  math = "math.kl"
+}
