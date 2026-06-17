@@ -7,6 +7,7 @@
 #include "compiler/expr_width.h"
 #include "ir/ir_builder.h"
 #include "ir/kir_numeric.h"
+#include "module/module_id.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -66,12 +67,6 @@ CompileResult Compiler::compile(const ast::Program &program) {
   }
 
   for (const ast::DeclPtr &declaration : program.declarations) {
-    if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
-      used_.insert(using_decl->namespace_name);
-      if (using_decl->is_namespace || using_decl->selected_symbols.empty()) {
-        opened_.insert(using_decl->namespace_name);
-      }
-    }
     if (const auto *import_decl = dynamic_cast<const ast::ImportDecl *>(declaration.get())) {
       process_import(*import_decl);
     }
@@ -87,40 +82,18 @@ CompileResult Compiler::compile(const ast::Program &program) {
     }
   }
 
-  // Resolve using mod { syms } after all imports are processed
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
-      if (!using_decl->selected_symbols.empty()) {
-        const std::string &ns = using_decl->namespace_name;
-        const bool is_imported = imported_namespaces_.count(ns) > 0;
-        for (const auto &sym : using_decl->selected_symbols) {
-          std::string qualified = ns + "::" + sym;
-          if (function_indices_.count(qualified)) {
-            function_indices_[sym] = function_indices_[qualified];
-          }
-          // Non-imported namespaces (io, fs, sys, …) expose native members.
-          // Record the alias so call/field-access codegen can emit the right
-          // native opcode when it encounters the bare name.
-          if (!is_imported) {
-            using_aliases_[sym] = {ns, sym};
-          }
-        }
-      } else if (using_decl->wildcard) {
-        const std::string &ns = using_decl->namespace_name;
-        const std::string prefix = ns + "::";
-        std::vector<std::string> qualified_keys;
-        qualified_keys.reserve(function_indices_.size());
-        for (const auto &[qualified, _] : function_indices_) {
-          qualified_keys.push_back(qualified);
-        }
-        std::sort(qualified_keys.begin(), qualified_keys.end());
-        for (const auto &qualified : qualified_keys) {
-          if (qualified.rfind(prefix, 0) == 0) {
-            function_indices_[qualified.substr(prefix.size())] =
-                function_indices_.at(qualified);
-          }
+      used_.insert(using_decl->namespace_name);
+      if (using_decl->is_namespace) {
+        opened_.insert(using_decl->namespace_name);
+        if (imported_namespaces_.count(using_decl->namespace_name)) {
+          open_imported_namespace(using_decl->namespace_name);
         }
       }
+    }
+    if (const auto *using_alias = dynamic_cast<const ast::UsingAliasDecl *>(declaration.get())) {
+      module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
     }
   }
 
@@ -225,7 +198,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
   for (const std::string &ns : imported_ns_order) {
     const auto &func_list = imported_function_decls_.at(ns);
     for (const auto *function : func_list) {
-      std::string qualified = ns + "::" + function->name;
+      std::string qualified = module_id_to_qualifier(ns) + "::" + function->name;
       compile_function(*function, qualified);
       if (!errors_.empty()) break;
     }
@@ -276,21 +249,15 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
       used_.insert(using_decl->namespace_name);
-      if (using_decl->is_namespace || using_decl->selected_symbols.empty()) {
+      if (using_decl->is_namespace) {
         opened_.insert(using_decl->namespace_name);
-      }
-      if (!using_decl->selected_symbols.empty()) {
-        const std::string &ns = using_decl->namespace_name;
-        for (const auto &sym : using_decl->selected_symbols) {
-          std::string qualified = ns + "::" + sym;
-          if (function_indices_.count(qualified)) {
-            function_indices_[sym] = function_indices_[qualified];
-          }
-          if (struct_indices_.count(qualified) || struct_indices_.count(sym)) {
-            // struct already registered unqualified during import
-          }
+        if (imported_namespaces_.count(using_decl->namespace_name)) {
+          open_imported_namespace(using_decl->namespace_name);
         }
       }
+    }
+    if (const auto *using_alias = dynamic_cast<const ast::UsingAliasDecl *>(declaration.get())) {
+      module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
     }
   }
 
@@ -1487,7 +1454,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
                                            imported_namespaces_.end());
         std::sort(ns_sorted.begin(), ns_sorted.end());
         for (const auto &ns : ns_sorted) {
-          auto qit = function_indices_.find(ns + "::" + callee_id->name);
+          auto qit = function_indices_.find(module_id_to_qualifier(ns) + "::" + callee_id->name);
           if (qit != function_indices_.end()) {
             func_it = qit;
             break;
@@ -1823,18 +1790,22 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       return;
     }
     // Check imported module namespaces
-    if (imported_namespaces_.count(ns_access->namespace_name)) {
-      std::string qualified = ns_access->namespace_name + "::" + ns_access->member_name;
-      auto it = function_indices_.find(qualified);
-      if (it != function_indices_.end()) {
-        emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(it->second)].function_idx),
-            ns_access->location);
+    {
+      const std::string qualified =
+          resolve_module_qualified(ns_access->namespace_name, ns_access->member_name);
+      const std::string prefix = qualified.substr(0, qualified.rfind("::"));
+      if (imported_qualifiers_.count(prefix)) {
+        auto it = function_indices_.find(qualified);
+        if (it != function_indices_.end()) {
+          emit_constant(Value::function_value(
+                            chunk_.constants()[static_cast<std::size_t>(it->second)].function_idx),
+                        ns_access->location);
+          return;
+        }
+        error_at(ns_access->location, "'" + ns_access->member_name + "' is not exported from '" +
+                                        prefix + "'.");
         return;
       }
-      error_at(ns_access->location, "'" + ns_access->member_name + "' is not exported from module '" +
-               ns_access->namespace_name + "'.");
-      return;
     }
     if (used_.count(ns_access->namespace_name) != 0) {
       return;
@@ -2384,26 +2355,6 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     enum_indices_[ed->name] = idx;
   }
 
-  // Apply this module's own `using mod { sym };` selections. Under the new
-  // import{} syntax a module declares dependencies with import{} and selects
-  // symbols with `using`, so imported public functions are registered only as
-  // `ns::name` above (the bare-name branch fires only for old-style selective
-  // import). Register the bare name for each function the module's `using`
-  // pulls in, so unqualified calls inside this module's bodies — compiled in
-  // Pass 2b — resolve. Types selected via `using` are already registered
-  // unqualified.
-  if (mod.program) {
-    for (const auto &md : mod.program->declarations) {
-      const auto *ud = dynamic_cast<const ast::UsingDecl *>(md.get());
-      if (!ud || ud->selected_symbols.empty()) continue;
-      for (const auto &sym : ud->selected_symbols) {
-        auto it = function_indices_.find(ud->namespace_name + "::" + sym);
-        if (it != function_indices_.end()) {
-          function_indices_[sym] = it->second;
-        }
-      }
-    }
-  }
 }
 
 void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl) {
@@ -2445,7 +2396,9 @@ void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl)
   }
 
   const std::string ns = mod.namespace_name;
+  const std::string qual = module_id_to_qualifier(ns);
   imported_namespaces_.insert(ns);
+  imported_qualifiers_.insert(qual);
   namespace_source_paths_[ns] = mod.resolved_path;
 
   for (const auto *func : mod.public_functions) {
@@ -2456,12 +2409,12 @@ void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl)
     });
     record_function_source(idx, mod.resolved_path);
     uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-    function_indices_[ns + "::" + func->name] = static_cast<int>(const_idx);
+    function_indices_[qual + "::" + func->name] = static_cast<int>(const_idx);
     imported_function_decls_[ns].push_back(func);
   }
 
   for (const auto *func : mod.private_functions) {
-    if (function_indices_.count(ns + "::" + func->name)) continue;
+    if (function_indices_.count(qual + "::" + func->name)) continue;
     int idx = chunk_.add_function(FunctionInfo{
         .name = func->name,
         .entry = 0,
@@ -2469,7 +2422,7 @@ void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl)
     });
     record_function_source(idx, mod.resolved_path);
     uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-    function_indices_[ns + "::" + func->name] = static_cast<int>(const_idx);
+    function_indices_[qual + "::" + func->name] = static_cast<int>(const_idx);
     imported_function_decls_[ns].push_back(func);
   }
 
@@ -2515,33 +2468,33 @@ void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl)
     int idx = chunk_.add_enum_meta(std::move(meta));
     enum_indices_[ed->name] = idx;
   }
+}
 
-  if (mod.program) {
-    for (const auto &md : mod.program->declarations) {
-      const auto *ud = dynamic_cast<const ast::UsingDecl *>(md.get());
-      if (!ud) continue;
-      if (ud->wildcard) {
-        const std::string prefix = ud->namespace_name + "::";
-        std::vector<std::string> qualified_keys;
-        qualified_keys.reserve(function_indices_.size());
-        for (const auto &[qualified, _] : function_indices_) {
-          qualified_keys.push_back(qualified);
-        }
-        std::sort(qualified_keys.begin(), qualified_keys.end());
-        for (const auto &qualified : qualified_keys) {
-          if (qualified.rfind(prefix, 0) == 0) {
-            function_indices_[qualified.substr(prefix.size())] =
-                function_indices_.at(qualified);
-          }
-        }
-      } else if (!ud->selected_symbols.empty()) {
-        for (const auto &sym : ud->selected_symbols) {
-          auto it = function_indices_.find(ud->namespace_name + "::" + sym);
-          if (it != function_indices_.end()) {
-            function_indices_[sym] = it->second;
-          }
-        }
-      }
+std::string Compiler::resolve_module_qualified(const std::string &ns,
+                                               const std::string &member) const {
+  auto it = module_aliases_.find(ns);
+  const std::string prefix = it != module_aliases_.end() ? it->second : ns;
+  return prefix + "::" + member;
+}
+
+void Compiler::open_imported_namespace(const std::string &module_id) {
+  if (!imported_namespaces_.count(module_id)) {
+    return;
+  }
+  const std::string prefix = module_id_to_qualifier(module_id) + "::";
+  std::vector<std::string> qualified_keys;
+  qualified_keys.reserve(function_indices_.size());
+  for (const auto &[qualified, _] : function_indices_) {
+    qualified_keys.push_back(qualified);
+  }
+  std::sort(qualified_keys.begin(), qualified_keys.end());
+  for (const auto &qualified : qualified_keys) {
+    if (qualified.rfind(prefix, 0) != 0) {
+      continue;
+    }
+    const std::string bare = qualified.substr(prefix.size());
+    if (!bare.empty() && bare.find("::") == std::string::npos) {
+      function_indices_[bare] = function_indices_.at(qualified);
     }
   }
 }

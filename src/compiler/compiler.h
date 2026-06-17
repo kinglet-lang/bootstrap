@@ -84,6 +84,8 @@ private:
   int resolve_free_function_for_type(const std::string &name, const std::string &arg_type) const;
   void attach_kir_metadata();
   void record_function_source(int function_idx, const std::string &source_path);
+  std::string resolve_module_qualified(const std::string &ns, const std::string &member) const;
+  void open_imported_namespace(const std::string &module_id);
 
   Chunk chunk_;
   BytecodeEmitter emitter_;
@@ -109,7 +111,9 @@ private:
   // (namespace, original member name), used to emit the correct native opcode
   // when a bare aliased name appears in a call or field-access expression.
   std::unordered_map<std::string, std::pair<std::string, std::string>> using_aliases_;
+  std::unordered_map<std::string, std::string> module_aliases_;
   std::unordered_set<std::string> imported_namespaces_;
+  std::unordered_set<std::string> imported_qualifiers_;
   std::unordered_map<std::string, std::vector<const ast::FunctionDecl *>> imported_function_decls_;
   // Resolved paths of modules already processed by process_import_from, so a
   // module reached through several import paths (diamond deps) is registered
