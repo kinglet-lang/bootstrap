@@ -436,14 +436,19 @@ struct ImportBlockDecl final : Decl {
 };
 
 struct UsingDecl final : Decl {
-  UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace,
-            std::vector<std::string> selected_symbols = {}, bool wildcard = false);
+  UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace);
   void print(std::ostream &out, int indent = 0) const override;
 
   std::string namespace_name;
   bool is_namespace;
-  bool wildcard = false;
-  std::vector<std::string> selected_symbols;
+};
+
+struct UsingAliasDecl final : Decl {
+  UsingAliasDecl(SourceLocation location, std::string alias, std::string module_id);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string alias;
+  std::string module_id;
 };
 
 struct NamespaceAccessExpr final : Expr {

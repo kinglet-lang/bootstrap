@@ -616,27 +616,24 @@ void ImportBlockDecl::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
-UsingDecl::UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace,
-                     std::vector<std::string> selected_symbols, bool wildcard)
-    : Decl(location), namespace_name(std::move(namespace_name)), is_namespace(is_namespace),
-      wildcard(wildcard), selected_symbols(std::move(selected_symbols)) {}
+UsingDecl::UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace)
+    : Decl(location), namespace_name(std::move(namespace_name)), is_namespace(is_namespace) {}
 
 void UsingDecl::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
-  if (wildcard) {
-    out << "(using-wildcard " << namespace_name << ")";
-  } else if (!selected_symbols.empty()) {
-    out << "(using " << namespace_name << " {";
-    for (std::size_t i = 0; i < selected_symbols.size(); ++i) {
-      if (i > 0) out << ", ";
-      out << selected_symbols[i];
-    }
-    out << "})";
-  } else if (is_namespace) {
+  if (is_namespace) {
     out << "(using-namespace " << namespace_name << ")";
   } else {
     out << "(using " << namespace_name << ")";
   }
+}
+
+UsingAliasDecl::UsingAliasDecl(SourceLocation location, std::string alias, std::string module_id)
+    : Decl(location), alias(std::move(alias)), module_id(std::move(module_id)) {}
+
+void UsingAliasDecl::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(using-alias " << alias << " = " << module_id << ")";
 }
 
 NamespaceAccessExpr::NamespaceAccessExpr(SourceLocation location, std::string namespace_name,
