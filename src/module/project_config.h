@@ -26,11 +26,14 @@ struct ProjectConfig {
   std::string cache_dir = ".kinglet/cache";
   std::string out_dir = ".kinglet/out";
   std::string default_backend = "native";
-  std::unordered_map<std::string, std::string> dependencies; // name → path
+  std::string build_default;
+  std::unordered_map<std::string, std::string> dependencies; // name → path (toml)
+  std::unordered_map<std::string, std::string> modules;       // name → path (nest)
   ProjectFmtSection fmt;
 };
 
 std::optional<ProjectConfig> find_project_config(const std::string &start_dir);
 std::optional<ProjectConfig> load_project_config_file(const std::filesystem::path &manifest_path);
+std::optional<ProjectConfig> find_nest_config(const std::string &start_dir);
 
 } // namespace kinglet

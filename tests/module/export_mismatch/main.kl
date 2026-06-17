@@ -1,0 +1,3 @@
+import bad;
+
+int main() { return value(); }

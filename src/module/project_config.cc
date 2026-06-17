@@ -1,5 +1,7 @@
 #include "module/project_config.h"
 
+#include "module/nest_parser.h"
+
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
@@ -150,16 +152,38 @@ std::optional<ProjectConfig> load_project_config_file(const std::filesystem::pat
   return config;
 }
 
+std::optional<ProjectConfig> find_nest_config(const std::string &start_dir) {
+  std::filesystem::path dir(start_dir);
+  while (true) {
+    const std::filesystem::path candidate = dir / "kinglet.nest";
+    if (std::filesystem::exists(candidate)) {
+      return load_nest_config_file(candidate);
+    }
+    const auto parent = dir.parent_path();
+    if (parent == dir) {
+      break;
+    }
+    dir = parent;
+  }
+  return std::nullopt;
+}
+
 std::optional<ProjectConfig> find_project_config(const std::string &start_dir) {
   std::filesystem::path dir(start_dir);
   while (true) {
-    std::filesystem::path candidate = dir / "kinglet.toml";
-    if (std::filesystem::exists(candidate)) {
-      return load_project_config_file(candidate);
+    const std::filesystem::path nest = dir / "kinglet.nest";
+    if (std::filesystem::exists(nest)) {
+      return load_nest_config_file(nest);
+    }
+    const std::filesystem::path toml = dir / "kinglet.toml";
+    if (std::filesystem::exists(toml)) {
+      return load_project_config_file(toml);
     }
 
-    auto parent = dir.parent_path();
-    if (parent == dir) break;
+    const auto parent = dir.parent_path();
+    if (parent == dir) {
+      break;
+    }
     dir = parent;
   }
   return std::nullopt;

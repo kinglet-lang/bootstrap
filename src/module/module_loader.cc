@@ -33,6 +33,29 @@ std::string ModuleLoader::derive_namespace(const std::string &path) const {
   return p.stem().string();
 }
 
+namespace {
+
+std::string export_module_name(const ast::Program &program) {
+  for (const auto &decl : program.declarations) {
+    if (const auto *exported = dynamic_cast<const ast::ExportModuleDecl *>(decl.get())) {
+      return exported->name;
+    }
+  }
+  return "";
+}
+
+void assign_namespace(ParsedModule &mod, const std::string &fallback_path) {
+  const std::string stem = std::filesystem::path(fallback_path).stem().string();
+  if (!mod.program) {
+    mod.namespace_name = stem;
+    return;
+  }
+  const std::string exported = export_module_name(*mod.program);
+  mod.namespace_name = exported.empty() ? stem : exported;
+}
+
+} // namespace
+
 void ModuleLoader::register_source_file(const std::string &path) {
   std::filesystem::path p(path);
   std::filesystem::path target = p.is_absolute()
@@ -54,7 +77,7 @@ ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
   try {
     if (path.size() >= 2 && path[0] == '/' && path[1] == '/') {
       if (!project_config_) {
-        return {nullptr, "Cannot resolve '//' path: no kinglet.toml found"};
+        return {nullptr, "Cannot resolve '//' path: no project manifest found"};
       }
       std::filesystem::path root(project_config_->root_dir);
       std::string relative = path.substr(2);
@@ -106,10 +129,11 @@ ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
   }
 
   ParsedModule mod;
-  mod.namespace_name = derive_namespace(path);
   mod.resolved_path = resolved;
+  mod.program = std::move(parse_result.program);
+  assign_namespace(mod, path);
 
-  for (const auto &decl : parse_result.program->declarations) {
+  for (const auto &decl : mod.program->declarations) {
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
       if (func->is_public) {
         mod.public_functions.push_back(func);
@@ -131,7 +155,6 @@ ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
     }
   }
 
-  mod.program = std::move(parse_result.program);
   loading_.erase(resolved);
   auto [inserted, _] = cache_.emplace(resolved, std::move(mod));
   return {&inserted->second, ""};
@@ -143,7 +166,7 @@ ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const 
     if (path.size() >= 2 && path[0] == '/' && path[1] == '/') {
       // Project-root-relative path: //parser/ast.kl
       if (!project_config_) {
-        return {nullptr, "Cannot resolve '//' path: no kinglet.toml found"};
+        return {nullptr, "Cannot resolve '//' path: no project manifest found"};
       }
       std::string relative = path.substr(2);
       std::filesystem::path root(project_config_->root_dir);
@@ -195,10 +218,11 @@ ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const 
   }
 
   ParsedModule mod;
-  mod.namespace_name = derive_namespace(path);
   mod.resolved_path = resolved;
+  mod.program = std::move(parse_result.program);
+  assign_namespace(mod, path);
 
-  for (const auto &decl : parse_result.program->declarations) {
+  for (const auto &decl : mod.program->declarations) {
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
       if (func->is_public) {
         mod.public_functions.push_back(func);
@@ -220,10 +244,28 @@ ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const 
     }
   }
 
-  mod.program = std::move(parse_result.program);
   loading_.erase(resolved);
   auto [inserted, _] = cache_.emplace(resolved, std::move(mod));
   return {&inserted->second, ""};
+}
+
+ModuleLoader::LoadResult ModuleLoader::load_by_logical_name(const std::string &module_id) {
+  if (!project_config_) {
+    return {nullptr, "Cannot resolve import '" + module_id + "': no kinglet.nest found"};
+  }
+  const auto it = project_config_->modules.find(module_id);
+  if (it == project_config_->modules.end()) {
+    return {nullptr, "Unknown module '" + module_id + "' in project manifest"};
+  }
+  auto result = load_from(it->second, project_config_->root_dir);
+  if (!result.module) {
+    return result;
+  }
+  if (result.module->namespace_name != module_id) {
+    return {nullptr, "export module '" + result.module->namespace_name +
+                          "' does not match manifest key '" + module_id + "'"};
+  }
+  return result;
 }
 
 } // namespace kinglet

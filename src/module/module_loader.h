@@ -39,6 +39,7 @@ public:
   void discover_project_root(const std::string &source_file_dir);
   LoadResult load(const std::string &path);
   LoadResult load_from(const std::string &path, const std::string &importing_file_dir);
+  LoadResult load_by_logical_name(const std::string &module_id);
 
 private:
   std::string resolve_path(const std::string &relative_path) const;
