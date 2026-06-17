@@ -5,6 +5,7 @@
 
 #include "ir/kir_container.h"
 #include "ir/kir_numeric.h"
+#include "module/module_id.h"
 #include "module/module_loader.h"
 #include "types/numeric.h"
 
@@ -749,76 +750,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     type_registry_.insert_or_assign(cast_err.name, cast_err);
   }
 
-  // First pass: register types, using declarations, and function signatures
+  // First pass: register types, imports, and function signatures
   for (const ast::DeclPtr &decl : program.declarations) {
-    if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
-      if (using_decl->namespace_name != "io" && using_decl->namespace_name != "fs" &&
-          using_decl->namespace_name != "sys" && !imported_namespaces_.count(using_decl->namespace_name)) {
-        error_at(using_decl->location, "Unknown module '" + using_decl->namespace_name + "'.");
-      }
-      used_.insert(using_decl->namespace_name);
-      if (using_decl->is_namespace) {
-        opened_.insert(using_decl->namespace_name);
-      }
-      if (using_decl->wildcard) {
-        if (!imported_namespaces_.count(using_decl->namespace_name)) {
-          error_at(using_decl->location,
-                   "Unknown module '" + using_decl->namespace_name + "'.");
-        } else {
-          const auto pub_it = module_public_symbols_.find(using_decl->namespace_name);
-          if (pub_it != module_public_symbols_.end()) {
-            for (const auto &sym : pub_it->second) {
-              std::string qualified = using_decl->namespace_name + "::" + sym;
-              auto resolved = lookup_var(qualified);
-              if (resolved) {
-                declare_var(sym, *resolved, false);
-                imported_bare_names_.insert(sym);
-              }
-            }
-          }
-        }
-      } else if (!using_decl->selected_symbols.empty()) {
-        const std::string &ns = using_decl->namespace_name;
-        const bool known_module = imported_namespaces_.count(ns) > 0;
-        for (const auto &sym : using_decl->selected_symbols) {
-          // Non-imported namespaces (io, fs, sys, …) expose native members
-          // rather than symbol-table entries.  Alias the bare name so that
-          // `out.line(...)` resolves identically to `io::out.line(...)`.
-          if (!known_module) {
-            using_aliases_[sym] = {ns, sym};
-            imported_bare_names_.insert(sym);
-            continue;
-          }
-          std::string qualified = ns + "::" + sym;
-          auto resolved = lookup_var(qualified);
-          if (resolved) {
-            declare_var(sym, *resolved, false);
-            imported_bare_names_.insert(sym);
-            continue;
-          }
-          // The symbol could not be pulled in. Diagnose why, distinguishing a
-          // non-pub symbol from one that does not exist. A pub struct/enum
-          // type resolves through the type registry rather than as a variable,
-          // so its absence from lookup_var is expected and not an error.
-          if (!known_module) {
-            continue;  // already reported as "Unknown module" above
-          }
-          const auto pub_it = module_public_symbols_.find(ns);
-          if (pub_it != module_public_symbols_.end() && pub_it->second.count(sym)) {
-            continue;  // pub type; usable via type registry, nothing to bind
-          }
-          const auto priv_it = module_private_symbols_.find(ns);
-          if (priv_it != module_private_symbols_.end() && priv_it->second.count(sym)) {
-            error_at(using_decl->location,
-                     "'" + sym + "' is not pub in module '" + ns + "'.");
-          } else {
-            error_at(using_decl->location,
-                     "Module '" + ns + "' has no symbol '" + sym + "'.");
-          }
-        }
-      }
-      continue;
-    }
     if (const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(decl.get())) {
       if (struct_decl->name == "Self") {
         error_at(struct_decl->location, "'Self' is a reserved type name.");
@@ -1061,8 +994,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             Type func_type(TypeKind::Function);
             func_type.param_types = std::move(param_types);
             func_type.return_type = std::make_unique<Type>(return_type);
-            declare_var(ns + "::" + fn->name, func_type, false);
-            kir_function_sigs_[ns + "::" + fn->name] = kir_sig_from(func_type);
+            declare_var(module_id_to_qualifier(ns) + "::" + fn->name, func_type, false);
+            kir_function_sigs_[module_id_to_qualifier(ns) + "::" + fn->name] = kir_sig_from(func_type);
             if (!import_decl->selected_symbols.empty()) {
               Type ft2(TypeKind::Function);
               ft2.param_types = func_type.param_types;
@@ -1083,7 +1016,9 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         } else {
           const auto &mod = *result.module;
           const std::string ns = mod.namespace_name;
+          const std::string qual = module_id_to_qualifier(ns);
           imported_namespaces_.insert(ns);
+          imported_qualifiers_.insert(qual);
           {
             auto &pub_set = module_public_symbols_[ns];
             for (const auto *fn : mod.public_functions) pub_set.insert(fn->name);
@@ -1128,8 +1063,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             Type func_type(TypeKind::Function);
             func_type.param_types = std::move(param_types);
             func_type.return_type = std::make_unique<Type>(return_type);
-            declare_var(ns + "::" + fn->name, func_type, false);
-            kir_function_sigs_[ns + "::" + fn->name] = kir_sig_from(func_type);
+            declare_var(qual + "::" + fn->name, func_type, false);
+            kir_function_sigs_[qual + "::" + fn->name] = kir_sig_from(func_type);
           }
         }
       }
@@ -1196,6 +1131,32 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             }
           }
         }
+      }
+    }
+  }
+
+  for (const ast::DeclPtr &decl : program.declarations) {
+    if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
+      const bool runtime_ns = using_decl->namespace_name == "io" ||
+                              using_decl->namespace_name == "fs" ||
+                              using_decl->namespace_name == "sys";
+      if (!runtime_ns && !imported_namespaces_.count(using_decl->namespace_name)) {
+        error_at(using_decl->location, "Unknown module '" + using_decl->namespace_name + "'.");
+      }
+      used_.insert(using_decl->namespace_name);
+      if (using_decl->is_namespace) {
+        opened_.insert(using_decl->namespace_name);
+        if (imported_namespaces_.count(using_decl->namespace_name)) {
+          open_imported_namespace(using_decl->namespace_name);
+        }
+      }
+      continue;
+    }
+    if (const auto *using_alias = dynamic_cast<const ast::UsingAliasDecl *>(decl.get())) {
+      if (!imported_namespaces_.count(using_alias->module_id)) {
+        error_at(using_alias->location, "Unknown module '" + using_alias->module_id + "'.");
+      } else {
+        module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
       }
     }
   }
@@ -1543,9 +1504,15 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         return fn;
       }
     }
-    // Check for imported function (e.g. math::add)
-    auto imported = lookup_var(ns_access->namespace_name + "::" + ns_access->member_name);
-    if (imported.has_value()) return *imported;
+    // Check for imported function (e.g. math::add or parser::ast::Node)
+    {
+      const std::string qualified =
+          resolve_module_qualified(ns_access->namespace_name, ns_access->member_name);
+      auto imported = lookup_var(qualified);
+      if (imported.has_value()) {
+        return *imported;
+      }
+    }
 
     auto enum_type = lookup_type(ns_access->namespace_name);
     if (enum_type.has_value() && enum_type->kind == TypeKind::Enum) {
@@ -3121,6 +3088,28 @@ void TypeChecker::check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::Sou
     warn_at(location, "Format string has " + std::to_string(placeholder_count) +
                           " placeholder(s) but " + std::to_string(value_count) +
                           " argument(s) provided.");
+  }
+}
+
+std::string TypeChecker::resolve_module_qualified(const std::string &ns,
+                                                  const std::string &member) const {
+  auto it = module_aliases_.find(ns);
+  const std::string prefix = it != module_aliases_.end() ? it->second : ns;
+  return prefix + "::" + member;
+}
+
+void TypeChecker::open_imported_namespace(const std::string &module_id) {
+  const auto pub_it = module_public_symbols_.find(module_id);
+  if (pub_it == module_public_symbols_.end()) {
+    return;
+  }
+  const std::string prefix = module_id_to_qualifier(module_id) + "::";
+  for (const auto &sym : pub_it->second) {
+    auto resolved = lookup_var(prefix + sym);
+    if (resolved) {
+      declare_var(sym, *resolved, false);
+      imported_bare_names_.insert(sym);
+    }
   }
 }
 

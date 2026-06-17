@@ -57,6 +57,8 @@ private:
   void warn_at(ast::SourceLocation location, std::string message);
   void check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::SourceLocation location);
   void forward_declare_imported_types(const ParsedModule &mod);
+  std::string resolve_module_qualified(const std::string &ns, const std::string &member) const;
+  void open_imported_namespace(const std::string &module_id);
 
   struct VarInfo {
     Type type;
@@ -90,6 +92,8 @@ private:
   // native members, so they resolve structurally rather than via the symbol
   // table.
   std::unordered_map<std::string, std::pair<std::string, std::string>> using_aliases_;
+  std::unordered_map<std::string, std::string> module_aliases_;
+  std::unordered_set<std::string> imported_qualifiers_;
   // Per-namespace exported / private symbol names, populated when an import is
   // processed. Used to give a precise diagnostic for `using mod { sym };` when
   // a symbol is missing from the module or exists but is not pub.
