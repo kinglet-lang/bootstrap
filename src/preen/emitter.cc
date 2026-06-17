@@ -619,6 +619,9 @@ std::string Emitter::emit_stmt(const ast::Stmt &stmt, bool block_child) {
 
 std::string Emitter::emit_decl(const ast::Decl &decl, bool top_level) {
   if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(&decl)) {
+    if (using_decl->wildcard) {
+      return "using " + using_decl->namespace_name + "::*;";
+    }
     if (!using_decl->selected_symbols.empty()) {
       return "using " + using_decl->namespace_name + " { " +
              join(using_decl->selected_symbols, ", ") + " };";
@@ -627,6 +630,12 @@ std::string Emitter::emit_decl(const ast::Decl &decl, bool top_level) {
       return "using namespace " + using_decl->namespace_name + ";";
     }
     return "using " + using_decl->namespace_name + ";";
+  }
+  if (const auto *exported = dynamic_cast<const ast::ExportModuleDecl *>(&decl)) {
+    return "export module " + exported->name + ";";
+  }
+  if (const auto *logical = dynamic_cast<const ast::LogicalImportDecl *>(&decl)) {
+    return "import " + logical->module_id + ";";
   }
   if (const auto *import = dynamic_cast<const ast::ImportDecl *>(&decl)) {
     std::string out = "import { \"" + import->path + "\"";
