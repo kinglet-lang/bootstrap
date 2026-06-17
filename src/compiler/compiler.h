@@ -73,6 +73,7 @@ private:
 
   void process_import(const ast::ImportDecl &import_decl);
   void process_import_from(const ast::ImportDecl &import_decl, const std::string &importing_file_dir);
+  void process_logical_import(const ast::LogicalImportDecl &import_decl);
   std::string infer_struct_type(const ast::Expr &expr) const;
   // Best-effort source-level type name of an expression, used to infer generic
   // type arguments at a call site (literals, locals, struct/method returns).

@@ -71,6 +71,9 @@ CompileResult Compiler::compile(const ast::Program &program) {
     if (const auto *import_decl = dynamic_cast<const ast::ImportDecl *>(declaration.get())) {
       process_import(*import_decl);
     }
+    if (const auto *logical_import = dynamic_cast<const ast::LogicalImportDecl *>(declaration.get())) {
+      process_logical_import(*logical_import);
+    }
     if (const auto *import_block = dynamic_cast<const ast::ImportBlockDecl *>(declaration.get())) {
       for (const auto &imp : import_block->imports) {
         if (const auto *id = dynamic_cast<const ast::ImportDecl *>(imp.get())) {
@@ -96,6 +99,14 @@ CompileResult Compiler::compile(const ast::Program &program) {
           // native opcode when it encounters the bare name.
           if (!is_imported) {
             using_aliases_[sym] = {ns, sym};
+          }
+        }
+      } else if (using_decl->wildcard) {
+        const std::string &ns = using_decl->namespace_name;
+        const std::string prefix = ns + "::";
+        for (const auto &[qualified, idx] : function_indices_) {
+          if (qualified.rfind(prefix, 0) == 0) {
+            function_indices_[qualified.substr(prefix.size())] = idx;
           }
         }
       }
@@ -2217,6 +2228,9 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     for (const auto &inner_decl : mod.program->declarations) {
       if (const auto *inner_import = dynamic_cast<const ast::ImportDecl *>(inner_decl.get())) {
         process_import_from(*inner_import, mod_dir);
+      } else if (const auto *inner_logical =
+                     dynamic_cast<const ast::LogicalImportDecl *>(inner_decl.get())) {
+        process_logical_import(*inner_logical);
       } else if (const auto *inner_block =
                      dynamic_cast<const ast::ImportBlockDecl *>(inner_decl.get())) {
         for (const auto &imp : inner_block->imports) {
@@ -2353,6 +2367,139 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
         auto it = function_indices_.find(ud->namespace_name + "::" + sym);
         if (it != function_indices_.end()) {
           function_indices_[sym] = it->second;
+        }
+      }
+    }
+  }
+}
+
+void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl) {
+  if (!module_loader_) {
+    error_at(import_decl.location, "Import not supported (no module loader configured).");
+    return;
+  }
+
+  auto result = module_loader_->load_by_logical_name(import_decl.module_id);
+  if (!result.module) {
+    error_at(import_decl.location, result.error);
+    return;
+  }
+
+  const ParsedModule &mod = *result.module;
+
+  if (!processed_modules_.insert(mod.resolved_path).second) {
+    return;
+  }
+
+  if (mod.program) {
+    for (const auto &inner_decl : mod.program->declarations) {
+      if (const auto *inner_import = dynamic_cast<const ast::ImportDecl *>(inner_decl.get())) {
+        std::string mod_dir = std::filesystem::path(mod.resolved_path).parent_path().string();
+        process_import_from(*inner_import, mod_dir);
+      } else if (const auto *inner_logical =
+                     dynamic_cast<const ast::LogicalImportDecl *>(inner_decl.get())) {
+        process_logical_import(*inner_logical);
+      } else if (const auto *inner_block =
+                     dynamic_cast<const ast::ImportBlockDecl *>(inner_decl.get())) {
+        std::string mod_dir = std::filesystem::path(mod.resolved_path).parent_path().string();
+        for (const auto &imp : inner_block->imports) {
+          if (const auto *id = dynamic_cast<const ast::ImportDecl *>(imp.get())) {
+            process_import_from(*id, mod_dir);
+          }
+        }
+      }
+    }
+  }
+
+  const std::string ns = mod.namespace_name;
+  imported_namespaces_.insert(ns);
+  namespace_source_paths_[ns] = mod.resolved_path;
+
+  for (const auto *func : mod.public_functions) {
+    int idx = chunk_.add_function(FunctionInfo{
+        .name = func->name,
+        .entry = 0,
+        .param_count = static_cast<int>(func->params.size()),
+    });
+    record_function_source(idx, mod.resolved_path);
+    uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
+    function_indices_[ns + "::" + func->name] = static_cast<int>(const_idx);
+    imported_function_decls_[ns].push_back(func);
+  }
+
+  for (const auto *func : mod.private_functions) {
+    if (function_indices_.count(ns + "::" + func->name)) continue;
+    int idx = chunk_.add_function(FunctionInfo{
+        .name = func->name,
+        .entry = 0,
+        .param_count = static_cast<int>(func->params.size()),
+    });
+    record_function_source(idx, mod.resolved_path);
+    uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
+    function_indices_[ns + "::" + func->name] = static_cast<int>(const_idx);
+    imported_function_decls_[ns].push_back(func);
+  }
+
+  for (const auto *sd : mod.public_structs) {
+    if (sd->type_params.empty()) {
+      StructMeta meta;
+      meta.name = sd->name;
+      for (const auto &field : sd->fields) meta.field_names.push_back(field.name);
+      int idx = chunk_.add_struct_meta(std::move(meta));
+      struct_indices_[sd->name] = idx;
+    }
+  }
+
+  for (const auto *ed : mod.public_enums) {
+    EnumMeta meta;
+    meta.name = ed->name;
+    for (const auto &v : ed->variants) {
+      meta.variants.push_back(v.name);
+      meta.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
+    }
+    int idx = chunk_.add_enum_meta(std::move(meta));
+    enum_indices_[ed->name] = idx;
+  }
+
+  for (const auto *sd : mod.private_structs) {
+    if (struct_indices_.count(sd->name)) continue;
+    if (sd->type_params.empty()) {
+      StructMeta meta;
+      meta.name = sd->name;
+      for (const auto &field : sd->fields) meta.field_names.push_back(field.name);
+      int idx = chunk_.add_struct_meta(std::move(meta));
+      struct_indices_[sd->name] = idx;
+    }
+  }
+  for (const auto *ed : mod.private_enums) {
+    if (enum_indices_.count(ed->name)) continue;
+    EnumMeta meta;
+    meta.name = ed->name;
+    for (const auto &v : ed->variants) {
+      meta.variants.push_back(v.name);
+      meta.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
+    }
+    int idx = chunk_.add_enum_meta(std::move(meta));
+    enum_indices_[ed->name] = idx;
+  }
+
+  if (mod.program) {
+    for (const auto &md : mod.program->declarations) {
+      const auto *ud = dynamic_cast<const ast::UsingDecl *>(md.get());
+      if (!ud) continue;
+      if (ud->wildcard) {
+        const std::string prefix = ud->namespace_name + "::";
+        for (const auto &[qualified, idx] : function_indices_) {
+          if (qualified.rfind(prefix, 0) == 0) {
+            function_indices_[qualified.substr(prefix.size())] = idx;
+          }
+        }
+      } else if (!ud->selected_symbols.empty()) {
+        for (const auto &sym : ud->selected_symbols) {
+          auto it = function_indices_.find(ud->namespace_name + "::" + sym);
+          if (it != function_indices_.end()) {
+            function_indices_[sym] = it->second;
+          }
         }
       }
     }

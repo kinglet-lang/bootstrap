@@ -411,6 +411,20 @@ struct ImportDecl final : Decl {
   std::vector<std::string> selected_symbols;
 };
 
+struct LogicalImportDecl final : Decl {
+  LogicalImportDecl(SourceLocation location, std::string module_id);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string module_id;
+};
+
+struct ExportModuleDecl final : Decl {
+  ExportModuleDecl(SourceLocation location, std::string name);
+  void print(std::ostream &out, int indent = 0) const override;
+
+  std::string name;
+};
+
 struct ImportBlockDecl final : Decl {
   ImportBlockDecl(SourceLocation location, std::vector<DeclPtr> imports);
   void print(std::ostream &out, int indent = 0) const override;
@@ -420,11 +434,12 @@ struct ImportBlockDecl final : Decl {
 
 struct UsingDecl final : Decl {
   UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace,
-            std::vector<std::string> selected_symbols = {});
+            std::vector<std::string> selected_symbols = {}, bool wildcard = false);
   void print(std::ostream &out, int indent = 0) const override;
 
   std::string namespace_name;
   bool is_namespace;
+  bool wildcard = false;
   std::vector<std::string> selected_symbols;
 };
 

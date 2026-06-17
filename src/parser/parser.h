@@ -35,6 +35,7 @@ public:
 
 private:
   ast::DeclPtr declaration();
+  ast::DeclPtr export_module_declaration();
   ast::DeclPtr using_declaration();
   ast::DeclPtr import_declaration();
   ast::DeclPtr function_declaration();

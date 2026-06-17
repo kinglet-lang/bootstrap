@@ -195,6 +195,10 @@ ast::DeclPtr Parser::declaration() {
     return using_declaration();
   }
 
+  if (match(TokenType::EXPORT)) {
+    return export_module_declaration();
+  }
+
   if (match(TokenType::IMPORT)) {
     return import_declaration();
   }
@@ -265,6 +269,14 @@ ast::DeclPtr Parser::using_declaration() {
   std::string ns_name(token_text(name));
 
   std::vector<std::string> selected;
+  bool wildcard = false;
+  if (match(TokenType::COLON_COLON)) {
+    consume(TokenType::STAR, "Expected '*' after '::' in using wildcard.");
+    wildcard = true;
+    consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
+    return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(ns_name),
+                                            is_namespace, std::move(selected), wildcard);
+  }
   if (match(TokenType::LEFT_BRACE)) {
     do {
       const Token &sym = consume(TokenType::IDENTIFIER, "Expected symbol name in using list.");
@@ -275,40 +287,34 @@ ast::DeclPtr Parser::using_declaration() {
 
   consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
   return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(ns_name),
-                                          is_namespace, std::move(selected));
+                                          is_namespace, std::move(selected), wildcard);
+}
+
+ast::DeclPtr Parser::export_module_declaration() {
+  const Token &export_token = previous();
+  const Token &module_kw =
+      consume(TokenType::IDENTIFIER, "Expected 'module' after 'export'.");
+  if (token_text(module_kw) != "module") {
+    error_at(module_kw, "Expected 'module' after 'export'.");
+    return nullptr;
+  }
+  const Token &name = consume(TokenType::IDENTIFIER, "Expected module name after 'export module'.");
+  consume(TokenType::SEMICOLON, "Expected ';' after export module.");
+  return std::make_unique<ast::ExportModuleDecl>(location_of(export_token),
+                                                 std::string(token_text(name)));
 }
 
 ast::DeclPtr Parser::import_declaration() {
   const Token &import_token = previous();
 
-  // New block form: import { "path1" \n "path2" as alias }
-  if (match(TokenType::LEFT_BRACE)) {
-    std::vector<ast::DeclPtr> imports;
-    while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
-      const Token &path_token = consume(TokenType::STRING_LIT, "Expected file path string in import block.");
-      std::string path(token_text(path_token));
-      if (path.size() >= 2 && path.front() == '"' && path.back() == '"') {
-        path = path.substr(1, path.size() - 2);
-      }
-
-      std::string alias;
-      if (check(TokenType::IDENTIFIER) && token_text(peek()) == "as") {
-        advance(); // consume 'as'
-        const Token &alias_token = consume(TokenType::IDENTIFIER, "Expected alias name after 'as'.");
-        alias = token_text(alias_token);
-      }
-
-      imports.push_back(std::make_unique<ast::ImportDecl>(
-          location_of(import_token), std::move(path), std::move(alias), std::vector<std::string>{}));
-    }
-    consume(TokenType::RIGHT_BRACE, "Expected '}' after import block.");
-    if (imports.size() == 1) {
-      return std::move(imports[0]);
-    }
-    return std::make_unique<ast::ImportBlockDecl>(location_of(import_token), std::move(imports));
+  if (check(TokenType::IDENTIFIER)) {
+    const Token &id = advance();
+    consume(TokenType::SEMICOLON, "Expected ';' after import.");
+    return std::make_unique<ast::LogicalImportDecl>(location_of(import_token),
+                                                    std::string(token_text(id)));
   }
 
-  error_at(peek(), "Expected '{' after 'import'. Old-form imports removed; use: import { \"path\" }");
+  error_at(peek(), "Expected module name after 'import'.");
   return nullptr;
 }
 

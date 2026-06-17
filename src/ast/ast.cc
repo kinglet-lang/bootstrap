@@ -584,6 +584,22 @@ void ImportDecl::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+LogicalImportDecl::LogicalImportDecl(SourceLocation location, std::string module_id)
+    : Decl(location), module_id(std::move(module_id)) {}
+
+void LogicalImportDecl::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(import-logical " << module_id << ")";
+}
+
+ExportModuleDecl::ExportModuleDecl(SourceLocation location, std::string name)
+    : Decl(location), name(std::move(name)) {}
+
+void ExportModuleDecl::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(export-module " << name << ")";
+}
+
 ImportBlockDecl::ImportBlockDecl(SourceLocation location, std::vector<DeclPtr> imports)
     : Decl(location), imports(std::move(imports)) {}
 
@@ -598,13 +614,15 @@ void ImportBlockDecl::print(std::ostream &out, int indent) const {
 }
 
 UsingDecl::UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace,
-                     std::vector<std::string> selected_symbols)
+                     std::vector<std::string> selected_symbols, bool wildcard)
     : Decl(location), namespace_name(std::move(namespace_name)), is_namespace(is_namespace),
-      selected_symbols(std::move(selected_symbols)) {}
+      wildcard(wildcard), selected_symbols(std::move(selected_symbols)) {}
 
 void UsingDecl::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
-  if (!selected_symbols.empty()) {
+  if (wildcard) {
+    out << "(using-wildcard " << namespace_name << ")";
+  } else if (!selected_symbols.empty()) {
     out << "(using " << namespace_name << " {";
     for (std::size_t i = 0; i < selected_symbols.size(); ++i) {
       if (i > 0) out << ", ";
