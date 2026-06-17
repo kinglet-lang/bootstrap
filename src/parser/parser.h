@@ -106,6 +106,8 @@ private:
   ast::SourceLocation location_of(const Token &token) const;
   std::string token_text(const Token &token) const;
   ast::TypeExpr parse_type_expr();
+  std::string parse_module_id(const char *context);
+  ast::ExprPtr parse_namespace_access(const Token &first, std::vector<std::string> segments);
   void synchronize();
   void error_at(const Token &token, std::string_view message);
 

@@ -268,29 +268,55 @@ ast::DeclPtr Parser::using_declaration() {
     set_completion({lsp::CompletionPosition::UsingNamespace, {}, {}, {}, {}, {}});
     return nullptr;
   }
-  const Token &name = consume(TokenType::IDENTIFIER, "Expected namespace name after 'using'.");
-  std::string ns_name(token_text(name));
-
-  std::vector<std::string> selected;
-  bool wildcard = false;
+  const Token &name = consume(TokenType::IDENTIFIER, "Expected name after 'using'.");
+  if (!is_namespace && match(TokenType::EQUAL)) {
+    const std::string module_id = parse_module_id("module alias");
+    consume(TokenType::SEMICOLON, "Expected ';' after using alias.");
+    return std::make_unique<ast::UsingAliasDecl>(location_of(using_token), std::string(token_text(name)),
+                                                 module_id);
+  }
   if (match(TokenType::COLON_COLON)) {
-    consume(TokenType::STAR, "Expected '*' after '::' in using wildcard.");
-    wildcard = true;
-    consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
-    return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(ns_name),
-                                            is_namespace, std::move(selected), wildcard);
+    error_at(previous(), "Wildcard `using module::*` is not supported; use `using namespace module` instead.");
+    return nullptr;
   }
   if (match(TokenType::LEFT_BRACE)) {
-    do {
-      const Token &sym = consume(TokenType::IDENTIFIER, "Expected symbol name in using list.");
-      selected.push_back(std::string(token_text(sym)));
-    } while (match(TokenType::COMMA));
-    consume(TokenType::RIGHT_BRACE, "Expected '}' after using symbol list.");
+    error_at(previous(), "Selective `using module { sym }` is not supported; use qualified access, "
+                          "`using alias = module`, or `using namespace module`.");
+    return nullptr;
   }
-
+  std::string module_id = std::string(token_text(name));
+  while (match(TokenType::DOT)) {
+    const Token &part = consume(TokenType::IDENTIFIER, "Expected identifier after '.' in module name.");
+    module_id.push_back('.');
+    module_id += token_text(part);
+  }
   consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
-  return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(ns_name),
-                                          is_namespace, std::move(selected), wildcard);
+  return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(module_id), is_namespace);
+}
+
+std::string Parser::parse_module_id(const char *context) {
+  const Token &first = consume(TokenType::IDENTIFIER, std::string("Expected ") + context + ".");
+  std::string module_id(token_text(first));
+  while (match(TokenType::DOT)) {
+    const Token &part = consume(TokenType::IDENTIFIER, "Expected identifier after '.' in module name.");
+    module_id.push_back('.');
+    module_id += token_text(part);
+  }
+  return module_id;
+}
+
+ast::ExprPtr Parser::parse_namespace_access(const Token &first, std::vector<std::string> segments) {
+  if (segments.size() < 2) {
+    return std::make_unique<ast::IdentifierExpr>(location_of(first), segments.front());
+  }
+  std::string qualifier;
+  for (size_t i = 0; i + 1 < segments.size(); ++i) {
+    if (i > 0) {
+      qualifier += "::";
+    }
+    qualifier += segments[i];
+  }
+  return std::make_unique<ast::NamespaceAccessExpr>(location_of(first), qualifier, segments.back());
 }
 
 ast::DeclPtr Parser::export_module_declaration() {
@@ -301,20 +327,18 @@ ast::DeclPtr Parser::export_module_declaration() {
     error_at(module_kw, "Expected 'module' after 'export'.");
     return nullptr;
   }
-  const Token &name = consume(TokenType::IDENTIFIER, "Expected module name after 'export module'.");
+  const std::string module_id = parse_module_id("module name after 'export module'");
   consume(TokenType::SEMICOLON, "Expected ';' after export module.");
-  return std::make_unique<ast::ExportModuleDecl>(location_of(export_token),
-                                                 std::string(token_text(name)));
+  return std::make_unique<ast::ExportModuleDecl>(location_of(export_token), module_id);
 }
 
 ast::DeclPtr Parser::import_declaration() {
   const Token &import_token = previous();
 
   if (check(TokenType::IDENTIFIER)) {
-    const Token &id = advance();
+    const std::string module_id = parse_module_id("module name after 'import'");
     consume(TokenType::SEMICOLON, "Expected ';' after import.");
-    return std::make_unique<ast::LogicalImportDecl>(location_of(import_token),
-                                                    std::string(token_text(id)));
+    return std::make_unique<ast::LogicalImportDecl>(location_of(import_token), module_id);
   }
 
   error_at(peek(), "Expected module name after 'import'.");
@@ -1195,10 +1219,17 @@ ast::ExprPtr Parser::primary() {
         set_completion({lsp::CompletionPosition::NamespaceAccess, {}, {}, token_text(identifier), {}, {}});
         return std::make_unique<ast::IdentifierExpr>(location_of(identifier), token_text(identifier));
       }
-      const Token &member =
-          consume(TokenType::IDENTIFIER, "Expected member name after '::'.");
-      return std::make_unique<ast::NamespaceAccessExpr>(
-          location_of(identifier), token_text(identifier), token_text(member));
+      std::vector<std::string> segments;
+      segments.push_back(std::string(token_text(identifier)));
+      const Token &first_part =
+          consume(TokenType::IDENTIFIER, "Expected name after '::'.");
+      segments.push_back(std::string(token_text(first_part)));
+      while (match(TokenType::COLON_COLON)) {
+        const Token &part =
+            consume(TokenType::IDENTIFIER, "Expected name after '::'.");
+        segments.push_back(std::string(token_text(part)));
+      }
+      return parse_namespace_access(identifier, std::move(segments));
     }
     if (check(TokenType::LEFT_BRACE) && current_ + 1 < tokens_.size() &&
         tokens_[current_ + 1].type != TokenType::RIGHT_BRACE &&
