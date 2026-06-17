@@ -8,6 +8,7 @@
 #include "ir/ir_builder.h"
 #include "ir/kir_numeric.h"
 #include "module/module_id.h"
+#include "module/native_symbol.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -319,20 +320,6 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
                        .errors = std::move(errors_),
                        .warnings = std::move(warnings_)};
 }
-
-namespace {
-
-std::string mangled_native_symbol(const std::string &name, const std::string &source_path) {
-  if (name == "main") {
-    return "kinglet_user_main";
-  }
-  if (!source_path.empty()) {
-    return "kinglet_fn_" + std::filesystem::path(source_path).stem().string() + "_" + name;
-  }
-  return "kinglet_fn_" + name;
-}
-
-} // namespace
 
 void Compiler::record_function_source(int function_idx, const std::string &source_path) {
   if (function_idx < 0) {

@@ -2,6 +2,8 @@ static_library("module") {
   sources = [
     "module_id.cc",
     "module_id.h",
+    "native_symbol.cc",
+    "native_symbol.h",
     "module_loader.cc",
     "module_loader.h",
     "nest_parser.cc",

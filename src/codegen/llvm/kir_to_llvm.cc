@@ -42,19 +42,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "module/native_symbol.h"
+
 namespace kinglet {
 
 namespace {
-
-std::string fn_symbol(const std::string &name, const std::string &source_path = "") {
-  if (name == "main") {
-    return "kinglet_user_main";
-  }
-  if (!source_path.empty()) {
-    return "kinglet_fn_" + std::filesystem::path(source_path).stem().string() + "_" + name;
-  }
-  return "kinglet_fn_" + name;
-}
 
 std::vector<const KirInstr *> linear_instrs(const KirFunction &fn) {
   std::vector<const KirInstr *> out;
@@ -2178,11 +2170,11 @@ bool lower_user_functions(llvm::Module *module, const KirModule &functions,
     std::vector<llvm::Type *> param_types(static_cast<std::size_t>(fn.param_count), i64);
     auto *fn_type = llvm::FunctionType::get(i64, param_types, false);
     llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage,
-                           fn_symbol(fn.name, fn.source_path), module);
+                           mangled_native_symbol(fn.name, fn.source_path), module);
   }
 
   for (const KirFunction &fn : functions.functions) {
-    llvm::Function *llvm_fn = module->getFunction(fn_symbol(fn.name, fn.source_path));
+    llvm::Function *llvm_fn = module->getFunction(mangled_native_symbol(fn.name, fn.source_path));
     FunctionLowerer lowerer(&context, metadata, llvm_fn, rt);
     if (di) {
       const std::filesystem::path src_path(fn.source_path.empty() ? "<entry>"
@@ -2263,7 +2255,7 @@ std::string shard_fingerprint_text(const KirModule &shard, const KirModule &full
     out << '\n';
   }
   for (const KirFunction &fn : shard.functions) {
-    out << "fn:" << fn_symbol(fn.name, fn.source_path) << ':' << fn.param_count << '\n';
+    out << "fn:" << mangled_native_symbol(fn.name, fn.source_path) << ':' << fn.param_count << '\n';
     for (const KirBasicBlock &bb : fn.blocks) {
       for (const KirInstr &instr : bb.instrs) {
         out << kir_opcode_name(instr.op);
