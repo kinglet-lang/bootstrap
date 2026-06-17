@@ -1,0 +1,7 @@
+export module demo.t;
+
+import demo.lib;
+
+int main() {
+  return demo::lib::make_node(1).value;
+}

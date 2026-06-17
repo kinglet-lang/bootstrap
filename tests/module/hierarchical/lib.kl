@@ -1,0 +1,16 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
+export module demo.lib;
+
+pub struct Node {
+  int value;
+}
+
+pub Node make_node(int value) {
+  return Node { value };
+}
+
+Node make_impl(int value) {
+  return Node { value };
+}

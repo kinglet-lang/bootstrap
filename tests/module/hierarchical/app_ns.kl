@@ -1,0 +1,7 @@
+export module demo.app;
+
+import demo.lib;
+
+int main() {
+  return 1;
+}

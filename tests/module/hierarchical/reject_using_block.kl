@@ -1,0 +1,3 @@
+using demo.lib { make_node };
+
+int main() { return 0; }

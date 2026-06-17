@@ -1,0 +1,6 @@
+project "hierarchical" version "0.0.0"
+
+modules {
+  demo.lib = "lib.kl"
+  demo.app = "main.kl"
+}
