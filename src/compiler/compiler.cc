@@ -5,6 +5,7 @@
 #include "ir/ir_builder.h"
 #include "ir/kir_numeric.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -104,9 +105,16 @@ CompileResult Compiler::compile(const ast::Program &program) {
       } else if (using_decl->wildcard) {
         const std::string &ns = using_decl->namespace_name;
         const std::string prefix = ns + "::";
-        for (const auto &[qualified, idx] : function_indices_) {
+        std::vector<std::string> qualified_keys;
+        qualified_keys.reserve(function_indices_.size());
+        for (const auto &[qualified, _] : function_indices_) {
+          qualified_keys.push_back(qualified);
+        }
+        std::sort(qualified_keys.begin(), qualified_keys.end());
+        for (const auto &qualified : qualified_keys) {
           if (qualified.rfind(prefix, 0) == 0) {
-            function_indices_[qualified.substr(prefix.size())] = idx;
+            function_indices_[qualified.substr(prefix.size())] =
+                function_indices_.at(qualified);
           }
         }
       }
@@ -204,8 +212,15 @@ CompileResult Compiler::compile(const ast::Program &program) {
     if (!errors_.empty()) break;
   }
 
-  // Pass 2b: compile imported function bodies
-  for (const auto &[ns, func_list] : imported_function_decls_) {
+  // Pass 2b: compile imported function bodies (deterministic namespace order).
+  std::vector<std::string> imported_ns_order;
+  imported_ns_order.reserve(imported_function_decls_.size());
+  for (const auto &[ns, _] : imported_function_decls_) {
+    imported_ns_order.push_back(ns);
+  }
+  std::sort(imported_ns_order.begin(), imported_ns_order.end());
+  for (const std::string &ns : imported_ns_order) {
+    const auto &func_list = imported_function_decls_.at(ns);
     for (const auto *function : func_list) {
       std::string qualified = ns + "::" + function->name;
       compile_function(*function, qualified);
@@ -493,6 +508,14 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
   scope_stack_.clear();
   local_types_.clear();
 
+  const std::string prev_compiling_ns = compiling_namespace_;
+  if (!lookup_name.empty()) {
+    const auto sep = lookup_name.find("::");
+    compiling_namespace_ = sep == std::string::npos ? "" : lookup_name.substr(0, sep);
+  } else {
+    compiling_namespace_.clear();
+  }
+
   // Look up this function's index and patch its entry point
   const std::string &name = lookup_name.empty() ? function.name : lookup_name;
   auto it = function_indices_.find(name);
@@ -535,6 +558,7 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
       kir_module_.functions.push_back(*kir);
       emitter_.lower(*kir);
       implicit_return_stmt_ = nullptr;
+      compiling_namespace_ = prev_compiling_ns;
       return;
     }
   }
@@ -565,6 +589,7 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     emit(OpCode::Return, function.location);
   }
   kir_recorder_.end_function(&kir_module_);
+  compiling_namespace_ = prev_compiling_ns;
 }
 
 void Compiler::compile_stmt(const ast::Stmt &stmt) {
@@ -1446,14 +1471,20 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
     // User-defined function call
     if (callee_id) {
-      auto func_it = function_indices_.find(callee_id->name);
-      // Fallback: try qualified names (ns::func) for intra-module calls
-      // inside non-selectively imported modules where only the qualified
-      // name was registered.
+      std::unordered_map<std::string, int>::const_iterator func_it =
+          function_indices_.end();
+      if (!compiling_namespace_.empty()) {
+        func_it = function_indices_.find(compiling_namespace_ + "::" + callee_id->name);
+      }
       if (func_it == function_indices_.end()) {
-        for (const auto &ns : imported_namespaces_) {
-          std::string qualified = ns + "::" + callee_id->name;
-          auto qit = function_indices_.find(qualified);
+        func_it = function_indices_.find(callee_id->name);
+      }
+      if (func_it == function_indices_.end()) {
+        std::vector<std::string> ns_sorted(imported_namespaces_.begin(),
+                                           imported_namespaces_.end());
+        std::sort(ns_sorted.begin(), ns_sorted.end());
+        for (const auto &ns : ns_sorted) {
+          auto qit = function_indices_.find(ns + "::" + callee_id->name);
           if (qit != function_indices_.end()) {
             func_it = qit;
             break;
@@ -2285,7 +2316,6 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     record_function_source(idx, mod.resolved_path);
     uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
     function_indices_[ns + "::" + func->name] = static_cast<int>(const_idx);
-    function_indices_[func->name] = static_cast<int>(const_idx);
     imported_function_decls_[ns].push_back(func);
   }
 
@@ -2489,9 +2519,16 @@ void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl)
       if (!ud) continue;
       if (ud->wildcard) {
         const std::string prefix = ud->namespace_name + "::";
-        for (const auto &[qualified, idx] : function_indices_) {
+        std::vector<std::string> qualified_keys;
+        qualified_keys.reserve(function_indices_.size());
+        for (const auto &[qualified, _] : function_indices_) {
+          qualified_keys.push_back(qualified);
+        }
+        std::sort(qualified_keys.begin(), qualified_keys.end());
+        for (const auto &qualified : qualified_keys) {
           if (qualified.rfind(prefix, 0) == 0) {
-            function_indices_[qualified.substr(prefix.size())] = idx;
+            function_indices_[qualified.substr(prefix.size())] =
+                function_indices_.at(qualified);
           }
         }
       } else if (!ud->selected_symbols.empty()) {

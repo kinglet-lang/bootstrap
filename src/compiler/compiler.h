@@ -114,6 +114,7 @@ private:
   std::unordered_set<std::string> processed_modules_;
   std::unordered_map<std::string, std::string> namespace_source_paths_;
   std::string entry_source_path_;
+  std::string compiling_namespace_;
   std::vector<std::string> function_source_paths_;
   std::unordered_map<std::string, std::string> local_types_;
   std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
