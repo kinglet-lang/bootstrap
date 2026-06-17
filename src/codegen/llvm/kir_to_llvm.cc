@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
 #include "codegen/llvm/kir_to_llvm.h"
 
 #include "ir/kir.h"

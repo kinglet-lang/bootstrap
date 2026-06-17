@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
 #include "module/module_loader.h"
 
 #include "lexer/scanner.h"

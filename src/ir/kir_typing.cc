@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
 #include "ir/kir_typing.h"
 
 #include "ir/kir_container.h"

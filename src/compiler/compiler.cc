@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
 #include "compiler/compiler.h"
 #include "compiler/dense_array_lit.h"
 

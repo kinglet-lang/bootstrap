@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
 #include "checker/type_checker.h"
 
 #include "ir/kir_container.h"
@@ -607,7 +610,7 @@ void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl, const 
 // Insert forward-declaration placeholders (name + kind only) for every type a
 // module exports, so that recursive variant payloads and cross-type references
 // resolve to the type rather than Void when the body is processed later. This
-// mirrors the local Pass 0 for imported modules.
+// mirrors the local forward-declaration pass for imported modules.
 void TypeChecker::forward_declare_imported_types(const ParsedModule &mod) {
   for (const ast::StructDecl *sd : mod.public_structs) {
     if (!sd->type_params.empty()) continue;
@@ -648,7 +651,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
   push_scope();
 
-  // Pass 0: insert forward-declaration placeholders for every named type so
+  // Forward-declare every named type so mutually recursive definitions resolve.
   // that types declared later in the source can still be referenced by
   // struct fields, enum variant payloads, or function signatures that appear
   // earlier in the file (e.g. enum Expr referencing FieldInit[]).
@@ -665,8 +668,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     }
   }
 
-  // Pass 0b: forward-declare every type exported by imported modules (and their
-  // direct dependencies) before any body is resolved, mirroring local Pass 0.
+  // Forward-declare types exported by imported modules (and their direct
+  // dependencies) before any body is resolved, mirroring the local pass above.
   // The per-import registration below resolves variant/field types inline, so
   // without this a recursive payload (ast::Expr containing Expr) or a reference
   // to a type declared later in another module collapses to Void across module

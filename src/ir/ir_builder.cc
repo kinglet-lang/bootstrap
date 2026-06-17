@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
 #include "ir/ir_builder.h"
 
 #include "ir/kir_numeric.h"

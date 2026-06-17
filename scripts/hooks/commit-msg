@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(git rev-parse --show-toplevel)"
+HOOK_DIR="$ROOT/scripts/hooks"
+
+exec python3 "$HOOK_DIR/check_commit_msg.py" "$1"

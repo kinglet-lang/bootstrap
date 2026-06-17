@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
 #include "kinglet/cli_driver.h"
 #include "checker/type_checker.h"
 #include "compiler/compiler.h"
@@ -40,7 +43,7 @@ namespace {
 
 #ifdef KINGLET_HAVE_EMBEDDED_COMPILER
 // `kinglet selfhost <args...>`: materialise the embedded native self-host
-// compiler in a content-addressed temp path and exec it (ADR 0015 L5-2).
+// compiler in a content-addressed temp path and exec it.
 int run_embedded_compiler(int argc, char **argv) {
 #if defined(_WIN32)
   (void)argc;

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kinglet Language Developers
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include "ast/ast.h"
@@ -10,7 +13,7 @@ namespace kinglet {
 
 // Builds structured KIR from a narrow AST subset (literals and int arithmetic).
 // The full compiler still emits bytecode directly; this module is the KIR
-// reference builder for --ir and golden tests (ADR 0005 M1).
+// reference builder for --ir and golden tests.
 class IrBuilder {
 public:
   std::optional<KirFunction> build_expr_function(const std::string &name,
