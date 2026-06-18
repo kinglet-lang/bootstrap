@@ -6,6 +6,7 @@
 #include "lexer/scanner.h"
 #include "parser/parser.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -269,6 +270,101 @@ ModuleLoader::LoadResult ModuleLoader::load_by_logical_name(const std::string &m
                           "' does not match manifest key '" + module_id + "'"};
   }
   return result;
+}
+
+ModuleLoader::DirectoryImportResult
+ModuleLoader::load_directory_import(const std::string &module_id) {
+  DirectoryImportResult out;
+  if (!project_config_) {
+    out.error = "Cannot resolve import '" + module_id + "': no kinglet.nest found";
+    return out;
+  }
+
+  // module_id "a.b" -> directory "a/b" relative to the project root.
+  std::string rel_dir = module_id;
+  for (char &c : rel_dir) {
+    if (c == '.') c = '/';
+  }
+  std::error_code ec;
+  std::filesystem::path dir =
+      std::filesystem::path(project_config_->root_dir) / rel_dir;
+  if (!std::filesystem::is_directory(dir, ec)) {
+    // Not a directory: caller falls back to reporting the manifest miss.
+    return out;
+  }
+  out.is_directory = true;
+
+  // Gather `.kl` stems in deterministic (sorted) order for reproducible builds.
+  std::vector<std::string> stems;
+  for (std::filesystem::directory_iterator it(dir, ec), end; it != end; it.increment(ec)) {
+    if (ec) break;
+    const std::filesystem::path &entry = it->path();
+    if (!std::filesystem::is_regular_file(entry, ec)) continue;
+    if (entry.extension() != ".kl") continue;
+    stems.push_back(entry.stem().string());
+  }
+  std::sort(stems.begin(), stems.end());
+
+  if (stems.empty()) {
+    out.error = "No .kl modules found in directory '" + module_id + "'";
+    return out;
+  }
+
+  const std::string rel_dir_with_sep = rel_dir + "/";
+  for (const std::string &stem : stems) {
+    const std::string rel_path = rel_dir_with_sep + stem + ".kl";
+    LoadResult result = load_from(rel_path, project_config_->root_dir);
+    if (!result.module) {
+      if (out.error.empty()) out.error = result.error;
+      continue;
+    }
+    // Each submodule must declare the matching dotted namespace so that
+    // `<module_id>::<stem>::symbol` resolves consistently.
+    const std::string expected_ns = module_id + "." + stem;
+    if (result.module->namespace_name != expected_ns) {
+      if (out.error.empty()) {
+        out.error = "Module in '" + rel_path + "' declares '" +
+                    result.module->namespace_name + "' but directory import '" +
+                    module_id + "' expects '" + expected_ns +
+                    "' (add 'export module " + expected_ns + ";')";
+      }
+      continue;
+    }
+    out.modules.push_back(result.module);
+  }
+  return out;
+}
+
+ModuleLoader::LogicalResolveResult
+ModuleLoader::resolve_logical(const std::string &module_id) {
+  LogicalResolveResult out;
+  const bool in_manifest =
+      project_config_ && project_config_->modules.count(module_id) > 0;
+  LoadResult manifest = load_by_logical_name(module_id);
+  if (manifest.module) {
+    out.modules.push_back(manifest.module);
+    return out;
+  }
+  if (in_manifest) {
+    // Listed in the manifest but failed to load or namespaced mismatched —
+    // surface that real error instead of falling back to a directory lookup.
+    out.error = manifest.error;
+    return out;
+  }
+  // Not in the manifest: try directory-as-module.
+  DirectoryImportResult dir = load_directory_import(module_id);
+  if (dir.is_directory) {
+    out.modules = std::move(dir.modules);
+    out.error = dir.error;  // empty on full success, else a partial-failure msg
+    return out;
+  }
+  // Neither manifest nor directory: surface the underlying reason.
+  out.error = dir.error.empty()
+                  ? ("Unknown module '" + module_id +
+                     "': not in project manifest and no directory '" + module_id +
+                     "/' found")
+                  : dir.error;
+  return out;
 }
 
 } // namespace kinglet

@@ -44,6 +44,26 @@ public:
   LoadResult load_from(const std::string &path, const std::string &importing_file_dir);
   LoadResult load_by_logical_name(const std::string &module_id);
 
+  // Directory-as-module: when `import <module_id>;` is not a manifest entry,
+  // treat <module_id> (dots -> slashes) as a directory under the project root
+  // and load every `<dir>/*.kl` as a submodule `<module_id>.<stem>`. This is
+  // the auto-import path that removes the need for a `_dir.kl` manifest.
+  struct DirectoryImportResult {
+    bool is_directory = false;             // did <root>/<module_id>/ exist?
+    std::vector<const ParsedModule *> modules;  // successfully loaded submodules
+    std::string error;                     // first error encountered, if any
+  };
+  DirectoryImportResult load_directory_import(const std::string &module_id);
+
+  // Unified logical resolution: manifest entry first, then directory-as-module.
+  // Returns the loaded module(s) — one for a manifest hit, N for a directory —
+  // and sets `error` when nothing was found or a submodule failed to load.
+  struct LogicalResolveResult {
+    std::vector<const ParsedModule *> modules;
+    std::string error;
+  };
+  LogicalResolveResult resolve_logical(const std::string &module_id);
+
 private:
   std::string resolve_path(const std::string &relative_path) const;
   std::string resolve_path_from(const std::string &relative_path, const std::string &base) const;
