@@ -721,9 +721,9 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         for (const auto &inner : result.module->program->declarations) {
           if (const auto *logical =
                   dynamic_cast<const ast::LogicalImportDecl *>(inner.get())) {
-            auto inner_result = module_loader_->load_by_logical_name(logical->module_id);
-            if (inner_result.module) {
-              forward_declare_imported_types(*inner_result.module);
+            auto inner_result = module_loader_->resolve_logical(logical->module_id);
+            for (const ParsedModule *inner_mod : inner_result.modules) {
+              forward_declare_imported_types(*inner_mod);
             }
           }
         }
@@ -732,9 +732,9 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
     for (const ast::DeclPtr &decl : program.declarations) {
       if (const auto *logical = dynamic_cast<const ast::LogicalImportDecl *>(decl.get())) {
-        auto result = module_loader_->load_by_logical_name(logical->module_id);
-        if (result.module) {
-          forward_declare_imported_types(*result.module);
+        auto result = module_loader_->resolve_logical(logical->module_id);
+        for (const ParsedModule *mod : result.modules) {
+          forward_declare_imported_types(*mod);
         }
       }
     }
@@ -1010,11 +1010,10 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     }
     if (const auto *logical_import = dynamic_cast<const ast::LogicalImportDecl *>(decl.get())) {
       if (module_loader_) {
-        auto result = module_loader_->load_by_logical_name(logical_import->module_id);
-        if (!result.module) {
-          error_at(logical_import->location, result.error);
-        } else {
-          const auto &mod = *result.module;
+        // Manifest entry first, then directory-as-module (one or more submodules).
+        auto result = module_loader_->resolve_logical(logical_import->module_id);
+        for (const ParsedModule *mod_ptr : result.modules) {
+          const auto &mod = *mod_ptr;
           const std::string ns = mod.namespace_name;
           const std::string qual = module_id_to_qualifier(ns);
           imported_namespaces_.insert(ns);
@@ -1066,6 +1065,13 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             declare_var(qual + "::" + fn->name, func_type, false);
             kir_function_sigs_[qual + "::" + fn->name] = kir_sig_from(func_type);
           }
+        }
+        if (result.modules.empty()) {
+          error_at(logical_import->location,
+                   result.error.empty() ? ("Unknown module '" + logical_import->module_id + "'")
+                                        : result.error);
+        } else if (!result.error.empty()) {
+          error_at(logical_import->location, result.error);
         }
       }
     }
