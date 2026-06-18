@@ -1,6 +1,7 @@
 #include "runtime/kinglet_rt_internal.h"
 
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -8,6 +9,7 @@
 #include <vector>
 
 #if defined(__unix__) || defined(__APPLE__)
+#include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
 #endif
@@ -177,6 +179,33 @@ kl_h kl_native_fs_write(kl_h path, kl_h content) {
     file.write(content_data, content_len);
   }
   return 0;
+}
+
+kl_h kl_native_fs_listdir(kl_h path) {
+  const char *data = nullptr;
+  int32_t len = 0;
+  if (!kl_string_view(path, &data, &len)) {
+    return 0;
+  }
+  const std::string dir(data, static_cast<std::size_t>(len));
+  std::vector<kl_h> entries;
+#if defined(__unix__) || defined(__APPLE__)
+  DIR *handle = opendir(dir.c_str());
+  if (handle == nullptr) {
+    return 0;
+  }
+  while (struct dirent *entry = readdir(handle)) {
+    const char *name = entry->d_name;
+    // Skip the synthetic "." and ".." entries; everything else (files,
+    // subdirectories, dotfiles) is returned so the caller owns the policy.
+    if (name[0] == '.' && name[1] == '\0') continue;
+    if (name[0] == '.' && name[1] == '.' && name[2] == '\0') continue;
+    entries.push_back(
+        kl_string_new(name, static_cast<int32_t>(std::strlen(name))));
+  }
+  closedir(handle);
+#endif
+  return kl_array_new(static_cast<int32_t>(entries.size()), entries.data());
 }
 
 kl_h kl_native_sys_args(void) {

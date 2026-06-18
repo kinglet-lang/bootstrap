@@ -61,6 +61,11 @@ kl_h kl_native_err_ln(int32_t argc, const kl_h *args);
 kl_h kl_native_in(int32_t argc, const kl_h *args, int32_t secret);
 kl_h kl_native_fs_read(kl_h path);
 kl_h kl_native_fs_write(kl_h path, kl_h content);
+// List the names of every entry in a directory (files, subdirectories,
+// dotfiles) except the synthetic "." and "..". No filtering by extension or
+// type: policy lives in the caller. Returns a kl_h array of kl_h strings,
+// or 0 (null) if the path cannot be opened as a directory.
+kl_h kl_native_fs_listdir(kl_h path);
 kl_h kl_native_sys_args(void);
 int32_t kl_value_len(kl_h value);
 
