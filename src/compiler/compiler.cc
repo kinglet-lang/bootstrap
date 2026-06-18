@@ -2349,15 +2349,22 @@ void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl)
     error_at(import_decl.location, "Import not supported (no module loader configured).");
     return;
   }
-
-  auto result = module_loader_->load_by_logical_name(import_decl.module_id);
-  if (!result.module) {
-    error_at(import_decl.location, result.error);
-    return;
+  // Manifest entry first, then directory-as-module (auto-import every
+  // <module_id>/*.kl), removing the need for a _dir.kl manifest.
+  auto result = module_loader_->resolve_logical(import_decl.module_id);
+  for (const ParsedModule *mod : result.modules) {
+    register_imported_module(*mod);
   }
+  if (result.modules.empty()) {
+    error_at(import_decl.location,
+             result.error.empty() ? ("Unknown module '" + import_decl.module_id + "'")
+                                  : result.error);
+  } else if (!result.error.empty()) {
+    error_at(import_decl.location, result.error);
+  }
+}
 
-  const ParsedModule &mod = *result.module;
-
+void Compiler::register_imported_module(const ParsedModule &mod) {
   if (!processed_modules_.insert(mod.resolved_path).second) {
     return;
   }
