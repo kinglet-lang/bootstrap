@@ -163,6 +163,8 @@ void Chunk::disassemble(std::ostream &out) const {
       out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::NativeFsWrite) {
       out << " argc=" << instruction.operand;
+    } else if (instruction.op == OpCode::NativeFsListdir) {
+      out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::NativeSysArgs) {
       out << " argc=" << instruction.operand;
     } else if (instruction.op == OpCode::ArrayNew) {
@@ -269,6 +271,8 @@ const char *opcode_name(OpCode op) {
     return "NativeFsRead";
   case OpCode::NativeFsWrite:
     return "NativeFsWrite";
+  case OpCode::NativeFsListdir:
+    return "NativeFsListdir";
   case OpCode::NativeSysArgs:
     return "NativeSysArgs";
   case OpCode::StructNew:

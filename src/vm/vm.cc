@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <iterator>
 #include <sstream>
@@ -859,6 +860,31 @@ VmResult Vm::run(const Chunk &chunk, const std::vector<std::string> &args) {
                        content.string_val().size()));
       }
       push(Value::null_value());
+      break;
+    }
+    case OpCode::NativeFsListdir: {
+      const uint32_t arg_count =
+          static_cast<uint32_t>(instruction.operand);
+      if (arg_count != 1)
+        return runtime_error("fs::__listdir expects exactly one argument.");
+      if (stack_.empty())
+        return runtime_error("Stack underflow for fs::__listdir.");
+      Value path = pop();
+      if (path.type != ValueType::String)
+        return runtime_error("fs::__listdir expects a string path.");
+      std::vector<Value> entries;
+      std::error_code ec;
+      std::filesystem::directory_iterator it(path.string_val(), ec);
+      if (ec) {
+        push(Value::null_value());
+        break;
+      }
+      for (; it != std::filesystem::directory_iterator(); it.increment(ec)) {
+        if (ec) { push(Value::null_value()); break; }
+        entries.push_back(Value::string_value(it->path().filename().string()));
+      }
+      if (ec) { break; }
+      push(Value::array_value(std::move(entries)));
       break;
     }
     case OpCode::NativeSysArgs: {

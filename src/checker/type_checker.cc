@@ -1496,6 +1496,12 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         fn.return_type = std::make_shared<Type>(void_type());
         return fn;
       }
+      if (ns_access->member_name == "__listdir") {
+        Type fn(TypeKind::Function);
+        fn.name = "native_fn";
+        fn.return_type = std::make_shared<Type>(array_type(string_type()));
+        return fn;
+      }
     }
     if (ns_access->namespace_name == "sys") {
       if (used_.count("sys") == 0) {
@@ -1802,6 +1808,14 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           }
         }
         return void_type();
+      }
+      if (ns_callee->member_name == "__listdir") {
+        if (call_expr->args.size() != 1) {
+          error_at(call_expr->location, "fs::__listdir expects exactly one argument (path).");
+        } else if (check_expr(*call_expr->args[0]).kind != TypeKind::String) {
+          error_at(call_expr->args[0]->location, "fs::__listdir expects a string path.");
+        }
+        return array_type(string_type());
       }
       error_at(ns_callee->location, "Unknown fs member '" + ns_callee->member_name + "'.");
       return void_type();

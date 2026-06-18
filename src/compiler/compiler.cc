@@ -1077,6 +1077,14 @@ void Compiler::compile_expr(const ast::Expr &expr) {
                      call_expr->location);
         return;
       }
+      if (ns_callee->member_name == "__listdir") {
+        for (const ast::ExprPtr &arg : call_expr->args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeFsListdir, static_cast<uint32_t>(call_expr->args.size()),
+                     call_expr->location);
+        return;
+      }
     }
 
     // Handle sys::args() direct call.

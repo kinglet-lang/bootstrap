@@ -61,6 +61,7 @@ enum class OpCode : uint8_t {
   NativeInSecret,
   NativeFsRead,
   NativeFsWrite,
+  NativeFsListdir,
   NativeSysArgs,
   StructNew,
   FieldGet,
