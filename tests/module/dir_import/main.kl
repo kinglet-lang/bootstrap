@@ -1,0 +1,11 @@
+using io;
+import user;
+using namespace user.math;
+
+// `import user;` auto-loads every user/*.kl as a submodule — no _dir.kl needed.
+int main() {
+  io::out.line("{}", user::math::add(2, 3));
+  io::out.line("{}", user::extra::double_it(21));
+  io::out.line("{}", sub(20, 5));  // opened via `using namespace user.math;`
+  return 0;
+}
