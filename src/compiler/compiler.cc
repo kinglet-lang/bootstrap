@@ -505,6 +505,13 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
       }
     }
   }
+  // The call side mangles symbols from function_source_paths_; keep the
+  // definition side identical so cross-module links resolve.
+  if (func_idx >= 0 &&
+      static_cast<std::size_t>(func_idx) < function_source_paths_.size() &&
+      !function_source_paths_[static_cast<std::size_t>(func_idx)].empty()) {
+    fn_source = function_source_paths_[static_cast<std::size_t>(func_idx)];
+  }
 
   // KIR fast path: single `return <expr>` with IrBuilder-supported expression.
   if (const ast::Expr *ret_expr = single_return_expr(function)) {
