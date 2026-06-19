@@ -171,7 +171,13 @@ Type float_literal_type_from_suffix(std::string_view suffix) {
   if (suffix == "f64") {
     return make_float_type("float64");
   }
-  return make_float_type("float32");
+  // Unsuffixed float literals default to float64. The VM holds every float as a
+  // double and the native backend would otherwise truncate an unsuffixed
+  // literal to float32 (ConstF32), so float-typed arithmetic diverged between
+  // hosts (and between the two native compilers during self-host). float32 is
+  // opt-in via an f32 suffix or a declared float32 type. Mirrors the int
+  // literal default (see default_int_literal_type).
+  return make_float_type("float64");
 }
 
 bool integer_assignable(const Type &from, const Type &to) {
@@ -184,8 +190,13 @@ bool integer_assignable(const Type &from, const Type &to) {
 
 bool float_assignable(const Type &from, const Type &to) {
   if (!is_float_type(from) || !is_float_type(to)) return false;
-  if (from.name == to.name) return true;
-  return from.name == "float32" && to.name == "float64";
+  // Float widths are interchangeable for assignment. The runtime stores every
+  // float as a double (KlFloat::value) and native float arithmetic is done in
+  // double — width only affects constant-literal materialization — so neither
+  // direction loses precision at runtime. This lets `float x = 1.5` (an
+  // unsuffixed float64 literal assigned to a float32 variable) keep working
+  // after unsuffixed float literals default to float64.
+  return true;
 }
 
 std::optional<Type> try_promote_integer_binary(const Type &left, const Type &right,
