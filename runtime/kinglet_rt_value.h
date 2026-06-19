@@ -113,6 +113,8 @@ kl_h kl_float_from_bits(int64_t bits);
 int64_t kl_float_to_bits(kl_h value);
 kl_h kl_bool_to_string(kl_h value);
 kl_h kl_null_to_string(void);
+kl_h kl_int_to_string(kl_h value);
+kl_h kl_char_to_string(kl_h value);
 
 // Polymorphic arithmetic mirroring the VM's tag dispatch: string concat for
 // `+`, IEEE double math when either side is a boxed float, int64 otherwise.

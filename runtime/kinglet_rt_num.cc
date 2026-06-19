@@ -75,6 +75,27 @@ kl_h kl_bool_to_string(kl_h value) {
   return kl_string_new(text.data(), static_cast<int32_t>(text.size()));
 }
 
+// Unconditionally format a wire value known (from its static KIR type) to be a
+// plain integer. Unlike kl_value_text / kl_cast_to_string, this never sniffs
+// the heap or inline-enum mark bits, so integers whose high bits collide with
+// KL_HEAP_MARK / KL_INLINE_ENUM_MARK (e.g. 0xFFFD<<48, an encoded enum tag the
+// compiler manipulates as an int) format correctly instead of being misread as
+// an enum variant.
+kl_h kl_int_to_string(kl_h value) {
+  const std::string text = std::to_string(kl_to_int(value));
+  return kl_string_new(text.data(), static_cast<int32_t>(text.size()));
+}
+
+// string(char): a Char is carried on the wire as its plain integer code point,
+// indistinguishable from an int, so the backend routes Char->string here (it
+// knows the static type) rather than to kl_cast_to_string. Emits the single
+// character byte, matching the VM's char semantics, instead of the decimal
+// spelling of the code point.
+kl_h kl_char_to_string(kl_h value) {
+  const char byte = static_cast<char>(kl_to_int(value) & 0xFF);
+  return kl_string_new(&byte, 1);
+}
+
 kl_h kl_null_to_string(void) {
   const std::string text = "null";
   return kl_string_new(text.data(), static_cast<int32_t>(text.size()));

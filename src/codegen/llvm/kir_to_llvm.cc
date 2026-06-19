@@ -151,6 +151,8 @@ struct RtFns {
   llvm::Function *float_to_bits = nullptr;
   llvm::Function *bool_to_string = nullptr;
   llvm::Function *null_to_string = nullptr;
+  llvm::Function *int_to_string = nullptr;
+  llvm::Function *char_to_string = nullptr;
   llvm::Function *value_add = nullptr;
   llvm::Function *value_sub = nullptr;
   llvm::Function *value_mul = nullptr;
@@ -277,6 +279,12 @@ RtFns declare_runtime(llvm::Module *module) {
                                               module);
   rt.null_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {}, false),
                                               llvm::Function::ExternalLinkage, "kl_null_to_string",
+                                              module);
+  rt.int_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                             llvm::Function::ExternalLinkage, "kl_int_to_string",
+                                             module);
+  rt.char_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                              llvm::Function::ExternalLinkage, "kl_char_to_string",
                                               module);
   rt.value_add = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_value_add", module);
@@ -443,7 +451,16 @@ llvm::Value *wire_for_string_display(llvm::IRBuilder<> &builder, const RtFns &rt
     return builder.CreateCall(rt.bool_to_string, {wire});
   case KirType::Null:
     return builder.CreateCall(rt.null_to_string, {});
+  case KirType::Char:
+    // Display a char as its character byte, matching VM semantics.
+    return builder.CreateCall(rt.char_to_string, {wire});
   default:
+    // A value statically known to be a plain integer must be formatted as an
+    // integer, never sniffed: large ints whose high bits land on the
+    // heap/inline-enum mark would otherwise be misread as a heap ref or enum.
+    if (kir_type_is_integer(kir_type_normalize(type))) {
+      return builder.CreateCall(rt.int_to_string, {wire});
+    }
     return wire;
   }
 }
@@ -1900,6 +1917,15 @@ public:
                                         {to_wire_i64(builder, rt_, src, src_ty)});
           } else if (src_ty == KirType::Null) {
             result = builder.CreateCall(rt_.null_to_string, {});
+          } else if (src_ty == KirType::Char) {
+            // string(char) yields the character byte, not its code point.
+            result = builder.CreateCall(rt_.char_to_string,
+                                        {to_wire_i64(builder, rt_, src, src_ty)});
+          } else if (kir_type_is_integer(kir_type_normalize(src_ty))) {
+            // string(int): format unconditionally so ints whose high bits land
+            // on the heap/inline-enum mark are not misread by kl_cast_to_string.
+            result = builder.CreateCall(rt_.int_to_string,
+                                        {to_wire_i64(builder, rt_, src, src_ty)});
           } else {
             result = builder.CreateCall(rt_.cast_to_string,
                                         {to_wire_i64(builder, rt_, src, src_ty)});

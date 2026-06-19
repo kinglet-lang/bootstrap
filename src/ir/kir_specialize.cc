@@ -77,7 +77,9 @@ void specialize_function(KirFunction &fn) {
     }
   }
 
-  for (KirInstr *instr : linear_mutable_instrs(fn)) {
+  const std::vector<KirInstr *> linear = linear_mutable_instrs(fn);
+  for (std::size_t idx = 0; idx < linear.size(); ++idx) {
+    KirInstr *instr = linear[idx];
     switch (instr->op) {
     case KirOpcode::ConstInt:
     case KirOpcode::ConstI32:
@@ -130,11 +132,17 @@ void specialize_function(KirFunction &fn) {
     case KirOpcode::IMul:
     case KirOpcode::IDiv:
     case KirOpcode::IMod: {
-      const KirType rhs = pop_type(&stack);
-      const KirType lhs = pop_type(&stack);
-      KirType width = kir_type_join_numeric(lhs, rhs);
-      if (width == KirType::Any && lhs == KirType::String && instr->op == KirOpcode::IAdd) {
-        width = KirType::String;
+      pop_type(&stack);
+      pop_type(&stack);
+      // Drive specialization off the authoritative per-instruction type that
+      // infer_kir_types() computed for this binop (it runs immediately before
+      // this pass). The local abstract stack here does not model Call/ConstFn/
+      // ArrayNew/etc. and desyncs on any non-trivial operand, so it must not be
+      // trusted to derive the operand width — doing so could pick IAdd32 for a
+      // string concat and lower a heap handle through a 32-bit integer add.
+      KirType width = KirType::Any;
+      if (idx < fn.instr_types.size()) {
+        width = fn.instr_types[idx];
       }
       if (width != KirType::Any && width != KirType::String) {
         instr->op = width_binop(instr->op, width);

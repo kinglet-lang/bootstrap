@@ -574,9 +574,27 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       pop_type(&state);
       pop_type(&state);
       break;
+    case KirOpcode::ArraySlice: {
+      // Stack: [object, start, end] -> slice. The result is the same kind as
+      // the sliced object (a string slice is a String, an array slice an
+      // Array); critically it must NOT inherit a stale Int type, or a slot
+      // holding the slice would be mistyped and later string-concat / display
+      // lowering would format the heap handle as an integer.
+      pop_type(&state); // end
+      pop_type(&state); // start
+      KirContainerType object_container;
+      const KirType object = pop_type(&state, &object_container);
+      if (object == KirType::String) {
+        result = KirType::String;
+        push_typed(&state, result);
+      } else {
+        result = KirType::Array;
+        push_typed(&state, result, object_container);
+      }
+      break;
+    }
     case KirOpcode::ArrayNew:
     case KirOpcode::DenseArrayNew:
-    case KirOpcode::ArraySlice:
     case KirOpcode::ArrayPush:
     case KirOpcode::ArrayResize:
     case KirOpcode::ArrayPop:
