@@ -137,9 +137,11 @@ void merge_slot_types(std::vector<KirType> *dst, const std::vector<KirType> &src
   for (std::size_t i = 0; i < src.size(); ++i) {
     if (i >= dst->size()) {
       dst->push_back(src[i]);
-    } else if ((*dst)[i] == KirType::Any) {
-      (*dst)[i] = src[i];
     } else {
+      // Join across control-flow paths. A slot that is Any on either side is
+      // Any after the merge (Any is the top type) — never let a concrete type
+      // overwrite an Any, or a slot reused for an enum handle and an int gets
+      // mis-typed as int32 and its 64-bit handle is truncated on load.
       (*dst)[i] = kir_type_join((*dst)[i], src[i]);
     }
   }
