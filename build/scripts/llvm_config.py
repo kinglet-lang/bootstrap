@@ -32,7 +32,9 @@ def main() -> int:
         if skip_next:
             skip_next = False
             continue
-        if flag == "-std=c++17":
+        if flag.startswith("-std="):
+            continue
+        if flag == "-fno-exceptions":
             continue
         if flag in ("-stdlib=libc++",):
             continue

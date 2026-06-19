@@ -28,7 +28,11 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
+#if LLVM_VERSION_MAJOR >= 16
 #include <llvm/TargetParser/Host.h>
+#else
+#include <llvm/Support/Host.h>
+#endif
 
 #include <cstring>
 #include <cstdlib>
@@ -664,7 +668,12 @@ bool emit_object(llvm::Module &module, const std::string &obj_path, std::string 
   }
 
   llvm::legacy::PassManager pass;
-  if (machine->addPassesToEmitFile(pass, dest, nullptr, llvm::CodeGenFileType::ObjectFile)) {
+#if LLVM_VERSION_MAJOR >= 18
+  const auto obj_file_type = llvm::CodeGenFileType::ObjectFile;
+#else
+  const auto obj_file_type = llvm::CGFT_ObjectFile;
+#endif
+  if (machine->addPassesToEmitFile(pass, dest, nullptr, obj_file_type)) {
     *error = "LLVM cannot emit an object file for this target";
     return false;
   }
@@ -2296,9 +2305,17 @@ std::string shard_stamp(const KirModule &shard, const KirModule &full,
   llvm::SHA256 hasher;
   const std::string text = shard_fingerprint_text(shard, full, options);
   hasher.update(text);
+#if LLVM_VERSION_MAJOR >= 16
   const auto digest = hasher.final();
   return llvm::toHex(llvm::ArrayRef<uint8_t>(digest.data(), digest.size()),
                      /*LowerCase=*/true);
+#else
+  const llvm::StringRef digest = hasher.final();
+  return llvm::toHex(llvm::ArrayRef<uint8_t>(
+                         reinterpret_cast<const uint8_t *>(digest.data()),
+                         digest.size()),
+                     /*LowerCase=*/true);
+#endif
 }
 
 } // namespace
