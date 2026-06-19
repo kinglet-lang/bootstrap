@@ -1114,7 +1114,7 @@ public:
           return false;
         }
         const std::string &text = kir_module_.constant_strings[static_cast<std::size_t>(pool_idx)];
-        llvm::Value *data = builder.CreateGlobalString(text);
+        llvm::Value *data = builder.CreateGlobalStringPtr(text);
         llvm::Value *len =
             llvm::ConstantInt::get(i32, static_cast<int>(text.size()));
         llvm::Value *handle = builder.CreateCall(rt_.string_new, {data, len});
