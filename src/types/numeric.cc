@@ -134,9 +134,14 @@ bool integer_fits_width(int64_t value, const IntWidthInfo &width) {
 }
 
 Type default_int_literal_type(int64_t value) {
-  if (value >= kInt32Min && value <= kInt32Max) {
-    return make_int_type("int32");
-  }
+  // Unsuffixed integer literals are Kinglet `int`, which is 64-bit (the VM
+  // represents every int as i64). Do NOT narrow small literals to int32: a
+  // narrowed slot specializes arithmetic to 32-bit ops on the native backend,
+  // so a variable declared `int` but initialized from a small literal (e.g.
+  // `int val = 0; val = val * 16 + ...`) overflows at 32 bits natively while
+  // the VM stays 64-bit — a host divergence. Fixed-width int32 must come from
+  // an explicit `i32` suffix or a declared `int32` type, never from inference.
+  (void)value;
   return make_int_type("int64");
 }
 
