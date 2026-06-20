@@ -1,0 +1,9 @@
+// EXPECT_OUT: 3.5
+using io;
+struct Box { float64 value; }
+struct Tag { int value; }
+int main() {
+  Box b = Box { 3.5 };
+  io::out.line(b.value);
+  return 0;
+}
