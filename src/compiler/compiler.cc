@@ -1191,8 +1191,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       }
     }
 
-    // Handle aliased bare names from `using io { out }`: out.line(...)
-    // emits the same native opcode as io::out.line(...).
+    // Handle `using namespace io;` bare out.line / err.line / in.secret.
     if (field_callee) {
       const auto *id_obj =
           dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
@@ -1220,32 +1219,6 @@ void Compiler::compile_expr(const ast::Expr &expr) {
           emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr->args.size()),
                        call_expr->location);
           return;
-        }
-      }
-      if (id_obj) {
-        auto alias_it = using_aliases_.find(id_obj->name);
-        if (alias_it != using_aliases_.end()) {
-          const auto &[ns, member] = alias_it->second;
-          if (ns == "io") {
-            if (member == "out" && field_callee->field_name == "line") {
-              for (const ast::ExprPtr &arg : call_expr->args) compile_expr(*arg);
-              emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr->args.size()),
-                           call_expr->location);
-              return;
-            }
-            if (member == "err" && field_callee->field_name == "line") {
-              for (const ast::ExprPtr &arg : call_expr->args) compile_expr(*arg);
-              emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr->args.size()),
-                           call_expr->location);
-              return;
-            }
-            if (member == "in" && field_callee->field_name == "secret") {
-              for (const ast::ExprPtr &arg : call_expr->args) compile_expr(*arg);
-              emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr->args.size()),
-                           call_expr->location);
-              return;
-            }
-          }
         }
       }
     }

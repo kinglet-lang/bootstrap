@@ -1565,36 +1565,6 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     }
     auto var_type = lookup_var(identifier->name);
     if (!var_type.has_value()) {
-      // Check if this bare name aliases a system-namespace member (e.g. `out`
-      // from `using io { out }`). Return the same native_fn type that
-      // NamespaceAccessExpr would produce for the qualified form.
-      auto alias_it = using_aliases_.find(identifier->name);
-      if (alias_it != using_aliases_.end()) {
-        const auto &[ns, member] = alias_it->second;
-        used_.insert(ns);
-        if (ns == "io") {
-          if (member == "out" || member == "err") {
-            Type fn(TypeKind::Function);
-            fn.name = "native_fn";
-            fn.return_type = std::make_shared<Type>(void_type());
-            return fn;
-          }
-          if (member == "in") {
-            Type fn(TypeKind::Function);
-            fn.name = "native_fn";
-            fn.return_type = std::make_shared<Type>(string_type());
-            return fn;
-          }
-        }
-        if (ns == "sys") {
-          if (member == "args") {
-            Type fn(TypeKind::Function);
-            fn.name = "native_fn";
-            fn.return_type = std::make_shared<Type>(array_type(string_type()));
-            return fn;
-          }
-        }
-      }
       error_at(identifier->location, "Undeclared variable '" + identifier->name + "'.");
       return int_type();
     }
@@ -2629,28 +2599,6 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           return fn;
         }
         if (id_obj->name == "in" && field_access->field_name == "secret") {
-          Type fn(TypeKind::Function);
-          fn.name = "native_fn";
-          fn.return_type = std::make_shared<Type>(string_type());
-          return fn;
-        }
-      }
-    }
-
-    // Handle aliased bare names from `using io { out }`: out.line(...)
-    // behaves identically to io::out.line(...).
-    if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_access->object.get())) {
-      auto alias_it = using_aliases_.find(id_obj->name);
-      if (alias_it != using_aliases_.end()) {
-        const auto &[ns, member] = alias_it->second;
-        if (ns == "io" && (member == "out" || member == "err") &&
-            field_access->field_name == "line") {
-          Type fn(TypeKind::Function);
-          fn.name = "native_fn";
-          fn.return_type = std::make_shared<Type>(void_type());
-          return fn;
-        }
-        if (ns == "io" && member == "in" && field_access->field_name == "secret") {
           Type fn(TypeKind::Function);
           fn.name = "native_fn";
           fn.return_type = std::make_shared<Type>(string_type());

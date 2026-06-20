@@ -87,11 +87,6 @@ private:
   std::unordered_set<std::string> opened_;  // using namespace io;
   std::unordered_set<std::string> imported_namespaces_;
   std::unordered_set<std::string> imported_bare_names_;  // for selective imports
-  // Bare names brought in by `using io { out }` for a system namespace
-  // (io/fs/sys), mapped to the (namespace, member) they alias. These name
-  // native members, so they resolve structurally rather than via the symbol
-  // table.
-  std::unordered_map<std::string, std::pair<std::string, std::string>> using_aliases_;
   std::unordered_map<std::string, std::string> module_aliases_;
   std::unordered_set<std::string> imported_qualifiers_;
   // Per-namespace exported / private symbol names, populated when an import is
