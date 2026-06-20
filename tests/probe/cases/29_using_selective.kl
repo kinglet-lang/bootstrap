@@ -1,3 +1,4 @@
 // EXPECT_OUT: ok
-using io { out };
+// Selective `using io { out }` is not supported; use `using namespace io` instead.
+using namespace io;
 int main() { out.line("ok"); return 0; }

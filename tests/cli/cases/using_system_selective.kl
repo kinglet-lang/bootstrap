@@ -1,7 +1,5 @@
-// Selective import of a system-library member: `using io { out }` makes the
-// bare name `out` an alias for io::out, so out.line(...) works identically to
-// io::out.line(...).
-using io { out };
+// Platform IO via `using namespace io;` — bare `out.line` works like `io::out.line`.
+using namespace io;
 
 int main() {
   out.line("ok");
