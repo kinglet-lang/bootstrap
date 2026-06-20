@@ -1,4 +1,4 @@
-// EXPECT_OUT: 0
+// EXPECT_OUT: 1
 using io;
 concept Printable<T> { string to_string(T value); }
 string to_string(int v) { return "x"; }

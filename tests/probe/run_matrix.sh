@@ -22,6 +22,9 @@ CASES="$ROOT/tests/probe/cases"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+# Fixture for 28_fs_read.kl (reads /tmp/_kl_probe_fs.txt).
+printf 'hello' > /tmp/_kl_probe_fs.txt
+
 # Furthest stage reached by the compiler.
 # parse / check / codegen expect a clean exit; run compares stdout to EXPECT_OUT.
 classify() {
