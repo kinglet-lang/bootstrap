@@ -6,6 +6,8 @@ may differ.
 
 ## Module and `using` rules (ADR 0018)
 
+Project manifest: **`kinglet.nest`** only (`kinglet.toml` retired).
+
 Supported:
 
 - `export module <id>;` + `import <module-id>;` (logical modules via `kinglet.nest`)
