@@ -416,15 +416,22 @@ llvm::Value *to_wire_i64(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Valu
   return llvm::ConstantInt::get(i64, 0);
 }
 
+// When the field name is unique across struct_metas, return its KirType; otherwise Any.
 KirType kir_field_type_for_name(const KirModule &module, const std::string &field_name) {
+  KirType found = KirType::Any;
+  int matches = 0;
   for (const KirStructMeta &meta : module.struct_metas) {
-    for (std::size_t fi = 0; fi < meta.field_names.size(); ++fi) {
-      if (meta.field_names[fi] == field_name && fi < meta.field_types.size()) {
-        return meta.field_types[fi];
-      }
+    const int fi = field_index_for_name(meta, field_name);
+    if (fi < 0 || static_cast<std::size_t>(fi) >= meta.field_types.size()) {
+      continue;
+    }
+    found = meta.field_types[static_cast<std::size_t>(fi)];
+    ++matches;
+    if (matches > 1) {
+      return KirType::Any;
     }
   }
-  return KirType::Any;
+  return matches == 1 ? found : KirType::Any;
 }
 
 KirType kir_local_type(const KirFunction &fn, int slot) {
@@ -1404,8 +1411,7 @@ public:
         llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
         llvm::Value *field_idx =
             resolve_field_index(builder, type_idx, kir_module_, field_name);
-        const KirType field_ty =
-            kir_field_type_for_name(kir_module_, field_name);
+        const KirType field_ty = kir_field_type_for_name(kir_module_, field_name);
         llvm::Value *wire = builder.CreateCall(rt_.struct_field_at, {obj, field_idx});
         const UnboxedScalar scalar =
             unbox_wire_scalar(builder, rt_, wire, field_ty, i64, i32);

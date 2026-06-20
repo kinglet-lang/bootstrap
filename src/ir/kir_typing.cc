@@ -543,24 +543,35 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       push_typed(&state, result);
       break;
     }
-    case KirOpcode::StructNew:
-      pop_type(&state);
+    case KirOpcode::StructNew: {
+      const int packed = instr->operands[0];
+      const int field_count = packed & 0xFFFF;
+      for (int fi = 0; fi < field_count; ++fi) {
+        pop_type(&state);
+      }
       result = KirType::Struct;
       push_typed(&state, result);
       break;
+    }
     case KirOpcode::FieldGet: {
       pop_type(&state);
       const int pool_idx = instr->operands[0];
+      result = KirType::Any;
       if (pool_idx >= 0 && static_cast<std::size_t>(pool_idx) < module.constant_strings.size()) {
         const std::string &field_name = module.constant_strings[static_cast<std::size_t>(pool_idx)];
+        KirType found = KirType::Any;
+        int matches = 0;
         for (const KirStructMeta &meta : module.struct_metas) {
           for (std::size_t fi = 0; fi < meta.field_names.size(); ++fi) {
-            if (meta.field_names[fi] == field_name &&
-                fi < meta.field_types.size()) {
-              result = meta.field_types[fi];
+            if (meta.field_names[fi] == field_name && fi < meta.field_types.size()) {
+              found = meta.field_types[fi];
+              ++matches;
               break;
             }
           }
+        }
+        if (matches == 1) {
+          result = found;
         }
       }
       if (result == KirType::Void) {
