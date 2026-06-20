@@ -295,6 +295,16 @@ std::string toml_escape(const std::string &value) {
 }
 
 std::string default_output_name(const ProjectConfig &config) {
+  if (!config.build_default.empty()) {
+    if (config.build_default == "core.main") {
+      return "compiler";
+    }
+    const auto dot = config.build_default.rfind('.');
+    if (dot != std::string::npos && dot + 1 < config.build_default.size()) {
+      return config.build_default.substr(dot + 1);
+    }
+    return config.build_default;
+  }
   if (config.build_root == "core/main.kl") {
     return "compiler";
   }
@@ -435,7 +445,7 @@ int cmd_init(int argc, char **argv) {
     return 64;
   }
 
-  const fs::path manifest = dir / "kinglet.toml";
+  const fs::path manifest = dir / "kinglet.nest";
   if (fs::exists(manifest)) {
     print_error("init", "project '" + project_name + "' already exists");
     return 64;
@@ -450,18 +460,18 @@ int cmd_init(int argc, char **argv) {
       print_error("init", "cannot write " + manifest.string());
       return 74;
     }
-    out << "[project]\n"
-        << "name = \"" << toml_escape(project_name) << "\"\n"
-        << "version = \"0.1.0\"\n"
+    out << "project \"" << toml_escape(project_name) << "\" version \"0.1.0\"\n"
         << "\n"
-        << "[build]\n"
-        << "root = \"src/main.kl\"\n"
-        << "cache_dir = \".kinglet/cache\"\n"
-        << "out_dir = \".kinglet/out\"\n"
+        << "modules {\n"
+        << "  app = \"src/main.kl\"\n"
+        << "}\n"
         << "\n"
-        << "[build.compiler]\n"
-        << "engine = \"ref\"\n"
-        << "default_backend = \"native\"\n";
+        << "build {\n"
+        << "  default = \"app\"\n"
+        << "  backend = native\n"
+        << "  cache = \".kinglet/cache\"\n"
+        << "  out = \".kinglet/out\"\n"
+        << "}\n";
   }
   const fs::path src_dir = dir / "src";
   const fs::path main_kl = src_dir / "main.kl";
@@ -475,7 +485,8 @@ int cmd_init(int argc, char **argv) {
       print_error("init", "cannot write " + main_kl.string());
       return 74;
     }
-    out << "using io;\n"
+    out << "export module app;\n"
+        << "using io;\n"
         << "\n"
         << "int main() {\n"
         << "  io::out.line(\"Hello from {}!\", \"" << toml_escape(project_name) << "\");\n"
@@ -486,7 +497,7 @@ int cmd_init(int argc, char **argv) {
   const ui::Painter &p = ui::g_out;
   std::cout << p.green("\u2713") << "  Created project " << p.bold(project_name) << "\n\n";
   std::cout << "   " << p.dim(display_path(dir) + "/") << "\n";
-  std::cout << "   " << p.cyan("kinglet.toml") << "\n";
+  std::cout << "   " << p.cyan("kinglet.nest") << "\n";
   std::cout << "   " << p.cyan("src/main.kl") << "\n\n";
   std::cout << p.bold("   Next steps") << "\n";
   std::cout << p.dim("     cd " + display_path(dir)) << "\n";
@@ -523,7 +534,7 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   const std::string start = root_arg.empty() ? fs::current_path().string() : fs::absolute(root_arg).string();
   const auto config = find_project_config(start);
   if (!config) {
-    print_error("build", "no kinglet.toml found (run kinglet init)");
+    print_error("build", "no kinglet.nest found (run kinglet init)");
     return 2;
   }
   if (backend.empty()) {
@@ -534,7 +545,12 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
     return 64;
   }
 
-  const fs::path entry = fs::path(config->root_dir) / config->build_root;
+  const auto entry_path = resolve_build_entry_path(*config);
+  if (!entry_path) {
+    print_error("build", "build.default module not found in kinglet.nest modules table");
+    return 2;
+  }
+  const fs::path entry = *entry_path;
   if (!fs::exists(entry)) {
     print_error("build", "entry not found: " + entry.string());
     return 2;
@@ -603,7 +619,7 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
 
   const auto config = find_project_config(fs::current_path().string());
   if (!config) {
-    print_error("run", "no kinglet.toml; use kinglet <file.kl> or kinglet init");
+    print_error("run", "no kinglet.nest; use kinglet <file.kl> or kinglet init");
     return 2;
   }
 
@@ -746,7 +762,7 @@ int cmd_prune(int argc, char **argv) {
   const std::string start = root_arg.empty() ? fs::current_path().string() : fs::absolute(root_arg).string();
   const auto config = find_project_config(start);
   if (!config) {
-    print_error("prune", "no kinglet.toml found");
+    print_error("prune", "no kinglet.nest found");
     return 2;
   }
 
@@ -865,14 +881,14 @@ int cmd_fmt(int argc, char **argv) {
   if (!config_path.empty()) {
     const fs::path manifest = fs::absolute(config_path);
     std::optional<ProjectConfig> config;
-    if (manifest.filename() == "kinglet.toml") {
-      config = load_project_config_file(manifest);
+    if (manifest.filename() == "kinglet.nest") {
+      config = load_nest_config_file(manifest);
     }
     if (!config) {
       config = find_project_config(manifest.parent_path().string());
     }
     if (!config) {
-      print_error("fmt", "no kinglet.toml found for --config");
+      print_error("fmt", "no kinglet.nest found for --config");
       return 2;
     }
     fmt_config = kinglet::preen::fmt_config_from_project(*config);
@@ -909,14 +925,14 @@ int cmd_fmt(int argc, char **argv) {
   if (paths.empty()) {
     const auto config = find_project_config(fs::current_path().string());
     if (!config) {
-      print_error("fmt", "no paths given and no kinglet.toml found");
+      print_error("fmt", "no paths given and no kinglet.nest found");
       return 2;
     }
     paths = collect_kl_files(fs::path(config->root_dir));
     if (paths.empty()) {
-      const fs::path entry = fs::path(config->root_dir) / config->build_root;
-      if (fs::exists(entry)) {
-        paths.push_back(entry);
+      const auto entry_path = resolve_build_entry_path(*config);
+      if (entry_path && fs::exists(*entry_path)) {
+        paths.push_back(*entry_path);
       }
     }
   } else {
