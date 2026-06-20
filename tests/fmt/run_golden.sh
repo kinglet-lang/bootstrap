@@ -57,7 +57,7 @@ run_project_case() {
   local name
   name="$(basename "$dir")"
   local actual="$TMP_DIR/$name.out"
-  local config="$dir/kinglet.toml"
+  local config="$dir/kinglet.nest"
 
   "$KINGLET" fmt --config "$config" --stdin <"$dir/input.kl" >"$actual"
   local rc=$?

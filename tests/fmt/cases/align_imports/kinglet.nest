@@ -1,0 +1,5 @@
+project "fmt-align-imports" version "0.1.0"
+
+fmt {
+  extensions = "align-imports"
+}

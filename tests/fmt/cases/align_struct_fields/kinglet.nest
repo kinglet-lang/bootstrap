@@ -1,0 +1,5 @@
+project "fmt-align-struct" version "0.1.0"
+
+fmt {
+  extensions = "align-struct-fields"
+}
