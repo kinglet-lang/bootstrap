@@ -279,16 +279,16 @@ ast::DeclPtr Parser::using_declaration() {
     error_at(previous(), "Wildcard `using module::*` is not supported; use `using namespace module` instead.");
     return nullptr;
   }
-  if (match(TokenType::LEFT_BRACE)) {
-    error_at(previous(), "Selective `using module { sym }` is not supported; use qualified access, "
-                          "`using alias = module`, or `using namespace module`.");
-    return nullptr;
-  }
   std::string module_id = std::string(token_text(name));
   while (match(TokenType::DOT)) {
     const Token &part = consume(TokenType::IDENTIFIER, "Expected identifier after '.' in module name.");
     module_id.push_back('.');
     module_id += token_text(part);
+  }
+  if (match(TokenType::LEFT_BRACE)) {
+    error_at(previous(), "Selective `using module { sym }` is not supported; use qualified access, "
+                          "`using alias = module`, or `using namespace module`.");
+    return nullptr;
   }
   consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
   return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(module_id), is_namespace);
