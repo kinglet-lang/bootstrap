@@ -6,7 +6,6 @@ _kinglet_defines = [ "KINGLET_VERSION=\"${kinglet_version}\"" ]
 group("default") {
   deps = [
     ":kinglet",
-    ":kinglet-vm",
     "//runtime:kinglet_rt",
   ]
   if (enable_llvm) {
@@ -58,20 +57,6 @@ executable("kinglet") {
     deps += [ ":embedded_compiler_cc" ]
     defines = [ "KINGLET_HAVE_EMBEDDED_COMPILER=1" ]
   }
-
-  include_dirs = [
-    "//src",
-  ]
-}
-
-executable("kinglet-vm") {
-  sources = [
-    "src/kinglet/vm_main.cc",
-  ]
-
-  deps = [
-    "//src/vm",
-  ]
 
   include_dirs = [
     "//src",

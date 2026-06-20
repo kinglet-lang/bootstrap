@@ -15,8 +15,8 @@
 #include "lexer/token.h"
 #include "parser/parser.h"
 #include "vm/value.h"
-#include "vm/vm.h"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -26,8 +26,8 @@
 #include <utility>
 #include <vector>
 
-#if defined(KINGLET_HAVE_EMBEDDED_COMPILER) && !defined(_WIN32)
-#include <sys/stat.h>
+#if !defined(_WIN32)
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -99,16 +99,75 @@ int run_embedded_compiler(int argc, char **argv) {
 
 enum class Mode {
   Run,
-  RunBytecode,
   Tokens,
   Ast,
   Check,
   Bytecode,
   Ir,
   Native,
-  SaveBytecode,
-  Repl,
 };
+
+#ifdef KINGLET_HAVE_LLVM
+int run_native_executable(const kinglet::KirModule &kir, const std::vector<std::string> &program_args,
+                          const char *argv0) {
+  const std::filesystem::path tmp_dir = std::filesystem::temp_directory_path();
+  std::string exe_template = (tmp_dir / "kinglet-run-XXXXXX").string();
+  std::vector<char> tpl(exe_template.begin(), exe_template.end());
+  tpl.push_back('\0');
+#if defined(_WIN32)
+  (void)kir;
+  (void)program_args;
+  (void)argv0;
+  std::cerr << "kinglet: native execution is not supported on Windows\n";
+  return 78;
+#else
+  const int fd = mkstemp(tpl.data());
+  if (fd < 0) {
+    std::cerr << "kinglet: failed to create temporary executable path\n";
+    return 74;
+  }
+  close(fd);
+  const std::string exe_path(tpl.data());
+  std::filesystem::remove(exe_path);
+
+  kinglet::NativeCompileOptions native_options;
+  const kinglet::NativeCompileResult native = kinglet::KirToLlvm::compile_executable(
+      kir, exe_path, resolve_rt_lib(argv0), native_options);
+  if (!native.ok) {
+    std::cerr << "kinglet: native compile failed: " << native.error << '\n';
+    return 78;
+  }
+
+  const pid_t child = fork();
+  if (child < 0) {
+    std::cerr << "kinglet: failed to spawn native executable\n";
+    std::filesystem::remove(exe_path);
+    return 71;
+  }
+  if (child == 0) {
+    std::vector<char *> exec_argv;
+    exec_argv.push_back(tpl.data());
+    for (const std::string &arg : program_args) {
+      exec_argv.push_back(const_cast<char *>(arg.c_str()));
+    }
+    exec_argv.push_back(nullptr);
+    execv(exe_path.c_str(), exec_argv.data());
+    _exit(127);
+  }
+
+  int status = 0;
+  if (waitpid(child, &status, 0) < 0) {
+    std::filesystem::remove(exe_path);
+    return 71;
+  }
+  std::filesystem::remove(exe_path);
+  if (WIFEXITED(status)) {
+    return WEXITSTATUS(status);
+  }
+  return 70;
+#endif
+}
+#endif
 
 #ifdef KINGLET_HAVE_LLVM
 std::string resolve_rt_lib(const char *argv0) {
@@ -143,14 +202,12 @@ std::string compiler_identity(const char *argv0) {
 #endif
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache <dir>] | --backend native -o <out> | --bytecode | --save-bytecode <out.kbc> [--strip-debug] | --run <program.kbc> | --repl] [file.kl]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache <dir>] | --backend native -o <out> | --bytecode] [file.kl] [args...]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
-      << "By default, compiles and runs main().\n"
-      << "With --run, loads and executes a pre-compiled .kbc file.\n"
+      << "By default, compiles to a native executable and runs main() (requires LLVM build).\n"
       << "With --native -g, emits DWARF debug info from KIR line tables.\n"
       << "With --obj-cache, caches per-module objects by content stamp for incremental rebuilds.\n"
-      << "With --save-bytecode --strip-debug, omits debug info for smaller output.\n"
       << "With selfhost <args...>, runs the embedded native compiler (if built in).\n";
 }
 
@@ -237,12 +294,9 @@ int main(int argc, char **argv) {
   }
 
   std::string input_path;
-  std::string save_bytecode_path;
   std::string native_out_path;
   std::string native_obj_cache_dir;
-  std::string run_bytecode_path;
   Mode mode = Mode::Run;
-  bool strip_debug = false;
   bool native_debug_info = false;
   std::vector<std::string> program_args;
 
@@ -252,11 +306,6 @@ int main(int argc, char **argv) {
     // program verbatim (so `kinglet script.kl --foo bar` passes `--foo bar`
     // to sys::args(), not to the interpreter).
     if (!input_path.empty()) {
-      program_args.emplace_back(arg);
-      continue;
-    }
-    // Once in RunBytecode mode, all remaining args belong to the program.
-    if (mode == Mode::RunBytecode) {
       program_args.emplace_back(arg);
       continue;
     }
@@ -318,25 +367,9 @@ int main(int argc, char **argv) {
       mode = Mode::Check;
       continue;
     }
-    if (arg == "--save-bytecode") {
-      mode = Mode::SaveBytecode;
-      // Next argument is the output path
-      if (i + 1 < argc) {
-        ++i;
-        save_bytecode_path = argv[i];
-      } else {
-        std::cerr << "kinglet: --save-bytecode requires an output path\n";
-        return 64;
-      }
-      continue;
-    }
-    if (arg == "--repl") {
-      mode = Mode::Repl;
-      continue;
-    }
     if (arg == "--strip-debug") {
-      strip_debug = true;
-      continue;
+      std::cerr << "kinglet: --strip-debug is only supported with legacy bytecode tooling (removed)\n";
+      return 64;
     }
     if (arg == "-g") {
       native_debug_info = true;
@@ -352,173 +385,19 @@ int main(int argc, char **argv) {
       }
       continue;
     }
-    if (arg == "--run") {
-      mode = Mode::RunBytecode;
-      if (i + 1 < argc) {
-        ++i;
-        run_bytecode_path = argv[i];
-      } else {
-        std::cerr << "kinglet: --run requires a .kbc file\n";
-        return 64;
-      }
-      continue;
+    if (arg == "--run" || arg == "--save-bytecode" || arg == "--repl") {
+      std::cerr << "kinglet: " << arg << " removed (VM backend deleted; use native build)\n";
+      return 64;
     }
     input_path = std::string(arg);
   }
 
-  // --run mode: load and execute a pre-compiled .kbc file.
-  if (mode == Mode::RunBytecode) {
-    program_args.clear();
-    bool past_run_path = false;
-    for (int i = 1; i < argc; ++i) {
-      if (!past_run_path) {
-        if (std::string_view(argv[i]) == "--run") {
-          ++i; // skip the .kbc path too
-          past_run_path = true;
-        }
-        continue;
-      }
-      program_args.emplace_back(argv[i]);
-    }
-
-    std::string error;
-    kinglet::Chunk chunk = kinglet::Chunk::deserialize(run_bytecode_path, &error);
-    if (!error.empty()) {
-      std::cerr << "kinglet: " << error << "\n";
-      return 66;
-    }
-
-    kinglet::Vm vm;
-    kinglet::VmResult result = vm.run(chunk, program_args);
-    if (!result.ok) {
-      std::cerr << "runtime error: " << result.error << "\n";
-      return 70;
-    }
-
-    return kinglet::exit_code_from_value(result.value);
-  }
-
   std::string source;
-  if (input_path.empty() && mode != Mode::Repl) {
+  if (input_path.empty()) {
     source = read_stdin();
-  } else if (!input_path.empty()) {
-    if (!read_file(input_path, &source)) {
-      std::cerr << "kinglet: failed to read '" << input_path << "'\n";
-      return 66;
-    }
-  }
-
-  if (mode == Mode::Repl) {
-    std::cout << "Kinglet REPL (type 'exit' to quit)\n";
-    kinglet::Vm vm;
-    while (true) {
-      std::cout << "> " << std::flush;
-      std::string line;
-      if (!std::getline(std::cin, line) || line == "exit") {
-        break;
-      }
-      if (line.empty()) {
-        continue;
-      }
-
-      // Wrap in a main function if not already wrapped
-      std::string wrapped_source;
-      if (line.find("int main") == std::string::npos &&
-          line.find("fn main") == std::string::npos) {
-        std::string expr = line;
-        while (!expr.empty() && expr.back() == ';') {
-          expr.pop_back();
-        }
-
-        const char *return_types[] = {"int", "float", "string", "bool", "void"};
-        bool found = false;
-        for (const char *rt : return_types) {
-          wrapped_source =
-              "using io; " + std::string(rt) + " main() => " + expr + ";";
-          kinglet::Scanner test_scanner(wrapped_source);
-          auto test_tokens = test_scanner.scan_tokens();
-          kinglet::Parser test_parser(test_tokens);
-          auto test_result = test_parser.parse();
-          if (!test_result.errors.empty()) continue;
-          kinglet::TypeChecker test_checker;
-          auto test_type = test_checker.check(*test_result.program);
-          if (test_type.errors.empty()) {
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          wrapped_source = "using io; int main() => " + expr + ";";
-        }
-      } else {
-        wrapped_source = line;
-      }
-
-      kinglet::Scanner scanner(std::move(wrapped_source));
-      const std::vector<kinglet::Token> tokens = scanner.scan_tokens();
-
-      bool had_error = false;
-      for (const kinglet::Token &token : tokens) {
-        if (token.type == kinglet::TokenType::ERROR) {
-          std::cerr << token.line << ':' << token.column << ": lexer error: "
-                    << token.lexeme << '\n';
-          had_error = true;
-        }
-      }
-      if (had_error) {
-        continue;
-      }
-
-      kinglet::Parser parser(tokens);
-      kinglet::ParseResult result = parser.parse();
-      for (const kinglet::ParseError &error : result.errors) {
-        std::cerr << error.line << ':' << error.column << ": parse error: "
-                  << error.message << '\n';
-      }
-      if (!result.errors.empty()) {
-        continue;
-      }
-
-      kinglet::TypeChecker checker;
-      kinglet::TypeCheckResult type_result = checker.check(*result.program);
-      bool has_type_errors = false;
-      for (const kinglet::TypeError &error : type_result.errors) {
-        const char *label = error.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
-        std::cerr << error.location.line << ':' << error.location.column
-                  << ": " << label << ": " << error.message << '\n';
-        if (error.severity == kinglet::DiagnosticSeverity::Error) has_type_errors = true;
-      }
-      if (has_type_errors) {
-        continue;
-      }
-
-      kinglet::Compiler compiler;
-      kinglet::CompileResult compile_result = compiler.compile(*result.program);
-      for (const kinglet::CompileError &error : compile_result.errors) {
-        std::cerr << error.location.line << ':' << error.location.column
-                  << ": compile error: " << error.message << '\n';
-      }
-      if (!compile_result.errors.empty()) {
-        continue;
-      }
-      for (const kinglet::CompileWarning &warning : compile_result.warnings) {
-        std::cerr << warning.location.line << ':' << warning.location.column
-                  << ": warning: " << warning.message << '\n';
-      }
-
-      kinglet::VmResult vm_result = vm.run(compile_result.chunk);
-      if (!vm_result.ok) {
-        std::cerr << "runtime error: " << vm_result.error << '\n';
-        continue;
-      }
-
-      if (vm_result.value.type != kinglet::ValueType::Null &&
-          (vm_result.value.type != kinglet::ValueType::Int ||
-           vm_result.value.as_int != 0)) {
-        std::cout << vm_result.value << '\n';
-      }
-    }
-    return 0;
+  } else if (!read_file(input_path, &source)) {
+    std::cerr << "kinglet: failed to read '" << input_path << "'\n";
+    return 66;
   }
 
   kinglet::Scanner scanner(std::move(source));
@@ -596,13 +475,7 @@ int main(int argc, char **argv) {
 
   if (has_type_errors) {
     if (mode == Mode::Check) { return 65; }
-    // Only abort on type errors for interactive modes (Run, Bytecode).
-    // For --save-bytecode, type errors are shown but do not prevent
-    // bytecode generation since the compiler does not depend on the
-    // type checker output.
-    if (mode != Mode::SaveBytecode) {
-      return 65;
-    }
+    return 65;
   }
 
   if (mode == Mode::Check) { return 0; }
@@ -670,20 +543,11 @@ int main(int argc, char **argv) {
 #endif
   }
 
-  if (mode == Mode::SaveBytecode) {
-    if (!compile_result.chunk.serialize(save_bytecode_path, strip_debug)) {
-      std::cerr << "kinglet: failed to write '" << save_bytecode_path << "'\n";
-      return 74;
-    }
-    return 0;
+#ifdef KINGLET_HAVE_LLVM
+  if (mode == Mode::Run) {
+    return run_native_executable(compile_result.kir, program_args, argv[0]);
   }
-
-  kinglet::Vm vm;
-  kinglet::VmResult vm_result = vm.run(compile_result.chunk, program_args);
-  if (!vm_result.ok) {
-    std::cerr << "runtime error: " << vm_result.error << '\n';
-    return 70;
-  }
-
-  return kinglet::exit_code_from_value(vm_result.value);
+#endif
+  std::cerr << "kinglet: execution requires LLVM native backend (rebuild with enable_llvm=true)\n";
+  return 78;
 }

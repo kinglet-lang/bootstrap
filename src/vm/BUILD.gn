@@ -4,12 +4,8 @@ static_library("vm") {
     "chunk.h",
     "numeric.cc",
     "numeric.h",
-    "cow.cc",
-    "cow.h",
     "value.cc",
     "value.h",
-    "vm.cc",
-    "vm.h",
   ]
 
   include_dirs = [

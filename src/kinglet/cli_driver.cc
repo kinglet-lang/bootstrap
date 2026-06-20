@@ -177,7 +177,7 @@ void print_cli_help(std::ostream &out) {
   out << p.bold("USAGE") << "\n";
   cmd(g_prog + " <file.kl> [args...]", "Compile and run (default)");
   cmd(g_prog + " init [path]", "Scaffold a new project (name = last segment)");
-  cmd(g_prog + " build [--backend native|vm]", "Build the project (--quiet, [root])");
+  cmd(g_prog + " build [--backend native]", "Build the project (--quiet, [root])");
   cmd(g_prog + " run [<file.kl> | args...]", "Run the built binary or a source file");
   cmd(g_prog + " prune [--all] [-n]", "Prune unreferenced Klos objects");
   cmd(g_prog + " fmt [--check] [paths...]", "Format sources (CI check or write)");
@@ -186,10 +186,7 @@ void print_cli_help(std::ostream &out) {
   out << "\n" << p.bold("COMPILER MODES") << " " << p.dim("(flags)") << "\n";
   cmd("--check, --tokens, --ast", "Diagnostics, tokens, AST");
   cmd("--bytecode, --ir", "Bytecode / KIR dump");
-  cmd("--save-bytecode <out.kbc>", "Compile to bytecode");
-  cmd("--run <program.kbc>", "Run compiled bytecode");
   cmd("--native <out>", "Native executable (requires LLVM build)");
-  cmd("--repl", "Interactive REPL");
   out << '\n';
 }
 
@@ -516,11 +513,12 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
       continue;
     }
     if (arg == "--backend") {
-      if (i + 1 >= argc) {
-        print_error("build", "--backend requires native or vm");
+      if (i + 1 >= argc || std::string_view(argv[i + 1]) != "native") {
+        print_error("build", "--backend requires native");
         return 64;
       }
-      backend = argv[++i];
+      backend = "native";
+      ++i;
       continue;
     }
     if (arg.starts_with('-')) {
@@ -540,8 +538,8 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   if (backend.empty()) {
     backend = config->default_backend;
   }
-  if (backend != "native" && backend != "vm") {
-    print_error("build", "unsupported backend '" + backend + "'");
+  if (backend != "native") {
+    print_error("build", "only native backend is supported (vm removed)");
     return 64;
   }
 
@@ -561,23 +559,18 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   ensure_dir(fs::path(config->root_dir) / ".kinglet/objects");
 
   const std::string out_name = default_output_name(*config);
-  const fs::path out_path =
-      backend == "native" ? out_dir / out_name : out_dir / (out_name + ".kbc");
+  const fs::path out_path = out_dir / out_name;
 
   std::vector<std::string> args;
-  if (backend == "native") {
 #ifndef KINGLET_HAVE_LLVM
-    print_error("build", "native backend not available (rebuild with enable_llvm=true)");
-    return 78;
+  print_error("build", "native backend not available (rebuild with enable_llvm=true)");
+  return 78;
 #else
-    const fs::path obj_cache = fs::path(config->root_dir) / ".kinglet/objects/native";
-    ensure_dir(obj_cache);
-    args = {"--backend", "native", "-o", out_path.string(), "--obj-cache", obj_cache.string(),
-            entry.string()};
+  const fs::path obj_cache = fs::path(config->root_dir) / ".kinglet/objects/native";
+  ensure_dir(obj_cache);
+  args = {"--backend", "native", "-o", out_path.string(), "--obj-cache", obj_cache.string(),
+          entry.string()};
 #endif
-  } else {
-    args = {"--save-bytecode", out_path.string(), entry.string()};
-  }
   if (args.empty()) {
     return 78;
   }
@@ -626,7 +619,6 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
   const fs::path out_dir = fs::path(config->root_dir) / config->out_dir;
   const std::string out_name = default_output_name(*config);
   fs::path native_bin = out_dir / out_name;
-  fs::path kbc = out_dir / (out_name + ".kbc");
 
   if (fs::exists(native_bin)) {
 #if defined(_WIN32)
@@ -643,13 +635,6 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
     print_error("run", "exec failed for " + native_bin.string());
     return 71;
 #endif
-  }
-  if (fs::exists(kbc)) {
-    std::vector<std::string> args = {"--run", kbc.string()};
-    for (int i = 2; i < argc; ++i) {
-      args.push_back(argv[i]);
-    }
-    return spawn_reexec(self_executable, args);
   }
 
   print_error("run", "no build output in " + display_path(out_dir) + " (run kinglet build)");
