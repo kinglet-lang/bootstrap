@@ -1151,10 +1151,20 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       }
       used_.insert(using_decl->namespace_name);
       if (using_decl->is_namespace) {
-        opened_.insert(using_decl->namespace_name);
         if (imported_namespaces_.count(using_decl->namespace_name)) {
+          const auto pub_it = module_public_symbols_.find(using_decl->namespace_name);
+          if (pub_it != module_public_symbols_.end()) {
+            for (const auto &sym : pub_it->second) {
+              if (lookup_var(sym)) {
+                error_at(using_decl->location,
+                         "Symbol '" + sym + "' already in scope; cannot `using namespace " +
+                             using_decl->namespace_name + "`.");
+              }
+            }
+          }
           open_imported_namespace(using_decl->namespace_name);
         }
+        opened_.insert(using_decl->namespace_name);
       }
       continue;
     }

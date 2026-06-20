@@ -335,6 +335,11 @@ ast::DeclPtr Parser::export_module_declaration() {
 ast::DeclPtr Parser::import_declaration() {
   const Token &import_token = previous();
 
+  if (match(TokenType::LEFT_BRACE)) {
+    error_at(previous(), "Import block syntax `import { ... }` is removed; use `import module-id;` "
+                          "with kinglet.nest.");
+    return nullptr;
+  }
   if (check(TokenType::IDENTIFIER)) {
     const std::string module_id = parse_module_id("module name after 'import'");
     consume(TokenType::SEMICOLON, "Expected ';' after import.");
