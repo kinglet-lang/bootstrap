@@ -25,4 +25,12 @@ if "$KINGLET" --check "$CASE/reject_using_selective_io.kl" 2>/dev/null; then
   echo "Expected reject_using_selective_io.kl to fail" >&2
   exit 1
 fi
+if "$KINGLET" --check "$CASE/reject_import_block.kl" 2>/dev/null; then
+  echo "Expected reject_import_block.kl to fail" >&2
+  exit 1
+fi
+if "$KINGLET" --check "$CASE/reject_using_namespace_collision.kl" 2>/dev/null; then
+  echo "Expected reject_using_namespace_collision.kl to fail" >&2
+  exit 1
+fi
 echo "Hierarchical module tests passed."
