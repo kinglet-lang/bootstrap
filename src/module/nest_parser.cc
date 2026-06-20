@@ -108,6 +108,40 @@ bool parse_kv_line(const std::string &line, std::string &key, std::string &value
   return !key.empty();
 }
 
+void append_extension_list(const std::string &raw, ProjectFmtSection &fmt) {
+  std::string trimmed = trim(raw);
+  if (trimmed.empty()) {
+    return;
+  }
+  if (trimmed.front() == '[' && trimmed.back() == ']') {
+    trimmed = trimmed.substr(1, trimmed.size() - 2);
+  }
+  std::stringstream ss(trimmed);
+  std::string part;
+  while (std::getline(ss, part, ',')) {
+    std::string item = trim(part);
+    if (item.size() >= 2 && item.front() == '"' && item.back() == '"') {
+      item = item.substr(1, item.size() - 2);
+    }
+    if (!item.empty()) {
+      fmt.extensions.push_back(item);
+    }
+  }
+}
+
+bool parse_bool_token(const std::string &value, bool &out) {
+  const std::string v = trim(value);
+  if (v == "true") {
+    out = true;
+    return true;
+  }
+  if (v == "false") {
+    out = false;
+    return true;
+  }
+  return false;
+}
+
 void parse_block_body(const std::string &body, const std::string &block_name, ProjectConfig &config) {
   std::istringstream in(body);
   std::string line;
@@ -132,6 +166,18 @@ void parse_block_body(const std::string &body, const std::string &block_name, Pr
         config.out_dir = value;
       } else if (key == "cache") {
         config.cache_dir = value;
+      }
+    } else if (block_name == "fmt") {
+      if (key == "indent") {
+        config.fmt.indent = std::stoi(value);
+      } else if (key == "max_width") {
+        config.fmt.max_width = std::stoi(value);
+      } else if (key == "newline") {
+        config.fmt.newline = value;
+      } else if (key == "trailing_comma") {
+        config.fmt.trailing_comma_set = parse_bool_token(value, config.fmt.trailing_comma);
+      } else if (key == "extensions") {
+        append_extension_list(value, config.fmt);
       }
     }
   }
@@ -218,6 +264,12 @@ bool parse_nest_manifest(const std::string &content, ProjectConfig &config) {
       pos = line_start;
       const std::string body = extract_block(content, pos, "build");
       parse_block_body(body, "build", config);
+      continue;
+    }
+    if (starts_with(line, "fmt ")) {
+      pos = line_start;
+      const std::string body = extract_block(content, pos, "fmt");
+      parse_block_body(body, "fmt", config);
       continue;
     }
     // targets { } and other blocks are ignored in this phase.

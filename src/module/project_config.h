@@ -30,13 +30,15 @@ struct ProjectConfig {
   std::string out_dir = ".kinglet/out";
   std::string default_backend = "native";
   std::string build_default;
-  std::unordered_map<std::string, std::string> dependencies; // name → path (toml)
-  std::unordered_map<std::string, std::string> modules;       // name → path (nest)
+  std::unordered_map<std::string, std::string> modules; // logical id → path (nest)
   ProjectFmtSection fmt;
 };
 
+// Resolve the default build entry file from nest `build.default` + `modules { }`.
+std::optional<std::string> resolve_build_entry_path(const ProjectConfig &config);
+
 std::optional<ProjectConfig> find_project_config(const std::string &start_dir);
-std::optional<ProjectConfig> load_project_config_file(const std::filesystem::path &manifest_path);
+std::optional<ProjectConfig> load_nest_config_file(const std::filesystem::path &manifest_path);
 std::optional<ProjectConfig> find_nest_config(const std::string &start_dir);
 
 } // namespace kinglet
