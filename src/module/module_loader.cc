@@ -312,6 +312,9 @@ ModuleLoader::load_directory_import(const std::string &module_id) {
 
   const std::string rel_dir_with_sep = rel_dir + "/";
   for (const std::string &stem : stems) {
+    if (stem == "_dir") {
+      continue;
+    }
     const std::string rel_path = rel_dir_with_sep + stem + ".kl";
     LoadResult result = load_from(rel_path, project_config_->root_dir);
     if (!result.module) {

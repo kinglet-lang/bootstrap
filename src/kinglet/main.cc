@@ -108,6 +108,8 @@ enum class Mode {
 };
 
 #ifdef KINGLET_HAVE_LLVM
+std::string resolve_rt_lib(const char *argv0);
+
 int run_native_executable(const kinglet::KirModule &kir, const std::vector<std::string> &program_args,
                           const char *argv0) {
   const std::filesystem::path tmp_dir = std::filesystem::temp_directory_path();

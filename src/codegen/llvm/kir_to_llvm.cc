@@ -368,7 +368,7 @@ int field_index_for_name(const KirStructMeta &meta, const std::string &field_nam
 llvm::Value *resolve_field_index(llvm::IRBuilder<> &builder, llvm::Value *type_idx,
                                 const KirModule &kir_module, const std::string &field_name) {
   llvm::Type *i32 = builder.getInt32Ty();
-  llvm::Value *result = llvm::ConstantInt::get(i32, -1);
+  llvm::Value *result = llvm::ConstantInt::get(i32, 0);
   for (std::size_t t = 0; t < kir_module.struct_metas.size(); ++t) {
     const int fi = field_index_for_name(kir_module.struct_metas[t], field_name);
     if (fi < 0) {
@@ -1411,7 +1411,12 @@ public:
         llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
         llvm::Value *field_idx =
             resolve_field_index(builder, type_idx, kir_module_, field_name);
-        const KirType field_ty = kir_field_type_for_name(kir_module_, field_name);
+        KirType field_ty = KirType::Any;
+        if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
+          field_ty = fn.instr_types[i];
+        } else {
+          field_ty = kir_field_type_for_name(kir_module_, field_name);
+        }
         llvm::Value *wire = builder.CreateCall(rt_.struct_field_at, {obj, field_idx});
         const UnboxedScalar scalar =
             unbox_wire_scalar(builder, rt_, wire, field_ty, i64, i32);
