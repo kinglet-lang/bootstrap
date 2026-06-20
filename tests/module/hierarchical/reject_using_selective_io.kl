@@ -1,0 +1,3 @@
+using io { out };
+
+int main() { return 0; }
