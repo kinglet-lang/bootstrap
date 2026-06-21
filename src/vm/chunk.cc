@@ -233,6 +233,8 @@ const char *opcode_name(OpCode op) {
     return "CastTo";
   case OpCode::FloatToBits:
     return "FloatToBits";
+  case OpCode::BitsToFloat:
+    return "BitsToFloat";
   case OpCode::Call:
     return "Call";
   case OpCode::Return:

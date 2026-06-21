@@ -1841,6 +1841,17 @@ public:
         temps[i] = bits;
         break;
       }
+      case KirOpcode::BitsToFloat: {
+        llvm::Value *bits = pop_value(&stack, error, &type_stack);
+        if (bits == nullptr) {
+          return false;
+        }
+        llvm::Value *value = builder.CreateCall(rt_.float_from_bits, {bits});
+        push(value);
+        temps[i] = value;
+        temp_types[i] = KirType::Float;
+        break;
+      }
       case KirOpcode::Nop:
         break;
       case KirOpcode::EnumVariant: {

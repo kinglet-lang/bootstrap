@@ -1786,18 +1786,33 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
 
     const auto *ns_callee =
         dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
-    // Type-qualified methods: int::bits(float) -> int
+    // Type-qualified methods: int::bits(float|double) -> uint64; float::from_bits(uint64) -> float
     if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
       if (call_expr->args.size() != 1) {
         error_at(call_expr->location, "int::bits() expects exactly 1 argument.");
-        return int_type();
+        return make_int_type("uint64");
       }
       Type arg_type = check_expr(*call_expr->args[0]);
       if (arg_type.kind != TypeKind::Float) {
         error_at(call_expr->location,
                  "int::bits() expects a float argument, got " + type_to_string(arg_type) + ".");
       }
-      return int_type();
+      return make_int_type("uint64");
+    }
+    if (ns_callee && ns_callee->namespace_name == "float" &&
+        ns_callee->member_name == "from_bits") {
+      if (call_expr->args.size() != 1) {
+        error_at(call_expr->location, "float::from_bits() expects exactly 1 argument.");
+        return float_type();
+      }
+      Type arg_type = check_expr(*call_expr->args[0]);
+      if (arg_type.kind != TypeKind::Int ||
+          (arg_type.name != "uint64" && arg_type.name != "int64" && arg_type.name != "int")) {
+        error_at(call_expr->location,
+                 "float::from_bits() expects a uint64 argument, got " +
+                     type_to_string(arg_type) + ".");
+      }
+      return float_type();
     }
     if (ns_callee && ns_callee->namespace_name == "io") {
       if (used_.count("io") == 0) {

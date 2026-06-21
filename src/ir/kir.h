@@ -152,6 +152,7 @@ enum class KirOpcode {
   EnumPayloadGet,
   CastTo,
   FloatToBits,
+  BitsToFloat,
   NativeOut,
   NativeOutLn,
   NativeErr,

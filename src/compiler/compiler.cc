@@ -1034,10 +1034,20 @@ void Compiler::compile_expr(const ast::Expr &expr) {
 
     const auto *ns_callee =
         dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
-    // Type-qualified methods: int::bits(float)
+    // Type-qualified methods: int::bits(float) -> uint64; float::from_bits(uint64) -> float
     if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
       compile_expr(*call_expr->args[0]);
       emit(OpCode::FloatToBits, call_expr->location);
+      return;
+    }
+    if (ns_callee && ns_callee->namespace_name == "float" &&
+        ns_callee->member_name == "from_bits") {
+      if (call_expr->args.size() != 1) {
+        error_at(call_expr->location, "float::from_bits() expects exactly 1 argument.");
+        return;
+      }
+      compile_expr(*call_expr->args[0]);
+      emit(OpCode::BitsToFloat, call_expr->location);
       return;
     }
     if (ns_callee && used_.count(ns_callee->namespace_name) != 0 &&

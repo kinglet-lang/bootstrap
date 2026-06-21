@@ -792,6 +792,11 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       result = KirType::Int;
       push_typed(&state, result);
       break;
+    case KirOpcode::BitsToFloat:
+      pop_type(&state);
+      result = KirType::Float;
+      push_typed(&state, result);
+      break;
     case KirOpcode::NativeOut:
     case KirOpcode::NativeOutLn:
     case KirOpcode::NativeErr:

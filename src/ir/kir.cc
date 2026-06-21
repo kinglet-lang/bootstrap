@@ -193,6 +193,8 @@ const char *kir_opcode_name(KirOpcode op) {
     return "cast_to";
   case KirOpcode::FloatToBits:
     return "float_to_bits";
+  case KirOpcode::BitsToFloat:
+    return "bits_to_float";
   case KirOpcode::NativeOut:
     return "native_out";
   case KirOpcode::NativeOutLn:
