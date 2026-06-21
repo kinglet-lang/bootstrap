@@ -7,13 +7,10 @@ on:
     branches: [main]
 
 jobs:
-  build-and-test:
+  build-and-test-unix:
     strategy:
       matrix:
-        include:
-          - os: windows-latest
-          - os: ubuntu-latest
-          - os: macos-latest
+        os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -23,26 +20,33 @@ jobs:
       - name: Install GN
         shell: bash
         run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
-            unzip gn.zip -d "$HOME/bin"
-            echo "$HOME/bin" >> $GITHUB_PATH
-          elif [ "$RUNNER_OS" == "macOS" ]; then
+          if [ "$RUNNER_OS" == "macOS" ]; then
             curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/mac-arm64/+/latest"
-            unzip gn.zip -d "$HOME/bin"
-            echo "$HOME/bin" >> $GITHUB_PATH
           else
             curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest"
-            unzip gn.zip -d "$HOME/bin"
-            echo "$HOME/bin" >> $GITHUB_PATH
           fi
+          unzip gn.zip -d "$HOME/bin"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
+      - name: Install LLVM
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            brew install llvm
+            echo "LLVM_CONFIG=$(brew --prefix llvm)/bin/llvm-config" >> "$GITHUB_ENV"
+          else
+            sudo apt-get update
+            sudo apt-get install -y llvm-dev clang
+            echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
+          fi
+
       - name: Generate build files
         shell: bash
-        run: gn gen out/Debug
+        run: |
+          gn gen out/Debug --args="enable_llvm=true llvm_config=\"$LLVM_CONFIG\""
 
       - name: Build
         shell: bash
@@ -50,4 +54,51 @@ jobs:
 
       - name: Run golden tests
         shell: bash
+        run: bash tests/cli/run_golden.sh
+
+  build-and-test-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # gn ships as a native Windows binary that emits drive-letter paths, which
+      # MSYS2's python cannot open. Use a native Windows python for gn's
+      # exec_script (--script-executable) instead.
+      - name: Set up native Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            unzip
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-llvm
+            mingw-w64-x86_64-ninja
+
+      - name: Install GN
+        run: |
+          curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
+          unzip -o gn.zip -d /usr/bin
+
+      - name: Generate build files
+        run: |
+          PYW="$(cygpath -m "$pythonLocation")/python.exe"
+          LLVMW="$(cygpath -m /mingw64/bin/llvm-config.exe)"
+          gn gen out/Debug \
+            --script-executable="$PYW" \
+            --args="enable_llvm=true llvm_config=\"$LLVMW\""
+
+      - name: Build
+        run: ninja -C out/Debug
+
+      - name: Run golden tests
         run: bash tests/cli/run_golden.sh
