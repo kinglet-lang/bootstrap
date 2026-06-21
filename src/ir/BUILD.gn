@@ -14,6 +14,8 @@ static_library("ir") {
     "kir_container.h",
     "kir_specialize.cc",
     "kir_specialize.h",
+    "kir_field_resolve.cc",
+    "kir_field_resolve.h",
   ]
 
   deps = [

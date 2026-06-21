@@ -215,6 +215,8 @@ struct KirModule {
   std::vector<std::string> function_symbols;
   std::vector<int32_t> function_param_counts;
   std::vector<KirFunctionSig> function_signatures;
+  // True after resolve_kir_field_operands has rewritten FieldGet/FieldSet operands.
+  bool field_operands_resolved = false;
 };
 
 const char *kir_type_name(KirType type);
