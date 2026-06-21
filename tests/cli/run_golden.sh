@@ -2,15 +2,37 @@
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# Windows builds emit kinglet.exe; MSYS/Git-Bash -x may not match a path
+# without the suffix when KINGLET is set explicitly in CI.
+resolve_kinglet_bin() {
+  local p="$1"
+  if [[ -x "$p" ]]; then
+    printf '%s' "$p"
+    return 0
+  fi
+  if [[ -x "${p}.exe" ]]; then
+    printf '%s' "${p}.exe"
+    return 0
+  fi
+  printf '%s' "$p"
+}
+
 if [[ -n "${KINGLET:-}" ]]; then
-  :
-elif [[ -x "$ROOT/out/Debug/kinglet" ]]; then
-  KINGLET="$ROOT/out/Debug/kinglet"
-elif [[ -x "$ROOT/out/Default/kinglet" ]]; then
-  KINGLET="$ROOT/out/Default/kinglet"
+  KINGLET="$(resolve_kinglet_bin "$KINGLET")"
+elif [[ -x "$ROOT/out/Debug/kinglet" ]] || [[ -x "$ROOT/out/Debug/kinglet.exe" ]]; then
+  KINGLET="$(resolve_kinglet_bin "$ROOT/out/Debug/kinglet")"
+elif [[ -x "$ROOT/out/Default/kinglet" ]] || [[ -x "$ROOT/out/Default/kinglet.exe" ]]; then
+  KINGLET="$(resolve_kinglet_bin "$ROOT/out/Default/kinglet")"
 else
-  KINGLET="$ROOT/out/Debug/kinglet"
+  KINGLET="$(resolve_kinglet_bin "$ROOT/out/Debug/kinglet")"
 fi
+
+if [[ ! -x "$KINGLET" ]]; then
+  echo "kinglet binary not found or not executable: $KINGLET" >&2
+  exit 1
+fi
+
 OUT_DIR="$(cd "$(dirname "$KINGLET")" && pwd)"
 TMP_DIR="$(mktemp -d)"
 FAILURES=0
@@ -95,7 +117,7 @@ run_contains_case() {
     FAILURES=$((FAILURES + 1))
   fi
   for expected in "$@"; do
-    if ! grep -q "$expected" "$stdout"; then
+    if ! grep -Fq "$expected" "$stdout"; then
       fail "$name stdout missing '$expected'"
     fi
   done
@@ -136,7 +158,9 @@ run_args_case() {
 }
 
 cd "$ROOT" || exit 1
-ninja -C "$OUT_DIR" >/dev/null
+if [[ "${KINGLET_SKIP_REBUILD:-}" != "1" ]]; then
+  ninja -C "$OUT_DIR" >/dev/null
+fi
 
 # --- Arrays ---
 run_case "arrays_success" "run" 0 $'1 20 []\n' ""

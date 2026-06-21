@@ -1,0 +1,4 @@
+# Golden oracles and shell scripts must stay LF on Windows checkouts.
+* text=auto eol=lf
+*.kl text eol=lf
+*.sh text eol=lf

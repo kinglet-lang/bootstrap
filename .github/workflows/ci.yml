@@ -58,58 +58,44 @@ jobs:
           export KINGLET="$PWD/out/Debug/kinglet"
           bash tests/cli/run_golden.sh
 
+  # Windows: Git Bash + non-LLVM kinglet is enough for compile-only golden
+  # (--check / --ast / --ir / --bytecode). Native `run` is unsupported on
+  # _WIN32; MSYS2+LLVM builds were failing the golden harness itself.
   build-and-test-windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
 
     steps:
       - uses: actions/checkout@v4
 
-      # gn ships as a native Windows binary that emits drive-letter paths, which
-      # MSYS2's python cannot open. Use a native Windows python for gn's
-      # exec_script (--script-executable) instead.
-      - name: Set up native Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Set up MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            unzip
-            mingw-w64-x86_64-clang
-            mingw-w64-x86_64-llvm
-            mingw-w64-x86_64-ninja
-
       - name: Install GN
+        shell: bash
         run: |
           curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
-          unzip -o gn.zip -d /usr/bin
+          unzip gn.zip -d "$HOME/bin"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
 
       - name: Generate build files
+        shell: bash
         run: |
-          PYW="$(cygpath -m "$pythonLocation")/python.exe"
-          LLVMW="$(cygpath -m /mingw64/bin/llvm-config.exe)"
-          gn gen out/Debug \
-            --script-executable="$PYW" \
-            --args="is_debug=false enable_llvm=true llvm_config=\"$LLVMW\""
+          gn gen out/Debug --args="is_debug=false"
 
       - name: Build
-        run: ninja -C out/Debug
+        shell: bash
+        run: ninja -C out/Debug kinglet
 
-      # Native program execution (kinglet run) is not implemented on Windows yet.
       - name: Run golden tests (compile-only)
+        shell: bash
         run: |
           export KINGLET="$PWD/out/Debug/kinglet"
           export KINGLET_SKIP_RUN=1
+          export KINGLET_SKIP_REBUILD=1
           bash tests/cli/run_golden.sh
 
-      - name: Native compile smoke
+      - name: Compile smoke
+        shell: bash
         run: |
-          ./out/Debug/kinglet --check tests/cli/cases/structs_basic.kl
-          ./out/Debug/kinglet --bytecode tests/cli/cases/structs_basic.kl >/dev/null
+          ./out/Debug/kinglet.exe --check tests/cli/cases/structs_basic.kl
+          ./out/Debug/kinglet.exe --bytecode tests/cli/cases/structs_basic.kl >/dev/null
