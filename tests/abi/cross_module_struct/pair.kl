@@ -1,0 +1,16 @@
+// Cross-module struct ABI: definition lives in one module, consumer reads by-value copy.
+
+export module abi.pair;
+
+pub struct Pair {
+  int hi;
+  int lo;
+}
+
+pub Pair make(int hi, int lo) {
+  return Pair { hi, lo };
+}
+
+pub int sum_by_value(Pair p) {
+  return p.hi * 10 + p.lo;
+}

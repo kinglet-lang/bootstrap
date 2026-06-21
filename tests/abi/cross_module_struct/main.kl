@@ -1,0 +1,9 @@
+import abi.pair;
+
+int main() {
+  auto p = abi::pair::make(3, 7);
+  if (p.hi != 3 || p.lo != 7) {
+    return 1;
+  }
+  return abi::pair::sum_by_value(p);
+}
