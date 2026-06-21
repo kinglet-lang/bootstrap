@@ -1,0 +1,11 @@
+// EXPECT_OUT: ok
+using io;
+
+void take_ref(&int x) { return; }
+
+int main() {
+  int a = 1;
+  take_ref(&a);
+  io::out.line("ok");
+  return 0;
+}

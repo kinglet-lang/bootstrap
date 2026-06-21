@@ -1637,6 +1637,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       error_at(identifier->location, "Undeclared variable '" + identifier->name + "'.");
       return int_type();
     }
+    check_referent_access(identifier->name, identifier->location, false);
     return deref_ref_type(var_type.value());
   }
 
@@ -1661,10 +1662,14 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         error_at(unary->location, "Cannot borrow a non-lvalue expression.");
         return void_type();
       }
+      const bool mut = unary->op == ast::UnaryOp::MutRef;
+      if (auto referent = referent_name_from_lvalue(*unary->right)) {
+        register_borrow(*referent, mut, unary->location);
+      }
       Type inner = right_type;
       Type ref{inner};
-      ref.kind = unary->op == ast::UnaryOp::MutRef ? TypeKind::MutRef : TypeKind::Ref;
-      ref.name = (unary->op == ast::UnaryOp::MutRef ? "&mut " : "&") + inner.name;
+      ref.kind = mut ? TypeKind::MutRef : TypeKind::Ref;
+      ref.name = (mut ? "&mut " : "&") + inner.name;
       ref.element_type = std::make_shared<Type>(inner);
       return ref;
     }
@@ -1764,6 +1769,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       error_at(assign->location, "Assignment to undeclared variable '" + assign->name + "'.");
       return int_type();
     }
+    check_referent_access(assign->name, assign->location, true);
     Type slot_type = var_type.value();
     if (slot_type.kind == TypeKind::Ref) {
       error_at(assign->location, "Cannot assign through a shared reference.");
@@ -2375,6 +2381,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       for (std::size_t i = 0; i < call_expr->args.size(); ++i) {
         check_expr(*call_expr->args[i]);
       }
+      release_call_argument_borrows(call_expr->args);
       return callee_type.return_type ? *callee_type.return_type : void_type();
     }
     if (call_expr->args.size() != callee_type.param_types.size()) {
@@ -2391,6 +2398,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
                      type_to_string(arg_type) + ".");
       }
     }
+    release_call_argument_borrows(call_expr->args);
     return callee_type.return_type ? *callee_type.return_type : int_type();
   }
 
@@ -3034,12 +3042,83 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
   return int_type();
 }
 
+std::optional<std::string> TypeChecker::referent_name_from_lvalue(const ast::Expr &expr) {
+  if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    return identifier->name;
+  }
+  if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
+    return referent_name_from_lvalue(*field->object);
+  }
+  if (const auto *index = dynamic_cast<const ast::IndexExpr *>(&expr)) {
+    return referent_name_from_lvalue(*index->object);
+  }
+  return std::nullopt;
+}
+
+void TypeChecker::register_borrow(const std::string &referent, bool mut,
+                                  ast::SourceLocation loc) {
+  for (const ActiveBorrow &borrow : active_borrows_) {
+    if (borrow.referent != referent) {
+      continue;
+    }
+    if (borrow.mut || mut) {
+      error_at(loc, "Conflicting borrow of '" + referent + "'.");
+      return;
+    }
+  }
+  active_borrows_.push_back(
+      ActiveBorrow{.referent = referent, .mut = mut, .scope_depth = scopes_.size()});
+}
+
+void TypeChecker::release_mut_borrow(const std::string &referent) {
+  active_borrows_.erase(
+      std::remove_if(active_borrows_.begin(), active_borrows_.end(),
+                     [&](const ActiveBorrow &b) { return b.mut && b.referent == referent; }),
+      active_borrows_.end());
+}
+
+void TypeChecker::check_referent_access(const std::string &name, ast::SourceLocation loc,
+                                        bool mutating) {
+  for (const ActiveBorrow &borrow : active_borrows_) {
+    if (borrow.referent != name) {
+      continue;
+    }
+    if (borrow.mut) {
+      error_at(loc, "Cannot use '" + name + "' while it is mutably borrowed.");
+      return;
+    }
+    if (mutating) {
+      error_at(loc, "Cannot mutate '" + name + "' while it is borrowed.");
+      return;
+    }
+  }
+}
+
+void TypeChecker::release_call_argument_borrows(const std::vector<ast::ExprPtr> &args) {
+  for (const ast::ExprPtr &arg : args) {
+    const auto *unary = dynamic_cast<const ast::UnaryExpr *>(arg.get());
+    if (!unary || unary->op != ast::UnaryOp::MutRef) {
+      continue;
+    }
+    if (auto referent = referent_name_from_lvalue(*unary->right)) {
+      release_mut_borrow(*referent);
+    }
+  }
+}
+
 void TypeChecker::push_scope() {
   scopes_.emplace_back();
 }
 
 void TypeChecker::pop_scope() {
   if (!scopes_.empty()) {
+    const std::size_t closing_depth = scopes_.size();
+    active_borrows_.erase(
+        std::remove_if(active_borrows_.begin(), active_borrows_.end(),
+                       [closing_depth](const ActiveBorrow &b) {
+                         return b.scope_depth == closing_depth;
+                       }),
+        active_borrows_.end());
     for (const auto &[name, info] : scopes_.back()) {
       if (!info.used && name != "_" && info.location.line > 0) {
         warn_at(info.location, "Unused variable '" + name + "'.");

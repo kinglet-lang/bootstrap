@@ -67,6 +67,19 @@ private:
     ast::SourceLocation location;
   };
 
+  struct ActiveBorrow {
+    std::string referent;
+    bool mut = false;
+    std::size_t scope_depth = 0;
+  };
+
+  void register_borrow(const std::string &referent, bool mut, ast::SourceLocation loc);
+  void release_mut_borrow(const std::string &referent);
+  void check_referent_access(const std::string &name, ast::SourceLocation loc, bool mutating);
+  void release_call_argument_borrows(const std::vector<ast::ExprPtr> &args);
+  static std::optional<std::string> referent_name_from_lvalue(const ast::Expr &expr);
+
+  std::vector<ActiveBorrow> active_borrows_;
   std::vector<std::unordered_map<std::string, VarInfo>> scopes_;
   std::unordered_map<std::string, Type> type_registry_;
   std::unordered_map<std::string, const ast::StructDecl *> generic_structs_;
