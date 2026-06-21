@@ -298,8 +298,9 @@ Token Scanner::number() {
 
     Token token = make_token(TokenType::INTEGER);
     const std::string value = current_lexeme_without_separators();
-    token.int_value = static_cast<int64_t>(std::strtoll(value.c_str(), nullptr, 16));
     token.suffix = scan_int_suffix();
+    token.int_value =
+        static_cast<int64_t>(std::strtoull(value.c_str(), nullptr, 16));
     return token;
   }
 
@@ -351,8 +352,13 @@ Token Scanner::number() {
     token.float_value = std::strtod(value.c_str(), nullptr);
     token.suffix = scan_float_suffix();
   } else {
-    token.int_value = static_cast<int64_t>(std::strtoll(value.c_str(), nullptr, 10));
     token.suffix = scan_int_suffix();
+    if (token.suffix == "u64") {
+      token.int_value =
+          static_cast<int64_t>(std::strtoull(value.c_str(), nullptr, 10));
+    } else {
+      token.int_value = static_cast<int64_t>(std::strtoll(value.c_str(), nullptr, 10));
+    }
   }
   return token;
 }

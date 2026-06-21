@@ -1,0 +1,7 @@
+// ADR 0023 D3: 64-bit hex + u64 suffix (enum mark high bits).
+
+int main() {
+  uint64 mark = 0xFFFD000000000000u64;
+  if (mark == 0) { return 1; }
+  return 0;
+}

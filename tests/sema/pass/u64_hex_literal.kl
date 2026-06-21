@@ -1,0 +1,9 @@
+// ADR 0023 D3: wide unsigned hex literals parse without signed narrowing.
+
+int main() {
+  uint64 lo = 0xFFFD0000u64;
+  uint64 full = 0xFFFD000000000000u64;
+  if (lo == 0) { return 1; }
+  if (full == 0) { return 2; }
+  return 0;
+}

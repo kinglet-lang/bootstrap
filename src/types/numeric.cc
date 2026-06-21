@@ -127,7 +127,7 @@ bool integer_fits_width(int64_t value, const IntWidthInfo &width) {
   case 32:
     return value >= 0 && value <= 4294967295LL;
   case 64:
-    return value >= 0;
+    return true; // any i64 bit pattern is a valid uint64
   default:
     return false;
   }
