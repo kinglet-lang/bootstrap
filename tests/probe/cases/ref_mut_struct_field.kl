@@ -1,0 +1,21 @@
+// EXPECT_OUT: ok
+// ADR 0022: &mut on struct scalar field with auto-deref through parameter.
+using io;
+
+struct Box {
+  int v;
+}
+
+void bump(&mut int x) {
+  x = x + 1;
+}
+
+int main() {
+  Box b = Box { 1 };
+  bump(&mut b.v);
+  if (b.v != 2) {
+    return 1;
+  }
+  io::out.line("ok");
+  return 0;
+}

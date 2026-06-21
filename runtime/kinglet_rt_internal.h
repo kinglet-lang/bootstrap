@@ -18,6 +18,7 @@ enum class KlKind : uint8_t {
   Enum = 3,
   Float = 4,
   Map = 5,
+  FieldMutRef = 6,
 };
 
 struct KlHeader {
@@ -64,6 +65,12 @@ struct KlMap {
   KlHeader hdr{KlKind::Map};
   std::vector<std::string> order;
   std::unordered_map<std::string, KlMapEntry> entries;
+};
+
+struct KlFieldMutRef {
+  KlHeader hdr{KlKind::FieldMutRef};
+  kl_h struct_obj = 0;
+  int32_t field_index = -1;
 };
 
 inline KlKind kl_heap_kind(kl_h value) {

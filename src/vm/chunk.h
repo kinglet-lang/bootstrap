@@ -67,6 +67,7 @@ enum class OpCode : uint8_t {
   NativeFsListdir,
   NativeSysArgs,
   StructNew,
+  BorrowFieldMut,
   FieldGet,
   FieldSet,
   EnumVariant,

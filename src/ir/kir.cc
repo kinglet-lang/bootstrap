@@ -137,6 +137,8 @@ const char *kir_opcode_name(KirOpcode op) {
     return "switch";
   case KirOpcode::StructNew:
     return "struct_new";
+  case KirOpcode::BorrowFieldMut:
+    return "borrow_field_mut";
   case KirOpcode::FieldGet:
     return "field_get";
   case KirOpcode::FieldSet:

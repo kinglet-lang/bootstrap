@@ -124,6 +124,7 @@ enum class KirOpcode {
   PropagateErr,
   Switch,
   StructNew,
+  BorrowFieldMut,
   FieldGet,
   FieldSet,
   ArrayNew,

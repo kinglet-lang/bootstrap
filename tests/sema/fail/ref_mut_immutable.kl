@@ -1,0 +1,5 @@
+int main() {
+  const int a = 1;
+  &mut a;
+  return 0;
+}

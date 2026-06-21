@@ -127,6 +127,9 @@ struct RtFns {
   llvm::Function *struct_type_index = nullptr;
   llvm::Function *struct_field_at = nullptr;
   llvm::Function *struct_field_set = nullptr;
+  llvm::Function *field_mut_ref_new = nullptr;
+  llvm::Function *ref_load = nullptr;
+  llvm::Function *ref_store = nullptr;
   llvm::Function *slice = nullptr;
   llvm::Function *enum_new = nullptr;
   llvm::Function *enum_new_payload = nullptr;
@@ -218,6 +221,13 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.struct_field_set = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i64}, false),
                                                llvm::Function::ExternalLinkage,
                                                "kl_struct_field_set", module);
+  rt.field_mut_ref_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
+                                              llvm::Function::ExternalLinkage,
+                                              "kl_field_mut_ref_new", module);
+  rt.ref_load = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                                       llvm::Function::ExternalLinkage, "kl_ref_load", module);
+  rt.ref_store = llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), {i64, i64}, false),
+                                        llvm::Function::ExternalLinkage, "kl_ref_store", module);
   rt.slice = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64, i64}, false),
                                       llvm::Function::ExternalLinkage, "kl_slice", module);
   rt.enum_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32}, false),
@@ -1192,25 +1202,23 @@ public:
         break;
       }
       case KirOpcode::DerefLoad: {
-        llvm::Value *ptr_i64 = pop_value(&stack, error, &type_stack);
-        if (ptr_i64 == nullptr) {
+        llvm::Value *ref = pop_value(&stack, error, &type_stack);
+        if (ref == nullptr) {
           return false;
         }
-        llvm::Value *ptr = builder.CreateIntToPtr(ptr_i64, llvm::PointerType::get(i64, 0));
-        llvm::Value *loaded = builder.CreateLoad(i64, ptr);
+        llvm::Value *loaded = builder.CreateCall(rt_.ref_load, {ref});
         push(loaded);
         temps[i] = loaded;
         temp_types[i] = KirType::Any;
         break;
       }
       case KirOpcode::DerefStore: {
-        llvm::Value *ptr_i64 = pop_value(&stack, error, &type_stack);
+        llvm::Value *ref = pop_value(&stack, error, &type_stack);
         llvm::Value *value = pop_value(&stack, error, &type_stack);
-        if (ptr_i64 == nullptr || value == nullptr) {
+        if (ref == nullptr || value == nullptr) {
           return false;
         }
-        llvm::Value *ptr = builder.CreateIntToPtr(ptr_i64, llvm::PointerType::get(i64, 0));
-        builder.CreateStore(value, ptr);
+        builder.CreateCall(rt_.ref_store, {ref, value});
         break;
       }
       case KirOpcode::StoreLocal: {
@@ -1429,6 +1437,33 @@ public:
              builder.CreateBitCast(fields, i64p)});
         push(obj);
         temps[i] = obj;
+        break;
+      }
+      case KirOpcode::BorrowFieldMut: {
+        const int operand = instr->operands[0];
+        llvm::Value *obj = pop_value(&stack, error, &type_stack);
+        if (obj == nullptr) {
+          return false;
+        }
+        llvm::Type *i32 = builder.getInt32Ty();
+        llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
+        llvm::Value *field_idx = nullptr;
+        if (kir_module_.field_operands_resolved) {
+          field_idx = llvm::ConstantInt::get(i32, operand);
+        } else {
+          if (operand < 0 ||
+              static_cast<std::size_t>(operand) >= kir_module_.constant_strings.size()) {
+            *error = "borrow_field_mut pool index out of range";
+            return false;
+          }
+          const std::string &field_name =
+              kir_module_.constant_strings[static_cast<std::size_t>(operand)];
+          field_idx = resolve_field_index(builder, type_idx, kir_module_, field_name);
+        }
+        llvm::Value *ref = builder.CreateCall(rt_.field_mut_ref_new, {obj, field_idx});
+        push(ref);
+        temps[i] = ref;
+        temp_types[i] = KirType::Int64;
         break;
       }
       case KirOpcode::FieldGet: {

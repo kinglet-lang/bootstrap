@@ -1,0 +1,10 @@
+struct Holder {
+  int slot;
+}
+
+int main() {
+  int a = 1;
+  Holder h = Holder { 0 };
+  h.slot = &a;
+  return 0;
+}

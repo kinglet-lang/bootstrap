@@ -1314,6 +1314,7 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
   if (const auto *return_stmt = dynamic_cast<const ast::ReturnStmt *>(&stmt)) {
     if (return_stmt->value) {
       Type value_type = check_expr(*return_stmt->value);
+      check_reference_escape(value_type, return_stmt->location);
       if (!types_assignable(value_type, expected_return)) {
         error_at(return_stmt->location,
                  "Cannot return " + type_to_string(value_type) + " from function returning " +
@@ -1333,6 +1334,7 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
     Type var_type = resolve_type_expr(var_decl->type, var_decl->location);
     if (var_decl->init) {
       Type init_type = check_expr(*var_decl->init);
+      check_reference_escape(init_type, var_decl->location);
       if (var_decl->type.name == "auto") {
         var_type = init_type;
       } else if (!types_assignable(init_type, var_type)) {
@@ -1667,6 +1669,10 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         return void_type();
       }
       const bool mut = unary->op == ast::UnaryOp::MutRef;
+      if (mut && !is_mutable_lvalue(*unary->right)) {
+        error_at(unary->location, "Cannot mutably borrow an immutable lvalue.");
+        return void_type();
+      }
       if (auto referent = referent_name_from_lvalue(*unary->right)) {
         register_borrow(*referent, mut, unary->location);
       }
@@ -2818,6 +2824,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
   if (const auto *field_assign = dynamic_cast<const ast::FieldAssignExpr *>(&expr)) {
     Type obj_type = check_expr(*field_assign->object);
     Type value_type = check_expr(*field_assign->value);
+    check_reference_escape(value_type, field_assign->location);
     if (obj_type.kind != TypeKind::Struct) {
       error_at(field_assign->location, "Cannot assign field on non-struct type.");
       return int_type();
@@ -3101,12 +3108,43 @@ void TypeChecker::check_referent_access(const std::string &name, ast::SourceLoca
 void TypeChecker::release_call_argument_borrows(const std::vector<ast::ExprPtr> &args) {
   for (const ast::ExprPtr &arg : args) {
     const auto *unary = dynamic_cast<const ast::UnaryExpr *>(arg.get());
-    if (!unary || unary->op != ast::UnaryOp::MutRef) {
+    if (!unary || (unary->op != ast::UnaryOp::MutRef && unary->op != ast::UnaryOp::Ref)) {
       continue;
     }
     if (auto referent = referent_name_from_lvalue(*unary->right)) {
-      release_mut_borrow(*referent);
+      if (unary->op == ast::UnaryOp::MutRef) {
+        release_mut_borrow(*referent);
+      }
     }
+  }
+}
+
+bool TypeChecker::is_mutable_lvalue(const ast::Expr &expr) const {
+  if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
+      const auto found = it->find(identifier->name);
+      if (found != it->end()) {
+        return found->second.is_mutable;
+      }
+    }
+    return false;
+  }
+  if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
+    return is_mutable_lvalue(*field->object);
+  }
+  if (const auto *index = dynamic_cast<const ast::IndexExpr *>(&expr)) {
+    return is_mutable_lvalue(*index->object);
+  }
+  return false;
+}
+
+bool TypeChecker::is_reference_type(const Type &type) {
+  return type.kind == TypeKind::Ref || type.kind == TypeKind::MutRef;
+}
+
+void TypeChecker::check_reference_escape(const Type &value_type, ast::SourceLocation loc) {
+  if (is_reference_type(value_type)) {
+    error_at(loc, "References cannot escape their owning scope.");
   }
 }
 

@@ -2198,6 +2198,13 @@ void Compiler::compile_lvalue_addr(const ast::Expr &expr) {
     emit_operand(OpCode::LoadLocalAddr, static_cast<uint32_t>(slot), identifier->location);
     return;
   }
+  if (const auto *field_access = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
+    compile_expr(*field_access->object);
+    uint32_t field_const =
+        chunk_.add_constant(Value::string_value(field_access->field_name));
+    emit_operand(OpCode::BorrowFieldMut, field_const, field_access->location);
+    return;
+  }
   error_at(expr.location, "Cannot take the address of this expression.");
 }
 

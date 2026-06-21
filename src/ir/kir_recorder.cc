@@ -272,6 +272,10 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     bb_.instrs.push_back(
         rec(KirOpcode::StructNew, {static_cast<int32_t>(operand)}, location));
     break;
+  case OpCode::BorrowFieldMut:
+    bb_.instrs.push_back(
+        rec(KirOpcode::BorrowFieldMut, {static_cast<int32_t>(operand)}, location));
+    break;
   case OpCode::FieldGet:
     bb_.instrs.push_back(
         rec(KirOpcode::FieldGet, {static_cast<int32_t>(operand)}, location));

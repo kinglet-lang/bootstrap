@@ -18,8 +18,10 @@ if [[ ! -x "$KINGLET" ]]; then
 fi
 
 "$KINGLET" --check "$CASE/main.kl" >/dev/null
+set +e
 "$KINGLET" "$CASE/main.kl" >/dev/null
 ec=$?
+set -e
 if [[ "$ec" -ne 37 ]]; then
   echo "expected exit 37 (3*10+7), got $ec" >&2
   exit 1

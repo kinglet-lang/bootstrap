@@ -285,6 +285,8 @@ const char *opcode_name(OpCode op) {
     return "NativeSysArgs";
   case OpCode::StructNew:
     return "StructNew";
+  case OpCode::BorrowFieldMut:
+    return "BorrowFieldMut";
   case OpCode::FieldGet:
     return "FieldGet";
   case OpCode::FieldSet:

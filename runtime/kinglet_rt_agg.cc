@@ -1,5 +1,6 @@
 #include "runtime/kinglet_rt_internal.h"
 
+#include <cstdint>
 #include <vector>
 
 namespace {
@@ -300,6 +301,58 @@ kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value) {
   }
   obj->fields[static_cast<std::size_t>(field_index)] = value;
   return object;
+}
+
+int32_t kl_field_mut_ref_is(kl_h value) {
+  return kl_is_kind(value, KlKind::FieldMutRef) ? 1 : 0;
+}
+
+kl_h kl_field_mut_ref_new(kl_h object, int32_t field_index) {
+  if (!kl_is_kind(object, KlKind::Struct) || field_index < 0) {
+    return kl_from_int(0);
+  }
+  auto *obj = static_cast<KlStruct *>(kl_unbox_ptr(object));
+  if (static_cast<std::size_t>(field_index) >= obj->fields.size()) {
+    return kl_from_int(0);
+  }
+  auto *ref = new KlFieldMutRef();
+  ref->struct_obj = object;
+  ref->field_index = field_index;
+  return kl_box_ptr(ref);
+}
+
+kl_h kl_field_mut_ref_load(kl_h reference) {
+  if (!kl_is_kind(reference, KlKind::FieldMutRef)) {
+    return kl_from_int(0);
+  }
+  auto *ref = static_cast<KlFieldMutRef *>(kl_unbox_ptr(reference));
+  return kl_struct_field_at(ref->struct_obj, ref->field_index);
+}
+
+kl_h kl_field_mut_ref_store(kl_h reference, kl_h value) {
+  if (!kl_is_kind(reference, KlKind::FieldMutRef)) {
+    return value;
+  }
+  auto *ref = static_cast<KlFieldMutRef *>(kl_unbox_ptr(reference));
+  (void)kl_struct_field_set(ref->struct_obj, ref->field_index, value);
+  return value;
+}
+
+kl_h kl_ref_load(kl_h reference) {
+  if (kl_field_mut_ref_is(reference)) {
+    return kl_field_mut_ref_load(reference);
+  }
+  auto *slot = reinterpret_cast<kl_h *>(static_cast<intptr_t>(reference));
+  return *slot;
+}
+
+void kl_ref_store(kl_h reference, kl_h value) {
+  if (kl_field_mut_ref_is(reference)) {
+    (void)kl_field_mut_ref_store(reference, value);
+    return;
+  }
+  auto *slot = reinterpret_cast<kl_h *>(static_cast<intptr_t>(reference));
+  *slot = value;
 }
 
 kl_h kl_slice(kl_h value, int64_t start, int64_t end) {

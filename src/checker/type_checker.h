@@ -78,6 +78,9 @@ private:
   void check_referent_access(const std::string &name, ast::SourceLocation loc, bool mutating);
   void release_call_argument_borrows(const std::vector<ast::ExprPtr> &args);
   static std::optional<std::string> referent_name_from_lvalue(const ast::Expr &expr);
+  bool is_mutable_lvalue(const ast::Expr &expr) const;
+  static bool is_reference_type(const Type &type);
+  void check_reference_escape(const Type &value_type, ast::SourceLocation loc);
 
   std::vector<ActiveBorrow> active_borrows_;
   std::vector<std::unordered_map<std::string, VarInfo>> scopes_;

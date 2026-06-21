@@ -105,6 +105,12 @@ kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields);
 int32_t kl_struct_type_index(kl_h object);
 kl_h kl_struct_field_at(kl_h object, int32_t field_index);
 kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value);
+int32_t kl_field_mut_ref_is(kl_h value);
+kl_h kl_field_mut_ref_new(kl_h object, int32_t field_index);
+kl_h kl_field_mut_ref_load(kl_h reference);
+kl_h kl_field_mut_ref_store(kl_h reference, kl_h value);
+kl_h kl_ref_load(kl_h reference);
+void kl_ref_store(kl_h reference, kl_h value);
 kl_h kl_slice(kl_h value, int64_t start, int64_t end);
 
 kl_h kl_float_new(double value);
