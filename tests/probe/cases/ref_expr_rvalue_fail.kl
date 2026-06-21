@@ -1,0 +1,8 @@
+// P0-5: &expr must reject rvalues.
+
+void take_ref(&int x) { return; }
+
+int main() {
+  take_ref(&(1 + 2));
+  return 0;
+}

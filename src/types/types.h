@@ -23,6 +23,8 @@ enum class TypeKind {
   Enum,
   Array,
   Map,
+  Ref,
+  MutRef,
 };
 
 struct Type;

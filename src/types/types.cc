@@ -77,7 +77,19 @@ bool Type::is_compatible_with(const Type &other) const {
                     element_type->is_compatible_with(*other.element_type);
       return key_ok && val_ok;
     }
+    if (kind == TypeKind::Ref || kind == TypeKind::MutRef) {
+      if (!element_type || !other.element_type) {
+        return true;
+      }
+      return element_type->is_compatible_with(*other.element_type);
+    }
     return true;
+  }
+  if (kind == TypeKind::MutRef && other.kind == TypeKind::Ref) {
+    if (!element_type || !other.element_type) {
+      return true;
+    }
+    return element_type->is_compatible_with(*other.element_type);
   }
   if (kind == TypeKind::Int && other.kind == TypeKind::Char) {
     return name == "int8";
@@ -201,6 +213,10 @@ std::ostream &operator<<(std::ostream &out, TypeKind kind) {
     return out << "Array";
   case TypeKind::Map:
     return out << "Map";
+  case TypeKind::Ref:
+    return out << "Ref";
+  case TypeKind::MutRef:
+    return out << "MutRef";
   }
   return out << "Unknown";
 }

@@ -72,6 +72,10 @@ const char *unary_op_name(UnaryOp op) {
     return "!";
   case UnaryOp::BitNot:
     return "~";
+  case UnaryOp::Ref:
+    return "&";
+  case UnaryOp::MutRef:
+    return "&mut";
   }
   return "?";
 }

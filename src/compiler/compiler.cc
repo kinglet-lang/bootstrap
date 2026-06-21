@@ -899,6 +899,10 @@ void Compiler::compile_expr(const ast::Expr &expr) {
     case ast::UnaryOp::BitNot:
       emit(OpCode::BitNot, unary->location);
       break;
+    case ast::UnaryOp::Ref:
+    case ast::UnaryOp::MutRef:
+      // Borrow lowering deferred: operand already on stack.
+      break;
     default:
       error_at(unary->location, "Unsupported unary operator.");
       break;
@@ -1062,6 +1066,24 @@ void Compiler::compile_expr(const ast::Expr &expr) {
         }
         emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr->args.size()),
                      call_expr->location);
+        return;
+      }
+    }
+
+    // Handle rt::enum_payload_at(enum, index) — constant index only.
+    if (ns_callee && ns_callee->namespace_name == "rt") {
+      if (ns_callee->member_name == "enum_payload_at") {
+        if (call_expr->args.size() != 2) {
+          error_at(call_expr->location, "rt::enum_payload_at expects exactly two arguments.");
+          return;
+        }
+        compile_expr(*call_expr->args[0]);
+        const auto *idx_lit = dynamic_cast<const ast::IntLiteralExpr *>(call_expr->args[1].get());
+        if (!idx_lit || idx_lit->value < 0) {
+          error_at(call_expr->location, "rt::enum_payload_at index must be a non-negative int literal.");
+          return;
+        }
+        emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(idx_lit->value), call_expr->location);
         return;
       }
     }

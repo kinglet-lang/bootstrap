@@ -1,0 +1,9 @@
+// P0-5: &expr on lvalues (sema slice).
+
+void take_ref(&int x) { return; }
+
+int main() {
+  int a = 1;
+  take_ref(&a);
+  return 0;
+}

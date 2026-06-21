@@ -36,6 +36,8 @@ enum class UnaryOp {
   Neg,
   Not,
   BitNot,
+  Ref,
+  MutRef,
 };
 
 enum class AssignOp {

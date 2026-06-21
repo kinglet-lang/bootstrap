@@ -1,0 +1,8 @@
+// P0-5: &T / &mut T in parameter types (parser + checker slice).
+
+void read_ref(&int x) { return; }
+void write_ref(&mut string s) { return; }
+
+int main() {
+  return 0;
+}

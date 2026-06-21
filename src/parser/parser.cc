@@ -993,6 +993,16 @@ ast::ExprPtr Parser::factor() {
 }
 
 ast::ExprPtr Parser::unary() {
+  if (match(TokenType::AMP)) {
+    const Token &amp = previous();
+    const bool mut = check(TokenType::IDENTIFIER) && token_text(peek()) == "mut";
+    if (mut) {
+      advance();
+    }
+    ast::ExprPtr inner = unary();
+    return std::make_unique<ast::UnaryExpr>(
+        location_of(amp), mut ? ast::UnaryOp::MutRef : ast::UnaryOp::Ref, std::move(inner));
+  }
   if (match_any({TokenType::BANG, TokenType::MINUS, TokenType::TILDE})) {
     const Token &op = previous();
     ast::ExprPtr right = unary();
@@ -1529,6 +1539,7 @@ bool Parser::is_type_start(TokenType type) const {
   case TokenType::CHAR:
   case TokenType::IDENTIFIER:
   case TokenType::LEFT_BRACE: // map type {K: V}
+  case TokenType::AMP:
     return true;
   default:
     return false;
@@ -1649,6 +1660,17 @@ ast::TypeExpr Parser::parse_type_expr() {
   if (at_completion()) {
     set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}});
     return ast::TypeExpr{"<error>", {}};
+  }
+  if (match(TokenType::AMP)) {
+    const bool mut = check(TokenType::IDENTIFIER) && token_text(peek()) == "mut";
+    if (mut) {
+      advance();
+    }
+    ast::TypeExpr inner = parse_type_expr();
+    if (mut) {
+      return ast::TypeExpr{"&mut", {std::move(inner)}};
+    }
+    return ast::TypeExpr{"&", {std::move(inner)}};
   }
   if (!is_type_start(peek().type)) {
     error_at(peek(), "Expected type name.");

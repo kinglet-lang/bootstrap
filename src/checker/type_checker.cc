@@ -20,6 +20,19 @@ namespace kinglet {
 
 namespace {
 
+bool is_lvalue_expr(const ast::Expr &expr) {
+  if (dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    return true;
+  }
+  if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
+    return is_lvalue_expr(*field->object);
+  }
+  if (const auto *index = dynamic_cast<const ast::IndexExpr *>(&expr)) {
+    return is_lvalue_expr(*index->object);
+  }
+  return false;
+}
+
 bool match_arm_is_catchall(const ast::MatchArm &arm) {
   if (arm.guard) {
     return false;
@@ -478,6 +491,22 @@ KirFunctionSig kir_sig_from(const Type &func_type) {
 } // namespace
 
 Type TypeChecker::resolve_type_name(const std::string &name) const {
+  if (name.size() >= 6 && name.compare(0, 5, "&mut ") == 0) {
+    Type inner = resolve_type_name(name.substr(5));
+    Type ref{inner};
+    ref.kind = TypeKind::MutRef;
+    ref.name = "&mut " + inner.name;
+    ref.element_type = std::make_shared<Type>(inner);
+    return ref;
+  }
+  if (name.size() >= 2 && name[0] == '&') {
+    Type inner = resolve_type_name(name.substr(1));
+    Type ref{inner};
+    ref.kind = TypeKind::Ref;
+    ref.name = "&" + inner.name;
+    ref.element_type = std::make_shared<Type>(inner);
+    return ref;
+  }
   if (name == "auto") {
     return int_type();
   }
@@ -544,6 +573,22 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
       error_at(loc, "Map key type must be string or int.");
     }
     return map_type(key, resolve_type_expr(expr.type_args[1], loc));
+  }
+  if (expr.name == "&" && expr.type_args.size() == 1) {
+    Type inner = resolve_type_expr(expr.type_args[0], loc);
+    Type ref{inner};
+    ref.kind = TypeKind::Ref;
+    ref.name = "&" + inner.name;
+    ref.element_type = std::make_shared<Type>(inner);
+    return ref;
+  }
+  if (expr.name == "&mut" && expr.type_args.size() == 1) {
+    Type inner = resolve_type_expr(expr.type_args[0], loc);
+    Type ref{inner};
+    ref.kind = TypeKind::MutRef;
+    ref.name = "&mut " + inner.name;
+    ref.element_type = std::make_shared<Type>(inner);
+    return ref;
   }
   if (expr.type_args.empty()) {
     Type t = resolve_type_name(expr.name);
@@ -1145,7 +1190,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
       const bool runtime_ns = using_decl->namespace_name == "io" ||
                               using_decl->namespace_name == "fs" ||
-                              using_decl->namespace_name == "sys";
+                              using_decl->namespace_name == "sys" ||
+                              using_decl->namespace_name == "rt";
       if (!runtime_ns && !imported_namespaces_.count(using_decl->namespace_name)) {
         error_at(using_decl->location, "Unknown module '" + using_decl->namespace_name + "'.");
       }
@@ -1596,6 +1642,19 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         error_at(unary->location, "Bitwise NOT requires an integer operand.");
       }
       return right_type;
+    case ast::UnaryOp::Ref:
+    case ast::UnaryOp::MutRef: {
+      if (!is_lvalue_expr(*unary->right)) {
+        error_at(unary->location, "Cannot borrow a non-lvalue expression.");
+        return void_type();
+      }
+      Type inner = right_type;
+      Type ref{inner};
+      ref.kind = unary->op == ast::UnaryOp::MutRef ? TypeKind::MutRef : TypeKind::Ref;
+      ref.name = (unary->op == ast::UnaryOp::MutRef ? "&mut " : "&") + inner.name;
+      ref.element_type = std::make_shared<Type>(inner);
+      return ref;
+    }
     default:
       error_at(unary->location, "Unsupported unary operator.");
       return int_type();
@@ -1758,6 +1817,23 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           check_expr(*arg);
         }
         return string_type();
+      }
+    }
+
+    // rt::enum_payload_at(value, index) — compiler/runtime bridge.
+    if (ns_callee && ns_callee->namespace_name == "rt") {
+      if (ns_callee->member_name == "enum_payload_at") {
+        if (call_expr->args.size() != 2) {
+          error_at(call_expr->location, "rt::enum_payload_at expects exactly two arguments.");
+        } else {
+          check_expr(*call_expr->args[0]);
+          const auto *idx_lit = dynamic_cast<const ast::IntLiteralExpr *>(call_expr->args[1].get());
+          if (!idx_lit || idx_lit->value < 0) {
+            error_at(call_expr->args[1]->location,
+                     "rt::enum_payload_at index must be a non-negative int literal.");
+          }
+        }
+        return void_type();
       }
     }
 
