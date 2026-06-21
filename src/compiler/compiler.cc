@@ -483,7 +483,13 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
 
   // Parameters become locals at slots 0..N-1
   for (const auto &param : function.params) {
-    locals_.push_back(Local{.name = param.name, .is_mutable = true});
+    Local local{.name = param.name, .is_mutable = true};
+    if (param.type.name == "&") {
+      local.slot_kind = Local::SlotKind::Ref;
+    } else if (param.type.name == "&mut") {
+      local.slot_kind = Local::SlotKind::MutRef;
+    }
+    locals_.push_back(local);
     if (param.name == "self" && !lookup_name.empty()) {
       auto sep = lookup_name.find("::");
       if (sep != std::string::npos) {
@@ -901,7 +907,7 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       break;
     case ast::UnaryOp::Ref:
     case ast::UnaryOp::MutRef:
-      // Borrow lowering deferred: operand already on stack.
+      compile_lvalue_addr(*unary->right);
       break;
     default:
       error_at(unary->location, "Unsupported unary operator.");
@@ -922,6 +928,9 @@ void Compiler::compile_expr(const ast::Expr &expr) {
       return;
     }
     emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), identifier->location);
+    if (local_is_ref(slot)) {
+      emit(OpCode::DerefLoad, identifier->location);
+    }
     return;
   }
 
@@ -2036,6 +2045,22 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
     return;
   }
 
+  if (local_is_ref(slot)) {
+    if (!local_is_mut_ref(slot)) {
+      error_at(assign.location, "Cannot assign through a shared reference.");
+      return;
+    }
+    if (assign.op != ast::AssignOp::Assign) {
+      error_at(assign.location, "Compound assignment through a mutable reference is not supported.");
+      return;
+    }
+    compile_expr(*assign.value);
+    emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), assign.location);
+    emit(OpCode::DerefStore, assign.location);
+    emit(OpCode::Null, assign.location);
+    return;
+  }
+
   if (assign.op == ast::AssignOp::Assign) {
     compile_expr(*assign.value);
   } else {
@@ -2142,6 +2167,38 @@ int Compiler::resolve_local(const std::string &name) const {
     }
   }
   return -1;
+}
+
+bool Compiler::local_is_ref(int slot) const {
+  if (slot < 0 || static_cast<std::size_t>(slot) >= locals_.size()) {
+    return false;
+  }
+  const auto kind = locals_[static_cast<std::size_t>(slot)].slot_kind;
+  return kind == Local::SlotKind::Ref || kind == Local::SlotKind::MutRef;
+}
+
+bool Compiler::local_is_mut_ref(int slot) const {
+  if (slot < 0 || static_cast<std::size_t>(slot) >= locals_.size()) {
+    return false;
+  }
+  return locals_[static_cast<std::size_t>(slot)].slot_kind == Local::SlotKind::MutRef;
+}
+
+void Compiler::compile_lvalue_addr(const ast::Expr &expr) {
+  if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    const int slot = resolve_local(identifier->name);
+    if (slot < 0) {
+      error_at(identifier->location, "Use of undeclared variable '" + identifier->name + "'.");
+      return;
+    }
+    if (local_is_ref(slot)) {
+      emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), identifier->location);
+      return;
+    }
+    emit_operand(OpCode::LoadLocalAddr, static_cast<uint32_t>(slot), identifier->location);
+    return;
+  }
+  error_at(expr.location, "Cannot take the address of this expression.");
 }
 
 bool Compiler::declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot) {

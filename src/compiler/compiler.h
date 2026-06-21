@@ -46,6 +46,7 @@ private:
   struct Local {
     std::string name;
     bool is_mutable = true;
+    enum class SlotKind { Value, Ref, MutRef } slot_kind = SlotKind::Value;
   };
 
   struct LoopInfo {
@@ -69,6 +70,9 @@ private:
   void patch_jump(std::size_t offset);
   void patch_jump_to(std::size_t offset, std::size_t target);
   int resolve_local(const std::string &name) const;
+  bool local_is_ref(int slot) const;
+  bool local_is_mut_ref(int slot) const;
+  void compile_lvalue_addr(const ast::Expr &expr);
   bool declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot);
   int resolve_struct(const ast::TypeExpr &type);
   void error_at(ast::SourceLocation location, std::string message);

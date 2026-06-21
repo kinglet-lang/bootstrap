@@ -223,6 +223,12 @@ const char *opcode_name(OpCode op) {
     return "Shr";
   case OpCode::LoadLocal:
     return "LoadLocal";
+  case OpCode::LoadLocalAddr:
+    return "LoadLocalAddr";
+  case OpCode::DerefLoad:
+    return "DerefLoad";
+  case OpCode::DerefStore:
+    return "DerefStore";
   case OpCode::StoreLocal:
     return "StoreLocal";
   case OpCode::Pop:

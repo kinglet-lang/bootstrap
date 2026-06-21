@@ -235,6 +235,15 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
   case OpCode::LoadLocal:
     bb_.instrs.push_back(rec(KirOpcode::LoadLocal, {static_cast<int32_t>(operand)}, location));
     break;
+  case OpCode::LoadLocalAddr:
+    bb_.instrs.push_back(rec(KirOpcode::LoadLocalAddr, {static_cast<int32_t>(operand)}, location));
+    break;
+  case OpCode::DerefLoad:
+    bb_.instrs.push_back(rec(KirOpcode::DerefLoad, {}, location));
+    break;
+  case OpCode::DerefStore:
+    bb_.instrs.push_back(rec(KirOpcode::DerefStore, {}, location));
+    break;
   case OpCode::StoreLocal:
     bb_.instrs.push_back(rec(KirOpcode::StoreLocal, {static_cast<int32_t>(operand)}, location));
     break;

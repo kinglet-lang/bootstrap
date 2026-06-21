@@ -426,6 +426,21 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       push_typed(&state, result, container);
       break;
     }
+    case KirOpcode::LoadLocalAddr:
+      result = KirType::Int64;
+      push_typed(&state, result);
+      break;
+    case KirOpcode::DerefLoad:
+      pop_type(&state);
+      result = KirType::Any;
+      push_typed(&state, result);
+      break;
+    case KirOpcode::DerefStore:
+      pop_type(&state);
+      pop_type(&state);
+      result = KirType::Null;
+      push_typed(&state, result);
+      break;
     case KirOpcode::StoreLocal: {
       const int slot = instr->operands[0];
       const KirType value = state.stack.empty() ? KirType::Any : state.stack.back();

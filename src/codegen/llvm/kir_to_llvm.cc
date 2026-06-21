@@ -1178,6 +1178,41 @@ public:
         }
         break;
       }
+      case KirOpcode::LoadLocalAddr: {
+        const int slot = instr->operands[0];
+        if (slot < 0 || static_cast<std::size_t>(slot) >= local_slots_.size()) {
+          *error = "load_local_addr slot out of range";
+          return false;
+        }
+        llvm::Value *addr =
+            builder.CreatePtrToInt(local_slots_[static_cast<std::size_t>(slot)], i64);
+        push(addr);
+        temps[i] = addr;
+        temp_types[i] = KirType::Int64;
+        break;
+      }
+      case KirOpcode::DerefLoad: {
+        llvm::Value *ptr_i64 = pop_value(&stack, error, &type_stack);
+        if (ptr_i64 == nullptr) {
+          return false;
+        }
+        llvm::Value *ptr = builder.CreateIntToPtr(ptr_i64, llvm::PointerType::get(i64, 0));
+        llvm::Value *loaded = builder.CreateLoad(i64, ptr);
+        push(loaded);
+        temps[i] = loaded;
+        temp_types[i] = KirType::Any;
+        break;
+      }
+      case KirOpcode::DerefStore: {
+        llvm::Value *ptr_i64 = pop_value(&stack, error, &type_stack);
+        llvm::Value *value = pop_value(&stack, error, &type_stack);
+        if (ptr_i64 == nullptr || value == nullptr) {
+          return false;
+        }
+        llvm::Value *ptr = builder.CreateIntToPtr(ptr_i64, llvm::PointerType::get(i64, 0));
+        builder.CreateStore(value, ptr);
+        break;
+      }
       case KirOpcode::StoreLocal: {
         const int slot = instr->operands[0];
         if (stack.empty()) {

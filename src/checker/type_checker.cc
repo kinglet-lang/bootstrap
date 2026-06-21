@@ -33,6 +33,13 @@ bool is_lvalue_expr(const ast::Expr &expr) {
   return false;
 }
 
+Type deref_ref_type(const Type &t) {
+  if ((t.kind == TypeKind::Ref || t.kind == TypeKind::MutRef) && t.element_type) {
+    return *t.element_type;
+  }
+  return t;
+}
+
 bool match_arm_is_catchall(const ast::MatchArm &arm) {
   if (arm.guard) {
     return false;
@@ -413,6 +420,12 @@ std::string type_to_string(const Type &type) {
   }
   if (type.kind == TypeKind::Void) {
     return "void";
+  }
+  if (type.kind == TypeKind::Ref && type.element_type) {
+    return "&" + type_to_string(*type.element_type);
+  }
+  if (type.kind == TypeKind::MutRef && type.element_type) {
+    return "&mut " + type_to_string(*type.element_type);
   }
   if (type.kind == TypeKind::Null) {
     return "null";
@@ -1624,7 +1637,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       error_at(identifier->location, "Undeclared variable '" + identifier->name + "'.");
       return int_type();
     }
-    return var_type.value();
+    return deref_ref_type(var_type.value());
   }
 
   if (const auto *unary = dynamic_cast<const ast::UnaryExpr *>(&expr)) {
@@ -1751,12 +1764,21 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       error_at(assign->location, "Assignment to undeclared variable '" + assign->name + "'.");
       return int_type();
     }
-    Type value_type = check_expr(*assign->value);
-    if (!types_assignable(value_type, var_type.value())) {
-      error_at(assign->location, "Cannot assign " + type_to_string(value_type) + " to " +
-                                     type_to_string(var_type.value()) + ".");
+    Type slot_type = var_type.value();
+    if (slot_type.kind == TypeKind::Ref) {
+      error_at(assign->location, "Cannot assign through a shared reference.");
+      return void_type();
     }
-    return var_type.value();
+    const Type target_type =
+        slot_type.kind == TypeKind::MutRef && slot_type.element_type
+            ? *slot_type.element_type
+            : slot_type;
+    Type value_type = check_expr(*assign->value);
+    if (!types_assignable(value_type, target_type)) {
+      error_at(assign->location, "Cannot assign " + type_to_string(value_type) + " to " +
+                                     type_to_string(target_type) + ".");
+    }
+    return target_type;
   }
 
   if (const auto *call_expr = dynamic_cast<const ast::CallExpr *>(&expr)) {
@@ -2708,7 +2730,7 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
       }
     }
 
-    Type obj_type = check_expr(*field_access->object);
+    Type obj_type = deref_ref_type(check_expr(*field_access->object));
     if (obj_type.kind == TypeKind::Map) {
       const std::string &method = field_access->field_name;
       if (method == "len" || method == "has" || method == "remove" || method == "keys") {

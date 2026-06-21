@@ -33,6 +33,12 @@ const char *kir_opcode_name(KirOpcode op) {
     return "const_string";
   case KirOpcode::LoadLocal:
     return "load_local";
+  case KirOpcode::LoadLocalAddr:
+    return "load_local_addr";
+  case KirOpcode::DerefLoad:
+    return "deref_load";
+  case KirOpcode::DerefStore:
+    return "deref_store";
   case KirOpcode::StoreLocal:
     return "store_local";
   case KirOpcode::Pop:

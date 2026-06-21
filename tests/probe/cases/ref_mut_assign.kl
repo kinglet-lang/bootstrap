@@ -1,0 +1,11 @@
+// ADR 0022 N2: assign through &mut parameter (auto-deref).
+
+void set_one(&mut int x) {
+  x = 1;
+}
+
+int main() {
+  int a = 0;
+  set_one(&mut a);
+  return a;
+}
