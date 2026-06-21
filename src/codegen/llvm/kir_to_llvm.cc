@@ -4,6 +4,7 @@
 #include "codegen/llvm/kir_to_llvm.h"
 
 #include "ir/kir.h"
+#include "ir/kir_field_resolve.h"
 #include "ir/kir_numeric.h"
 #include "ir/kir_specialize.h"
 #include "ir/kir_typing.h"
@@ -1396,26 +1397,34 @@ public:
         break;
       }
       case KirOpcode::FieldGet: {
-        const int pool_idx = instr->operands[0];
-        if (pool_idx < 0 ||
-            static_cast<std::size_t>(pool_idx) >= kir_module_.constant_strings.size()) {
-          *error = "field_get pool index out of range";
-          return false;
-        }
+        const int operand = instr->operands[0];
         llvm::Value *obj = pop_value(&stack, error, &type_stack);
         if (obj == nullptr) {
           return false;
         }
-        const std::string &field_name =
-            kir_module_.constant_strings[static_cast<std::size_t>(pool_idx)];
+        llvm::Type *i32 = builder.getInt32Ty();
         llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
-        llvm::Value *field_idx =
-            resolve_field_index(builder, type_idx, kir_module_, field_name);
+        llvm::Value *field_idx = nullptr;
         KirType field_ty = KirType::Any;
-        if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
-          field_ty = fn.instr_types[i];
+        if (kir_module_.field_operands_resolved) {
+          field_idx = llvm::ConstantInt::get(i32, operand);
+          if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
+            field_ty = fn.instr_types[i];
+          }
         } else {
-          field_ty = kir_field_type_for_name(kir_module_, field_name);
+          if (operand < 0 ||
+              static_cast<std::size_t>(operand) >= kir_module_.constant_strings.size()) {
+            *error = "field_get pool index out of range";
+            return false;
+          }
+          const std::string &field_name =
+              kir_module_.constant_strings[static_cast<std::size_t>(operand)];
+          field_idx = resolve_field_index(builder, type_idx, kir_module_, field_name);
+          if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
+            field_ty = fn.instr_types[i];
+          } else {
+            field_ty = kir_field_type_for_name(kir_module_, field_name);
+          }
         }
         llvm::Value *wire = builder.CreateCall(rt_.struct_field_at, {obj, field_idx});
         const UnboxedScalar scalar =
@@ -1432,12 +1441,7 @@ public:
         break;
       }
       case KirOpcode::FieldSet: {
-        const int pool_idx = instr->operands[0];
-        if (pool_idx < 0 ||
-            static_cast<std::size_t>(pool_idx) >= kir_module_.constant_strings.size()) {
-          *error = "field_set pool index out of range";
-          return false;
-        }
+        const int operand = instr->operands[0];
         llvm::Value *value = pop_value(&stack, error, &type_stack);
         if (value == nullptr) {
           return false;
@@ -1446,11 +1450,21 @@ public:
         if (obj == nullptr) {
           return false;
         }
-        const std::string &field_name =
-            kir_module_.constant_strings[static_cast<std::size_t>(pool_idx)];
+        llvm::Type *i32 = builder.getInt32Ty();
         llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
-        llvm::Value *field_idx =
-            resolve_field_index(builder, type_idx, kir_module_, field_name);
+        llvm::Value *field_idx = nullptr;
+        if (kir_module_.field_operands_resolved) {
+          field_idx = llvm::ConstantInt::get(i32, operand);
+        } else {
+          if (operand < 0 ||
+              static_cast<std::size_t>(operand) >= kir_module_.constant_strings.size()) {
+            *error = "field_set pool index out of range";
+            return false;
+          }
+          const std::string &field_name =
+              kir_module_.constant_strings[static_cast<std::size_t>(operand)];
+          field_idx = resolve_field_index(builder, type_idx, kir_module_, field_name);
+        }
         llvm::Value *updated =
             builder.CreateCall(rt_.struct_field_set, {obj, field_idx, value});
         push(updated);
@@ -1573,9 +1587,9 @@ public:
           return false;
         }
         llvm::Value *wire_value = to_wire_i64(builder, rt_, value, value_ty);
-        llvm::Value *result = builder.CreateCall(rt_.array_push, {array, wire_value});
-        push(result);
-        temps[i] = result;
+        builder.CreateCall(rt_.array_push, {array, wire_value});
+        push(array);
+        temps[i] = array;
         break;
       }
       case KirOpcode::ArrayResize: {
@@ -2179,6 +2193,7 @@ void copy_kir_metadata(KirModule *dst, const KirModule &src) {
   dst->function_symbols = src.function_symbols;
   dst->function_param_counts = src.function_param_counts;
   dst->function_signatures = src.function_signatures;
+  dst->field_operands_resolved = src.field_operands_resolved;
 }
 
 int first_instr_line(const KirFunction &fn) {
@@ -2365,6 +2380,7 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
   KirModule typed_module = module;
   infer_kir_types(&typed_module);
   specialize_kir_arithmetic(&typed_module);
+  resolve_kir_field_operands(typed_module);
   const KirModule &module_ref = typed_module;
   std::map<std::string, KirModule> shards;
   for (const KirFunction &fn : module_ref.functions) {
