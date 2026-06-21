@@ -1,0 +1,15 @@
+// RUN: check
+
+concept Printable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "x";
+}
+
+int main() {
+  int n = 42;
+  string s = n.to_string();
+  return s.len();
+}

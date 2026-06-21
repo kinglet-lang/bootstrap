@@ -1,0 +1,16 @@
+// RUN: check
+// COMPILE-FAIL
+// CHECK-ERR: does not satisfy concept
+
+concept Printable<T> {
+  string to_string(T value);
+}
+
+string greet(Printable item) {
+  return to_string(item);
+}
+
+int main() {
+  greet(42);
+  return 0;
+}

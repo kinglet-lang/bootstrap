@@ -1,0 +1,19 @@
+// RUN: check
+
+concept Printable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "n";
+}
+
+string greet(Printable item) {
+  return to_string(item);
+}
+
+int main() {
+  string s = greet(42);
+  string t = Printable::to_string(42);
+  return s.len() + t.len();
+}
