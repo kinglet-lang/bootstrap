@@ -182,8 +182,16 @@ Type float_literal_type_from_suffix(std::string_view suffix) {
 
 bool integer_assignable(const Type &from, const Type &to) {
   if (!is_integer_type(from) || !is_integer_type(to)) return false;
-  const IntWidthInfo fw = int_width_info(from);
-  const IntWidthInfo tw = int_width_info(to);
+  Type from_canon = from;
+  Type to_canon = to;
+  if (auto name = canonical_int_type_name(from.name)) {
+    from_canon.name = *name;
+  }
+  if (auto name = canonical_int_type_name(to.name)) {
+    to_canon.name = *name;
+  }
+  const IntWidthInfo fw = int_width_info(from_canon);
+  const IntWidthInfo tw = int_width_info(to_canon);
   if (fw.is_signed != tw.is_signed) return false;
   return fw.bits <= tw.bits;
 }

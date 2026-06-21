@@ -1,0 +1,6 @@
+int main() {
+  int64 a = 42;
+  int32 b = 42i32;
+  int x = a;
+  return x;
+}

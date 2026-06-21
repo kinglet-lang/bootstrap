@@ -1326,6 +1326,10 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
   }
 
   if (const auto *var_decl = dynamic_cast<const ast::VarDeclStmt *>(&stmt)) {
+    if (var_decl->type.name == "auto" && !var_decl->init) {
+      error_at(var_decl->location, "auto requires an initializer.");
+      return;
+    }
     Type var_type = resolve_type_expr(var_decl->type, var_decl->location);
     if (var_decl->init) {
       Type init_type = check_expr(*var_decl->init);
