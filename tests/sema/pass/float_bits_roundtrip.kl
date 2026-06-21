@@ -1,0 +1,14 @@
+// ADR 0023 D6: int::bits returns uint64; float::from_bits accepts uint64.
+
+int main() {
+  float x = 2.5;
+  uint64 bits = int::bits(x);
+  float y = float::from_bits(bits);
+  if (bits == 0) {
+    return 1;
+  }
+  if (int::bits(y) != bits) {
+    return 2;
+  }
+  return 0;
+}

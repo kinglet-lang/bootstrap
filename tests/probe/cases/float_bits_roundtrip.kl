@@ -1,0 +1,14 @@
+// EXPECT_OUT: ok
+// ADR 0023 D6: int::bits / float::from_bits roundtrip on native.
+using io;
+
+int main() {
+  float x = 1.5;
+  uint64 bits = int::bits(x);
+  float y = float::from_bits(bits);
+  if (int::bits(y) != bits) {
+    return 1;
+  }
+  io::out.line("ok");
+  return 0;
+}
