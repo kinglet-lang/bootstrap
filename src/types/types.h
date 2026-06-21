@@ -25,6 +25,7 @@ enum class TypeKind {
   Map,
   Ref,
   MutRef,
+  Concept,
 };
 
 struct Type;

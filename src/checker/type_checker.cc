@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <sstream>
 #include <unordered_set>
@@ -393,6 +394,9 @@ bool types_assignable(const Type &from, const Type &to) {
     }
     return normalize_generic_mangle(from.name) == normalize_generic_mangle(to.name);
   }
+  if (to.kind == TypeKind::Concept) {
+    return false; // handled at call sites with explicit satisfaction checks
+  }
   return from.is_compatible_with(to);
 }
 
@@ -429,6 +433,9 @@ std::string type_to_string(const Type &type) {
   }
   if (type.kind == TypeKind::Null) {
     return "null";
+  }
+  if (type.kind == TypeKind::Concept) {
+    return type.name;
   }
   std::ostringstream oss;
   oss << type.kind;
@@ -604,6 +611,11 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
     return ref;
   }
   if (expr.type_args.empty()) {
+    if (concept_registry_.count(expr.name)) {
+      Type concept_type(TypeKind::Concept);
+      concept_type.name = expr.name;
+      return concept_type;
+    }
     Type t = resolve_type_name(expr.name);
     if (t.name.find("<unknown:") == 0 && loc.line > 0) {
       error_at(loc, "Unknown type '" + expr.name + "'.");
@@ -702,6 +714,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   opened_.clear();
   type_registry_.clear();
   concept_registry_.clear();
+  concept_generic_functions_.clear();
+  free_functions_.clear();
   method_registry_.clear();
   kir_function_sigs_.clear();
 
@@ -709,6 +723,12 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   ast::desugar_pipes(mutable_program);
 
   push_scope();
+
+  for (const ast::DeclPtr &decl : program.declarations) {
+    if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(decl.get())) {
+      concept_registry_[concept_decl->name] = concept_decl;
+    }
+  }
 
   // Forward-declare every named type so mutually recursive definitions resolve.
   // that types declared later in the source can still be referenced by
@@ -865,6 +885,11 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         generic_functions_[func->name] = func;
         continue;
       }
+      if (function_uses_concept_params(*func)) {
+        concept_generic_functions_[func->name] = func;
+        continue;
+      }
+      free_functions_.push_back(func);
       Type return_type = resolve_type_expr(func->return_type);
       std::vector<Type> param_types;
       for (const auto &param : func->params) {
@@ -883,10 +908,6 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               MethodInfo{.decl = func, .target_type = receiver};
         }
       }
-    }
-    if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(decl.get())) {
-      concept_registry_[concept_decl->name] = concept_decl;
-      continue;
     }
     if (const auto *import_decl = dynamic_cast<const ast::ImportDecl *>(decl.get())) {
       // Check for duplicate symbols in selective import
@@ -1248,7 +1269,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       continue;
     }
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
-      if (func->type_params.empty()) {
+      if (func->type_params.empty() && !function_uses_concept_params(*func)) {
         check_function(*func);
       }
     }
@@ -1992,24 +2013,15 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
         return int_type();
       }
       Type arg_ty = check_expr(*call_expr->args[0]);
-      auto fn_ty = lookup_var(ns_callee->member_name);
-      if (!fn_ty.has_value() || fn_ty->kind != TypeKind::Function) {
-        error_at(call_expr->location, "No implementation of '" + ns_callee->namespace_name + "::" +
-                                        ns_callee->member_name + "' for type '" +
-                                        type_to_string(arg_ty) + "'.");
+      auto ret = lookup_concept_method(ns_callee->namespace_name, ns_callee->member_name, arg_ty,
+                                       call_expr->location);
+      if (!ret.has_value()) {
         return int_type();
       }
-      if (call_expr->args.size() != fn_ty->param_types.size()) {
+      if (call_expr->args.size() > 1) {
         error_at(call_expr->location, "Wrong number of arguments.");
-        return fn_ty->return_type ? *fn_ty->return_type : int_type();
       }
-      for (std::size_t i = 0; i < call_expr->args.size(); ++i) {
-        Type at = check_expr(*call_expr->args[i]);
-        if (!types_assignable(at, fn_ty->param_types[i])) {
-          error_at(call_expr->args[i]->location, "Argument type mismatch.");
-        }
-      }
-      return fn_ty->return_type ? *fn_ty->return_type : int_type();
+      return *ret;
     }
 
     // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
@@ -2305,6 +2317,11 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
           return resolve_type_expr(decl->return_type);
         }
       }
+      auto ufcs_ret = lookup_ufcs_free_method(field_callee->field_name, obj_type, call_expr->args,
+                                            call_expr->location);
+      if (ufcs_ret.has_value()) {
+        return *ufcs_ret;
+      }
     }
 
     {
@@ -2370,6 +2387,78 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
             return ret;
           }
           for (size_t i = 0; i < arg_types.size(); ++i) {
+            if (!types_assignable(arg_types[i], param_types[i])) {
+              error_at(call_expr->args[i]->location,
+                       "Expected " + type_to_string(param_types[i]) + ", got " +
+                           type_to_string(arg_types[i]) + ".");
+            }
+          }
+          return ret;
+        }
+        auto concept_gen_it = concept_generic_functions_.find(callee_id->name);
+        if (concept_gen_it != concept_generic_functions_.end()) {
+          const ast::FunctionDecl *decl = concept_gen_it->second;
+          std::vector<Type> arg_types;
+          arg_types.reserve(call_expr->args.size());
+          for (const auto &arg : call_expr->args) {
+            arg_types.push_back(check_expr(*arg));
+          }
+
+          std::unordered_map<std::string, Type> concept_bindings;
+          for (std::size_t i = 0; i < decl->params.size() && i < arg_types.size(); ++i) {
+            Type param_ty = resolve_type_expr(decl->params[i].type);
+            if (param_ty.kind != TypeKind::Concept) {
+              continue;
+            }
+            const std::string &concept_name = param_ty.name;
+            auto binding_it = concept_bindings.find(concept_name);
+            if (binding_it == concept_bindings.end()) {
+              concept_bindings.insert_or_assign(concept_name, arg_types[i]);
+              continue;
+            }
+            if (type_match_key(arg_types[i]) != type_match_key(binding_it->second)) {
+              error_at(call_expr->args[i]->location,
+                       "Concept parameter '" + concept_name + "' must use the same concrete type.");
+            }
+          }
+
+          for (const auto &[concept_name, concrete] : concept_bindings) {
+            auto cd_it = concept_registry_.find(concept_name);
+            if (cd_it != concept_registry_.end()) {
+              type_satisfies_concept(cd_it->second, concrete, call_expr->location);
+            }
+          }
+
+          std::function<ast::TypeExpr(const ast::TypeExpr &)> substitute_concepts;
+          substitute_concepts = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
+            if (te.type_args.empty()) {
+              auto concept_it = concept_registry_.find(te.name);
+              if (concept_it != concept_registry_.end()) {
+                auto binding_it = concept_bindings.find(te.name);
+                if (binding_it != concept_bindings.end()) {
+                  return type_to_type_expr(binding_it->second);
+                }
+              }
+            }
+            ast::TypeExpr result = te;
+            for (ast::TypeExpr &arg : result.type_args) {
+              arg = substitute_concepts(arg);
+            }
+            return result;
+          };
+
+          Type ret = resolve_type_expr(substitute_concepts(decl->return_type));
+          std::vector<Type> param_types;
+          for (const auto &param : decl->params) {
+            param_types.push_back(resolve_type_expr(substitute_concepts(param.type)));
+          }
+          if (arg_types.size() != param_types.size()) {
+            error_at(call_expr->location,
+                     "Expected " + std::to_string(param_types.size()) + " arguments, got " +
+                         std::to_string(arg_types.size()) + ".");
+            return ret;
+          }
+          for (std::size_t i = 0; i < arg_types.size(); ++i) {
             if (!types_assignable(arg_types[i], param_types[i])) {
               error_at(call_expr->args[i]->location,
                        "Expected " + type_to_string(param_types[i]) + ", got " +
@@ -3332,6 +3421,144 @@ void TypeChecker::open_imported_namespace(const std::string &module_id) {
       imported_bare_names_.insert(sym);
     }
   }
+}
+
+bool TypeChecker::function_uses_concept_params(const ast::FunctionDecl &function) const {
+  for (const auto &param : function.params) {
+    if (param.type.type_args.empty() && concept_registry_.count(param.type.name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::string TypeChecker::type_match_key(const Type &type) const {
+  if (type.kind == TypeKind::Struct || type.kind == TypeKind::Enum) {
+    return type.name;
+  }
+  return type_to_string(type);
+}
+
+const ast::FunctionDecl *TypeChecker::find_free_function_for_type(const std::string &name,
+                                                                   const std::string &key) const {
+  for (const ast::FunctionDecl *fn : free_functions_) {
+    if (fn->name != name || fn->params.empty()) {
+      continue;
+    }
+    Type first = const_cast<TypeChecker *>(this)->resolve_type_expr(fn->params[0].type);
+    if (type_match_key(first) == key) {
+      return fn;
+    }
+  }
+  return nullptr;
+}
+
+bool TypeChecker::type_satisfies_concept(const ast::ConceptDecl *concept_decl, const Type &concrete,
+                                         ast::SourceLocation loc) {
+  if (concept_decl == nullptr) {
+    return false;
+  }
+  if (concept_decl->type_params.size() != 1) {
+    return true;
+  }
+  const std::string &tp_name = concept_decl->type_params[0];
+  std::unordered_map<std::string, ast::TypeExpr> subst;
+  subst[tp_name] = type_to_type_expr(concrete);
+  const std::string key = type_match_key(concrete);
+
+  for (const ast::ConceptMethodDecl &method : concept_decl->methods) {
+    const ast::FunctionDecl *impl = find_free_function_for_type(method.name, key);
+    if (impl == nullptr) {
+      error_at(loc, "Type '" + type_to_string(concrete) + "' does not satisfy concept '" +
+                        concept_decl->name + "': missing '" + method.name + "'.");
+      return false;
+    }
+    if (impl->params.size() != method.params.size()) {
+      error_at(loc, "Implementation of '" + method.name + "' for type '" + type_to_string(concrete) +
+                        "' has wrong arity for concept '" + concept_decl->name + "'.");
+      return false;
+    }
+    Type expected_ret = resolve_type_expr(substitute_type_params(method.return_type, subst));
+    Type actual_ret = resolve_type_expr(impl->return_type);
+    if (!types_assignable(actual_ret, expected_ret)) {
+      error_at(loc, "Implementation of '" + method.name + "' for type '" + type_to_string(concrete) +
+                        "' has incompatible return type for concept '" + concept_decl->name + "'.");
+      return false;
+    }
+    for (std::size_t i = 0; i < method.params.size(); ++i) {
+      Type expected_param = resolve_type_expr(substitute_type_params(method.params[i].type, subst));
+      Type actual_param = resolve_type_expr(impl->params[i].type);
+      if (!types_assignable(actual_param, expected_param)) {
+        error_at(loc, "Implementation of '" + method.name + "' for type '" + type_to_string(concrete) +
+                          "' has incompatible parameter types for concept '" + concept_decl->name +
+                          "'.");
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+std::optional<Type> TypeChecker::lookup_concept_method(const std::string &concept_name,
+                                                       const std::string &method_name,
+                                                       const Type &arg_ty,
+                                                       ast::SourceLocation loc) {
+  auto concept_it = concept_registry_.find(concept_name);
+  if (concept_it == concept_registry_.end()) {
+    error_at(loc, "Unknown concept '" + concept_name + "'.");
+    return std::nullopt;
+  }
+  const ast::ConceptDecl *concept_decl = concept_it->second;
+  bool method_found = false;
+  for (const ast::ConceptMethodDecl &method : concept_decl->methods) {
+    if (method.name == method_name) {
+      method_found = true;
+      break;
+    }
+  }
+  if (!method_found) {
+    error_at(loc, "Concept '" + concept_name + "' has no method '" + method_name + "'.");
+    return std::nullopt;
+  }
+
+  const std::string key = type_match_key(arg_ty);
+  const ast::FunctionDecl *impl = find_free_function_for_type(method_name, key);
+  if (impl == nullptr) {
+    error_at(loc, "No implementation of '" + concept_name + "::" + method_name + "' for type '" +
+                      type_to_string(arg_ty) + "'.");
+    return std::nullopt;
+  }
+  type_satisfies_concept(concept_decl, arg_ty, loc);
+
+  if (impl->params.size() < 1) {
+    error_at(loc, "Invalid implementation of '" + method_name + "'.");
+    return std::nullopt;
+  }
+  return resolve_type_expr(impl->return_type);
+}
+
+std::optional<Type> TypeChecker::lookup_ufcs_free_method(const std::string &method_name,
+                                                         const Type &receiver,
+                                                         const std::vector<ast::ExprPtr> &args,
+                                                         ast::SourceLocation loc) {
+  const std::string key = type_match_key(receiver);
+  const ast::FunctionDecl *impl = find_free_function_for_type(method_name, key);
+  if (impl == nullptr) {
+    return std::nullopt;
+  }
+  if (args.size() + 1 != impl->params.size()) {
+    error_at(loc, "Expected " + std::to_string(impl->params.size() - 1) + " arguments, got " +
+                      std::to_string(args.size()) + ".");
+    return resolve_type_expr(impl->return_type);
+  }
+  for (std::size_t i = 0; i < args.size(); ++i) {
+    Type arg_type = check_expr(*args[i]);
+    Type param_type = resolve_type_expr(impl->params[i + 1].type);
+    if (!types_assignable(arg_type, param_type)) {
+      error_at(args[i]->location, "Argument type mismatch.");
+    }
+  }
+  return resolve_type_expr(impl->return_type);
 }
 
 } // namespace kinglet

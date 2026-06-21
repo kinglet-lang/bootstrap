@@ -51,6 +51,18 @@ private:
   std::optional<Type> lookup_type(const std::string &name) const;
   Type resolve_type_name(const std::string &name) const;
   Type resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocation loc = {});
+  bool function_uses_concept_params(const ast::FunctionDecl &function) const;
+  std::string type_match_key(const Type &type) const;
+  bool type_satisfies_concept(const ast::ConceptDecl *concept_decl, const Type &concrete,
+                              ast::SourceLocation loc);
+  const ast::FunctionDecl *find_free_function_for_type(const std::string &name,
+                                                       const std::string &key) const;
+  std::optional<Type> lookup_concept_method(const std::string &concept_name,
+                                            const std::string &method_name, const Type &arg_ty,
+                                            ast::SourceLocation loc);
+  std::optional<Type> lookup_ufcs_free_method(const std::string &method_name, const Type &receiver,
+                                              const std::vector<ast::ExprPtr> &args,
+                                              ast::SourceLocation loc);
   std::string mangle_name(const std::string &base, const std::vector<ast::TypeExpr> &args) const;
   void instantiate_generic_struct(const ast::StructDecl *decl, const std::vector<ast::TypeExpr> &args);
   void error_at(ast::SourceLocation location, std::string message);
@@ -87,6 +99,8 @@ private:
   std::unordered_map<std::string, Type> type_registry_;
   std::unordered_map<std::string, const ast::StructDecl *> generic_structs_;
   std::unordered_map<std::string, const ast::FunctionDecl *> generic_functions_;
+  std::unordered_map<std::string, const ast::FunctionDecl *> concept_generic_functions_;
+  std::vector<const ast::FunctionDecl *> free_functions_;
   std::unordered_set<std::string> instantiated_;
 
   struct MethodInfo {

@@ -217,6 +217,8 @@ std::ostream &operator<<(std::ostream &out, TypeKind kind) {
     return out << "Ref";
   case TypeKind::MutRef:
     return out << "MutRef";
+  case TypeKind::Concept:
+    return out << "Concept";
   }
   return out << "Unknown";
 }
