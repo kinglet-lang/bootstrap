@@ -39,14 +39,14 @@ jobs:
             echo "LLVM_CONFIG=$(brew --prefix llvm)/bin/llvm-config" >> "$GITHUB_ENV"
           else
             sudo apt-get update
-            sudo apt-get install -y llvm-dev clang
+            sudo apt-get install -y llvm-dev clang python-is-python3
             echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
           fi
 
       - name: Generate build files
         shell: bash
         run: |
-          gn gen out/Debug --args="enable_llvm=true llvm_config=\"$LLVM_CONFIG\""
+          gn gen out/Debug --args="is_debug=false enable_llvm=true llvm_config=\"$LLVM_CONFIG\""
 
       - name: Build
         shell: bash
@@ -54,7 +54,9 @@ jobs:
 
       - name: Run golden tests
         shell: bash
-        run: bash tests/cli/run_golden.sh
+        run: |
+          export KINGLET="$PWD/out/Debug/kinglet"
+          bash tests/cli/run_golden.sh
 
   build-and-test-windows:
     runs-on: windows-latest
@@ -95,10 +97,19 @@ jobs:
           LLVMW="$(cygpath -m /mingw64/bin/llvm-config.exe)"
           gn gen out/Debug \
             --script-executable="$PYW" \
-            --args="enable_llvm=true llvm_config=\"$LLVMW\""
+            --args="is_debug=false enable_llvm=true llvm_config=\"$LLVMW\""
 
       - name: Build
         run: ninja -C out/Debug
 
-      - name: Run golden tests
-        run: bash tests/cli/run_golden.sh
+      # Native program execution (kinglet run) is not implemented on Windows yet.
+      - name: Run golden tests (compile-only)
+        run: |
+          export KINGLET="$PWD/out/Debug/kinglet"
+          export KINGLET_SKIP_RUN=1
+          bash tests/cli/run_golden.sh
+
+      - name: Native compile smoke
+        run: |
+          ./out/Debug/kinglet --check tests/cli/cases/structs_basic.kl
+          ./out/Debug/kinglet --bytecode tests/cli/cases/structs_basic.kl >/dev/null

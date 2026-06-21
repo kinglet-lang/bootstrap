@@ -50,8 +50,24 @@ std::string kl_value_text(kl_h value) {
     return float_text(static_cast<KlFloat *>(ptr)->value);
   case KlKind::Enum:
     return "<enum>";
-  case KlKind::Array:
-    return "[array]";
+  case KlKind::Array: {
+    auto *arr = static_cast<KlArray *>(ptr);
+    if (!arr->dense_dims.empty()) {
+      return "[array]";
+    }
+    if (arr->elements.empty()) {
+      return "[]";
+    }
+    std::string out = "[";
+    for (std::size_t i = 0; i < arr->elements.size(); ++i) {
+      if (i > 0) {
+        out += ", ";
+      }
+      out += kl_value_text(arr->elements[i]);
+    }
+    out += "]";
+    return out;
+  }
   case KlKind::Struct:
     return "<struct>";
   case KlKind::Map:

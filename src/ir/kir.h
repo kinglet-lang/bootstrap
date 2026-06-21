@@ -114,6 +114,7 @@ enum class KirOpcode {
   ICmpLe,
   ICmpGe,
   ConstFn,
+  ConstNativeFn,
   Call,
   Ret,
   Br,

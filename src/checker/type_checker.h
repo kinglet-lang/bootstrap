@@ -112,6 +112,7 @@ private:
   std::unordered_map<std::string, std::unordered_set<std::string>> module_private_symbols_;
   int loop_depth_ = 0;
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
+  Type implicit_return_value_type_{TypeKind::Void};
   ModuleLoader *module_loader_ = nullptr;
 };
 

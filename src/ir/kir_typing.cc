@@ -413,6 +413,10 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       result = KirType::Fn;
       push_typed(&state, result);
       break;
+    case KirOpcode::ConstNativeFn:
+      result = KirType::Fn;
+      push_typed(&state, result);
+      break;
     case KirOpcode::LoadLocal: {
       const int slot = instr->operands[0];
       KirContainerType container;
@@ -550,11 +554,22 @@ void infer_function(KirFunction *fn, const KirModule &module) {
     }
     case KirOpcode::Call: {
       const int argc = instr->operands[0];
+      KirType ret = KirType::Any;
+      if (i > 0 && linear[i - 1]->op == KirOpcode::ConstFn &&
+          !linear[i - 1]->operands.empty()) {
+        const int fn_idx = linear[i - 1]->operands[0];
+        if (fn_idx >= 0 &&
+            static_cast<std::size_t>(fn_idx) < module.function_signatures.size()) {
+          ret = module.function_signatures[static_cast<std::size_t>(fn_idx)].return_type;
+        }
+      } else if (i > 0 && linear[i - 1]->op == KirOpcode::ConstNativeFn) {
+        ret = KirType::Null;
+      }
       for (int arg = 0; arg < argc; ++arg) {
         pop_type(&state);
       }
       pop_type(&state);
-      result = KirType::Any;
+      result = ret;
       push_typed(&state, result);
       break;
     }
@@ -742,9 +757,8 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         if (kir_type_is_container(result) && object_container.nested_shape != KirContainerShape::None) {
           result_container = kir_container_peel_element(object_container);
         }
-      } else if (object == KirType::String &&
-                 (key == KirType::Int || key == KirType::Int32 || key == KirType::Char)) {
-        result = KirType::Int8;
+      } else if (object == KirType::String && kir_type_is_integer(kir_type_normalize(key))) {
+        result = KirType::Char;
       } else {
         result = KirType::Any;
       }

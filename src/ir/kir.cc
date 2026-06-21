@@ -117,6 +117,8 @@ const char *kir_opcode_name(KirOpcode op) {
     return "icmp_ge";
   case KirOpcode::ConstFn:
     return "const_fn";
+  case KirOpcode::ConstNativeFn:
+    return "const_native_fn";
   case KirOpcode::Call:
     return "call";
   case KirOpcode::Ret:

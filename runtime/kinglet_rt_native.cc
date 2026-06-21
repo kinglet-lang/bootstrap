@@ -82,11 +82,12 @@ extern "C" {
 
 void kl_set_program_args(int32_t argc, const char **argv) {
   g_program_args.clear();
-  if (argv == nullptr || argc <= 0) {
+  if (argv == nullptr || argc <= 1) {
     return;
   }
-  g_program_args.reserve(static_cast<std::size_t>(argc));
-  for (int32_t i = 0; i < argc; ++i) {
+  // Skip argv[0] (executable path); kinglet forwards only args after the .kl file.
+  g_program_args.reserve(static_cast<std::size_t>(argc - 1));
+  for (int32_t i = 1; i < argc; ++i) {
     if (argv[i] != nullptr) {
       g_program_args.emplace_back(argv[i]);
     }
@@ -215,6 +216,36 @@ kl_h kl_native_sys_args(void) {
     elements.push_back(kl_string_new(arg.data(), static_cast<int32_t>(arg.size())));
   }
   return kl_array_new(static_cast<int32_t>(elements.size()), elements.data());
+}
+
+kl_h kl_invoke_native(kl_h callee, int32_t argc, const kl_h *args) {
+  const int64_t tag = kl_to_int(callee);
+  if (tag >= 0) {
+    return 0;
+  }
+  const int fn = static_cast<int>(-tag - 1);
+  switch (fn) {
+  case 0:
+    return kl_native_out(argc, args);
+  case 1:
+    return kl_native_out_ln(argc, args);
+  case 2:
+    return kl_native_err(argc, args);
+  case 3:
+    return kl_native_err_ln(argc, args);
+  case 4:
+    return kl_native_in(argc, args, 0);
+  case 5:
+    return kl_native_in(argc, args, 1);
+  case 6:
+    return argc == 1 ? kl_native_fs_read(args[0]) : 0;
+  case 7:
+    return argc == 2 ? kl_native_fs_write(args[0], args[1]) : 0;
+  case 8:
+    return kl_native_sys_args();
+  default:
+    return 0;
+  }
 }
 
 } // extern "C"

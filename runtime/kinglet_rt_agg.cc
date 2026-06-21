@@ -1,9 +1,16 @@
 #include "runtime/kinglet_rt_internal.h"
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 namespace {
+
+[[noreturn]] void runtime_abort(const char *message) {
+  std::fprintf(stderr, "runtime error: %s\n", message);
+  std::exit(70);
+}
 
 bool kl_array_is_dense(const KlArray *arr) {
   return arr != nullptr && !arr->dense_dims.empty();
@@ -95,7 +102,7 @@ kl_h kl_array_get(kl_h array, int32_t index) {
       const int32_t rows = obj->dense_dims[0];
       const int32_t cols = obj->dense_dims[1];
       if (index >= rows) {
-        return kl_from_int(0);
+        runtime_abort("Array index out of bounds.");
       }
       const std::size_t base =
           static_cast<std::size_t>(index) * static_cast<std::size_t>(cols);
@@ -104,7 +111,7 @@ kl_h kl_array_get(kl_h array, int32_t index) {
     return kl_from_int(0);
   }
   if (static_cast<std::size_t>(index) >= obj->elements.size()) {
-    return kl_from_int(0);
+    runtime_abort("Array index out of bounds.");
   }
   return obj->elements[static_cast<std::size_t>(index)];
 }

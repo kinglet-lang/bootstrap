@@ -149,6 +149,9 @@ void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
   } else if (value.type == ValueType::Function) {
     bb_.instrs.push_back(
         rec(KirOpcode::ConstFn, {static_cast<int32_t>(value.function_idx)}, location));
+  } else if (value.type == ValueType::NativeFunction) {
+    bb_.instrs.push_back(
+        rec(KirOpcode::ConstNativeFn, {static_cast<int32_t>(value.native_fn)}, location));
   }
 }
 

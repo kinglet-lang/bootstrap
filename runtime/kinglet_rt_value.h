@@ -67,6 +67,7 @@ kl_h kl_native_fs_write(kl_h path, kl_h content);
 // or 0 (null) if the path cannot be opened as a directory.
 kl_h kl_native_fs_listdir(kl_h path);
 kl_h kl_native_sys_args(void);
+kl_h kl_invoke_native(kl_h callee, int32_t argc, const kl_h *args);
 int32_t kl_value_len(kl_h value);
 
 kl_h kl_array_new(int32_t count, const kl_h *elements);

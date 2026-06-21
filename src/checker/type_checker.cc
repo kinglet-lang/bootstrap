@@ -1275,6 +1275,7 @@ void TypeChecker::check_function(const ast::FunctionDecl &function) {
 
   if (function.body) {
     implicit_return_stmt_ = nullptr;
+    implicit_return_value_type_ = Type(TypeKind::Void);
     if (return_type.kind != TypeKind::Void) {
       if (const auto *block = dynamic_cast<const ast::BlockStmt *>(function.body.get())) {
         if (!block->statements.empty()) {
@@ -1285,7 +1286,13 @@ void TypeChecker::check_function(const ast::FunctionDecl &function) {
       }
     }
     check_stmt(*function.body, return_type);
+    if (function.return_type.name == "auto" &&
+        implicit_return_value_type_.kind != TypeKind::Void) {
+      kir_function_sigs_[function.name].return_type =
+          kir_type_from(implicit_return_value_type_);
+    }
     implicit_return_stmt_ = nullptr;
+    implicit_return_value_type_ = Type(TypeKind::Void);
   }
 
   pop_scope();
@@ -1368,8 +1375,10 @@ void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return)
     Type result_type = check_expr(*expr_stmt->expr);
     if (result_type.kind != TypeKind::Void) {
       bool suppress = false;
-      if (expr_stmt == implicit_return_stmt_)
+      if (expr_stmt == implicit_return_stmt_) {
         suppress = true;
+        implicit_return_value_type_ = result_type;
+      }
       // Don't suppress for imported function calls — the semicolon
       // suggests intentional discard, even when auto-returned.
       if (suppress) {

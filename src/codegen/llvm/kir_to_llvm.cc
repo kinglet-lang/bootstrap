@@ -146,6 +146,7 @@ struct RtFns {
   llvm::Function *native_fs_read = nullptr;
   llvm::Function *native_fs_write = nullptr;
   llvm::Function *native_sys_args = nullptr;
+  llvm::Function *invoke_native = nullptr;
   llvm::Function *value_eq = nullptr;
   llvm::Function *value_is_err = nullptr;
   llvm::Function *exit_code = nullptr;
@@ -268,6 +269,9 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.native_sys_args = llvm::Function::Create(llvm::FunctionType::get(i64, false),
                                                llvm::Function::ExternalLinkage, "kl_native_sys_args",
                                                module);
+  rt.invoke_native = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i64p}, false),
+                                            llvm::Function::ExternalLinkage, "kl_invoke_native",
+                                            module);
   rt.value_eq = llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
                                        llvm::Function::ExternalLinkage, "kl_value_eq", module);
   rt.value_is_err = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
@@ -470,6 +474,7 @@ llvm::Value *wire_for_string_display(llvm::IRBuilder<> &builder, const RtFns &rt
   case KirType::Null:
     return builder.CreateCall(rt.null_to_string, {});
   case KirType::Char:
+  case KirType::Int8:
     // Display a char as its character byte, matching VM semantics.
     return builder.CreateCall(rt.char_to_string, {wire});
   default:
@@ -942,12 +947,14 @@ public:
         }
       }
       stack.assign(max_depth, nullptr);
-      type_stack.assign(max_depth, KirType::Any);
       llvm::IRBuilder<> phi_builder(bb);
       phi_builder.SetInsertPoint(bb, bb->getFirstInsertionPt());
+      type_stack.assign(max_depth, KirType::Any);
       for (std::size_t d = 0; d < max_depth; ++d) {
         llvm::PHINode *phi = phi_builder.CreatePHI(i64, static_cast<unsigned>(preds.size()),
                                                      "stk" + std::to_string(d));
+        KirType merged_ty = KirType::Any;
+        bool have_ty = false;
         for (llvm::BasicBlock *pred : preds) {
           llvm::Value *incoming = llvm::UndefValue::get(i64);
           const auto it = exit_stacks.find(pred);
@@ -955,8 +962,19 @@ public:
             incoming = it->second[d];
           }
           phi->addIncoming(incoming, pred);
+          const auto tit = exit_type_stacks.find(pred);
+          if (tit != exit_type_stacks.end() && d < tit->second.size()) {
+            const KirType t = tit->second[d];
+            if (!have_ty) {
+              merged_ty = t;
+              have_ty = true;
+            } else if (merged_ty != t) {
+              merged_ty = KirType::Any;
+            }
+          }
         }
         stack[d] = phi;
+        type_stack[d] = merged_ty;
       }
       return true;
     };
@@ -977,6 +995,11 @@ public:
         if (!merge_stack_at_leader(i)) {
           return false;
         }
+      }
+      // Bytecode may leave unreachable instructions after Br/Ret in the same
+      // leader region; never emit into a block that already has a terminator.
+      if (bb->getTerminator() != nullptr) {
+        continue;
       }
       llvm::IRBuilder<> builder(bb);
       if (di_subprogram_ != nullptr) {
@@ -1133,6 +1156,7 @@ public:
       case KirOpcode::ConstBool:
         push(llvm::ConstantInt::get(i64, instr->operands.empty() ? 0 : instr->operands[0]));
         temps[i] = stack.back();
+        temp_types[i] = KirType::Bool;
         break;
       case KirOpcode::ConstNull:
         push(llvm::ConstantInt::get(i64, 0));
@@ -1366,6 +1390,14 @@ public:
         temps[i] = result;
         break;
       }
+      case KirOpcode::ConstNativeFn: {
+        const int fn = instr->operands.empty() ? 0 : instr->operands[0];
+        llvm::Value *tag = llvm::ConstantInt::get(i64, -(fn + 1));
+        push(tag);
+        temps[i] = tag;
+        temp_types[i] = KirType::Fn;
+        break;
+      }
       case KirOpcode::Call: {
         const int argc = instr->operands[0];
         if (argc < 0) {
@@ -1383,10 +1415,35 @@ public:
             return false;
           }
         }
+        llvm::PointerType *i64p = llvm::PointerType::getUnqual(i64);
+        auto emit_invoke_native = [&]() -> bool {
+          llvm::Value *argv = llvm::ConstantPointerNull::get(i64p);
+          if (argc > 0) {
+            llvm::AllocaInst *elements =
+                builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, argc), "call_args");
+            for (int ai = 0; ai < argc; ++ai) {
+              llvm::Value *slot =
+                  builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ai));
+              builder.CreateStore(args[static_cast<std::size_t>(ai)], slot);
+            }
+            argv = builder.CreateBitCast(elements, i64p);
+          }
+          llvm::Value *result = builder.CreateCall(
+              rt_.invoke_native,
+              {callee_tag, llvm::ConstantInt::get(i32, argc), argv});
+          push(result);
+          temps[i] = result;
+          if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
+            temp_types[i] = fn.instr_types[i];
+          }
+          return true;
+        };
         llvm::ConstantInt *callee_const = llvm::dyn_cast<llvm::ConstantInt>(callee_tag);
-        if (callee_const == nullptr) {
-          *error = "call callee is not a known function constant";
-          return false;
+        if (callee_const == nullptr || callee_const->getSExtValue() < 0) {
+          if (!emit_invoke_native()) {
+            return false;
+          }
+          break;
         }
         const int fn_index = static_cast<int>(callee_const->getSExtValue());
         if (fn_index < 0 ||
@@ -1409,6 +1466,9 @@ public:
         llvm::Value *result = builder.CreateCall(target, args);
         push(result);
         temps[i] = result;
+        if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
+          temp_types[i] = fn.instr_types[i];
+        }
         break;
       }
       case KirOpcode::StructNew: {

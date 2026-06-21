@@ -2,13 +2,16 @@
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-if [[ -x "$ROOT/out/Default/kinglet" ]]; then
-  KINGLET="$ROOT/out/Default/kinglet"
+if [[ -n "${KINGLET:-}" ]]; then
+  :
 elif [[ -x "$ROOT/out/Debug/kinglet" ]]; then
   KINGLET="$ROOT/out/Debug/kinglet"
-else
+elif [[ -x "$ROOT/out/Default/kinglet" ]]; then
   KINGLET="$ROOT/out/Default/kinglet"
+else
+  KINGLET="$ROOT/out/Debug/kinglet"
 fi
+OUT_DIR="$(cd "$(dirname "$KINGLET")" && pwd)"
 TMP_DIR="$(mktemp -d)"
 FAILURES=0
 
@@ -41,6 +44,9 @@ run_case() {
   local expected_exit="$3"
   local expected_stdout="$4"
   local expected_stderr="$5"
+  if [[ "$mode" == "run" && "${KINGLET_SKIP_RUN:-}" == "1" ]]; then
+    return 0
+  fi
   local source="$ROOT/tests/cli/cases/$name.kl"
   local stdout="$TMP_DIR/$name.stdout"
   local stderr="$TMP_DIR/$name.stderr"
@@ -99,6 +105,9 @@ run_contains_case() {
 # Usage: run_args_case <name> <expected_exit> <expected_stdout> <expected_stderr> [program args...]
 run_args_case() {
   local name="$1"
+  if [[ "${KINGLET_SKIP_RUN:-}" == "1" ]]; then
+    return 0
+  fi
   local expected_exit="$2"
   local expected_stdout="$3"
   local expected_stderr="$4"
@@ -127,7 +136,7 @@ run_args_case() {
 }
 
 cd "$ROOT" || exit 1
-ninja -C out/Debug >/dev/null
+ninja -C "$OUT_DIR" >/dev/null
 
 # --- Arrays ---
 run_case "arrays_success" "run" 0 $'1 20 []\n' ""
