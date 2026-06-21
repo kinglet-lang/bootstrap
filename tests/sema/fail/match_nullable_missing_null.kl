@@ -1,0 +1,15 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+bool? pick(bool ok) {
+  return ok ? true : null;
+}
+
+int main() {
+  bool? b = pick(false);
+  return b match {
+    true => 1,
+    false => 2,
+  };
+}

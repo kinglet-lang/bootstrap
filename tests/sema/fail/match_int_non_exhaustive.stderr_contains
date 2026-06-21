@@ -1,0 +1,1 @@
+error: Non-exhaustive match on int. Add a catch-all pattern (`_` or `let x`).

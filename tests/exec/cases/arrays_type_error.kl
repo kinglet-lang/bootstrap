@@ -1,0 +1,7 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+int main() {
+  int[] xs = [1, "no"];
+  return xs[0];
+}

@@ -1,0 +1,5 @@
+warning: Condition is always true.
+warning: Condition is always false; loop body never executes.
+warning: Unused variable 'x'.
+warning: Unreachable code.
+warning: Unused variable 'unused'.

@@ -1,0 +1,54 @@
+// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return int(s)? * 10;
+}
+
+int main() {
+  // Cast — infallible
+  io::out.line("int(3.7) = {}", int(3.7));
+  io::out.line("float(42) = {}", float(42));
+  io::out.line("string(99) = {}", string(99));
+
+  // Cast — fallible + bare ?:
+  int a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int c = int("") ?: -1;
+  io::out.line("c = {}", c);
+
+  // Chained ?:
+  string s1 = "bad";
+  string s2 = "7";
+  int d = int(s1) ?: int(s2) ?: -1;
+  io::out.line("d = {}", d);
+
+  // Postfix ? in T?-returning function
+  int f = parse_int("5") ?: 0;
+  io::out.line("f = {}", f);
+  int g = parse_int("bad") ?: 0;
+  io::out.line("g = {}", g);
+
+  // try / catch — error path
+  int n;
+  try {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -99;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch — success path
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.line("m = {}", m);
+
+  return 0;
+}

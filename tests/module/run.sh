@@ -3,11 +3,16 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 KINGLET="${KINGLET_BOOTSTRAP:-$ROOT/out/Default/kinglet}"
-FIXTURE="$(cd "$ROOT/../test" && pwd)"
+FIXTURE="$(cd "$ROOT/../test" 2>/dev/null && pwd || true)"
 
 if [[ ! -x "$KINGLET" ]]; then
   echo "kinglet not found at $KINGLET" >&2
   exit 2
+fi
+
+if [[ -z "$FIXTURE" || ! -d "$FIXTURE" ]]; then
+  echo "SKIP: module integration (../test fixture not present)"
+  exit 0
 fi
 
 failures=0

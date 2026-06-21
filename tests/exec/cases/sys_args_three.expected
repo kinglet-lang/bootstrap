@@ -1,0 +1,4 @@
+argc: 3
+arg: alpha
+arg: beta
+arg: --flag

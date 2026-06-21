@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out.line("hello {}", "world");
+  io::out.line("{} + {} = {}", 1, 2, 3);
+  io::out("no newline");
+  io::out(" here\n");
+  io::out.line("done");
+  return 0;
+}

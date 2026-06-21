@@ -1,0 +1,7 @@
+len: 5
+after push: len = 6
+popped: 6
+removed at 0: 1
+contains 3: true
+contains 99: false
+after clear: len = 0

@@ -1,0 +1,21 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Color c = Color::Red;
+  string r = c match {
+    Color::Red => "red",
+    Color::Green => "green",
+  };
+  io::out.line(r);
+  return 0;
+}

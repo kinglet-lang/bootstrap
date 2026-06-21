@@ -1,0 +1,2 @@
+5 |> twice |> add_one = 11
+3 |> add_one |> twice |> negate = -8

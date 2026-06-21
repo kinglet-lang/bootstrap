@@ -1,0 +1,4 @@
+index_of 3: 2
+index_of 99: -1
+slice(1,4): 2 3 4
+reversed: 5 4 3 2 1

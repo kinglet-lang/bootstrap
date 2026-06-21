@@ -1,0 +1,13 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+enum Option { Some(int), None }
+
+int main() {
+  Option o = Option::Some(0);
+  return o match {
+    Option::Some(0) => 1,
+    Option::None => 0,
+  };
+}

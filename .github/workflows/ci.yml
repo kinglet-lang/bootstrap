@@ -56,6 +56,7 @@ jobs:
         shell: bash
         run: |
           export KINGLET="$PWD/out/Debug/kinglet"
+          export KINGLET_SKIP_REBUILD=1
           bash tests/cli/run_golden.sh
 
   # Windows: Git Bash + non-LLVM kinglet is enough for compile-only golden
@@ -92,10 +93,13 @@ jobs:
           export KINGLET="$PWD/out/Debug/kinglet"
           export KINGLET_SKIP_RUN=1
           export KINGLET_SKIP_REBUILD=1
-          bash tests/cli/run_golden.sh
+          bash tests/sema/run.sh
+          bash tests/parser/run.sh
+          bash tests/codegen/run.sh
+          bash tests/ir/run.sh
 
       - name: Compile smoke
         shell: bash
         run: |
-          ./out/Debug/kinglet.exe --check tests/cli/cases/structs_basic.kl
-          ./out/Debug/kinglet.exe --bytecode tests/cli/cases/structs_basic.kl >/dev/null
+          ./out/Debug/kinglet.exe --check tests/exec/cases/structs_basic.kl
+          ./out/Debug/kinglet.exe --bytecode tests/exec/cases/structs_basic.kl >/dev/null

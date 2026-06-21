@@ -1,4 +1,0 @@
-int main() {
-  int32 x = 42i64;
-  return x;
-}

@@ -1,3 +1,5 @@
+// RUN: check
+
 // ADR 0023 D3: wide unsigned hex literals parse without signed narrowing.
 
 int main() {

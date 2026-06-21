@@ -1,0 +1,15 @@
+// RUN: check
+
+enum Color { Red, Green, Blue }
+
+int score(Color c) {
+  return c match {
+    Color::Red => 1,
+    Color::Red => 2,
+    _ => 0,
+  };
+}
+
+int main() {
+  return score(Color::Green);
+}

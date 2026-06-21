@@ -1,0 +1,20 @@
+// RUN: run
+
+// Generic struct literals written WITHOUT type arguments (`Box { 7 }`):
+// the type arguments are inferred from the field values, then the struct is
+// monomorphized through the normal path. (generics_basic.kl covers the
+// explicit `Box<int> b { ... }` form; this covers the `= Box { ... }` form.)
+using io;
+
+struct Box<T> { T value; }
+struct Pair<A, B> { A first; B second; }
+
+int main() {
+  Box<int> a = Box { 7 };
+  io::out.line("{}", a.value);
+  Box<string> b = Box { "hi" };
+  io::out.line("{}", b.value);
+  Pair<int, string> p = Pair { 1, "x" };
+  io::out.line("{} {}", p.first, p.second);
+  return 0;
+}

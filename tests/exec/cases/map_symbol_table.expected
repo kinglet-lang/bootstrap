@@ -1,0 +1,5 @@
+found: x kind=1
+z not found
+total=2
+  x -> kind=1
+  y -> kind=2

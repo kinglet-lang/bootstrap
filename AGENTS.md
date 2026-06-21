@@ -26,14 +26,13 @@ ninja -C out/Default kinglet kinglet_rt
 Run:
 
 ```bash
-./out/Debug/kinglet tests/cli/cases/operators_arithmetic.kl
+./out/Debug/kinglet tests/exec/cases/operators_arithmetic.kl
 ./out/Debug/klet --check path/to/file.kl   # if you `ln -s kinglet klet` locally
-./out/Debug/kinglet build              # project build (needs kinglet.toml)
+./out/Debug/kinglet build              # project build (needs kinglet.nest)
 ./out/Debug/kinglet init
-./out/Debug/kinglet --repl
 ```
 
-CLI golden tests: `bash tests/cli/run_golden.sh`
+Test suites: `bash tests/run_all.sh` (see [tests/README.md](tests/README.md))
 
 ## Directory Structure
 
@@ -51,7 +50,7 @@ src/
 
 runtime/                          # libkinglet_rt (user program native RT)
 build/                            # GN toolchains, llvm.gni, embed.gni
-tests/cli/                        # Ref compiler regression
+tests/                            # ADR 0012 layout (see tests/README.md)
 ```
 
 ## Code Conventions

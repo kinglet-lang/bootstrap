@@ -1,0 +1,8 @@
+// RUN: ir
+// CHECK: index_get
+// CHECK: : int32
+
+int main() {
+  Array<int32> xs = [1i32, 2i32, 3i32];
+  return xs[0];
+}

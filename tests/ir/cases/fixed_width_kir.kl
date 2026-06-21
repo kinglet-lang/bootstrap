@@ -1,0 +1,15 @@
+// RUN: ir
+// CHECK: const_i32
+// CHECK: const_i64
+// CHECK: iadd32
+// CHECK: : int32
+
+using io;
+
+int main() {
+  int32 a = 42i32;
+  int64 b = 100i64;
+  int32 c = a + a;
+  io::out.line("{} {} {}", a, b, c);
+  return 0;
+}

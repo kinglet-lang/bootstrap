@@ -69,7 +69,7 @@ VM opcodes and KIR share representation during bootstrap.
 
 ## Tests
 
-Ref regression: `tests/cli/run_golden.sh` (from repo root).
+Ref regression: `bash tests/run_all.sh` (from repo root). See [tests/README.md](../tests/README.md).
 
 Formatter goldens: `tests/fmt/run_golden.sh`.
 

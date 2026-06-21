@@ -1,7 +1,0 @@
-// Platform IO via `using namespace io;` — bare `out.line` works like `io::out.line`.
-using namespace io;
-
-int main() {
-  out.line("ok");
-  return 0;
-}

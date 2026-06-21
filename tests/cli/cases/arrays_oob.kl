@@ -1,4 +1,0 @@
-int main() {
-  int[] xs = [1];
-  return xs[2];
-}

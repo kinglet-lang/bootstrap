@@ -1,9 +1,0 @@
-using io;
-
-int main() {
-  int32 a = 42i32;
-  int64 b = 100i64;
-  int32 c = a + a;
-  io::out.line("{} {} {}", a, b, c);
-  return 0;
-}

@@ -35,8 +35,8 @@ Supported:
 
 ```bash
 ninja -C out/Default kinglet
-bash tests/cli/run_golden.sh
-bash tests/probe/run_matrix.sh          # capability snapshot (30 probes)
+bash tests/run_all.sh
+bash tests/probe/run_matrix.sh          # capability snapshot (38 probes)
 bash tests/module/hierarchical/run.sh   # logical modules + reject { } / ::*
 ```
 
