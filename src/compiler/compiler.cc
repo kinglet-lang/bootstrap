@@ -53,6 +53,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
   namespace_source_paths_.clear();
   function_source_paths_.clear();
   concept_registry_.clear();
+  concept_generic_func_decls_.clear();
   func_first_param_.clear();
   global_const_inits_.clear();
 
@@ -144,6 +145,10 @@ CompileResult Compiler::compile(const ast::Program &program) {
     if (const auto *function = dynamic_cast<const ast::FunctionDecl *>(declaration.get())) {
       if (!function->type_params.empty()) {
         generic_func_decls_[function->name] = function;
+        continue;
+      }
+      if (function_uses_concept_params(*function)) {
+        concept_generic_func_decls_[function->name] = function;
         continue;
       }
       int idx = chunk_.add_function(FunctionInfo{
@@ -289,12 +294,22 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
     }
   }
 
+  for (const ast::DeclPtr &declaration : program.declarations) {
+    if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(declaration.get())) {
+      concept_registry_[concept_decl->name] = concept_decl;
+    }
+  }
+
   // Register and compile all functions (no main required)
   std::vector<const ast::FunctionDecl *> functions;
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *function = dynamic_cast<const ast::FunctionDecl *>(declaration.get())) {
       if (!function->type_params.empty()) {
         generic_func_decls_[function->name] = function;
+        continue;
+      }
+      if (function_uses_concept_params(*function)) {
+        concept_generic_func_decls_[function->name] = function;
         continue;
       }
       int idx = chunk_.add_function(FunctionInfo{
@@ -1393,6 +1408,22 @@ void Compiler::compile_expr(const ast::Expr &expr) {
           return;
         }
       }
+      const std::string receiver_ty = infer_arg_type_name(*field_callee->object);
+      if (!receiver_ty.empty()) {
+        const int free_idx = resolve_free_function_for_type(field_callee->field_name, receiver_ty);
+        if (free_idx >= 0) {
+          compile_expr(*field_callee->object);
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_constant(Value::function_value(
+              chunk_.constants()[static_cast<std::size_t>(free_idx)].function_idx),
+              call_expr->location);
+          emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size() + 1),
+                       call_expr->location);
+          return;
+        }
+      }
     }
 
     // Generic function call — type arguments are explicit, or inferred from the
@@ -1429,6 +1460,48 @@ void Compiler::compile_expr(const ast::Expr &expr) {
         for (const std::string &n : type_arg_names) {
           mangled += "__" + n;
         }
+        auto func_it = function_indices_.find(mangled);
+        if (func_it == function_indices_.end()) {
+          int idx = chunk_.add_function(FunctionInfo{
+              .name = mangled,
+              .entry = 0,
+              .param_count = static_cast<int>(decl->params.size()),
+          });
+          record_function_source(idx, entry_source_path_);
+          uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
+          function_indices_[mangled] = static_cast<int>(const_idx);
+          pending_generic_funcs_.push_back({mangled, decl});
+        }
+        func_it = function_indices_.find(mangled);
+        if (func_it != function_indices_.end()) {
+          for (const ast::ExprPtr &arg : call_expr->args) {
+            compile_expr(*arg);
+          }
+          emit_constant(Value::function_value(
+              chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+              call_expr->location);
+          emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
+          return;
+        }
+      }
+    }
+
+    // Concept-generic function call — infer concrete type from concept-typed params.
+    if (callee_id && concept_generic_func_decls_.count(callee_id->name)) {
+      const ast::FunctionDecl *decl = concept_generic_func_decls_.at(callee_id->name);
+      std::string concrete_ty;
+      for (std::size_t i = 0; i < decl->params.size() && i < call_expr->args.size(); ++i) {
+        const ast::TypeExpr &pt = decl->params[i].type;
+        if (pt.type_args.empty() && concept_registry_.count(pt.name)) {
+          const std::string ty = infer_arg_type_name(*call_expr->args[i]);
+          if (!ty.empty()) {
+            concrete_ty = ty;
+            break;
+          }
+        }
+      }
+      if (!concrete_ty.empty()) {
+        const std::string mangled = callee_id->name + "__" + concrete_ty;
         auto func_it = function_indices_.find(mangled);
         if (func_it == function_indices_.end()) {
           int idx = chunk_.add_function(FunctionInfo{
@@ -2575,6 +2648,15 @@ void Compiler::open_imported_namespace(const std::string &module_id) {
       function_indices_[bare] = function_indices_.at(qualified);
     }
   }
+}
+
+bool Compiler::function_uses_concept_params(const ast::FunctionDecl &function) const {
+  for (const auto &param : function.params) {
+    if (param.type.type_args.empty() && concept_registry_.count(param.type.name)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 } // namespace kinglet

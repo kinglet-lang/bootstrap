@@ -90,6 +90,7 @@ private:
   // type arguments at a call site (literals, locals, struct/method returns).
   std::string infer_arg_type_name(const ast::Expr &expr) const;
   int resolve_free_function_for_type(const std::string &name, const std::string &arg_type) const;
+  bool function_uses_concept_params(const ast::FunctionDecl &function) const;
   void attach_kir_metadata();
   void record_function_source(int function_idx, const std::string &source_path);
   std::string resolve_module_qualified(const std::string &ns, const std::string &member) const;
@@ -111,6 +112,7 @@ private:
   std::unordered_map<std::string, int> enum_indices_;
   std::unordered_map<std::string, const ast::StructDecl *> generic_struct_decls_;
   std::unordered_map<std::string, const ast::FunctionDecl *> generic_func_decls_;
+  std::unordered_map<std::string, const ast::FunctionDecl *> concept_generic_func_decls_;
   std::vector<std::pair<std::string, const ast::FunctionDecl *>> pending_generic_funcs_;
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
   ModuleLoader *module_loader_ = nullptr;
