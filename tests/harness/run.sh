@@ -233,7 +233,11 @@ run_pipeline() {
   local stderr="$3"
   expand_run_args_to_array "$src"
   local ec=0
-  "$KINGLET_BIN" "$src" "${RUN_ARGS_ITEMS[@]}" >"$stdout" 2>"$stderr" || ec=$?
+  if ((${#RUN_ARGS_ITEMS[@]} > 0)); then
+    "$KINGLET_BIN" "$src" "${RUN_ARGS_ITEMS[@]}" >"$stdout" 2>"$stderr" || ec=$?
+  else
+    "$KINGLET_BIN" "$src" >"$stdout" 2>"$stderr" || ec=$?
+  fi
   echo "$ec"
 }
 
@@ -353,9 +357,9 @@ run_one_file() {
       strip_cr "$stdout" "$stderr"
       local golden="${src%.kl}.bytecode"
       if [[ -f "$golden" ]]; then
-        if ! diff -u --strip-trailing-cr "$golden" "$stdout" >/dev/null; then
+        if ! diff -u "$golden" "$stdout" >/dev/null; then
           fail_case "$name" "bytecode golden mismatch"
-          diff -u --strip-trailing-cr "$golden" "$stdout" | sed 's/^/      /' | head -20 >&2
+          diff -u "$golden" "$stdout" | sed 's/^/      /' | head -20 >&2
           return
         fi
         pass_case "$name"
