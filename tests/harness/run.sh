@@ -215,16 +215,15 @@ expand_run_args() {
   printf '%s' "$expanded"
 }
 
-run_args_array() {
+expand_run_args_to_array() {
   local src="$1"
-  local -n _out=$2
-  _out=()
+  RUN_ARGS_ITEMS=()
   local expanded
   expanded="$(expand_run_args "$src" "$RUN_ARGS")"
   [[ -z "$expanded" ]] && return 0
   local token
   for token in $expanded; do
-    _out+=("$token")
+    RUN_ARGS_ITEMS+=("$token")
   done
 }
 
@@ -232,10 +231,9 @@ run_pipeline() {
   local src="$1"
   local stdout="$2"
   local stderr="$3"
-  local -a args=()
-  run_args_array "$src" args
+  expand_run_args_to_array "$src"
   local ec=0
-  "$KINGLET_BIN" "$src" "${args[@]}" >"$stdout" 2>"$stderr" || ec=$?
+  "$KINGLET_BIN" "$src" "${RUN_ARGS_ITEMS[@]}" >"$stdout" 2>"$stderr" || ec=$?
   echo "$ec"
 }
 
