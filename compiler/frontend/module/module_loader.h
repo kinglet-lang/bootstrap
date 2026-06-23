@@ -68,6 +68,10 @@ private:
   std::string resolve_path(const std::string &relative_path) const;
   std::string resolve_path_from(const std::string &relative_path, const std::string &base) const;
   std::string derive_namespace(const std::string &path) const;
+  // Shared body of load() / load_from(): given an already-resolved canonical
+  // path, run the self/circular/cache guards, read+lex+parse, classify decls,
+  // and cache the result. `path` is the original import specifier (for errors).
+  LoadResult load_resolved(const std::string &resolved, const std::string &path);
 
   std::string base_dir_;
   std::optional<ProjectConfig> project_config_;

@@ -93,75 +93,7 @@ ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
     return {nullptr, "Cannot resolve import path: " + path};
   }
 
-  if (source_files_.count(resolved)) {
-    return {nullptr, "File cannot import itself: " + path};
-  }
-
-  if (loading_.count(resolved)) {
-    return {nullptr, "Circular import detected: " + path};
-  }
-
-  auto it = cache_.find(resolved);
-  if (it != cache_.end()) {
-    return {&it->second, ""};
-  }
-
-  std::ifstream file(resolved, std::ios::in | std::ios::binary);
-  if (!file) {
-    return {nullptr, "Cannot open file: " + path};
-  }
-  std::ostringstream buffer;
-  buffer << file.rdbuf();
-  std::string source = buffer.str();
-
-  loading_.insert(resolved);
-
-  Scanner scanner(std::move(source));
-  auto tokens = scanner.scan_tokens();
-  for (const auto &token : tokens) {
-    if (token.type == TokenType::ERROR) {
-      loading_.erase(resolved);
-      return {nullptr, "Lexer error in " + path + ": " + std::string(token.lexeme)};
-    }
-  }
-
-  Parser parser(tokens);
-  auto parse_result = parser.parse();
-  if (!parse_result.errors.empty()) {
-    loading_.erase(resolved);
-    return {nullptr, "Parse error in " + path + ": " + parse_result.errors[0].message};
-  }
-
-  ParsedModule mod;
-  mod.resolved_path = resolved;
-  mod.program = std::move(parse_result.program);
-  assign_namespace(mod, path);
-
-  for (const auto &decl : mod.program->declarations) {
-    if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
-      if (func->is_public) {
-        mod.public_functions.push_back(func);
-      } else {
-        mod.private_functions.push_back(func);
-      }
-    } else if (const auto *sd = dynamic_cast<const ast::StructDecl *>(decl.get())) {
-      if (sd->is_public) {
-        mod.public_structs.push_back(sd);
-      } else {
-        mod.private_structs.push_back(sd);
-      }
-    } else if (const auto *ed = dynamic_cast<const ast::EnumDecl *>(decl.get())) {
-      if (ed->is_public) {
-        mod.public_enums.push_back(ed);
-      } else {
-        mod.private_enums.push_back(ed);
-      }
-    }
-  }
-
-  loading_.erase(resolved);
-  auto [inserted, _] = cache_.emplace(resolved, std::move(mod));
-  return {&inserted->second, ""};
+  return load_resolved(resolved, path);
 }
 
 ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const std::string &importing_file_dir) {
@@ -182,6 +114,10 @@ ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const 
     return {nullptr, "Cannot resolve import path: " + path};
   }
 
+  return load_resolved(resolved, path);
+}
+
+ModuleLoader::LoadResult ModuleLoader::load_resolved(const std::string &resolved, const std::string &path) {
   if (source_files_.count(resolved)) {
     return {nullptr, "File cannot import itself: " + path};
   }
