@@ -2360,8 +2360,8 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
 
   const ParsedModule &mod = *result.module;
 
-  // Process each module once. Diamond dependencies (token/ast/bytecode reached
-  // via several import paths) would otherwise re-register functions and
+  // Process each module once. Diamond dependencies (a module reached via
+  // several import paths) would otherwise re-register functions and
   // re-compile imported bodies repeatedly — exponential on a deep DAG.
   if (!processed_modules_.insert(mod.resolved_path).second) {
     return;

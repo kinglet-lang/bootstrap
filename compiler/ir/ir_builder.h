@@ -12,8 +12,8 @@
 namespace kinglet {
 
 // Builds structured KIR from a narrow AST subset (literals and int arithmetic).
-// The full compiler still emits bytecode directly; this module is the KIR
-// reference builder for --ir and golden tests.
+// Used as a fast path for simple single-expression functions, bypassing the
+// full OpCode → KirRecorder → KirModule pipeline.
 class IrBuilder {
 public:
   std::optional<KirFunction> build_expr_function(const std::string &name,

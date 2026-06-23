@@ -10,7 +10,7 @@ bash tests/run_all.sh                 # all gating suites + probe snapshot
 bash tests/harness/run.sh <path>      # ad-hoc harness on a file or directory
 bash tests/exec/run.sh                # native compile + run (end-to-end)
 bash tests/sema/run.sh                # type checker pass + fail
-bash tests/codegen/run.sh             # bytecode shape checks
+bash tests/codegen/run.sh             # KIR shape checks (formerly bytecode)
 bash tests/ir/run.sh                  # KIR (`--ir`) dump checks
 bash tests/parser/run.sh              # AST (`--ast`) checks
 bash tests/probe/run_matrix.sh        # capability snapshot (non-gating)
@@ -27,7 +27,7 @@ tests/
   sema/
     pass/           RUN: check (must pass)
     fail/           RUN: check + COMPILE-FAIL
-  codegen/cases/    RUN: bytecode
+  codegen/cases/    RUN: ir (KIR shape checks)
   ir/cases/         RUN: ir (bootstrap KIR dump)
   parser/cases/     RUN: ast
   probe/            capability matrix (snapshot, always exits 0)
@@ -49,7 +49,6 @@ See [harness/directives.md](harness/directives.md).
 |--------|---------|
 | `run` | `kinglet file.kl [args…]` |
 | `check` | `kinglet --check file.kl` |
-| `bytecode` | `kinglet --bytecode file.kl` |
 | `ir` | `kinglet --ir file.kl` |
 | `ast` | `kinglet --ast file.kl` |
 
@@ -67,7 +66,7 @@ Environment:
 |------|-------|------------|
 | End-to-end behavior | `exec/cases/` | `RUN: run`, `.expected`, `.stderr`, `.args` |
 | Type check must pass/fail | `sema/pass/` or `sema/fail/` | `RUN: check`, `COMPILE-FAIL`, `CHECK-ERR` |
-| Bytecode shape | `codegen/cases/` | `RUN: bytecode`, `CHECK:` or `.bytecode` |
+| KIR shape | `codegen/cases/` | `RUN: ir`, `CHECK:` |
 | KIR lowering | `ir/cases/` | `RUN: ir`, `CHECK:` |
 | AST shape | `parser/cases/` | `RUN: ast`, `CHECK:` |
 | Language probe | `probe/cases/` | `// EXPECT_OUT:` header |

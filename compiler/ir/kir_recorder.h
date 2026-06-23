@@ -10,7 +10,9 @@
 
 namespace kinglet {
 
-// Records bytecode emission as structured KIR during legacy compile paths.
+// Translates OpCode emission events into structured KIR during compilation.
+// Compiler calls on_emit() / on_constant() / record_jump() as it walks the AST;
+// KirRecorder accumulates KirInstr nodes and finalises a KirFunction on end_function().
 class KirRecorder {
 public:
   void begin_function(const std::string &name, int param_count,

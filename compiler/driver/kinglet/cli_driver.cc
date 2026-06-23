@@ -185,7 +185,7 @@ void print_cli_help(std::ostream &out) {
   cmd(g_prog + " -v, --version", "Show version");
   out << "\n" << p.bold("COMPILER MODES") << " " << p.dim("(flags)") << "\n";
   cmd("--check, --tokens, --ast", "Diagnostics, tokens, AST");
-  cmd("--bytecode, --ir", "Bytecode / KIR dump");
+  cmd("--ir", "KIR dump");
   cmd("--native <out>", "Native executable (requires LLVM build)");
   out << '\n';
 }

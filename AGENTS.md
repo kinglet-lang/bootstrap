@@ -3,7 +3,7 @@
 ## Project Overview
 
 C++20 **reference compiler** (stage0) for Kinglet: lexer → parser → checker →
-compiler → KIR → VM bytecode and (optional) LLVM native. Language semantics and
+compiler → KIR → LLVM native. Language semantics and
 self-host parity are defined in [kinglet-lang/kinglet](https://github.com/kinglet-lang/kinglet).
 
 This repo is **not** the language spec repo. No editor extensions or LSP server
@@ -42,8 +42,8 @@ See [compiler/README.md](compiler/README.md) for the pipeline diagram and GN dep
 compiler/                         # the bootstrap compiler (C++20)
 ├── frontend/                     # lexer, parser, ast, types, checker, module
 ├── ir/                           # KIR (shared middle-end IR)
-├── backend/                      # compiler (AST→KIR), vm, codegen/llvm (optional)
-└── driver/                       # kinglet (main, cli_driver, vm_main), preen (formatter)
+├── backend/                      # compiler (AST→KIR), vm (types/opcodes), codegen/llvm (optional)
+└── driver/                       # kinglet (main, cli_driver), preen (formatter)
 
 runtime/                          # libkinglet_rt (user program native RT; ABI-stable, independent)
 build/                            # GN toolchains, llvm.gni, embed.gni
@@ -65,11 +65,10 @@ tests/                            # ADR 0012 layout (see tests/README.md)
 |--|----------------------|--------------|
 | Role | Ref, fast, authoritative for `kinglet build` | Shadow, `kinglet prove` |
 | Sources | C++ | Kinglet `.kl` under `core/`, `compiler/`, … |
-| Parity | — | Bytecode identity `compiler.kbc == S3` (ADR 0013) |
+| Parity | — | Native output identity (ADR 0013) |
 
 ## Large Files (split when touching)
 
 - `frontend/checker/type_checker.cc`
 - `backend/compiler/compiler.cc`
-- `backend/codegen/llvm/kir_to_llvm.cc`
 - `frontend/parser/parser.cc`

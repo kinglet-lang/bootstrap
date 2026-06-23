@@ -1,4 +1,4 @@
-> **Bootstrap (Ref)** — C++ reference compiler and VM host for Kinglet: lexer, parser, checker, bytecode VM, KIR, and optional LLVM native (`enable_llvm=true`). Language design, ADRs, self-host tests, and `kinglet build` live in [kinglet-lang/kinglet](https://github.com/kinglet-lang/kinglet); this repo is the bootstrap stage used until v0 native execution ships.
+> **Bootstrap (Ref)** — C++ reference compiler for Kinglet: lexer, parser, checker, KIR middle-end, and LLVM native backend (`enable_llvm=true`). Language design, ADRs, self-host tests, and `kinglet build` live in [kinglet-lang/kinglet](https://github.com/kinglet-lang/kinglet); this repo is the bootstrap stage used until v0 native execution ships.
 
 <p align="center">
   <picture>
@@ -8,7 +8,7 @@
   </picture>
 </p>
 
-<p align="center">A bytecode-compiled language exploring the C++ proposals that deserved a second life.</p>
+<p align="center">A natively-compiled language exploring the C++ proposals that deserved a second life.</p>
 
 <p align="center">
   <a href="https://github.com/kinglet-lang/bootstrap/releases"><img src="https://img.shields.io/github/v/tag/kinglet-lang/bootstrap?label=version&sort=semver" alt="Version"></a>
@@ -45,7 +45,7 @@ Editor extensions live in [kinglet-lang/lsp](https://github.com/kinglet-lang/lsp
 ```bash
 gn gen out/Release --args='is_debug=false'
 ninja -C out/Release
-./out/Release/kinglet [--tokens | --ast | --bytecode | --repl] <file.kl>
+./out/Release/kinglet [--tokens | --ast | --ir | --native <out>] <file.kl>
 ```
 
 ## Quick Example

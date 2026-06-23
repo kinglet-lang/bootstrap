@@ -14,17 +14,14 @@ Source is organized into four tiers: `frontend/` (parse + semantics),
   → frontend/lexer/      scan tokens
   → frontend/parser/     AST
   → frontend/checker/    types + diagnostics
-  → backend/compiler/    AST → KIR (via ir/kir_recorder) + VM bytecode (bytecode_emitter)
+  → backend/compiler/    AST → KIR (via ir/kir_recorder)
   → ir/                  KIR in memory (typing, specialize, dump)
-       ├→ backend/vm/             execute .kbc (or in-process Chunk)
        └→ backend/codegen/llvm/   link libkinglet_rt → native executable
 ```
 
 User-facing CLI: `driver/kinglet/` (`cli_driver` for init/build/run/prune/fmt;
-`main` for dev flags and REPL). Optional `kinglet-vm` runs the VM host only.
-
-Formatting: `driver/preen/` (`kinglet::preen`) — parse-then-emit formatter used by
-`kinglet fmt` (CI/batch) and intended for in-process LSP integration.
+`main` for dev flags). Formatting: `driver/preen/` (`kinglet::preen`) — parse-then-emit
+formatter used by `kinglet fmt` and intended for in-process LSP integration.
 
 ## Directories
 
@@ -38,10 +35,10 @@ Formatting: `driver/preen/` (`kinglet::preen`) — parse-then-emit formatter use
 | `frontend/module/` | frontend | `ModuleLoader` (imports), `project_config` (`kinglet.toml`) |
 | `driver/preen/` | driver | `kinglet::preen` formatter (`format_string`, extensions, `[fmt]` config) |
 | `ir/` | ir | KIR structs, record from compiler, typing/specialize passes |
-| `backend/compiler/` | backend | Main compile driver, bytecode emission, width/dense array helpers |
-| `backend/vm/` | backend | `Chunk`, opcodes, RC/COW `Value`, `Vm` interpreter |
+| `backend/compiler/` | backend | Main compile driver, dense array helpers |
+| `backend/vm/` | backend | `Chunk` (opcode/metadata types), RC/COW `Value` |
 | `backend/codegen/llvm/` | backend | `KirToLlvm` — optional (`enable_llvm=true`) |
-| `driver/kinglet/` | driver | `main.cc`, `cli_driver.cc`, `vm_main.cc` |
+| `driver/kinglet/` | driver | `main.cc`, `cli_driver.cc` |
 
 Top-level sibling: `runtime/` (`libkinglet_rt`) — linked into **user** native
 binaries, not into the compiler itself (except LLVM link step).

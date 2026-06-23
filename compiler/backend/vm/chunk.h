@@ -105,10 +105,9 @@ enum class OpCode : uint8_t {
   PopHandler,
   PropagateErr,
   IsNull,
-  // Appended after the original VM opcode order (kept in lockstep with the
-  // self-host backend/vm/chunk.h and compiler/bytecode.kl). New opcodes must be
-  // appended here, never inserted mid-enum: kbc serializes opcodes as raw enum
-  // ordinals, so a mid-enum insert renumbers every later opcode.
+  // New opcodes must be appended here, never inserted mid-enum: KirRecorder's
+  // on_emit() switch maps OpCode ordinals to KirOpcode, so a mid-enum insert
+  // would silently mismap every opcode that follows.
   StringToInt,
   StringToFloat,
   StringCode,
