@@ -38,8 +38,10 @@ CompileResult Compiler::compile(const ast::Program &program) {
   // Pipe-desugaring is the caller's responsibility (run once after parse,
   // before compile) so that compile() can take a const Program without casting.
 
-  chunk_ = Chunk();
-  emitter_.reset(&chunk_);
+  function_infos_.clear();
+  struct_metas_.clear();
+  enum_metas_.clear();
+  constant_pool_.clear();
   kir_module_ = KirModule();
   locals_.clear();
   errors_.clear();
@@ -64,7 +66,8 @@ CompileResult Compiler::compile(const ast::Program &program) {
     meta.name = "CastError";
     meta.variants = {"Empty", "NotANumber", "Overflow"};
     meta.variant_param_counts = {0, 1, 1};
-    int idx = chunk_.add_enum_meta(std::move(meta));
+    int idx = static_cast<int>(enum_metas_.size());
+    enum_metas_.push_back(std::move(meta));
     enum_indices_["CastError"] = idx;
   }
 
@@ -111,7 +114,8 @@ CompileResult Compiler::compile(const ast::Program &program) {
       for (const auto &field : struct_decl->fields) {
         meta.field_names.push_back(field.name);
       }
-      int idx = chunk_.add_struct_meta(std::move(meta));
+      int idx = static_cast<int>(struct_metas_.size());
+      struct_metas_.push_back(std::move(meta));
       struct_indices_[struct_decl->name] = idx;
     }
     if (const auto *enum_decl = dynamic_cast<const ast::EnumDecl *>(declaration.get())) {
@@ -121,7 +125,8 @@ CompileResult Compiler::compile(const ast::Program &program) {
         meta.variants.push_back(v.name);
         meta.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
       }
-      int idx = chunk_.add_enum_meta(std::move(meta));
+      int idx = static_cast<int>(enum_metas_.size());
+      enum_metas_.push_back(std::move(meta));
       enum_indices_[enum_decl->name] = idx;
     }
   }
@@ -151,20 +156,20 @@ CompileResult Compiler::compile(const ast::Program &program) {
         concept_generic_func_decls_[function->name] = function;
         continue;
       }
-      int idx = chunk_.add_function(FunctionInfo{
+      int idx = static_cast<int>(function_infos_.size());
+      function_infos_.push_back(FunctionInfo{
           .name = function->name,
           .entry = 0,
           .param_count = static_cast<int>(function->params.size()),
       });
       record_function_source(idx, entry_source_path_);
-      uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-      function_indices_[function->name] = static_cast<int>(const_idx);
+      function_indices_[function->name] = idx;
       method_return_types_[function->name] = function->return_type.name;
       if (!function->params.empty()) {
         const std::string &receiver = function->params[0].type.name;
         func_first_param_[function->name] = receiver;
         if (struct_indices_.count(receiver)) {
-          function_indices_[receiver + "::" + function->name] = static_cast<int>(const_idx);
+          function_indices_[receiver + "::" + function->name] = idx;
         }
       }
       functions.push_back(function);
@@ -176,8 +181,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
 
   if (main_index < 0) {
     error_at(program.location, "Expected a main function.");
-    return CompileResult{.chunk = std::move(chunk_),
-                         .kir = std::move(kir_module_),
+    return CompileResult{.kir = std::move(kir_module_),
                          .errors = std::move(errors_),
                          .warnings = std::move(warnings_)};
   }
@@ -222,15 +226,16 @@ CompileResult Compiler::compile(const ast::Program &program) {
   }
 
   attach_kir_metadata();
-  return CompileResult{.chunk = std::move(chunk_),
-                       .kir = std::move(kir_module_),
+  return CompileResult{.kir = std::move(kir_module_),
                        .errors = std::move(errors_),
                        .warnings = std::move(warnings_)};
 }
 
 CompileResult Compiler::compile_module(const ast::Program &program) {
-  chunk_ = Chunk();
-  emitter_.reset(&chunk_);
+  function_infos_.clear();
+  struct_metas_.clear();
+  enum_metas_.clear();
+  constant_pool_.clear();
   kir_module_ = KirModule();
   locals_.clear();
   errors_.clear();
@@ -248,7 +253,8 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
     meta.name = "CastError";
     meta.variants = {"Empty", "NotANumber", "Overflow"};
     meta.variant_param_counts = {0, 1, 1};
-    int idx = chunk_.add_enum_meta(std::move(meta));
+    int idx = static_cast<int>(enum_metas_.size());
+    enum_metas_.push_back(std::move(meta));
     enum_indices_["CastError"] = idx;
   }
 
@@ -279,7 +285,8 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
       for (const auto &field : struct_decl->fields) {
         meta.field_names.push_back(field.name);
       }
-      int idx = chunk_.add_struct_meta(std::move(meta));
+      int idx = static_cast<int>(struct_metas_.size());
+      struct_metas_.push_back(std::move(meta));
       struct_indices_[struct_decl->name] = idx;
     }
     if (const auto *enum_decl = dynamic_cast<const ast::EnumDecl *>(declaration.get())) {
@@ -289,7 +296,8 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
         meta.variants.push_back(v.name);
         meta.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
       }
-      int idx = chunk_.add_enum_meta(std::move(meta));
+      int idx = static_cast<int>(enum_metas_.size());
+      enum_metas_.push_back(std::move(meta));
       enum_indices_[enum_decl->name] = idx;
     }
   }
@@ -312,14 +320,14 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
         concept_generic_func_decls_[function->name] = function;
         continue;
       }
-      int idx = chunk_.add_function(FunctionInfo{
+      int idx = static_cast<int>(function_infos_.size());
+      function_infos_.push_back(FunctionInfo{
           .name = function->name,
           .entry = 0,
           .param_count = static_cast<int>(function->params.size()),
       });
       record_function_source(idx, entry_source_path_);
-      uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-      function_indices_[function->name] = static_cast<int>(const_idx);
+      function_indices_[function->name] = idx;
       functions.push_back(function);
     }
   }
@@ -330,8 +338,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   }
 
   attach_kir_metadata();
-  return CompileResult{.chunk = std::move(chunk_),
-                       .kir = std::move(kir_module_),
+  return CompileResult{.kir = std::move(kir_module_),
                        .errors = std::move(errors_),
                        .warnings = std::move(warnings_)};
 }
@@ -349,7 +356,7 @@ void Compiler::record_function_source(int function_idx, const std::string &sourc
 
 void Compiler::attach_kir_metadata() {
   kir_module_.struct_metas.clear();
-  for (const StructMeta &meta : chunk_.struct_metas()) {
+  for (const StructMeta &meta : struct_metas_) {
     KirStructMeta km;
     km.name = meta.name;
     km.field_names = meta.field_names;
@@ -359,8 +366,8 @@ void Compiler::attach_kir_metadata() {
   kir_module_.function_names.clear();
   kir_module_.function_symbols.clear();
   kir_module_.function_param_counts.clear();
-  for (std::size_t i = 0; i < chunk_.functions().size(); ++i) {
-    const FunctionInfo &fn = chunk_.functions()[i];
+  for (std::size_t i = 0; i < function_infos_.size(); ++i) {
+    const FunctionInfo &fn = function_infos_[i];
     kir_module_.function_names.push_back(fn.name);
     kir_module_.function_param_counts.push_back(static_cast<int32_t>(fn.param_count));
     std::string src;
@@ -369,7 +376,7 @@ void Compiler::attach_kir_metadata() {
     }
     kir_module_.function_symbols.push_back(mangled_native_symbol(fn.name, src));
   }
-  for (const EnumMeta &meta : chunk_.enum_metas()) {
+  for (const EnumMeta &meta : enum_metas_) {
     KirEnumMeta km;
     km.name = meta.name;
     km.variants = meta.variants;
@@ -379,7 +386,7 @@ void Compiler::attach_kir_metadata() {
     }
     kir_module_.enum_metas.push_back(std::move(km));
   }
-  const std::vector<Value> &constants = chunk_.constants();
+  const std::vector<Value> &constants = constant_pool_;
   kir_module_.constant_strings.resize(constants.size());
   for (std::size_t i = 0; i < constants.size(); ++i) {
     if (constants[i].type == ValueType::String) {
@@ -412,7 +419,7 @@ std::string Compiler::infer_struct_type(const ast::Expr &expr) const {
     if (parent_type.empty()) return "";
     auto si = struct_indices_.find(parent_type);
     if (si == struct_indices_.end()) return "";
-    const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(si->second)];
+    const auto &meta = struct_metas_[static_cast<std::size_t>(si->second)];
     for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
       if (meta.field_names[i] == field->field_name) {
         return "";
@@ -488,14 +495,6 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     compiling_namespace_.clear();
   }
 
-  // Look up this function's index and patch its entry point
-  const std::string &name = lookup_name.empty() ? function.name : lookup_name;
-  auto it = function_indices_.find(name);
-  int const_idx = it->second;
-  int func_idx = chunk_.constants()[static_cast<std::size_t>(const_idx)].function_idx;
-  const_cast<FunctionInfo &>(chunk_.functions()[static_cast<std::size_t>(func_idx)]).entry =
-      chunk_.instructions().size();
-
   // Parameters become locals at slots 0..N-1
   for (const auto &param : function.params) {
     Local local{.name = param.name, .is_mutable = true};
@@ -514,6 +513,10 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
       local_types_[param.name] = param.type.name;
     }
   }
+
+  const std::string &name = lookup_name.empty() ? function.name : lookup_name;
+  auto fn_it = function_indices_.find(name);
+  const int func_idx = (fn_it != function_indices_.end()) ? fn_it->second : -1;
 
   std::string fn_source = entry_source_path_;
   if (!lookup_name.empty()) {
@@ -541,7 +544,6 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
       kir->source_path = fn_source;
       kir->param_count = static_cast<int>(function.params.size());
       kir_module_.functions.push_back(*kir);
-      emitter_.lower(*kir);
       implicit_return_stmt_ = nullptr;
       compiling_namespace_ = prev_compiling_ns;
       return;
@@ -559,7 +561,6 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
   }
 
   kir_recorder_.begin_function(name, static_cast<int>(function.params.size()), fn_source);
-  kir_instr_at_bc_.clear();
   bool body_returned = false;
   if (body && !body->statements.empty()) {
     body_returned =
@@ -700,7 +701,7 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
   if (const auto *while_stmt = dynamic_cast<const ast::WhileStmt *>(&stmt)) {
     loop_stack_.emplace_back();
 
-    const std::size_t loop_start = chunk_.instructions().size();
+    const std::size_t loop_start = kir_recorder_.instr_count();
     compile_expr(*while_stmt->condition);
     loop_stack_.back().break_jumps.push_back(emit_jump(OpCode::JmpFalse, while_stmt->location));
     compile_stmt(*while_stmt->body);
@@ -725,14 +726,14 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       compile_stmt(*for_stmt->init);
     }
 
-    const std::size_t loop_start = chunk_.instructions().size();
+    const std::size_t loop_start = kir_recorder_.instr_count();
     if (for_stmt->condition) {
       compile_expr(*for_stmt->condition);
       loop_stack_.back().break_jumps.push_back(emit_jump(OpCode::JmpFalse, for_stmt->location));
     }
     compile_stmt(*for_stmt->body);
 
-    const std::size_t step_start = chunk_.instructions().size();
+    const std::size_t step_start = kir_recorder_.instr_count();
     for (std::size_t jump : loop_stack_.back().continue_jumps) {
       patch_jump_to(jump, step_start);
     }
@@ -787,31 +788,24 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     // error value into the binding slot and runs the catch body.
 
     // Placeholder PushHandler — patch operand after we know catch_pc.
-    const std::size_t handler_idx = chunk_.instructions().size();
+    const std::size_t handler_idx = kir_recorder_.instr_count();
     emit_operand(OpCode::PushHandler, 0, stmt.location);
 
     // Compile try body — `?` inside will generate JmpIfErr whose target
     // is the catch stub (see PropagateExpr).
     const bool prev_in_try = in_try_;
-    const std::size_t prev_catch_pc = try_catch_pc_;
     in_try_ = true;
-    // try_catch_pc_ will be set below once we know catch_pc.
     compile_stmt(*try_catch->body);
     in_try_ = prev_in_try;
-    try_catch_pc_ = prev_catch_pc;
 
     emit(OpCode::PopHandler, stmt.location);
     const std::size_t end_jump = emit_jump(OpCode::Jmp, stmt.location);
 
     // --- catch landing pad ---
-    const std::size_t catch_pc = chunk_.instructions().size();
+    const std::size_t catch_pc = kir_recorder_.instr_count();
     // Patch the PushHandler operand to be the relative offset.
     const int32_t handler_offset = static_cast<int32_t>(catch_pc - (handler_idx + 1));
-    chunk_.patch_operand(handler_idx, handler_offset);
-    const auto handler_kir = kir_instr_at_bc_.find(handler_idx);
-    if (handler_kir != kir_instr_at_bc_.end()) {
-      kir_recorder_.patch_operand(handler_kir->second, handler_offset);
-    }
+    kir_recorder_.patch_operand(handler_idx, handler_offset);
 
     // The error value is on the stack (left by `?` stub: Pop + Null + Return
     // in function-level mode; inside try the `?` stub will instead Jmp here
@@ -1183,7 +1177,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     auto enum_it = enum_indices_.find(ns_callee->namespace_name);
     if (enum_it != enum_indices_.end()) {
       int type_idx = enum_it->second;
-      const auto &meta = chunk_.enum_metas()[static_cast<std::size_t>(type_idx)];
+      const auto &meta = enum_metas_[static_cast<std::size_t>(type_idx)];
       int variant_idx = -1;
       for (int i = 0; i < static_cast<int>(meta.variants.size()); ++i) {
         if (meta.variants[static_cast<std::size_t>(i)] == ns_callee->member_name) {
@@ -1212,9 +1206,9 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       return;
     }
     const std::string arg_ty = infer_arg_type_name(*call_expr.args[0]);
-    const int const_idx =
+    const int func_idx =
         resolve_free_function_for_type(ns_callee->member_name, arg_ty);
-    if (const_idx < 0) {
+    if (func_idx < 0) {
       error_at(call_expr.location, "No implementation of '" + ns_callee->namespace_name + "::" +
                                       ns_callee->member_name + "' for type '" + arg_ty + "'.");
       return;
@@ -1222,9 +1216,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     for (const ast::ExprPtr &arg : call_expr.args) {
       compile_expr(*arg);
     }
-    emit_constant(Value::function_value(
-                      chunk_.constants()[static_cast<std::size_t>(const_idx)].function_idx),
-                  call_expr.location);
+    emit_constant(Value::function_value(func_idx), call_expr.location);
     emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
     return;
   }
@@ -1417,7 +1409,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+            func_it->second),
             call_expr.location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
                      call_expr.location);
@@ -1433,7 +1425,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(free_idx)].function_idx),
+            free_idx),
             call_expr.location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
                      call_expr.location);
@@ -1478,14 +1470,14 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       }
       auto func_it = function_indices_.find(mangled);
       if (func_it == function_indices_.end()) {
-        int idx = chunk_.add_function(FunctionInfo{
+        int idx = static_cast<int>(function_infos_.size());
+        function_infos_.push_back(FunctionInfo{
             .name = mangled,
             .entry = 0,
             .param_count = static_cast<int>(decl->params.size()),
         });
         record_function_source(idx, entry_source_path_);
-        uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-        function_indices_[mangled] = static_cast<int>(const_idx);
+        function_indices_[mangled] = idx;
         pending_generic_funcs_.push_back({mangled, decl});
       }
       func_it = function_indices_.find(mangled);
@@ -1494,7 +1486,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+            func_it->second),
             call_expr.location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
         return;
@@ -1520,14 +1512,14 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       const std::string mangled = callee_id->name + "__" + concrete_ty;
       auto func_it = function_indices_.find(mangled);
       if (func_it == function_indices_.end()) {
-        int idx = chunk_.add_function(FunctionInfo{
+        int idx = static_cast<int>(function_infos_.size());
+        function_infos_.push_back(FunctionInfo{
             .name = mangled,
             .entry = 0,
             .param_count = static_cast<int>(decl->params.size()),
         });
         record_function_source(idx, entry_source_path_);
-        uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-        function_indices_[mangled] = static_cast<int>(const_idx);
+        function_indices_[mangled] = idx;
         pending_generic_funcs_.push_back({mangled, decl});
       }
       func_it = function_indices_.find(mangled);
@@ -1536,7 +1528,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+            func_it->second),
             call_expr.location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
         return;
@@ -1571,7 +1563,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         compile_expr(*arg);
       }
       emit_constant(Value::function_value(
-          chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+          func_it->second),
           call_expr.location);
       emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
       return;
@@ -1676,7 +1668,7 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
         return;
       }
       int type_idx = enum_it->second;
-      const auto &meta = chunk_.enum_metas()[static_cast<std::size_t>(type_idx)];
+      const auto &meta = enum_metas_[static_cast<std::size_t>(type_idx)];
       int variant_idx = -1;
       for (int i = 0; i < static_cast<int>(meta.variants.size()); ++i) {
         if (meta.variants[static_cast<std::size_t>(i)] == enum_pat->variant_name) {
@@ -1740,7 +1732,7 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
         error_at(struct_pat->location, "Unknown struct type '" + struct_pat->struct_name + "'.");
         return;
       }
-      const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(struct_it->second)];
+      const auto &meta = struct_metas_[static_cast<std::size_t>(struct_it->second)];
       std::vector<std::size_t> fail_jumps;
       std::vector<uint32_t> bind_slots;
       for (std::size_t i = 0; i < struct_pat->fields.size(); ++i) {
@@ -1760,7 +1752,7 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
           const uint32_t slot = static_cast<uint32_t>(locals_.size());
           locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
           emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
-          uint32_t field_const = chunk_.add_constant(Value::string_value(field_name));
+          uint32_t field_const = add_constant_(Value::string_value(field_name));
           emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
           emit_operand(OpCode::StoreLocal, slot, struct_pat->location);
           emit(OpCode::Pop, struct_pat->location);
@@ -1769,7 +1761,7 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
           continue;
         } else {
           emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
-          uint32_t field_const = chunk_.add_constant(Value::string_value(field_name));
+          uint32_t field_const = add_constant_(Value::string_value(field_name));
           emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
           compile_expr(*pf.pattern);
           emit(OpCode::Eq, struct_pat->location);
@@ -1829,7 +1821,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
   auto enum_it = enum_indices_.find(ns_access.namespace_name);
   if (enum_it != enum_indices_.end()) {
     int type_idx = enum_it->second;
-    const auto &meta = chunk_.enum_metas()[static_cast<std::size_t>(type_idx)];
+    const auto &meta = enum_metas_[static_cast<std::size_t>(type_idx)];
     int variant_idx = -1;
     for (int i = 0; i < static_cast<int>(meta.variants.size()); ++i) {
       if (meta.variants[static_cast<std::size_t>(i)] == ns_access.member_name) {
@@ -1907,7 +1899,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
       auto it = function_indices_.find(qualified);
       if (it != function_indices_.end()) {
         emit_constant(Value::function_value(
-                          chunk_.constants()[static_cast<std::size_t>(it->second)].function_idx),
+                          it->second),
                       ns_access.location);
         return;
       }
@@ -1968,7 +1960,7 @@ void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) 
     return;
   }
   int type_idx = struct_idx;
-  const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(type_idx)];
+  const auto &meta = struct_metas_[static_cast<std::size_t>(type_idx)];
   for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
     if (i < struct_lit.fields.size()) {
       compile_expr(*struct_lit.fields[i].value);
@@ -2001,7 +1993,7 @@ void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
     return;
   }
   compile_expr(*field_access.object);
-  uint32_t field_const = chunk_.add_constant(Value::string_value(field_access.field_name));
+  uint32_t field_const = add_constant_(Value::string_value(field_access.field_name));
   emit_operand(OpCode::FieldGet, field_const, field_access.location);
   return;
 
@@ -2011,7 +2003,7 @@ void Compiler::compile_field_assign(const ast::FieldAssignExpr &field_assign) {
 
   compile_expr(*field_assign.object);
   compile_expr(*field_assign.value);
-  uint32_t field_const = chunk_.add_constant(Value::string_value(field_assign.field_name));
+  uint32_t field_const = add_constant_(Value::string_value(field_assign.field_name));
   emit_operand(OpCode::FieldSet, field_const, field_assign.location);
   return;
 
@@ -2206,75 +2198,39 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
 }
 
 void Compiler::emit(OpCode op, ast::SourceLocation location) {
-  kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
   kir_recorder_.on_emit(op, 0, location);
-  emitter_.emit(op, location);
 }
 
 void Compiler::emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location) {
-  kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
   kir_recorder_.on_emit(op, operand, location);
-  emitter_.emit_operand(op, operand, location);
 }
 
 void Compiler::emit_constant(Value value, ast::SourceLocation location, KirType numeric_type) {
-  kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
-  const uint32_t pool_index = chunk_.add_constant(value);
-  emitter_.emit_operand(OpCode::Constant, pool_index, location);
+  const uint32_t pool_index = add_constant_(value);
   kir_recorder_.on_constant(value, pool_index, location, numeric_type);
 }
 
 std::size_t Compiler::emit_jump(OpCode op, ast::SourceLocation location) {
-  kir_instr_at_bc_[chunk_.instructions().size()] = kir_recorder_.instr_count();
-  kir_recorder_.record_jump(op, location);
-  return emitter_.emit_jump(op, location);
+  return kir_recorder_.record_jump(op, location);
 }
 
-void Compiler::patch_jump(std::size_t offset) {
-  emitter_.patch_jump(offset);
-  if (offset >= chunk_.instructions().size()) {
-    return;
-  }
-  const auto jump_it = kir_instr_at_bc_.find(offset);
-  if (jump_it == kir_instr_at_bc_.end()) {
-    return;
-  }
-  const int32_t rel = chunk_.instructions()[offset].operand;
-  const std::size_t bc_target = offset + 1 + static_cast<std::size_t>(rel);
-  std::size_t kir_target = 0;
-  if (bc_target == chunk_.instructions().size()) {
-    kir_target = kir_recorder_.instr_count();
-  } else {
-    const auto target_it = kir_instr_at_bc_.find(bc_target);
-    if (target_it == kir_instr_at_bc_.end()) {
-      return;
-    }
-    kir_target = target_it->second;
-  }
+void Compiler::patch_jump(std::size_t kir_jump_idx) {
+  const std::size_t kir_target = kir_recorder_.instr_count();
   const int32_t kir_rel =
-      static_cast<int32_t>(kir_target) - static_cast<int32_t>(jump_it->second) - 1;
-  kir_recorder_.patch_jump(jump_it->second, kir_rel);
+      static_cast<int32_t>(kir_target) - static_cast<int32_t>(kir_jump_idx) - 1;
+  kir_recorder_.patch_jump(kir_jump_idx, kir_rel);
 }
 
-void Compiler::patch_jump_to(std::size_t offset, std::size_t target) {
-  emitter_.patch_jump_to(offset, target);
-  const auto jump_it = kir_instr_at_bc_.find(offset);
-  if (jump_it == kir_instr_at_bc_.end()) {
-    return;
-  }
-  std::size_t kir_target = 0;
-  if (target == chunk_.instructions().size()) {
-    kir_target = kir_recorder_.instr_count();
-  } else {
-    const auto target_it = kir_instr_at_bc_.find(target);
-    if (target_it == kir_instr_at_bc_.end()) {
-      return;
-    }
-    kir_target = target_it->second;
-  }
+void Compiler::patch_jump_to(std::size_t kir_jump_idx, std::size_t kir_target) {
   const int32_t kir_rel =
-      static_cast<int32_t>(kir_target) - static_cast<int32_t>(jump_it->second) - 1;
-  kir_recorder_.patch_jump(jump_it->second, kir_rel);
+      static_cast<int32_t>(kir_target) - static_cast<int32_t>(kir_jump_idx) - 1;
+  kir_recorder_.patch_jump(kir_jump_idx, kir_rel);
+}
+
+uint32_t Compiler::add_constant_(Value value) {
+  uint32_t idx = static_cast<uint32_t>(constant_pool_.size());
+  constant_pool_.push_back(std::move(value));
+  return idx;
 }
 
 int Compiler::resolve_local(const std::string &name) const {
@@ -2318,7 +2274,7 @@ void Compiler::compile_lvalue_addr(const ast::Expr &expr) {
   if (const auto *field_access = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
     compile_expr(*field_access->object);
     uint32_t field_const =
-        chunk_.add_constant(Value::string_value(field_access->field_name));
+        add_constant_(Value::string_value(field_access->field_name));
     emit_operand(OpCode::BorrowFieldMut, field_const, field_access->location);
     return;
   }
@@ -2359,7 +2315,8 @@ int Compiler::resolve_struct(const ast::TypeExpr &type) {
   for (const auto &field : decl->fields) {
     meta.field_names.push_back(field.name);
   }
-  int idx = chunk_.add_struct_meta(std::move(meta));
+  int idx = static_cast<int>(struct_metas_.size());
+  struct_metas_.push_back(std::move(meta));
   struct_indices_[mangled] = idx;
   return idx;
 }
@@ -2449,19 +2406,19 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
       if (!found) continue;
     }
 
-    int idx = chunk_.add_function(FunctionInfo{
+    int idx = static_cast<int>(function_infos_.size());
+    function_infos_.push_back(FunctionInfo{
         .name = func->name,
         .entry = 0,
         .param_count = static_cast<int>(func->params.size()),
     });
     record_function_source(idx, mod.resolved_path);
-    uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
 
     std::string qualified = ns + "::" + func->name;
-    function_indices_[qualified] = static_cast<int>(const_idx);
+    function_indices_[qualified] = idx;
 
     if (!import_decl.selected_symbols.empty()) {
-      function_indices_[func->name] = static_cast<int>(const_idx);
+      function_indices_[func->name] = idx;
     }
 
     imported_function_decls_[ns].push_back(func);
@@ -2470,14 +2427,14 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
   // Also register private functions so pub functions can call them.
   for (const auto *func : mod.private_functions) {
     if (function_indices_.count(ns + "::" + func->name)) continue;
-    int idx = chunk_.add_function(FunctionInfo{
+    int idx = static_cast<int>(function_infos_.size());
+    function_infos_.push_back(FunctionInfo{
         .name = func->name,
         .entry = 0,
         .param_count = static_cast<int>(func->params.size()),
     });
     record_function_source(idx, mod.resolved_path);
-    uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-    function_indices_[ns + "::" + func->name] = static_cast<int>(const_idx);
+    function_indices_[ns + "::" + func->name] = idx;
     imported_function_decls_[ns].push_back(func);
   }
 
@@ -2496,7 +2453,8 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
       for (const auto &field : sd->fields) {
         meta.field_names.push_back(field.name);
       }
-      int idx = chunk_.add_struct_meta(std::move(meta));
+      int idx = static_cast<int>(struct_metas_.size());
+      struct_metas_.push_back(std::move(meta));
       struct_indices_[sd->name] = idx;
     }
   }
@@ -2516,7 +2474,8 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
       meta.variants.push_back(v.name);
       meta.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
     }
-    int idx = chunk_.add_enum_meta(std::move(meta));
+    int idx = static_cast<int>(enum_metas_.size());
+    enum_metas_.push_back(std::move(meta));
     enum_indices_[ed->name] = idx;
   }
 
@@ -2527,7 +2486,8 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
       StructMeta meta;
       meta.name = sd->name;
       for (const auto &field : sd->fields) meta.field_names.push_back(field.name);
-      int idx = chunk_.add_struct_meta(std::move(meta));
+      int idx = static_cast<int>(struct_metas_.size());
+      struct_metas_.push_back(std::move(meta));
       struct_indices_[sd->name] = idx;
     }
   }
@@ -2539,7 +2499,8 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
       meta.variants.push_back(v.name);
       meta.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
     }
-    int idx = chunk_.add_enum_meta(std::move(meta));
+    int idx = static_cast<int>(enum_metas_.size());
+    enum_metas_.push_back(std::move(meta));
     enum_indices_[ed->name] = idx;
   }
 
@@ -2597,27 +2558,27 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
   namespace_source_paths_[ns] = mod.resolved_path;
 
   for (const auto *func : mod.public_functions) {
-    int idx = chunk_.add_function(FunctionInfo{
+    int idx = static_cast<int>(function_infos_.size());
+    function_infos_.push_back(FunctionInfo{
         .name = func->name,
         .entry = 0,
         .param_count = static_cast<int>(func->params.size()),
     });
     record_function_source(idx, mod.resolved_path);
-    uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-    function_indices_[qual + "::" + func->name] = static_cast<int>(const_idx);
+    function_indices_[qual + "::" + func->name] = idx;
     imported_function_decls_[ns].push_back(func);
   }
 
   for (const auto *func : mod.private_functions) {
     if (function_indices_.count(qual + "::" + func->name)) continue;
-    int idx = chunk_.add_function(FunctionInfo{
+    int idx = static_cast<int>(function_infos_.size());
+    function_infos_.push_back(FunctionInfo{
         .name = func->name,
         .entry = 0,
         .param_count = static_cast<int>(func->params.size()),
     });
     record_function_source(idx, mod.resolved_path);
-    uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-    function_indices_[qual + "::" + func->name] = static_cast<int>(const_idx);
+    function_indices_[qual + "::" + func->name] = idx;
     imported_function_decls_[ns].push_back(func);
   }
 
@@ -2626,7 +2587,8 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
       StructMeta meta;
       meta.name = sd->name;
       for (const auto &field : sd->fields) meta.field_names.push_back(field.name);
-      int idx = chunk_.add_struct_meta(std::move(meta));
+      int idx = static_cast<int>(struct_metas_.size());
+      struct_metas_.push_back(std::move(meta));
       struct_indices_[sd->name] = idx;
     }
   }
@@ -2638,7 +2600,8 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
       meta.variants.push_back(v.name);
       meta.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
     }
-    int idx = chunk_.add_enum_meta(std::move(meta));
+    int idx = static_cast<int>(enum_metas_.size());
+    enum_metas_.push_back(std::move(meta));
     enum_indices_[ed->name] = idx;
   }
 
@@ -2648,7 +2611,8 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
       StructMeta meta;
       meta.name = sd->name;
       for (const auto &field : sd->fields) meta.field_names.push_back(field.name);
-      int idx = chunk_.add_struct_meta(std::move(meta));
+      int idx = static_cast<int>(struct_metas_.size());
+      struct_metas_.push_back(std::move(meta));
       struct_indices_[sd->name] = idx;
     }
   }
@@ -2660,7 +2624,8 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
       meta.variants.push_back(v.name);
       meta.variant_param_counts.push_back(static_cast<int>(v.param_types.size()));
     }
-    int idx = chunk_.add_enum_meta(std::move(meta));
+    int idx = static_cast<int>(enum_metas_.size());
+    enum_metas_.push_back(std::move(meta));
     enum_indices_[ed->name] = idx;
   }
 }

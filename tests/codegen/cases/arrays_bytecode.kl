@@ -1,7 +1,7 @@
-// RUN: bytecode
-// CHECK: ArrayNew
-// CHECK: IndexGet
-// CHECK: IndexSet
+// RUN: ir
+// CHECK: array_new
+// CHECK: index_get
+// CHECK: index_set
 
 int main() {
   int[] xs = [1, 2, 3];

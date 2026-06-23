@@ -164,12 +164,6 @@ public:
   void disassemble(std::ostream &out) const;
   void patch_operand(std::size_t index, int32_t operand);
 
-  // Bytecode serialization (.kbc format)
-  // When strip_debug is true, line/column info is omitted from the output,
-  // producing smaller .kbc files suitable for deployment.
-  bool serialize(const std::string &path, bool strip_debug = false) const;
-  static Chunk deserialize(const std::string &path, std::string *error);
-
 private:
   std::vector<Value> constants_;
   std::vector<Instruction> instructions_;

@@ -4,7 +4,6 @@
 #pragma once
 
 #include "frontend/ast/ast.h"
-#include "backend/compiler/bytecode_emitter.h"
 #include "ir/kir.h"
 #include "ir/kir_recorder.h"
 #include "frontend/module/module_loader.h"
@@ -29,7 +28,6 @@ struct CompileWarning {
 };
 
 struct CompileResult {
-  Chunk chunk;
   KirModule kir;
   std::vector<CompileError> errors;
   std::vector<CompileWarning> warnings;
@@ -153,9 +151,12 @@ private:
   void record_function_source(int function_idx, const std::string &source_path);
   std::string resolve_module_qualified(const std::string &ns, const std::string &member) const;
   void open_imported_namespace(const std::string &module_id);
+  uint32_t add_constant_(Value value);
 
-  Chunk chunk_;
-  BytecodeEmitter emitter_;
+  std::vector<FunctionInfo> function_infos_;
+  std::vector<StructMeta> struct_metas_;
+  std::vector<EnumMeta> enum_metas_;
+  std::vector<Value> constant_pool_;
   KirModule kir_module_;
   KirRecorder kir_recorder_;
   std::vector<Local> locals_;
@@ -193,8 +194,6 @@ private:
   std::unordered_map<std::string, std::string> func_first_param_;
   std::unordered_map<std::string, const ast::Expr *> global_const_inits_;
   bool in_try_ = false;
-  std::size_t try_catch_pc_ = 0; // catch landing pad PC for current try block
-  std::unordered_map<std::size_t, std::size_t> kir_instr_at_bc_;
 };
 
 } // namespace kinglet

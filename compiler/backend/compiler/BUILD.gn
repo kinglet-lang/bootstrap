@@ -1,7 +1,5 @@
 static_library("compiler") {
   sources = [
-    "bytecode_emitter.cc",
-    "bytecode_emitter.h",
     "compiler.cc",
     "compiler.h",
     "dense_array_lit.cc",

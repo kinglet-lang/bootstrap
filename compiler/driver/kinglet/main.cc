@@ -102,7 +102,6 @@ enum class Mode {
   Tokens,
   Ast,
   Check,
-  Bytecode,
   Ir,
   Native,
 };
@@ -204,7 +203,7 @@ std::string compiler_identity(const char *argv0) {
 #endif
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache <dir>] | --backend native -o <out> | --bytecode] [file.kl] [args...]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache <dir>] | --backend native -o <out>] [file.kl] [args...]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles to a native executable and runs main() (requires LLVM build).\n"
@@ -323,10 +322,6 @@ int main(int argc, char **argv) {
       mode = Mode::Ast;
       continue;
     }
-    if (arg == "--bytecode") {
-      mode = Mode::Bytecode;
-      continue;
-    }
     if (arg == "--ir") {
       mode = Mode::Ir;
       continue;
@@ -387,8 +382,8 @@ int main(int argc, char **argv) {
       }
       continue;
     }
-    if (arg == "--run" || arg == "--save-bytecode" || arg == "--repl") {
-      std::cerr << "kinglet: " << arg << " removed (VM backend deleted; use native build)\n";
+    if (arg == "--run" || arg == "--save-bytecode" || arg == "--repl" || arg == "--bytecode") {
+      std::cerr << "kinglet: " << arg << " removed (VM backend deleted; use --ir or native build)\n";
       return 64;
     }
     input_path = std::string(arg);
@@ -511,11 +506,6 @@ int main(int argc, char **argv) {
   }
 
   kinglet::prepare_kir(compile_result.kir, checker);
-
-  if (mode == Mode::Bytecode) {
-    compile_result.chunk.disassemble(std::cout);
-    return 0;
-  }
 
   if (mode == Mode::Ir) {
     std::cout << dump_kir_module(compile_result.kir);
