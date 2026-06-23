@@ -60,7 +60,7 @@ struct KirFunctionSig {
   KirContainerType return_container;
 };
 
-enum class KirOpcode {
+enum class KirOpcode : std::uint8_t {
   ConstInt,
   ConstI32,
   ConstI64,
