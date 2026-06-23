@@ -35,7 +35,7 @@ struct CompileResult {
   std::vector<CompileWarning> warnings;
 };
 
-class Compiler {
+class Compiler : public ast::ExprVisitor {
 public:
   CompileResult compile(const ast::Program &program);
   CompileResult compile_module(const ast::Program &program);
@@ -61,6 +61,64 @@ private:
   void compile_stmt(const ast::Stmt &stmt);
   void compile_expr(const ast::Expr &expr);
   void compile_assignment(const ast::AssignExpr &assign);
+
+  // Per-node compile helpers, extracted from the former monolithic compile_expr.
+  void compile_int_literal(const ast::IntLiteralExpr &lit);
+  void compile_char_literal(const ast::CharLiteralExpr &lit);
+  void compile_float_literal(const ast::FloatLiteralExpr &lit);
+  void compile_string_literal(const ast::StringLiteralExpr &lit);
+  void compile_bool_literal(const ast::BoolLiteralExpr &lit);
+  void compile_null_literal(const ast::NullLiteralExpr &lit);
+  void compile_unary(const ast::UnaryExpr &unary);
+  void compile_identifier(const ast::IdentifierExpr &id);
+  void compile_assign_expr(const ast::AssignExpr &assign);
+  void compile_binary(const ast::BinaryExpr &binary);
+  void compile_call(const ast::CallExpr &call);
+  void compile_match(const ast::MatchExpr &match);
+  void compile_namespace_access(const ast::NamespaceAccessExpr &ns);
+  void compile_struct_literal(const ast::StructLiteralExpr &lit);
+  void compile_field_access(const ast::FieldAccessExpr &fa);
+  void compile_field_assign(const ast::FieldAssignExpr &fa);
+  void compile_array_literal(const ast::ArrayLiteralExpr &lit);
+  void compile_map_literal(const ast::MapLiteralExpr &lit);
+  void compile_index(const ast::IndexExpr &idx);
+  void compile_index_assign(const ast::IndexAssignExpr &idx);
+  void compile_cast(const ast::CastExpr &cast);
+  void compile_ternary(const ast::TernaryExpr &ternary);
+  void compile_null_coalesce(const ast::NullCoalesceExpr &nc);
+  void compile_propagate(const ast::PropagateExpr &prop);
+
+  // ExprVisitor overrides — each forwards to the corresponding compile_X().
+  void visit(const ast::IntLiteralExpr &x) override;
+  void visit(const ast::CharLiteralExpr &x) override;
+  void visit(const ast::FloatLiteralExpr &x) override;
+  void visit(const ast::StringLiteralExpr &x) override;
+  void visit(const ast::BoolLiteralExpr &x) override;
+  void visit(const ast::UnaryExpr &x) override;
+  void visit(const ast::IdentifierExpr &x) override;
+  void visit(const ast::AssignExpr &x) override;
+  void visit(const ast::BinaryExpr &x) override;
+  void visit(const ast::CallExpr &x) override;
+  void visit(const ast::MatchExpr &x) override;
+  void visit(const ast::NamespaceAccessExpr &x) override;
+  void visit(const ast::StructLiteralExpr &x) override;
+  void visit(const ast::FieldAccessExpr &x) override;
+  void visit(const ast::FieldAssignExpr &x) override;
+  void visit(const ast::ArrayLiteralExpr &x) override;
+  void visit(const ast::MapLiteralExpr &x) override;
+  void visit(const ast::IndexExpr &x) override;
+  void visit(const ast::IndexAssignExpr &x) override;
+  void visit(const ast::CastExpr &x) override;
+  void visit(const ast::TernaryExpr &x) override;
+  void visit(const ast::NullCoalesceExpr &x) override;
+  void visit(const ast::PropagateExpr &x) override;
+  // Fallbacks for types compile_expr never sees at the top level.
+  void visit(const ast::NullLiteralExpr &x) override;
+  void visit(const ast::PipeExpr &) override {}
+  void visit(const ast::BindingPattern &) override {}
+  void visit(const ast::ArrayPattern &) override {}
+  void visit(const ast::EnumPattern &) override {}
+  void visit(const ast::StructPattern &) override {}
 
   void emit(OpCode op, ast::SourceLocation location);
   void emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location);

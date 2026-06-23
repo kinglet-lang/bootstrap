@@ -840,1271 +840,1315 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
   error_at(stmt.location, "Unsupported statement in VM compiler.");
 }
 
-void Compiler::compile_expr(const ast::Expr &expr) {
-  if (const auto *int_lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
-    const KirType width =
-        kir_type_from_int_literal_suffix(int_lit->width_suffix, int_lit->value);
-    emit_constant(Value::int_value(int_lit->value), int_lit->location, width);
+void Compiler::compile_int_literal(const ast::IntLiteralExpr &int_lit) {
+
+  const KirType width =
+      kir_type_from_int_literal_suffix(int_lit.width_suffix, int_lit.value);
+  emit_constant(Value::int_value(int_lit.value), int_lit.location, width);
+  return;
+
+}
+
+void Compiler::compile_char_literal(const ast::CharLiteralExpr &char_lit) {
+
+  emit_constant(Value::char_value(char_lit.value), char_lit.location, KirType::Int8);
+  return;
+
+}
+
+void Compiler::compile_float_literal(const ast::FloatLiteralExpr &float_lit) {
+
+  const KirType width = kir_type_from_float_literal_suffix(float_lit.width_suffix);
+  emit_constant(Value::double_value(float_lit.value), float_lit.location, width);
+  return;
+
+}
+
+void Compiler::compile_string_literal(const ast::StringLiteralExpr &string_lit) {
+
+  // Unescape: \n -> newline, \t -> tab, etc.
+  std::string unescaped;
+  unescaped.reserve(string_lit.value.size());
+  for (std::size_t i = 0; i < string_lit.value.size(); ++i) {
+    if (string_lit.value[i] == '\\' && i + 1 < string_lit.value.size()) {
+      switch (string_lit.value[i + 1]) {
+      case 'n':
+        unescaped += '\n';
+        ++i;
+        break;
+      case 't':
+        unescaped += '\t';
+        ++i;
+        break;
+      case 'r':
+        unescaped += '\r';
+        ++i;
+        break;
+      case '\\':
+        unescaped += '\\';
+        ++i;
+        break;
+      case '"':
+        unescaped += '"';
+        ++i;
+        break;
+      default:
+        unescaped += string_lit.value[i];
+        break;
+      }
+    } else {
+      unescaped += string_lit.value[i];
+    }
+  }
+  emit_constant(Value::string_value(unescaped), string_lit.location);
+  return;
+
+}
+
+void Compiler::compile_bool_literal(const ast::BoolLiteralExpr &bool_lit) {
+
+  emit(bool_lit.value ? OpCode::True : OpCode::False, bool_lit.location);
+  return;
+
+}
+void Compiler::compile_null_literal(const ast::NullLiteralExpr &null_lit) {
+  emit(OpCode::Null, null_lit.location);
+}
+
+void Compiler::compile_unary(const ast::UnaryExpr &unary) {
+
+  compile_expr(*unary.right);
+  switch (unary.op) {
+  case ast::UnaryOp::Neg:
+    emit(OpCode::Negate, unary.location);
+    break;
+  case ast::UnaryOp::Not:
+    emit(OpCode::Not, unary.location);
+    break;
+  case ast::UnaryOp::BitNot:
+    emit(OpCode::BitNot, unary.location);
+    break;
+  case ast::UnaryOp::Ref:
+  case ast::UnaryOp::MutRef:
+    compile_lvalue_addr(*unary.right);
+    break;
+  default:
+    error_at(unary.location, "Unsupported unary operator.");
+    break;
+  }
+  return;
+
+}
+
+void Compiler::compile_identifier(const ast::IdentifierExpr &identifier) {
+
+  auto git = global_const_inits_.find(identifier.name);
+  if (git != global_const_inits_.end()) {
+    compile_expr(*git->second);
     return;
   }
-
-  if (const auto *char_lit = dynamic_cast<const ast::CharLiteralExpr *>(&expr)) {
-    emit_constant(Value::char_value(char_lit->value), char_lit->location, KirType::Int8);
+  const int slot = resolve_local(identifier.name);
+  if (slot < 0) {
+    error_at(identifier.location, "Use of undeclared variable '" + identifier.name + "'.");
     return;
   }
+  emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), identifier.location);
+  if (local_is_ref(slot)) {
+    emit(OpCode::DerefLoad, identifier.location);
+  }
+  return;
 
-  if (const auto *float_lit = dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) {
-    const KirType width = kir_type_from_float_literal_suffix(float_lit->width_suffix);
-    emit_constant(Value::double_value(float_lit->value), float_lit->location, width);
+}
+
+void Compiler::compile_assign_expr(const ast::AssignExpr &assign) {
+
+  compile_assignment(assign);
+  return;
+
+}
+
+void Compiler::compile_binary(const ast::BinaryExpr &binary) {
+
+  if (binary.op == ast::BinaryOp::And) {
+    compile_expr(*binary.left);
+    std::size_t false_jump = emit_jump(OpCode::JmpFalse, binary.location);
+    compile_expr(*binary.right);
+    std::size_t end_jump = emit_jump(OpCode::Jmp, binary.location);
+    patch_jump(false_jump);
+    emit(OpCode::False, binary.location);
+    patch_jump(end_jump);
     return;
   }
-
-  if (const auto *string_lit = dynamic_cast<const ast::StringLiteralExpr *>(&expr)) {
-    // Unescape: \n -> newline, \t -> tab, etc.
-    std::string unescaped;
-    unescaped.reserve(string_lit->value.size());
-    for (std::size_t i = 0; i < string_lit->value.size(); ++i) {
-      if (string_lit->value[i] == '\\' && i + 1 < string_lit->value.size()) {
-        switch (string_lit->value[i + 1]) {
-        case 'n':
-          unescaped += '\n';
-          ++i;
-          break;
-        case 't':
-          unescaped += '\t';
-          ++i;
-          break;
-        case 'r':
-          unescaped += '\r';
-          ++i;
-          break;
-        case '\\':
-          unescaped += '\\';
-          ++i;
-          break;
-        case '"':
-          unescaped += '"';
-          ++i;
-          break;
-        default:
-          unescaped += string_lit->value[i];
-          break;
-        }
-      } else {
-        unescaped += string_lit->value[i];
-      }
-    }
-    emit_constant(Value::string_value(unescaped), string_lit->location);
+  if (binary.op == ast::BinaryOp::Or) {
+    compile_expr(*binary.left);
+    std::size_t false_jump = emit_jump(OpCode::JmpFalse, binary.location);
+    emit(OpCode::True, binary.location);
+    std::size_t end_jump = emit_jump(OpCode::Jmp, binary.location);
+    patch_jump(false_jump);
+    compile_expr(*binary.right);
+    patch_jump(end_jump);
     return;
   }
-
-  if (const auto *bool_lit = dynamic_cast<const ast::BoolLiteralExpr *>(&expr)) {
-    emit(bool_lit->value ? OpCode::True : OpCode::False, bool_lit->location);
-    return;
+  compile_expr(*binary.left);
+  compile_expr(*binary.right);
+  const std::string width = infer_expr_type_name(binary, local_types_);
+  switch (binary.op) {
+  case ast::BinaryOp::Add:
+  case ast::BinaryOp::Sub:
+  case ast::BinaryOp::Mul:
+  case ast::BinaryOp::Div:
+  case ast::BinaryOp::Mod:
+    emit(width_arithmetic_opcode(binary.op, width), binary.location);
+    break;
+  case ast::BinaryOp::Eq:
+    emit(OpCode::Eq, binary.location);
+    break;
+  case ast::BinaryOp::Neq:
+    emit(OpCode::Neq, binary.location);
+    break;
+  case ast::BinaryOp::Lt:
+    emit(OpCode::Lt, binary.location);
+    break;
+  case ast::BinaryOp::Gt:
+    emit(OpCode::Gt, binary.location);
+    break;
+  case ast::BinaryOp::Le:
+    emit(OpCode::Le, binary.location);
+    break;
+  case ast::BinaryOp::Ge:
+    emit(OpCode::Ge, binary.location);
+    break;
+  case ast::BinaryOp::BitAnd:
+    emit(OpCode::BitAnd, binary.location);
+    break;
+  case ast::BinaryOp::BitOr:
+    emit(OpCode::BitOr, binary.location);
+    break;
+  case ast::BinaryOp::BitXor:
+    emit(OpCode::BitXor, binary.location);
+    break;
+  case ast::BinaryOp::Shl:
+    emit(OpCode::Shl, binary.location);
+    break;
+  case ast::BinaryOp::Shr:
+    emit(OpCode::Shr, binary.location);
+    break;
+  default:
+    error_at(binary.location, "Unsupported binary operator.");
+    break;
   }
+  return;
 
-  if (dynamic_cast<const ast::NullLiteralExpr *>(&expr)) {
-    emit(OpCode::Null, expr.location);
-    return;
-  }
+}
 
-  if (const auto *unary = dynamic_cast<const ast::UnaryExpr *>(&expr)) {
-    compile_expr(*unary->right);
-    switch (unary->op) {
-    case ast::UnaryOp::Neg:
-      emit(OpCode::Negate, unary->location);
-      break;
-    case ast::UnaryOp::Not:
-      emit(OpCode::Not, unary->location);
-      break;
-    case ast::UnaryOp::BitNot:
-      emit(OpCode::BitNot, unary->location);
-      break;
-    case ast::UnaryOp::Ref:
-    case ast::UnaryOp::MutRef:
-      compile_lvalue_addr(*unary->right);
-      break;
-    default:
-      error_at(unary->location, "Unsupported unary operator.");
-      break;
-    }
-    return;
-  }
+void Compiler::compile_call(const ast::CallExpr &call_expr) {
 
-  if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
-    auto git = global_const_inits_.find(identifier->name);
-    if (git != global_const_inits_.end()) {
-      compile_expr(*git->second);
-      return;
-    }
-    const int slot = resolve_local(identifier->name);
-    if (slot < 0) {
-      error_at(identifier->location, "Use of undeclared variable '" + identifier->name + "'.");
-      return;
-    }
-    emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), identifier->location);
-    if (local_is_ref(slot)) {
-      emit(OpCode::DerefLoad, identifier->location);
-    }
-    return;
-  }
-
-  if (const auto *assign = dynamic_cast<const ast::AssignExpr *>(&expr)) {
-    compile_assignment(*assign);
-    return;
-  }
-
-  if (const auto *binary = dynamic_cast<const ast::BinaryExpr *>(&expr)) {
-    if (binary->op == ast::BinaryOp::And) {
-      compile_expr(*binary->left);
-      std::size_t false_jump = emit_jump(OpCode::JmpFalse, binary->location);
-      compile_expr(*binary->right);
-      std::size_t end_jump = emit_jump(OpCode::Jmp, binary->location);
-      patch_jump(false_jump);
-      emit(OpCode::False, binary->location);
-      patch_jump(end_jump);
-      return;
-    }
-    if (binary->op == ast::BinaryOp::Or) {
-      compile_expr(*binary->left);
-      std::size_t false_jump = emit_jump(OpCode::JmpFalse, binary->location);
-      emit(OpCode::True, binary->location);
-      std::size_t end_jump = emit_jump(OpCode::Jmp, binary->location);
-      patch_jump(false_jump);
-      compile_expr(*binary->right);
-      patch_jump(end_jump);
-      return;
-    }
-    compile_expr(*binary->left);
-    compile_expr(*binary->right);
-    const std::string width = infer_expr_type_name(*binary, local_types_);
-    switch (binary->op) {
-    case ast::BinaryOp::Add:
-    case ast::BinaryOp::Sub:
-    case ast::BinaryOp::Mul:
-    case ast::BinaryOp::Div:
-    case ast::BinaryOp::Mod:
-      emit(width_arithmetic_opcode(binary->op, width), binary->location);
-      break;
-    case ast::BinaryOp::Eq:
-      emit(OpCode::Eq, binary->location);
-      break;
-    case ast::BinaryOp::Neq:
-      emit(OpCode::Neq, binary->location);
-      break;
-    case ast::BinaryOp::Lt:
-      emit(OpCode::Lt, binary->location);
-      break;
-    case ast::BinaryOp::Gt:
-      emit(OpCode::Gt, binary->location);
-      break;
-    case ast::BinaryOp::Le:
-      emit(OpCode::Le, binary->location);
-      break;
-    case ast::BinaryOp::Ge:
-      emit(OpCode::Ge, binary->location);
-      break;
-    case ast::BinaryOp::BitAnd:
-      emit(OpCode::BitAnd, binary->location);
-      break;
-    case ast::BinaryOp::BitOr:
-      emit(OpCode::BitOr, binary->location);
-      break;
-    case ast::BinaryOp::BitXor:
-      emit(OpCode::BitXor, binary->location);
-      break;
-    case ast::BinaryOp::Shl:
-      emit(OpCode::Shl, binary->location);
-      break;
-    case ast::BinaryOp::Shr:
-      emit(OpCode::Shr, binary->location);
-      break;
-    default:
-      error_at(binary->location, "Unsupported binary operator.");
-      break;
-    }
-    return;
-  }
-
-  if (const auto *call_expr = dynamic_cast<const ast::CallExpr *>(&expr)) {
-    const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr->callee.get());
-    // Handle bare io:: members when 'using namespace io;' is in effect
-    if (callee_id && opened_.count("io") != 0) {
-      if (callee_id->name == "out") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-      if (callee_id->name == "err") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeErr, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-      if (callee_id->name == "in") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-    }
-
-    const auto *ns_callee =
-        dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr->callee.get());
-    // Type-qualified methods: int::bits(float) -> uint64; float::from_bits(uint64) -> float
-    if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
-      compile_expr(*call_expr->args[0]);
-      emit(OpCode::FloatToBits, call_expr->location);
-      return;
-    }
-    if (ns_callee && ns_callee->namespace_name == "float" &&
-        ns_callee->member_name == "from_bits") {
-      if (call_expr->args.size() != 1) {
-        error_at(call_expr->location, "float::from_bits() expects exactly 1 argument.");
-        return;
-      }
-      compile_expr(*call_expr->args[0]);
-      emit(OpCode::BitsToFloat, call_expr->location);
-      return;
-    }
-    if (ns_callee && used_.count(ns_callee->namespace_name) != 0 &&
-        ns_callee->namespace_name == "io") {
-      if (ns_callee->member_name == "out") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-
-      if (ns_callee->member_name == "err") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeErr, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-
-      if (ns_callee->member_name == "in") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-    }
-
-    // Handle rt::enum_payload_at(enum, index) — constant index only.
-    if (ns_callee && ns_callee->namespace_name == "rt") {
-      if (ns_callee->member_name == "enum_payload_at") {
-        if (call_expr->args.size() != 2) {
-          error_at(call_expr->location, "rt::enum_payload_at expects exactly two arguments.");
-          return;
-        }
-        compile_expr(*call_expr->args[0]);
-        const auto *idx_lit = dynamic_cast<const ast::IntLiteralExpr *>(call_expr->args[1].get());
-        if (!idx_lit || idx_lit->value < 0) {
-          error_at(call_expr->location, "rt::enum_payload_at index must be a non-negative int literal.");
-          return;
-        }
-        emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(idx_lit->value), call_expr->location);
-        return;
-      }
-    }
-
-    // Handle fs::__read(...) / fs::__write(...) direct calls.
-    if (ns_callee && used_.count("fs") != 0 && ns_callee->namespace_name == "fs") {
-      if (ns_callee->member_name == "__read") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeFsRead, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-      if (ns_callee->member_name == "__write") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeFsWrite, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-      if (ns_callee->member_name == "__listdir") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeFsListdir, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-    }
-
-    // Handle sys::args() direct call.
-    if (ns_callee && used_.count("sys") != 0 && ns_callee->namespace_name == "sys") {
-      if (ns_callee->member_name == "args") {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_operand(OpCode::NativeSysArgs, static_cast<uint32_t>(call_expr->args.size()),
-                     call_expr->location);
-        return;
-      }
-    }
-
-    // Handle enum variant construction with payload: Shape::Circle(1.0)
-    if (ns_callee) {
-      auto enum_it = enum_indices_.find(ns_callee->namespace_name);
-      if (enum_it != enum_indices_.end()) {
-        int type_idx = enum_it->second;
-        const auto &meta = chunk_.enum_metas()[static_cast<std::size_t>(type_idx)];
-        int variant_idx = -1;
-        for (int i = 0; i < static_cast<int>(meta.variants.size()); ++i) {
-          if (meta.variants[static_cast<std::size_t>(i)] == ns_callee->member_name) {
-            variant_idx = i;
-            break;
-          }
-        }
-        if (variant_idx < 0) {
-          error_at(ns_callee->location, "Unknown enum variant '" + ns_callee->member_name + "'.");
-          return;
-        }
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) |
-                           static_cast<uint32_t>(variant_idx);
-        emit_operand(OpCode::EnumVariantPayload, operand, call_expr->location);
-        return;
-      }
-    }
-
-    if (ns_callee && concept_registry_.count(ns_callee->namespace_name)) {
-      if (call_expr->args.empty()) {
-        error_at(call_expr->location, "Concept method '" + ns_callee->namespace_name + "::" +
-                                        ns_callee->member_name + "' expects at least one argument.");
-        return;
-      }
-      const std::string arg_ty = infer_arg_type_name(*call_expr->args[0]);
-      const int const_idx =
-          resolve_free_function_for_type(ns_callee->member_name, arg_ty);
-      if (const_idx < 0) {
-        error_at(call_expr->location, "No implementation of '" + ns_callee->namespace_name + "::" +
-                                        ns_callee->member_name + "' for type '" + arg_ty + "'.");
-        return;
-      }
-      for (const ast::ExprPtr &arg : call_expr->args) {
+  const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get());
+  // Handle bare io:: members when 'using namespace io;' is in effect
+  if (callee_id && opened_.count("io") != 0) {
+    if (callee_id->name == "out") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_constant(Value::function_value(
-                        chunk_.constants()[static_cast<std::size_t>(const_idx)].function_idx),
-                    call_expr->location);
-      emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
+      emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (callee_id->name == "err") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeErr, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (callee_id->name == "in") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+  }
+
+  const auto *ns_callee =
+      dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
+  // Type-qualified methods: int::bits(float) -> uint64; float::from_bits(uint64) -> float
+  if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
+    compile_expr(*call_expr.args[0]);
+    emit(OpCode::FloatToBits, call_expr.location);
+    return;
+  }
+  if (ns_callee && ns_callee->namespace_name == "float" &&
+      ns_callee->member_name == "from_bits") {
+    if (call_expr.args.size() != 1) {
+      error_at(call_expr.location, "float::from_bits() expects exactly 1 argument.");
+      return;
+    }
+    compile_expr(*call_expr.args[0]);
+    emit(OpCode::BitsToFloat, call_expr.location);
+    return;
+  }
+  if (ns_callee && used_.count(ns_callee->namespace_name) != 0 &&
+      ns_callee->namespace_name == "io") {
+    if (ns_callee->member_name == "out") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
       return;
     }
 
-    // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
-    const auto *field_callee =
-        dynamic_cast<const ast::FieldAccessExpr *>(call_expr->callee.get());
-    if (field_callee) {
-      const auto *ns_obj =
-          dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
-      if (ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
-        if (ns_obj->member_name == "out" && field_callee->field_name == "line") {
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr->args.size()),
-                       call_expr->location);
-          return;
-        }
-        if (ns_obj->member_name == "err" && field_callee->field_name == "line") {
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr->args.size()),
-                       call_expr->location);
-          return;
-        }
-        if (ns_obj->member_name == "in" && field_callee->field_name == "secret") {
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr->args.size()),
-                       call_expr->location);
-          return;
-        }
+    if (ns_callee->member_name == "err") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
       }
+      emit_operand(OpCode::NativeErr, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
     }
 
-    // Handle `using namespace io;` bare out.line / err.line / in.secret.
-    if (field_callee) {
-      const auto *id_obj =
-          dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
-      if (id_obj && opened_.count("io") != 0) {
-        if (id_obj->name == "out" && field_callee->field_name == "line") {
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr->args.size()),
-                       call_expr->location);
-          return;
-        }
-        if (id_obj->name == "err" && field_callee->field_name == "line") {
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr->args.size()),
-                       call_expr->location);
-          return;
-        }
-        if (id_obj->name == "in" && field_callee->field_name == "secret") {
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr->args.size()),
-                       call_expr->location);
-          return;
-        }
+    if (ns_callee->member_name == "in") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
       }
+      emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
     }
+  }
 
-    // Handle array/string method calls
-    if (field_callee) {
-      const std::string &method = field_callee->field_name;
-      if (method == "len" || method == "push" || method == "pop" ||
-          method == "remove" || method == "contains" || method == "clear" ||
-          method == "insert" || method == "index_of" || method == "slice" ||
-          method == "reverse" || method == "resize" || method == "has" ||
-          method == "keys" || method == "starts_with" ||
-          method == "ends_with" || method == "replace" || method == "split" ||
-          method == "trim" || method == "to_upper" || method == "to_lower") {
-        compile_expr(*field_callee->object);
-        if (method == "len") {
-          emit(OpCode::ArrayLen, call_expr->location);
-          return;
-        }
-        if (method == "has") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::MapHas, call_expr->location);
-          return;
-        }
-        if (method == "keys") {
-          emit(OpCode::MapKeys, call_expr->location);
-          return;
-        }
-        if (method == "push") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::ArrayPush, call_expr->location);
-          return;
-        }
-        if (method == "resize") {
-          compile_expr(*call_expr->args[0]);
-          compile_expr(*call_expr->args[1]);
-          emit(OpCode::ArrayResize, call_expr->location);
-          return;
-        }
-        if (method == "pop") {
-          emit(OpCode::ArrayPop, call_expr->location);
-          return;
-        }
-        if (method == "remove") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::ArrayRemove, call_expr->location);
-          return;
-        }
-        if (method == "contains") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::ArrayContains, call_expr->location);
-          return;
-        }
-        if (method == "clear") {
-          emit(OpCode::ArrayClear, call_expr->location);
-          return;
-        }
-        if (method == "insert") {
-          compile_expr(*call_expr->args[0]);
-          compile_expr(*call_expr->args[1]);
-          emit(OpCode::ArrayInsert, call_expr->location);
-          return;
-        }
-        if (method == "index_of") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::ArrayIndexOf, call_expr->location);
-          return;
-        }
-        if (method == "slice") {
-          compile_expr(*call_expr->args[0]);
-          compile_expr(*call_expr->args[1]);
-          emit(OpCode::ArraySlice, call_expr->location);
-          return;
-        }
-        if (method == "reverse") {
-          emit(OpCode::ArrayReverse, call_expr->location);
-          return;
-        }
-        if (method == "starts_with") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::StringStartsWith, call_expr->location);
-          return;
-        }
-        if (method == "ends_with") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::StringEndsWith, call_expr->location);
-          return;
-        }
-        if (method == "replace") {
-          compile_expr(*call_expr->args[0]);
-          compile_expr(*call_expr->args[1]);
-          emit(OpCode::StringReplace, call_expr->location);
-          return;
-        }
-        if (method == "split") {
-          compile_expr(*call_expr->args[0]);
-          emit(OpCode::StringSplit, call_expr->location);
-          return;
-        }
-        if (method == "trim") {
-          emit(OpCode::StringTrim, call_expr->location);
-          return;
-        }
-        if (method == "to_upper") {
-          emit(OpCode::StringToUpper, call_expr->location);
-          return;
-        }
-        if (method == "to_lower") {
-          emit(OpCode::StringToLower, call_expr->location);
-          return;
-        }
-      }
-    }
-
-    // Handle impl method calls: obj.method(args...)
-    if (field_callee) {
-      std::string obj_type = infer_struct_type(*field_callee->object);
-      if (!obj_type.empty()) {
-        std::string method_key = obj_type + "::" + field_callee->field_name;
-        auto func_it = function_indices_.find(method_key);
-        if (func_it != function_indices_.end()) {
-          compile_expr(*field_callee->object);
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_constant(Value::function_value(
-              chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
-              call_expr->location);
-          emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size() + 1),
-                       call_expr->location);
-          return;
-        }
-      }
-      const std::string receiver_ty = infer_arg_type_name(*field_callee->object);
-      if (!receiver_ty.empty()) {
-        const int free_idx = resolve_free_function_for_type(field_callee->field_name, receiver_ty);
-        if (free_idx >= 0) {
-          compile_expr(*field_callee->object);
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_constant(Value::function_value(
-              chunk_.constants()[static_cast<std::size_t>(free_idx)].function_idx),
-              call_expr->location);
-          emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size() + 1),
-                       call_expr->location);
-          return;
-        }
-      }
-    }
-
-    // Generic function call — type arguments are explicit, or inferred from the
-    // argument expressions (matching parameters written as bare type params).
-    if (callee_id && generic_func_decls_.count(callee_id->name)) {
-      const ast::FunctionDecl *decl = generic_func_decls_.at(callee_id->name);
-      std::vector<std::string> type_arg_names;
-      if (!call_expr->type_args.empty()) {
-        for (const auto &arg : call_expr->type_args) {
-          type_arg_names.push_back(arg.to_string());
-        }
-      } else {
-        std::unordered_map<std::string, std::string> inferred;
-        for (size_t i = 0; i < decl->params.size() && i < call_expr->args.size(); ++i) {
-          const ast::TypeExpr &pt = decl->params[i].type;
-          if (!pt.type_args.empty() || inferred.count(pt.name)) continue;
-          bool is_type_param = false;
-          for (const std::string &tp : decl->type_params) {
-            if (tp == pt.name) { is_type_param = true; break; }
-          }
-          if (is_type_param) {
-            inferred[pt.name] = infer_arg_type_name(*call_expr->args[i]);
-          }
-        }
-        for (const std::string &tp : decl->type_params) {
-          auto it = inferred.find(tp);
-          if (it != inferred.end() && !it->second.empty()) {
-            type_arg_names.push_back(it->second);
-          }
-        }
-      }
-      if (type_arg_names.size() == decl->type_params.size()) {
-        std::string mangled = callee_id->name;
-        for (const std::string &n : type_arg_names) {
-          mangled += "__" + n;
-        }
-        auto func_it = function_indices_.find(mangled);
-        if (func_it == function_indices_.end()) {
-          int idx = chunk_.add_function(FunctionInfo{
-              .name = mangled,
-              .entry = 0,
-              .param_count = static_cast<int>(decl->params.size()),
-          });
-          record_function_source(idx, entry_source_path_);
-          uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-          function_indices_[mangled] = static_cast<int>(const_idx);
-          pending_generic_funcs_.push_back({mangled, decl});
-        }
-        func_it = function_indices_.find(mangled);
-        if (func_it != function_indices_.end()) {
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_constant(Value::function_value(
-              chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
-              call_expr->location);
-          emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
-          return;
-        }
-      }
-    }
-
-    // Concept-generic function call — infer concrete type from concept-typed params.
-    if (callee_id && concept_generic_func_decls_.count(callee_id->name)) {
-      const ast::FunctionDecl *decl = concept_generic_func_decls_.at(callee_id->name);
-      std::string concrete_ty;
-      for (std::size_t i = 0; i < decl->params.size() && i < call_expr->args.size(); ++i) {
-        const ast::TypeExpr &pt = decl->params[i].type;
-        if (pt.type_args.empty() && concept_registry_.count(pt.name)) {
-          const std::string ty = infer_arg_type_name(*call_expr->args[i]);
-          if (!ty.empty()) {
-            concrete_ty = ty;
-            break;
-          }
-        }
-      }
-      if (!concrete_ty.empty()) {
-        const std::string mangled = callee_id->name + "__" + concrete_ty;
-        auto func_it = function_indices_.find(mangled);
-        if (func_it == function_indices_.end()) {
-          int idx = chunk_.add_function(FunctionInfo{
-              .name = mangled,
-              .entry = 0,
-              .param_count = static_cast<int>(decl->params.size()),
-          });
-          record_function_source(idx, entry_source_path_);
-          uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
-          function_indices_[mangled] = static_cast<int>(const_idx);
-          pending_generic_funcs_.push_back({mangled, decl});
-        }
-        func_it = function_indices_.find(mangled);
-        if (func_it != function_indices_.end()) {
-          for (const ast::ExprPtr &arg : call_expr->args) {
-            compile_expr(*arg);
-          }
-          emit_constant(Value::function_value(
-              chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
-              call_expr->location);
-          emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
-          return;
-        }
-      }
-    }
-
-    // User-defined function call
-    if (callee_id) {
-      std::unordered_map<std::string, int>::const_iterator func_it =
-          function_indices_.end();
-      if (!compiling_namespace_.empty()) {
-        func_it = function_indices_.find(compiling_namespace_ + "::" + callee_id->name);
-      }
-      if (func_it == function_indices_.end()) {
-        func_it = function_indices_.find(callee_id->name);
-      }
-      if (func_it == function_indices_.end()) {
-        std::vector<std::string> ns_sorted(imported_namespaces_.begin(),
-                                           imported_namespaces_.end());
-        std::sort(ns_sorted.begin(), ns_sorted.end());
-        for (const auto &ns : ns_sorted) {
-          auto qit = function_indices_.find(module_id_to_qualifier(ns) + "::" + callee_id->name);
-          if (qit != function_indices_.end()) {
-            func_it = qit;
-            break;
-          }
-        }
-      }
-      if (func_it != function_indices_.end()) {
-        for (const ast::ExprPtr &arg : call_expr->args) {
-          compile_expr(*arg);
-        }
-        emit_constant(Value::function_value(
-            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
-            call_expr->location);
-        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
+  // Handle rt::enum_payload_at(enum, index) — constant index only.
+  if (ns_callee && ns_callee->namespace_name == "rt") {
+    if (ns_callee->member_name == "enum_payload_at") {
+      if (call_expr.args.size() != 2) {
+        error_at(call_expr.location, "rt::enum_payload_at expects exactly two arguments.");
         return;
       }
-    }
-
-    for (const ast::ExprPtr &arg : call_expr->args) {
-      compile_expr(*arg);
-    }
-    compile_expr(*call_expr->callee);
-    emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr->args.size()), call_expr->location);
-    return;
-  }
-
-  if (const auto *match_expr = dynamic_cast<const ast::MatchExpr *>(&expr)) {
-    compile_expr(*match_expr->value);
-    const uint32_t temp_slot = static_cast<uint32_t>(locals_.size());
-    locals_.push_back(Local{.name = "<match_value>", .is_mutable = false});
-    emit_operand(OpCode::StoreLocal, temp_slot, match_expr->location);
-
-    std::vector<std::size_t> end_jumps;
-    for (const ast::MatchArm &arm : match_expr->arms) {
-      const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(arm.pattern.get());
-      const auto *binding = dynamic_cast<const ast::BindingPattern *>(arm.pattern.get());
-
-      if (identifier && identifier->name == "_") {
-        if (arm.guard) {
-          compile_expr(*arm.guard);
-          const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
-          emit(OpCode::Pop, match_expr->location);
-          compile_expr(*arm.body);
-          end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
-          patch_jump(next_arm);
-        } else {
-          emit(OpCode::Pop, match_expr->location);
-          compile_expr(*arm.body);
-        }
-      } else if (binding) {
-        const uint32_t bind_slot = static_cast<uint32_t>(locals_.size());
-        locals_.push_back(Local{.name = binding->name, .is_mutable = false});
-        emit_operand(OpCode::LoadLocal, temp_slot, match_expr->location);
-        emit_operand(OpCode::StoreLocal, bind_slot, match_expr->location);
-        emit(OpCode::Pop, match_expr->location);
-        if (arm.guard) {
-          compile_expr(*arm.guard);
-          const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
-          emit(OpCode::Pop, match_expr->location);
-          compile_expr(*arm.body);
-          end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
-          patch_jump(next_arm);
-        } else {
-          compile_expr(*arm.body);
-        }
-        locals_.pop_back();
-      } else if (const auto *arr_pat = dynamic_cast<const ast::ArrayPattern *>(arm.pattern.get())) {
-        std::vector<uint32_t> bind_slots;
-        std::vector<std::size_t> fail_jumps;
-        for (std::size_t i = 0; i < arr_pat->elements.size(); ++i) {
-          const auto &elem = arr_pat->elements[i];
-          const auto *elem_binding = dynamic_cast<const ast::BindingPattern *>(elem.get());
-          const auto *elem_wildcard = dynamic_cast<const ast::IdentifierExpr *>(elem.get());
-          if (elem_binding) {
-            const uint32_t slot = static_cast<uint32_t>(locals_.size());
-            locals_.push_back(Local{.name = elem_binding->name, .is_mutable = false});
-            emit_operand(OpCode::LoadLocal, temp_slot, match_expr->location);
-            emit_constant(Value::int_value(static_cast<int>(i)), match_expr->location);
-            emit(OpCode::IndexGet, match_expr->location);
-            emit_operand(OpCode::StoreLocal, slot, match_expr->location);
-            emit(OpCode::Pop, match_expr->location);
-            bind_slots.push_back(slot);
-          } else if (elem_wildcard && elem_wildcard->name == "_") {
-            // wildcard element, skip
-          } else {
-            emit_operand(OpCode::LoadLocal, temp_slot, match_expr->location);
-            emit_constant(Value::int_value(static_cast<int>(i)), match_expr->location);
-            emit(OpCode::IndexGet, match_expr->location);
-            compile_expr(*elem);
-            emit(OpCode::Eq, match_expr->location);
-            fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr->location));
-          }
-        }
-        if (arm.guard) {
-          compile_expr(*arm.guard);
-          fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr->location));
-          emit(OpCode::Pop, match_expr->location);
-        }
-        compile_expr(*arm.body);
-        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
-        for (std::size_t fj : fail_jumps) {
-          patch_jump(fj);
-        }
-        for (std::size_t j = 0; j < bind_slots.size(); ++j) {
-          locals_.pop_back();
-        }
-      } else if (const auto *enum_pat = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get())) {
-        // Enum pattern: match variant and optionally extract payload
-        auto enum_it = enum_indices_.find(enum_pat->enum_name);
-        if (enum_it == enum_indices_.end()) {
-          error_at(enum_pat->location, "Unknown enum type '" + enum_pat->enum_name + "'.");
-          return;
-        }
-        int type_idx = enum_it->second;
-        const auto &meta = chunk_.enum_metas()[static_cast<std::size_t>(type_idx)];
-        int variant_idx = -1;
-        for (int i = 0; i < static_cast<int>(meta.variants.size()); ++i) {
-          if (meta.variants[static_cast<std::size_t>(i)] == enum_pat->variant_name) {
-            variant_idx = i;
-            break;
-          }
-        }
-        if (variant_idx < 0) {
-          error_at(enum_pat->location, "Unknown enum variant '" + enum_pat->variant_name + "'.");
-          return;
-        }
-
-        std::vector<std::size_t> fail_jumps;
-        std::vector<uint32_t> bind_slots;
-
-        // Check if value matches this enum type and variant
-        // Stack: [initial_val]
-        emit_operand(OpCode::LoadLocal, temp_slot, match_expr->location);
-        uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
-        emit_operand(OpCode::EnumVariant, operand, enum_pat->location);
-        emit(OpCode::Eq, enum_pat->location);
-        fail_jumps.push_back(emit_jump(OpCode::JmpFalse, enum_pat->location));
-        // JmpFalse popped the Eq result; initial_val still on stack.
-
-        // Extract payload bindings — these push/pop around initial_val.
-        for (std::size_t i = 0; i < enum_pat->fields.size(); ++i) {
-          const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(enum_pat->fields[i].get());
-          if (field_binding) {
-            const uint32_t slot = static_cast<uint32_t>(locals_.size());
-            locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
-            emit_operand(OpCode::LoadLocal, temp_slot, enum_pat->location);
-            emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(i), enum_pat->location);
-            emit_operand(OpCode::StoreLocal, slot, enum_pat->location);
-            emit(OpCode::Pop, enum_pat->location);
-            bind_slots.push_back(slot);
-          }
-        }
-
-        if (arm.guard) {
-          compile_expr(*arm.guard);
-          fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr->location));
-          // Pop initial_val so body result is clean on stack.
-          emit(OpCode::Pop, match_expr->location);
-        } else {
-          // No guard: pop initial_val before body.
-          emit(OpCode::Pop, match_expr->location);
-        }
-
-        compile_expr(*arm.body);
-        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
-
-        for (std::size_t fj : fail_jumps) {
-          patch_jump(fj);
-        }
-        for (std::size_t j = 0; j < bind_slots.size(); ++j) {
-          locals_.pop_back();
-        }
-      } else if (const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(arm.pattern.get())) {
-        auto struct_it = struct_indices_.find(struct_pat->struct_name);
-        if (struct_it == struct_indices_.end()) {
-          error_at(struct_pat->location, "Unknown struct type '" + struct_pat->struct_name + "'.");
-          return;
-        }
-        const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(struct_it->second)];
-        std::vector<std::size_t> fail_jumps;
-        std::vector<uint32_t> bind_slots;
-        for (std::size_t i = 0; i < struct_pat->fields.size(); ++i) {
-          const auto &pf = struct_pat->fields[i];
-          std::string field_name;
-          if (!pf.name.empty()) {
-            field_name = pf.name;
-          } else if (i < meta.field_names.size()) {
-            field_name = meta.field_names[i];
-          } else {
-            error_at(struct_pat->location, "Struct pattern has too many fields.");
-            return;
-          }
-          const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(pf.pattern.get());
-          const auto *field_wildcard = dynamic_cast<const ast::IdentifierExpr *>(pf.pattern.get());
-          if (field_binding) {
-            const uint32_t slot = static_cast<uint32_t>(locals_.size());
-            locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
-            emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
-            uint32_t field_const = chunk_.add_constant(Value::string_value(field_name));
-            emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
-            emit_operand(OpCode::StoreLocal, slot, struct_pat->location);
-            emit(OpCode::Pop, struct_pat->location);
-            bind_slots.push_back(slot);
-          } else if (field_wildcard && field_wildcard->name == "_") {
-            continue;
-          } else {
-            emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
-            uint32_t field_const = chunk_.add_constant(Value::string_value(field_name));
-            emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
-            compile_expr(*pf.pattern);
-            emit(OpCode::Eq, struct_pat->location);
-            fail_jumps.push_back(emit_jump(OpCode::JmpFalse, struct_pat->location));
-          }
-        }
-        if (arm.guard) {
-          compile_expr(*arm.guard);
-          fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr->location));
-          emit(OpCode::Pop, match_expr->location);
-        } else {
-          emit(OpCode::Pop, match_expr->location);
-        }
-        compile_expr(*arm.body);
-        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
-        for (std::size_t fj : fail_jumps) {
-          patch_jump(fj);
-        }
-        for (std::size_t j = 0; j < bind_slots.size(); ++j) {
-          locals_.pop_back();
-        }
-      } else {
-        emit_operand(OpCode::LoadLocal, temp_slot, match_expr->location);
-        compile_expr(*arm.pattern);
-        emit(OpCode::Eq, match_expr->location);
-        if (arm.guard) {
-          const std::size_t skip_guard = emit_jump(OpCode::JmpFalse, match_expr->location);
-          emit(OpCode::Pop, match_expr->location);
-          compile_expr(*arm.guard);
-          const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
-          emit(OpCode::Pop, match_expr->location);
-          compile_expr(*arm.body);
-          end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
-          patch_jump(next_arm);
-          patch_jump(skip_guard);
-        } else {
-          const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr->location);
-          emit(OpCode::Pop, match_expr->location);
-          compile_expr(*arm.body);
-          end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr->location));
-          patch_jump(next_arm);
-        }
+      compile_expr(*call_expr.args[0]);
+      const auto *idx_lit = dynamic_cast<const ast::IntLiteralExpr *>(call_expr.args[1].get());
+      if (!idx_lit || idx_lit->value < 0) {
+        error_at(call_expr.location, "rt::enum_payload_at index must be a non-negative int literal.");
+        return;
       }
+      emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(idx_lit->value), call_expr.location);
+      return;
     }
-
-    for (std::size_t jump : end_jumps) {
-      patch_jump(jump);
-    }
-
-    locals_.pop_back();
-    return;
   }
 
-  if (const auto *ns_access = dynamic_cast<const ast::NamespaceAccessExpr *>(&expr)) {
-    auto enum_it = enum_indices_.find(ns_access->namespace_name);
+  // Handle fs::__read(...) / fs::__write(...) direct calls.
+  if (ns_callee && used_.count("fs") != 0 && ns_callee->namespace_name == "fs") {
+    if (ns_callee->member_name == "__read") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeFsRead, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (ns_callee->member_name == "__write") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeFsWrite, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (ns_callee->member_name == "__listdir") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeFsListdir, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+  }
+
+  // Handle sys::args() direct call.
+  if (ns_callee && used_.count("sys") != 0 && ns_callee->namespace_name == "sys") {
+    if (ns_callee->member_name == "args") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(OpCode::NativeSysArgs, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+  }
+
+  // Handle enum variant construction with payload: Shape::Circle(1.0)
+  if (ns_callee) {
+    auto enum_it = enum_indices_.find(ns_callee->namespace_name);
     if (enum_it != enum_indices_.end()) {
       int type_idx = enum_it->second;
       const auto &meta = chunk_.enum_metas()[static_cast<std::size_t>(type_idx)];
       int variant_idx = -1;
       for (int i = 0; i < static_cast<int>(meta.variants.size()); ++i) {
-        if (meta.variants[static_cast<std::size_t>(i)] == ns_access->member_name) {
+        if (meta.variants[static_cast<std::size_t>(i)] == ns_callee->member_name) {
           variant_idx = i;
           break;
         }
       }
       if (variant_idx < 0) {
-        error_at(ns_access->location, "Unknown enum variant '" + ns_access->member_name + "'.");
+        error_at(ns_callee->location, "Unknown enum variant '" + ns_callee->member_name + "'.");
         return;
       }
-      int param_count = meta.variant_param_counts[static_cast<std::size_t>(variant_idx)];
-      if (param_count > 0) {
-        error_at(ns_access->location, "Enum variant '" + ns_access->member_name + "' requires " +
-                 std::to_string(param_count) + " argument(s).");
-        return;
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
       }
       uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) |
                          static_cast<uint32_t>(variant_idx);
-      emit_operand(OpCode::EnumVariant, operand, ns_access->location);
+      emit_operand(OpCode::EnumVariantPayload, operand, call_expr.location);
       return;
     }
-    if (ns_access->namespace_name == "io" && used_.count("io") != 0) {
-      NativeFn fn;
-      if (ns_access->member_name == "out") {
-        fn = NativeFn::IoOut;
-      } else if (ns_access->member_name == "err") {
-        fn = NativeFn::IoErr;
-      } else if (ns_access->member_name == "in") {
-        fn = NativeFn::IoIn;
-      } else {
-        error_at(ns_access->location, "Unknown io member '" + ns_access->member_name + "'.");
-        return;
-      }
-      emit_constant(Value::native_function_value(fn), ns_access->location);
+  }
+
+  if (ns_callee && concept_registry_.count(ns_callee->namespace_name)) {
+    if (call_expr.args.empty()) {
+      error_at(call_expr.location, "Concept method '" + ns_callee->namespace_name + "::" +
+                                      ns_callee->member_name + "' expects at least one argument.");
       return;
     }
-    if (ns_access->namespace_name == "fs" && used_.count("fs") != 0) {
-      NativeFn fn;
-      if (ns_access->member_name == "__read") {
-        fn = NativeFn::FsRead;
-      } else if (ns_access->member_name == "__write") {
-        fn = NativeFn::FsWrite;
-      } else {
-        error_at(ns_access->location, "Unknown fs member '" + ns_access->member_name + "'.");
-        return;
-      }
-      emit_constant(Value::native_function_value(fn), ns_access->location);
+    const std::string arg_ty = infer_arg_type_name(*call_expr.args[0]);
+    const int const_idx =
+        resolve_free_function_for_type(ns_callee->member_name, arg_ty);
+    if (const_idx < 0) {
+      error_at(call_expr.location, "No implementation of '" + ns_callee->namespace_name + "::" +
+                                      ns_callee->member_name + "' for type '" + arg_ty + "'.");
       return;
     }
-    if (ns_access->namespace_name == "sys" && used_.count("sys") != 0) {
-      NativeFn fn;
-      if (ns_access->member_name == "args") {
-        fn = NativeFn::SysArgs;
-      } else {
-        error_at(ns_access->location, "Unknown sys member '" + ns_access->member_name + "'.");
-        return;
-      }
-      emit_constant(Value::native_function_value(fn), ns_access->location);
-      return;
+    for (const ast::ExprPtr &arg : call_expr.args) {
+      compile_expr(*arg);
     }
-    // Check concept namespaces for fully-qualified calls (Printable::to_string)
-    if (concept_registry_.count(ns_access->namespace_name)) {
-      // Defer to calling context: the callee will resolve the trait method
-      // based on the argument type. For now, emit the member as a name lookup
-      // so the call site can mangle it as Type::method.
-      return;
-    }
-    // Check imported module namespaces
-    {
-      const std::string qualified =
-          resolve_module_qualified(ns_access->namespace_name, ns_access->member_name);
-      const std::string prefix = qualified.substr(0, qualified.rfind("::"));
-      if (imported_qualifiers_.count(prefix)) {
-        auto it = function_indices_.find(qualified);
-        if (it != function_indices_.end()) {
-          emit_constant(Value::function_value(
-                            chunk_.constants()[static_cast<std::size_t>(it->second)].function_idx),
-                        ns_access->location);
-          return;
-        }
-        error_at(ns_access->location, "'" + ns_access->member_name + "' is not exported from '" +
-                                        prefix + "'.");
-        return;
-      }
-    }
-    if (used_.count(ns_access->namespace_name) != 0) {
-      return;
-    }
-    if (ns_access->namespace_name == "io") {
-      error_at(ns_access->location,
-               "Module 'io' is not imported. Add 'using io;' at the top of the file.");
-    } else {
-      error_at(ns_access->location, "Unknown namespace '" + ns_access->namespace_name + "'.");
-    }
+    emit_constant(Value::function_value(
+                      chunk_.constants()[static_cast<std::size_t>(const_idx)].function_idx),
+                  call_expr.location);
+    emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
     return;
   }
 
-  if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(&expr)) {
-    // Infer omitted type arguments for a generic struct literal from its field
-    // values (e.g. `Box { 7 }` -> `Box<int>`), mirroring the checker.
-    ast::TypeExpr lit_type = struct_lit->struct_type;
-    if (lit_type.type_args.empty() && generic_struct_decls_.count(lit_type.name)) {
-      const ast::StructDecl *decl = generic_struct_decls_.at(lit_type.name);
+  // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
+  const auto *field_callee =
+      dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get());
+  if (field_callee) {
+    const auto *ns_obj =
+        dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
+    if (ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
+      if (ns_obj->member_name == "out" && field_callee->field_name == "line") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr.args.size()),
+                     call_expr.location);
+        return;
+      }
+      if (ns_obj->member_name == "err" && field_callee->field_name == "line") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr.args.size()),
+                     call_expr.location);
+        return;
+      }
+      if (ns_obj->member_name == "in" && field_callee->field_name == "secret") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr.args.size()),
+                     call_expr.location);
+        return;
+      }
+    }
+  }
+
+  // Handle `using namespace io;` bare out.line / err.line / in.secret.
+  if (field_callee) {
+    const auto *id_obj =
+        dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
+    if (id_obj && opened_.count("io") != 0) {
+      if (id_obj->name == "out" && field_callee->field_name == "line") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr.args.size()),
+                     call_expr.location);
+        return;
+      }
+      if (id_obj->name == "err" && field_callee->field_name == "line") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr.args.size()),
+                     call_expr.location);
+        return;
+      }
+      if (id_obj->name == "in" && field_callee->field_name == "secret") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr.args.size()),
+                     call_expr.location);
+        return;
+      }
+    }
+  }
+
+  // Handle array/string method calls
+  if (field_callee) {
+    const std::string &method = field_callee->field_name;
+    if (method == "len" || method == "push" || method == "pop" ||
+        method == "remove" || method == "contains" || method == "clear" ||
+        method == "insert" || method == "index_of" || method == "slice" ||
+        method == "reverse" || method == "resize" || method == "has" ||
+        method == "keys" || method == "starts_with" ||
+        method == "ends_with" || method == "replace" || method == "split" ||
+        method == "trim" || method == "to_upper" || method == "to_lower") {
+      compile_expr(*field_callee->object);
+      if (method == "len") {
+        emit(OpCode::ArrayLen, call_expr.location);
+        return;
+      }
+      if (method == "has") {
+        compile_expr(*call_expr.args[0]);
+        emit(OpCode::MapHas, call_expr.location);
+        return;
+      }
+      if (method == "keys") {
+        emit(OpCode::MapKeys, call_expr.location);
+        return;
+      }
+      if (method == "push") {
+        compile_expr(*call_expr.args[0]);
+        emit(OpCode::ArrayPush, call_expr.location);
+        return;
+      }
+      if (method == "resize") {
+        compile_expr(*call_expr.args[0]);
+        compile_expr(*call_expr.args[1]);
+        emit(OpCode::ArrayResize, call_expr.location);
+        return;
+      }
+      if (method == "pop") {
+        emit(OpCode::ArrayPop, call_expr.location);
+        return;
+      }
+      if (method == "remove") {
+        compile_expr(*call_expr.args[0]);
+        emit(OpCode::ArrayRemove, call_expr.location);
+        return;
+      }
+      if (method == "contains") {
+        compile_expr(*call_expr.args[0]);
+        emit(OpCode::ArrayContains, call_expr.location);
+        return;
+      }
+      if (method == "clear") {
+        emit(OpCode::ArrayClear, call_expr.location);
+        return;
+      }
+      if (method == "insert") {
+        compile_expr(*call_expr.args[0]);
+        compile_expr(*call_expr.args[1]);
+        emit(OpCode::ArrayInsert, call_expr.location);
+        return;
+      }
+      if (method == "index_of") {
+        compile_expr(*call_expr.args[0]);
+        emit(OpCode::ArrayIndexOf, call_expr.location);
+        return;
+      }
+      if (method == "slice") {
+        compile_expr(*call_expr.args[0]);
+        compile_expr(*call_expr.args[1]);
+        emit(OpCode::ArraySlice, call_expr.location);
+        return;
+      }
+      if (method == "reverse") {
+        emit(OpCode::ArrayReverse, call_expr.location);
+        return;
+      }
+      if (method == "starts_with") {
+        compile_expr(*call_expr.args[0]);
+        emit(OpCode::StringStartsWith, call_expr.location);
+        return;
+      }
+      if (method == "ends_with") {
+        compile_expr(*call_expr.args[0]);
+        emit(OpCode::StringEndsWith, call_expr.location);
+        return;
+      }
+      if (method == "replace") {
+        compile_expr(*call_expr.args[0]);
+        compile_expr(*call_expr.args[1]);
+        emit(OpCode::StringReplace, call_expr.location);
+        return;
+      }
+      if (method == "split") {
+        compile_expr(*call_expr.args[0]);
+        emit(OpCode::StringSplit, call_expr.location);
+        return;
+      }
+      if (method == "trim") {
+        emit(OpCode::StringTrim, call_expr.location);
+        return;
+      }
+      if (method == "to_upper") {
+        emit(OpCode::StringToUpper, call_expr.location);
+        return;
+      }
+      if (method == "to_lower") {
+        emit(OpCode::StringToLower, call_expr.location);
+        return;
+      }
+    }
+  }
+
+  // Handle impl method calls: obj.method(args...)
+  if (field_callee) {
+    std::string obj_type = infer_struct_type(*field_callee->object);
+    if (!obj_type.empty()) {
+      std::string method_key = obj_type + "::" + field_callee->field_name;
+      auto func_it = function_indices_.find(method_key);
+      if (func_it != function_indices_.end()) {
+        compile_expr(*field_callee->object);
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_constant(Value::function_value(
+            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+            call_expr.location);
+        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
+                     call_expr.location);
+        return;
+      }
+    }
+    const std::string receiver_ty = infer_arg_type_name(*field_callee->object);
+    if (!receiver_ty.empty()) {
+      const int free_idx = resolve_free_function_for_type(field_callee->field_name, receiver_ty);
+      if (free_idx >= 0) {
+        compile_expr(*field_callee->object);
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_constant(Value::function_value(
+            chunk_.constants()[static_cast<std::size_t>(free_idx)].function_idx),
+            call_expr.location);
+        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
+                     call_expr.location);
+        return;
+      }
+    }
+  }
+
+  // Generic function call — type arguments are explicit, or inferred from the
+  // argument expressions (matching parameters written as bare type params).
+  if (callee_id && generic_func_decls_.count(callee_id->name)) {
+    const ast::FunctionDecl *decl = generic_func_decls_.at(callee_id->name);
+    std::vector<std::string> type_arg_names;
+    if (!call_expr.type_args.empty()) {
+      for (const auto &arg : call_expr.type_args) {
+        type_arg_names.push_back(arg.to_string());
+      }
+    } else {
       std::unordered_map<std::string, std::string> inferred;
-      for (size_t i = 0; i < decl->fields.size() && i < struct_lit->fields.size(); ++i) {
-        const ast::TypeExpr &ft = decl->fields[i].type;
-        if (!ft.type_args.empty() || inferred.count(ft.name)) continue;
+      for (size_t i = 0; i < decl->params.size() && i < call_expr.args.size(); ++i) {
+        const ast::TypeExpr &pt = decl->params[i].type;
+        if (!pt.type_args.empty() || inferred.count(pt.name)) continue;
         bool is_type_param = false;
         for (const std::string &tp : decl->type_params) {
-          if (tp == ft.name) { is_type_param = true; break; }
+          if (tp == pt.name) { is_type_param = true; break; }
         }
         if (is_type_param) {
-          inferred[ft.name] = infer_arg_type_name(*struct_lit->fields[i].value);
+          inferred[pt.name] = infer_arg_type_name(*call_expr.args[i]);
         }
       }
-      std::vector<std::string> targs;
       for (const std::string &tp : decl->type_params) {
         auto it = inferred.find(tp);
-        if (it != inferred.end() && !it->second.empty()) targs.push_back(it->second);
-      }
-      if (targs.size() == decl->type_params.size()) {
-        for (const std::string &n : targs) {
-          ast::TypeExpr a;
-          a.name = n;
-          lit_type.type_args.push_back(a);
+        if (it != inferred.end() && !it->second.empty()) {
+          type_arg_names.push_back(it->second);
         }
       }
     }
-    int struct_idx = resolve_struct(lit_type);
-    if (struct_idx < 0) {
-      std::string type_name = struct_lit->struct_type.to_string();
-      error_at(struct_lit->location, "Unknown struct type '" + type_name + "'.");
-      return;
-    }
-    int type_idx = struct_idx;
-    const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(type_idx)];
-    for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
-      if (i < struct_lit->fields.size()) {
-        compile_expr(*struct_lit->fields[i].value);
-      } else {
-        emit(OpCode::Null, struct_lit->location);
+    if (type_arg_names.size() == decl->type_params.size()) {
+      std::string mangled = callee_id->name;
+      for (const std::string &n : type_arg_names) {
+        mangled += "__" + n;
       }
-    }
-    emit_operand(OpCode::StructNew, static_cast<uint32_t>((type_idx << 16) |
-                 static_cast<int>(meta.field_names.size())), struct_lit->location);
-    return;
-  }
-
-  if (const auto *field_access = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
-    if (const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_access->object.get());
-        ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
-      NativeFn fn;
-      if (ns_obj->member_name == "out" && field_access->field_name == "line") {
-        fn = NativeFn::IoOutLine;
-      } else if (ns_obj->member_name == "err" && field_access->field_name == "line") {
-        fn = NativeFn::IoErrLine;
-      } else if (ns_obj->member_name == "in" && field_access->field_name == "secret") {
-        fn = NativeFn::IoInSecret;
-      } else {
-        error_at(field_access->location, "Unknown io method '" + ns_obj->member_name + "." + field_access->field_name + "'.");
+      auto func_it = function_indices_.find(mangled);
+      if (func_it == function_indices_.end()) {
+        int idx = chunk_.add_function(FunctionInfo{
+            .name = mangled,
+            .entry = 0,
+            .param_count = static_cast<int>(decl->params.size()),
+        });
+        record_function_source(idx, entry_source_path_);
+        uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
+        function_indices_[mangled] = static_cast<int>(const_idx);
+        pending_generic_funcs_.push_back({mangled, decl});
+      }
+      func_it = function_indices_.find(mangled);
+      if (func_it != function_indices_.end()) {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_constant(Value::function_value(
+            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+            call_expr.location);
+        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
         return;
       }
-      emit_constant(Value::native_function_value(fn), field_access->location);
-      return;
     }
-    compile_expr(*field_access->object);
-    uint32_t field_const = chunk_.add_constant(Value::string_value(field_access->field_name));
-    emit_operand(OpCode::FieldGet, field_const, field_access->location);
-    return;
   }
 
-  if (const auto *field_assign = dynamic_cast<const ast::FieldAssignExpr *>(&expr)) {
-    compile_expr(*field_assign->object);
-    compile_expr(*field_assign->value);
-    uint32_t field_const = chunk_.add_constant(Value::string_value(field_assign->field_name));
-    emit_operand(OpCode::FieldSet, field_const, field_assign->location);
-    return;
-  }
-
-  if (const auto *array_lit = dynamic_cast<const ast::ArrayLiteralExpr *>(&expr)) {
-    DenseArrayLit2D dense_shape;
-    if (analyze_dense_array_literal_2d(*array_lit, &dense_shape)) {
-      for (const ast::ExprPtr &row_expr : array_lit->elements) {
-        const auto *row_lit = dynamic_cast<const ast::ArrayLiteralExpr *>(row_expr.get());
-        for (const ast::ExprPtr &cell : row_lit->elements) {
-          compile_expr(*cell);
+  // Concept-generic function call — infer concrete type from concept-typed params.
+  if (callee_id && concept_generic_func_decls_.count(callee_id->name)) {
+    const ast::FunctionDecl *decl = concept_generic_func_decls_.at(callee_id->name);
+    std::string concrete_ty;
+    for (std::size_t i = 0; i < decl->params.size() && i < call_expr.args.size(); ++i) {
+      const ast::TypeExpr &pt = decl->params[i].type;
+      if (pt.type_args.empty() && concept_registry_.count(pt.name)) {
+        const std::string ty = infer_arg_type_name(*call_expr.args[i]);
+        if (!ty.empty()) {
+          concrete_ty = ty;
+          break;
         }
       }
-      emit_operand(OpCode::DenseArrayNew,
-                   pack_dense2d_shape(dense_shape.rows, dense_shape.cols),
-                   array_lit->location);
+    }
+    if (!concrete_ty.empty()) {
+      const std::string mangled = callee_id->name + "__" + concrete_ty;
+      auto func_it = function_indices_.find(mangled);
+      if (func_it == function_indices_.end()) {
+        int idx = chunk_.add_function(FunctionInfo{
+            .name = mangled,
+            .entry = 0,
+            .param_count = static_cast<int>(decl->params.size()),
+        });
+        record_function_source(idx, entry_source_path_);
+        uint32_t const_idx = chunk_.add_constant(Value::function_value(idx));
+        function_indices_[mangled] = static_cast<int>(const_idx);
+        pending_generic_funcs_.push_back({mangled, decl});
+      }
+      func_it = function_indices_.find(mangled);
+      if (func_it != function_indices_.end()) {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_constant(Value::function_value(
+            chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+            call_expr.location);
+        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
+        return;
+      }
+    }
+  }
+
+  // User-defined function call
+  if (callee_id) {
+    std::unordered_map<std::string, int>::const_iterator func_it =
+        function_indices_.end();
+    if (!compiling_namespace_.empty()) {
+      func_it = function_indices_.find(compiling_namespace_ + "::" + callee_id->name);
+    }
+    if (func_it == function_indices_.end()) {
+      func_it = function_indices_.find(callee_id->name);
+    }
+    if (func_it == function_indices_.end()) {
+      std::vector<std::string> ns_sorted(imported_namespaces_.begin(),
+                                         imported_namespaces_.end());
+      std::sort(ns_sorted.begin(), ns_sorted.end());
+      for (const auto &ns : ns_sorted) {
+        auto qit = function_indices_.find(module_id_to_qualifier(ns) + "::" + callee_id->name);
+        if (qit != function_indices_.end()) {
+          func_it = qit;
+          break;
+        }
+      }
+    }
+    if (func_it != function_indices_.end()) {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_constant(Value::function_value(
+          chunk_.constants()[static_cast<std::size_t>(func_it->second)].function_idx),
+          call_expr.location);
+      emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
       return;
     }
-    for (const ast::ExprPtr &element : array_lit->elements) {
-      compile_expr(*element);
-    }
-    emit_operand(OpCode::ArrayNew, static_cast<uint32_t>(array_lit->elements.size()),
-                 array_lit->location);
-    return;
   }
 
-  if (const auto *map_lit = dynamic_cast<const ast::MapLiteralExpr *>(&expr)) {
-    for (std::size_t i = 0; i < map_lit->keys.size(); ++i) {
-      compile_expr(*map_lit->keys[i]);
-      compile_expr(*map_lit->values[i]);
-    }
-    emit_operand(OpCode::MapNew, static_cast<uint32_t>(map_lit->keys.size()),
-                 map_lit->location);
-    return;
+  for (const ast::ExprPtr &arg : call_expr.args) {
+    compile_expr(*arg);
   }
+  compile_expr(*call_expr.callee);
+  emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
+  return;
 
-  if (const auto *index_expr = dynamic_cast<const ast::IndexExpr *>(&expr)) {
-    compile_expr(*index_expr->object);
-    compile_expr(*index_expr->index);
-    emit(OpCode::IndexGet, index_expr->location);
-    return;
-  }
+}
 
-  if (const auto *index_assign = dynamic_cast<const ast::IndexAssignExpr *>(&expr)) {
-    compile_expr(*index_assign->object);
-    compile_expr(*index_assign->index);
-    compile_expr(*index_assign->value);
-    emit(OpCode::IndexSet, index_assign->location);
-    return;
-  }
+void Compiler::compile_match(const ast::MatchExpr &match_expr) {
 
-  if (const auto *cast = dynamic_cast<const ast::CastExpr *>(&expr)) {
-    compile_expr(*cast->value);
-    int target_kind = -1;
-    const std::string &t = cast->target_type.name;
-    if (t == "int") target_kind = 0;
-    else if (t == "float") target_kind = 1;
-    else if (t == "string") target_kind = 2;
-    else if (t == "char" || t == "byte") target_kind = 3;
-    if (target_kind < 0) {
-      error_at(cast->location, "Cast target '" + t + "' is not supported in VM compiler.");
-      return;
-    }
-    emit_operand(OpCode::CastTo, static_cast<uint32_t>(target_kind), cast->location);
-    return;
-  }
+  compile_expr(*match_expr.value);
+  const uint32_t temp_slot = static_cast<uint32_t>(locals_.size());
+  locals_.push_back(Local{.name = "<match_value>", .is_mutable = false});
+  emit_operand(OpCode::StoreLocal, temp_slot, match_expr.location);
 
-  if (const auto *ternary = dynamic_cast<const ast::TernaryExpr *>(&expr)) {
-    compile_expr(*ternary->condition);
-    const std::size_t else_jump = emit_jump(OpCode::JmpFalse, ternary->location);
-    compile_expr(*ternary->then_expr);
-    const std::size_t end_jump = emit_jump(OpCode::Jmp, ternary->location);
-    patch_jump(else_jump);
-    compile_expr(*ternary->else_expr);
-    patch_jump(end_jump);
-    return;
-  }
+  std::vector<std::size_t> end_jumps;
+  for (const ast::MatchArm &arm : match_expr.arms) {
+    const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(arm.pattern.get());
+    const auto *binding = dynamic_cast<const ast::BindingPattern *>(arm.pattern.get());
 
-  if (const auto *null_coalesce = dynamic_cast<const ast::NullCoalesceExpr *>(&expr)) {
-    compile_expr(*null_coalesce->left);
-    // Peek-and-branch on null / CastError. Success arm keeps the original LHS;
-    // fallback arm sees the error value (Pop for bare ?:, or bind with let err =>).
-    const std::size_t fallback_jump = emit_jump(OpCode::JmpIfErr, null_coalesce->location);
-    const std::size_t end_jump = emit_jump(OpCode::Jmp, null_coalesce->location);
-    patch_jump(fallback_jump);
-    if (null_coalesce->err_binding.empty()) {
-      emit(OpCode::Pop, null_coalesce->location);
-      compile_expr(*null_coalesce->right);
-    } else {
-      const uint32_t err_slot = static_cast<uint32_t>(locals_.size());
-      locals_.push_back(Local{.name = null_coalesce->err_binding, .is_mutable = false});
-      emit_operand(OpCode::StoreLocal, err_slot, null_coalesce->location);
-      compile_expr(*null_coalesce->right);
+    if (identifier && identifier->name == "_") {
+      if (arm.guard) {
+        compile_expr(*arm.guard);
+        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr.location);
+        emit(OpCode::Pop, match_expr.location);
+        compile_expr(*arm.body);
+        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+        patch_jump(next_arm);
+      } else {
+        emit(OpCode::Pop, match_expr.location);
+        compile_expr(*arm.body);
+      }
+    } else if (binding) {
+      const uint32_t bind_slot = static_cast<uint32_t>(locals_.size());
+      locals_.push_back(Local{.name = binding->name, .is_mutable = false});
+      emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+      emit_operand(OpCode::StoreLocal, bind_slot, match_expr.location);
+      emit(OpCode::Pop, match_expr.location);
+      if (arm.guard) {
+        compile_expr(*arm.guard);
+        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr.location);
+        emit(OpCode::Pop, match_expr.location);
+        compile_expr(*arm.body);
+        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+        patch_jump(next_arm);
+      } else {
+        compile_expr(*arm.body);
+      }
       locals_.pop_back();
-    }
-    patch_jump(end_jump);
-    return;
-  }
+    } else if (const auto *arr_pat = dynamic_cast<const ast::ArrayPattern *>(arm.pattern.get())) {
+      std::vector<uint32_t> bind_slots;
+      std::vector<std::size_t> fail_jumps;
+      for (std::size_t i = 0; i < arr_pat->elements.size(); ++i) {
+        const auto &elem = arr_pat->elements[i];
+        const auto *elem_binding = dynamic_cast<const ast::BindingPattern *>(elem.get());
+        const auto *elem_wildcard = dynamic_cast<const ast::IdentifierExpr *>(elem.get());
+        if (elem_binding) {
+          const uint32_t slot = static_cast<uint32_t>(locals_.size());
+          locals_.push_back(Local{.name = elem_binding->name, .is_mutable = false});
+          emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+          emit_constant(Value::int_value(static_cast<int>(i)), match_expr.location);
+          emit(OpCode::IndexGet, match_expr.location);
+          emit_operand(OpCode::StoreLocal, slot, match_expr.location);
+          emit(OpCode::Pop, match_expr.location);
+          bind_slots.push_back(slot);
+        } else if (elem_wildcard && elem_wildcard->name == "_") {
+          // wildcard element, skip
+        } else {
+          emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+          emit_constant(Value::int_value(static_cast<int>(i)), match_expr.location);
+          emit(OpCode::IndexGet, match_expr.location);
+          compile_expr(*elem);
+          emit(OpCode::Eq, match_expr.location);
+          fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr.location));
+        }
+      }
+      if (arm.guard) {
+        compile_expr(*arm.guard);
+        fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr.location));
+        emit(OpCode::Pop, match_expr.location);
+      }
+      compile_expr(*arm.body);
+      end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+      for (std::size_t fj : fail_jumps) {
+        patch_jump(fj);
+      }
+      for (std::size_t j = 0; j < bind_slots.size(); ++j) {
+        locals_.pop_back();
+      }
+    } else if (const auto *enum_pat = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get())) {
+      // Enum pattern: match variant and optionally extract payload
+      auto enum_it = enum_indices_.find(enum_pat->enum_name);
+      if (enum_it == enum_indices_.end()) {
+        error_at(enum_pat->location, "Unknown enum type '" + enum_pat->enum_name + "'.");
+        return;
+      }
+      int type_idx = enum_it->second;
+      const auto &meta = chunk_.enum_metas()[static_cast<std::size_t>(type_idx)];
+      int variant_idx = -1;
+      for (int i = 0; i < static_cast<int>(meta.variants.size()); ++i) {
+        if (meta.variants[static_cast<std::size_t>(i)] == enum_pat->variant_name) {
+          variant_idx = i;
+          break;
+        }
+      }
+      if (variant_idx < 0) {
+        error_at(enum_pat->location, "Unknown enum variant '" + enum_pat->variant_name + "'.");
+        return;
+      }
 
-  if (const auto *prop = dynamic_cast<const ast::PropagateExpr *>(&expr)) {
-    compile_expr(*prop->value);
-    if (in_try_) {
-      // Inside a try block: use PropagateErr which peeks the stack and
-      // either no-ops (success) or pops + jumps to catch via handler_stack_.
-      emit(OpCode::PropagateErr, prop->location);
+      std::vector<std::size_t> fail_jumps;
+      std::vector<uint32_t> bind_slots;
+
+      // Check if value matches this enum type and variant
+      // Stack: [initial_val]
+      emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+      uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
+      emit_operand(OpCode::EnumVariant, operand, enum_pat->location);
+      emit(OpCode::Eq, enum_pat->location);
+      fail_jumps.push_back(emit_jump(OpCode::JmpFalse, enum_pat->location));
+      // JmpFalse popped the Eq result; initial_val still on stack.
+
+      // Extract payload bindings — these push/pop around initial_val.
+      for (std::size_t i = 0; i < enum_pat->fields.size(); ++i) {
+        const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(enum_pat->fields[i].get());
+        if (field_binding) {
+          const uint32_t slot = static_cast<uint32_t>(locals_.size());
+          locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
+          emit_operand(OpCode::LoadLocal, temp_slot, enum_pat->location);
+          emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(i), enum_pat->location);
+          emit_operand(OpCode::StoreLocal, slot, enum_pat->location);
+          emit(OpCode::Pop, enum_pat->location);
+          bind_slots.push_back(slot);
+        }
+      }
+
+      if (arm.guard) {
+        compile_expr(*arm.guard);
+        fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr.location));
+        // Pop initial_val so body result is clean on stack.
+        emit(OpCode::Pop, match_expr.location);
+      } else {
+        // No guard: pop initial_val before body.
+        emit(OpCode::Pop, match_expr.location);
+      }
+
+      compile_expr(*arm.body);
+      end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+
+      for (std::size_t fj : fail_jumps) {
+        patch_jump(fj);
+      }
+      for (std::size_t j = 0; j < bind_slots.size(); ++j) {
+        locals_.pop_back();
+      }
+    } else if (const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(arm.pattern.get())) {
+      auto struct_it = struct_indices_.find(struct_pat->struct_name);
+      if (struct_it == struct_indices_.end()) {
+        error_at(struct_pat->location, "Unknown struct type '" + struct_pat->struct_name + "'.");
+        return;
+      }
+      const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(struct_it->second)];
+      std::vector<std::size_t> fail_jumps;
+      std::vector<uint32_t> bind_slots;
+      for (std::size_t i = 0; i < struct_pat->fields.size(); ++i) {
+        const auto &pf = struct_pat->fields[i];
+        std::string field_name;
+        if (!pf.name.empty()) {
+          field_name = pf.name;
+        } else if (i < meta.field_names.size()) {
+          field_name = meta.field_names[i];
+        } else {
+          error_at(struct_pat->location, "Struct pattern has too many fields.");
+          return;
+        }
+        const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(pf.pattern.get());
+        const auto *field_wildcard = dynamic_cast<const ast::IdentifierExpr *>(pf.pattern.get());
+        if (field_binding) {
+          const uint32_t slot = static_cast<uint32_t>(locals_.size());
+          locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
+          emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
+          uint32_t field_const = chunk_.add_constant(Value::string_value(field_name));
+          emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
+          emit_operand(OpCode::StoreLocal, slot, struct_pat->location);
+          emit(OpCode::Pop, struct_pat->location);
+          bind_slots.push_back(slot);
+        } else if (field_wildcard && field_wildcard->name == "_") {
+          continue;
+        } else {
+          emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
+          uint32_t field_const = chunk_.add_constant(Value::string_value(field_name));
+          emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
+          compile_expr(*pf.pattern);
+          emit(OpCode::Eq, struct_pat->location);
+          fail_jumps.push_back(emit_jump(OpCode::JmpFalse, struct_pat->location));
+        }
+      }
+      if (arm.guard) {
+        compile_expr(*arm.guard);
+        fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr.location));
+        emit(OpCode::Pop, match_expr.location);
+      } else {
+        emit(OpCode::Pop, match_expr.location);
+      }
+      compile_expr(*arm.body);
+      end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+      for (std::size_t fj : fail_jumps) {
+        patch_jump(fj);
+      }
+      for (std::size_t j = 0; j < bind_slots.size(); ++j) {
+        locals_.pop_back();
+      }
     } else {
-      // Function-level: JmpIfErr → Pop + Null + Return.
-      const std::size_t err_jump = emit_jump(OpCode::JmpIfErr, prop->location);
-      const std::size_t end_jump = emit_jump(OpCode::Jmp, prop->location);
-      patch_jump(err_jump);
-      emit(OpCode::Pop, prop->location);
-      emit(OpCode::Null, prop->location);
-      emit(OpCode::Return, prop->location);
-      patch_jump(end_jump);
+      emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+      compile_expr(*arm.pattern);
+      emit(OpCode::Eq, match_expr.location);
+      if (arm.guard) {
+        const std::size_t skip_guard = emit_jump(OpCode::JmpFalse, match_expr.location);
+        emit(OpCode::Pop, match_expr.location);
+        compile_expr(*arm.guard);
+        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr.location);
+        emit(OpCode::Pop, match_expr.location);
+        compile_expr(*arm.body);
+        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+        patch_jump(next_arm);
+        patch_jump(skip_guard);
+      } else {
+        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr.location);
+        emit(OpCode::Pop, match_expr.location);
+        compile_expr(*arm.body);
+        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+        patch_jump(next_arm);
+      }
     }
-    return;
   }
 
-  error_at(expr.location, "Unsupported expression in VM compiler.");
+  for (std::size_t jump : end_jumps) {
+    patch_jump(jump);
+  }
+
+  locals_.pop_back();
+  return;
+
+}
+
+void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_access) {
+
+  auto enum_it = enum_indices_.find(ns_access.namespace_name);
+  if (enum_it != enum_indices_.end()) {
+    int type_idx = enum_it->second;
+    const auto &meta = chunk_.enum_metas()[static_cast<std::size_t>(type_idx)];
+    int variant_idx = -1;
+    for (int i = 0; i < static_cast<int>(meta.variants.size()); ++i) {
+      if (meta.variants[static_cast<std::size_t>(i)] == ns_access.member_name) {
+        variant_idx = i;
+        break;
+      }
+    }
+    if (variant_idx < 0) {
+      error_at(ns_access.location, "Unknown enum variant '" + ns_access.member_name + "'.");
+      return;
+    }
+    int param_count = meta.variant_param_counts[static_cast<std::size_t>(variant_idx)];
+    if (param_count > 0) {
+      error_at(ns_access.location, "Enum variant '" + ns_access.member_name + "' requires " +
+               std::to_string(param_count) + " argument(s).");
+      return;
+    }
+    uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) |
+                       static_cast<uint32_t>(variant_idx);
+    emit_operand(OpCode::EnumVariant, operand, ns_access.location);
+    return;
+  }
+  if (ns_access.namespace_name == "io" && used_.count("io") != 0) {
+    NativeFn fn;
+    if (ns_access.member_name == "out") {
+      fn = NativeFn::IoOut;
+    } else if (ns_access.member_name == "err") {
+      fn = NativeFn::IoErr;
+    } else if (ns_access.member_name == "in") {
+      fn = NativeFn::IoIn;
+    } else {
+      error_at(ns_access.location, "Unknown io member '" + ns_access.member_name + "'.");
+      return;
+    }
+    emit_constant(Value::native_function_value(fn), ns_access.location);
+    return;
+  }
+  if (ns_access.namespace_name == "fs" && used_.count("fs") != 0) {
+    NativeFn fn;
+    if (ns_access.member_name == "__read") {
+      fn = NativeFn::FsRead;
+    } else if (ns_access.member_name == "__write") {
+      fn = NativeFn::FsWrite;
+    } else {
+      error_at(ns_access.location, "Unknown fs member '" + ns_access.member_name + "'.");
+      return;
+    }
+    emit_constant(Value::native_function_value(fn), ns_access.location);
+    return;
+  }
+  if (ns_access.namespace_name == "sys" && used_.count("sys") != 0) {
+    NativeFn fn;
+    if (ns_access.member_name == "args") {
+      fn = NativeFn::SysArgs;
+    } else {
+      error_at(ns_access.location, "Unknown sys member '" + ns_access.member_name + "'.");
+      return;
+    }
+    emit_constant(Value::native_function_value(fn), ns_access.location);
+    return;
+  }
+  // Check concept namespaces for fully-qualified calls (Printable::to_string)
+  if (concept_registry_.count(ns_access.namespace_name)) {
+    // Defer to calling context: the callee will resolve the trait method
+    // based on the argument type. For now, emit the member as a name lookup
+    // so the call site can mangle it as Type::method.
+    return;
+  }
+  // Check imported module namespaces
+  {
+    const std::string qualified =
+        resolve_module_qualified(ns_access.namespace_name, ns_access.member_name);
+    const std::string prefix = qualified.substr(0, qualified.rfind("::"));
+    if (imported_qualifiers_.count(prefix)) {
+      auto it = function_indices_.find(qualified);
+      if (it != function_indices_.end()) {
+        emit_constant(Value::function_value(
+                          chunk_.constants()[static_cast<std::size_t>(it->second)].function_idx),
+                      ns_access.location);
+        return;
+      }
+      error_at(ns_access.location, "'" + ns_access.member_name + "' is not exported from '" +
+                                      prefix + "'.");
+      return;
+    }
+  }
+  if (used_.count(ns_access.namespace_name) != 0) {
+    return;
+  }
+  if (ns_access.namespace_name == "io") {
+    error_at(ns_access.location,
+             "Module 'io' is not imported. Add 'using io;' at the top of the file.");
+  } else {
+    error_at(ns_access.location, "Unknown namespace '" + ns_access.namespace_name + "'.");
+  }
+  return;
+
+}
+
+void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) {
+
+  // Infer omitted type arguments for a generic struct literal from its field
+  // values (e.g. `Box { 7 }` -> `Box<int>`), mirroring the checker.
+  ast::TypeExpr lit_type = struct_lit.struct_type;
+  if (lit_type.type_args.empty() && generic_struct_decls_.count(lit_type.name)) {
+    const ast::StructDecl *decl = generic_struct_decls_.at(lit_type.name);
+    std::unordered_map<std::string, std::string> inferred;
+    for (size_t i = 0; i < decl->fields.size() && i < struct_lit.fields.size(); ++i) {
+      const ast::TypeExpr &ft = decl->fields[i].type;
+      if (!ft.type_args.empty() || inferred.count(ft.name)) continue;
+      bool is_type_param = false;
+      for (const std::string &tp : decl->type_params) {
+        if (tp == ft.name) { is_type_param = true; break; }
+      }
+      if (is_type_param) {
+        inferred[ft.name] = infer_arg_type_name(*struct_lit.fields[i].value);
+      }
+    }
+    std::vector<std::string> targs;
+    for (const std::string &tp : decl->type_params) {
+      auto it = inferred.find(tp);
+      if (it != inferred.end() && !it->second.empty()) targs.push_back(it->second);
+    }
+    if (targs.size() == decl->type_params.size()) {
+      for (const std::string &n : targs) {
+        ast::TypeExpr a;
+        a.name = n;
+        lit_type.type_args.push_back(a);
+      }
+    }
+  }
+  int struct_idx = resolve_struct(lit_type);
+  if (struct_idx < 0) {
+    std::string type_name = struct_lit.struct_type.to_string();
+    error_at(struct_lit.location, "Unknown struct type '" + type_name + "'.");
+    return;
+  }
+  int type_idx = struct_idx;
+  const auto &meta = chunk_.struct_metas()[static_cast<std::size_t>(type_idx)];
+  for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
+    if (i < struct_lit.fields.size()) {
+      compile_expr(*struct_lit.fields[i].value);
+    } else {
+      emit(OpCode::Null, struct_lit.location);
+    }
+  }
+  emit_operand(OpCode::StructNew, static_cast<uint32_t>((type_idx << 16) |
+               static_cast<int>(meta.field_names.size())), struct_lit.location);
+  return;
+
+}
+
+void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
+
+  if (const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
+      ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
+    NativeFn fn;
+    if (ns_obj->member_name == "out" && field_access.field_name == "line") {
+      fn = NativeFn::IoOutLine;
+    } else if (ns_obj->member_name == "err" && field_access.field_name == "line") {
+      fn = NativeFn::IoErrLine;
+    } else if (ns_obj->member_name == "in" && field_access.field_name == "secret") {
+      fn = NativeFn::IoInSecret;
+    } else {
+      error_at(field_access.location, "Unknown io method '" + ns_obj->member_name + "." + field_access.field_name + "'.");
+      return;
+    }
+    emit_constant(Value::native_function_value(fn), field_access.location);
+    return;
+  }
+  compile_expr(*field_access.object);
+  uint32_t field_const = chunk_.add_constant(Value::string_value(field_access.field_name));
+  emit_operand(OpCode::FieldGet, field_const, field_access.location);
+  return;
+
+}
+
+void Compiler::compile_field_assign(const ast::FieldAssignExpr &field_assign) {
+
+  compile_expr(*field_assign.object);
+  compile_expr(*field_assign.value);
+  uint32_t field_const = chunk_.add_constant(Value::string_value(field_assign.field_name));
+  emit_operand(OpCode::FieldSet, field_const, field_assign.location);
+  return;
+
+}
+
+void Compiler::compile_array_literal(const ast::ArrayLiteralExpr &array_lit) {
+
+  DenseArrayLit2D dense_shape;
+  if (analyze_dense_array_literal_2d(array_lit, &dense_shape)) {
+    for (const ast::ExprPtr &row_expr : array_lit.elements) {
+      const auto *row_lit = dynamic_cast<const ast::ArrayLiteralExpr *>(row_expr.get());
+      for (const ast::ExprPtr &cell : row_lit->elements) {
+        compile_expr(*cell);
+      }
+    }
+    emit_operand(OpCode::DenseArrayNew,
+                 pack_dense2d_shape(dense_shape.rows, dense_shape.cols),
+                 array_lit.location);
+    return;
+  }
+  for (const ast::ExprPtr &element : array_lit.elements) {
+    compile_expr(*element);
+  }
+  emit_operand(OpCode::ArrayNew, static_cast<uint32_t>(array_lit.elements.size()),
+               array_lit.location);
+  return;
+
+}
+
+void Compiler::compile_map_literal(const ast::MapLiteralExpr &map_lit) {
+
+  for (std::size_t i = 0; i < map_lit.keys.size(); ++i) {
+    compile_expr(*map_lit.keys[i]);
+    compile_expr(*map_lit.values[i]);
+  }
+  emit_operand(OpCode::MapNew, static_cast<uint32_t>(map_lit.keys.size()),
+               map_lit.location);
+  return;
+
+}
+
+void Compiler::compile_index(const ast::IndexExpr &index_expr) {
+
+  compile_expr(*index_expr.object);
+  compile_expr(*index_expr.index);
+  emit(OpCode::IndexGet, index_expr.location);
+  return;
+
+}
+
+void Compiler::compile_index_assign(const ast::IndexAssignExpr &index_assign) {
+
+  compile_expr(*index_assign.object);
+  compile_expr(*index_assign.index);
+  compile_expr(*index_assign.value);
+  emit(OpCode::IndexSet, index_assign.location);
+  return;
+
+}
+
+void Compiler::compile_cast(const ast::CastExpr &cast) {
+
+  compile_expr(*cast.value);
+  int target_kind = -1;
+  const std::string &t = cast.target_type.name;
+  if (t == "int") target_kind = 0;
+  else if (t == "float") target_kind = 1;
+  else if (t == "string") target_kind = 2;
+  else if (t == "char" || t == "byte") target_kind = 3;
+  if (target_kind < 0) {
+    error_at(cast.location, "Cast target '" + t + "' is not supported in VM compiler.");
+    return;
+  }
+  emit_operand(OpCode::CastTo, static_cast<uint32_t>(target_kind), cast.location);
+  return;
+
+}
+
+void Compiler::compile_ternary(const ast::TernaryExpr &ternary) {
+
+  compile_expr(*ternary.condition);
+  const std::size_t else_jump = emit_jump(OpCode::JmpFalse, ternary.location);
+  compile_expr(*ternary.then_expr);
+  const std::size_t end_jump = emit_jump(OpCode::Jmp, ternary.location);
+  patch_jump(else_jump);
+  compile_expr(*ternary.else_expr);
+  patch_jump(end_jump);
+  return;
+
+}
+
+void Compiler::compile_null_coalesce(const ast::NullCoalesceExpr &null_coalesce) {
+
+  compile_expr(*null_coalesce.left);
+  // Peek-and-branch on null / CastError. Success arm keeps the original LHS;
+  // fallback arm sees the error value (Pop for bare ?:, or bind with let err =>).
+  const std::size_t fallback_jump = emit_jump(OpCode::JmpIfErr, null_coalesce.location);
+  const std::size_t end_jump = emit_jump(OpCode::Jmp, null_coalesce.location);
+  patch_jump(fallback_jump);
+  if (null_coalesce.err_binding.empty()) {
+    emit(OpCode::Pop, null_coalesce.location);
+    compile_expr(*null_coalesce.right);
+  } else {
+    const uint32_t err_slot = static_cast<uint32_t>(locals_.size());
+    locals_.push_back(Local{.name = null_coalesce.err_binding, .is_mutable = false});
+    emit_operand(OpCode::StoreLocal, err_slot, null_coalesce.location);
+    compile_expr(*null_coalesce.right);
+    locals_.pop_back();
+  }
+  patch_jump(end_jump);
+  return;
+
+}
+
+void Compiler::compile_propagate(const ast::PropagateExpr &prop) {
+
+  compile_expr(*prop.value);
+  if (in_try_) {
+    // Inside a try block: use PropagateErr which peeks the stack and
+    // either no-ops (success) or pops + jumps to catch via handler_stack_.
+    emit(OpCode::PropagateErr, prop.location);
+  } else {
+    // Function-level: JmpIfErr → Pop + Null + Return.
+    const std::size_t err_jump = emit_jump(OpCode::JmpIfErr, prop.location);
+    const std::size_t end_jump = emit_jump(OpCode::Jmp, prop.location);
+    patch_jump(err_jump);
+    emit(OpCode::Pop, prop.location);
+    emit(OpCode::Null, prop.location);
+    emit(OpCode::Return, prop.location);
+    patch_jump(end_jump);
+  }
+  return;
+
+}
+
+void Compiler::compile_expr(const ast::Expr &expr) {
+  expr.accept(*this);
 }
 
 void Compiler::compile_assignment(const ast::AssignExpr &assign) {
@@ -2659,4 +2703,28 @@ bool Compiler::function_uses_concept_params(const ast::FunctionDecl &function) c
   return false;
 }
 
+void Compiler::visit(const ast::IntLiteralExpr &x) { compile_int_literal(x); }
+void Compiler::visit(const ast::CharLiteralExpr &x) { compile_char_literal(x); }
+void Compiler::visit(const ast::FloatLiteralExpr &x) { compile_float_literal(x); }
+void Compiler::visit(const ast::StringLiteralExpr &x) { compile_string_literal(x); }
+void Compiler::visit(const ast::BoolLiteralExpr &x) { compile_bool_literal(x); }
+void Compiler::visit(const ast::NullLiteralExpr &x) { compile_null_literal(x); }
+void Compiler::visit(const ast::UnaryExpr &x) { compile_unary(x); }
+void Compiler::visit(const ast::IdentifierExpr &x) { compile_identifier(x); }
+void Compiler::visit(const ast::AssignExpr &x) { compile_assign_expr(x); }
+void Compiler::visit(const ast::BinaryExpr &x) { compile_binary(x); }
+void Compiler::visit(const ast::CallExpr &x) { compile_call(x); }
+void Compiler::visit(const ast::MatchExpr &x) { compile_match(x); }
+void Compiler::visit(const ast::NamespaceAccessExpr &x) { compile_namespace_access(x); }
+void Compiler::visit(const ast::StructLiteralExpr &x) { compile_struct_literal(x); }
+void Compiler::visit(const ast::FieldAccessExpr &x) { compile_field_access(x); }
+void Compiler::visit(const ast::FieldAssignExpr &x) { compile_field_assign(x); }
+void Compiler::visit(const ast::ArrayLiteralExpr &x) { compile_array_literal(x); }
+void Compiler::visit(const ast::MapLiteralExpr &x) { compile_map_literal(x); }
+void Compiler::visit(const ast::IndexExpr &x) { compile_index(x); }
+void Compiler::visit(const ast::IndexAssignExpr &x) { compile_index_assign(x); }
+void Compiler::visit(const ast::CastExpr &x) { compile_cast(x); }
+void Compiler::visit(const ast::TernaryExpr &x) { compile_ternary(x); }
+void Compiler::visit(const ast::NullCoalesceExpr &x) { compile_null_coalesce(x); }
+void Compiler::visit(const ast::PropagateExpr &x) { compile_propagate(x); }
 } // namespace kinglet
