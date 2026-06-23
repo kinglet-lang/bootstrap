@@ -1,0 +1,32 @@
+import("//build/llvm.gni")
+
+if (enable_llvm) {
+  config("llvm") {
+    cflags_cc = llvm_cxxflags
+    ldflags = llvm_ldflags
+    libs = llvm_libs
+    defines = [ "KINGLET_HAVE_LLVM=1" ]
+  }
+
+  source_set("llvm_codegen") {
+    sources = [
+      "kir_to_llvm.cc",
+      "kir_to_llvm.h",
+    ]
+
+    public = [
+      "kir_to_llvm.h",
+    ]
+
+    deps = [
+      "//compiler/ir",
+      "//compiler/frontend/module",
+    ]
+
+    public_configs = [ ":llvm" ]
+
+    include_dirs = [
+      "//compiler",
+    ]
+  }
+}

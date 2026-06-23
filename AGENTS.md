@@ -36,19 +36,16 @@ Test suites: `bash tests/run_all.sh` (see [tests/README.md](tests/README.md))
 
 ## Directory Structure
 
-See [src/README.md](src/README.md) for the pipeline diagram and GN deps.
+See [compiler/README.md](compiler/README.md) for the pipeline diagram and GN deps.
 
 ```
-src/
-├── lexer/ parser/ ast/ types/    # frontend
-├── checker/ module/              # semantics + imports + kinglet.toml
-├── ir/                           # KIR (shared backend IR)
-├── compiler/                     # AST → KIR + VM bytecode
-├── vm/                           # bytecode interpreter
-├── codegen/llvm/                 # KIR → native (optional)
-└── kinglet/                      # main, cli_driver, vm_main
+compiler/                         # the bootstrap compiler (C++20)
+├── frontend/                     # lexer, parser, ast, types, checker, module
+├── ir/                           # KIR (shared middle-end IR)
+├── backend/                      # compiler (AST→KIR), vm, codegen/llvm (optional)
+└── driver/                       # kinglet (main, cli_driver, vm_main), preen (formatter)
 
-runtime/                          # libkinglet_rt (user program native RT)
+runtime/                          # libkinglet_rt (user program native RT; ABI-stable, independent)
 build/                            # GN toolchains, llvm.gni, embed.gni
 tests/                            # ADR 0012 layout (see tests/README.md)
 ```
@@ -59,8 +56,8 @@ tests/                            # ADR 0012 layout (see tests/README.md)
 - `-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion`
 - Namespace: `kinglet`, `kinglet::ast`
 - `dynamic_cast` for AST dispatch (no visitor yet)
-- Each module: `src/<name>/BUILD.gn` static_library; wire new libs in root `BUILD.gn`
-- `include_dirs = ["//src"]` — includes are `"lexer/scanner.h"` style
+- Each module: `compiler/<tier>/<name>/BUILD.gn` static_library; wire new libs in root `BUILD.gn`
+- `include_dirs = ["//compiler"]` — includes are `"frontend/lexer/scanner.h"` style
 
 ## Ref vs Shadow
 
@@ -72,7 +69,7 @@ tests/                            # ADR 0012 layout (see tests/README.md)
 
 ## Large Files (split when touching)
 
-- `checker/type_checker.cc`
-- `compiler/compiler.cc`
-- `codegen/llvm/kir_to_llvm.cc`
-- `parser/parser.cc`
+- `frontend/checker/type_checker.cc`
+- `backend/compiler/compiler.cc`
+- `backend/codegen/llvm/kir_to_llvm.cc`
+- `frontend/parser/parser.cc`

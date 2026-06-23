@@ -1,0 +1,31 @@
+static_library("preen") {
+  sources = [
+    "config.cc",
+    "config.h",
+    "emitter.cc",
+    "emitter.h",
+    "extension.cc",
+    "extension.h",
+    "fmt_lexer.cc",
+    "fmt_lexer.h",
+    "preen.cc",
+    "preen.h",
+    "span_map.cc",
+    "span_map.h",
+    "token_trivia.cc",
+    "token_trivia.h",
+    "trivia.cc",
+    "trivia.h",
+  ]
+
+  deps = [
+    "//compiler/frontend/ast",
+    "//compiler/frontend/lexer",
+    "//compiler/frontend/module",
+    "//compiler/frontend/parser",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}

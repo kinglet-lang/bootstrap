@@ -1,0 +1,24 @@
+static_library("compiler") {
+  sources = [
+    "bytecode_emitter.cc",
+    "bytecode_emitter.h",
+    "compiler.cc",
+    "compiler.h",
+    "dense_array_lit.cc",
+    "dense_array_lit.h",
+    "expr_width.cc",
+    "expr_width.h",
+  ]
+
+  deps = [
+    "//compiler/frontend/ast",
+    "//compiler/ir",
+    "//compiler/frontend/module",
+    "//compiler/frontend/types",
+    "//compiler/backend/vm",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}

@@ -1,0 +1,30 @@
+static_library("module") {
+  sources = [
+    "module_id.cc",
+    "module_id.h",
+    "native_symbol.cc",
+    "native_symbol.h",
+    "module_loader.cc",
+    "module_loader.h",
+    "nest_parser.cc",
+    "nest_parser.h",
+    "project_config.cc",
+    "project_config.h",
+  ]
+
+  deps = [
+    "//compiler/frontend/ast",
+    "//compiler/frontend/lexer",
+    "//compiler/frontend/parser",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}
+
+executable("nest_parser_test") {
+  sources = [ "nest_parser_test.cc" ]
+  deps = [ ":module" ]
+  include_dirs = [ "//compiler" ]
+}

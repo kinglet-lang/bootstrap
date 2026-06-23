@@ -12,18 +12,18 @@ from pathlib import Path
 CORE_SUFFIXES = {".cc", ".h", ".c", ".kl"}
 
 BOOTSTRAP_CORE_PREFIXES = (
-    "src/ast/",
-    "src/checker/",
-    "src/compiler/",
-    "src/lexer/",
-    "src/module/",
-    "src/parser/",
-    "src/preen/",
-    "src/types/",
-    "src/ir/",
-    "src/codegen/llvm/",
-    "src/kinglet/main.",
-    "src/kinglet/cli_driver.",
+    "compiler/frontend/ast/",
+    "compiler/frontend/checker/",
+    "compiler/backend/compiler/",
+    "compiler/frontend/lexer/",
+    "compiler/frontend/module/",
+    "compiler/frontend/parser/",
+    "compiler/driver/preen/",
+    "compiler/frontend/types/",
+    "compiler/ir/",
+    "compiler/backend/codegen/llvm/",
+    "compiler/driver/kinglet/main.",
+    "compiler/driver/kinglet/cli_driver.",
 )
 
 KINGLET_CORE_PREFIXES = (
@@ -70,7 +70,7 @@ def repo_root() -> Path:
 
 
 def core_prefixes(root: Path) -> tuple[str, ...]:
-    if (root / "src" / "compiler").is_dir():
+    if (root / "compiler" / "frontend").is_dir():
         return BOOTSTRAP_CORE_PREFIXES
     if (root / "compiler").is_dir() and (root / "parser").is_dir():
         return KINGLET_CORE_PREFIXES

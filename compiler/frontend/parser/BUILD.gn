@@ -1,0 +1,15 @@
+static_library("parser") {
+  sources = [
+    "parser.cc",
+    "parser.h",
+  ]
+
+  deps = [
+    "//compiler/frontend/ast",
+    "//compiler/frontend/lexer",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}

@@ -1,0 +1,14 @@
+static_library("vm") {
+  sources = [
+    "chunk.cc",
+    "chunk.h",
+    "numeric.cc",
+    "numeric.h",
+    "value.cc",
+    "value.h",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}

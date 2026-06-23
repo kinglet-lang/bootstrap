@@ -9,7 +9,7 @@ group("default") {
     "//runtime:kinglet_rt",
   ]
   if (enable_llvm) {
-    deps += [ "//src/codegen/llvm:llvm_codegen" ]
+    deps += [ "//compiler/backend/codegen/llvm:llvm_codegen" ]
   }
 }
 
@@ -27,29 +27,29 @@ if (embed_compiler_path != "") {
 
 executable("kinglet") {
   sources = [
-    "src/kinglet/cli_driver.cc",
-    "src/kinglet/main.cc",
+    "compiler/driver/kinglet/cli_driver.cc",
+    "compiler/driver/kinglet/main.cc",
   ]
 
   defines = _kinglet_defines
 
   deps = [
-    "//src/checker",
-    "//src/compiler",
-    "//src/ir",
-    "//src/lexer",
-    "//src/module",
-    "//src/parser",
-    "//src/preen",
-    "//src/vm",
+    "//compiler/frontend/checker",
+    "//compiler/backend/compiler",
+    "//compiler/ir",
+    "//compiler/frontend/lexer",
+    "//compiler/frontend/module",
+    "//compiler/frontend/parser",
+    "//compiler/driver/preen",
+    "//compiler/backend/vm",
   ]
 
   if (enable_llvm) {
     deps += [
       "//runtime:kinglet_rt",
-      "//src/codegen/llvm:llvm_codegen",
+      "//compiler/backend/codegen/llvm:llvm_codegen",
     ]
-    configs += [ "//src/codegen/llvm:llvm" ]
+    configs += [ "//compiler/backend/codegen/llvm:llvm" ]
   }
 
   if (embed_compiler_path != "") {
@@ -59,6 +59,6 @@ executable("kinglet") {
   }
 
   include_dirs = [
-    "//src",
+    "//compiler",
   ]
 }

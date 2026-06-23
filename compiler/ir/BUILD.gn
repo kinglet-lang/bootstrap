@@ -1,0 +1,30 @@
+static_library("ir") {
+  sources = [
+    "ir_builder.cc",
+    "ir_builder.h",
+    "kir.cc",
+    "kir.h",
+    "kir_recorder.cc",
+    "kir_recorder.h",
+    "kir_typing.cc",
+    "kir_typing.h",
+    "kir_numeric.cc",
+    "kir_numeric.h",
+    "kir_container.cc",
+    "kir_container.h",
+    "kir_specialize.cc",
+    "kir_specialize.h",
+    "kir_field_resolve.cc",
+    "kir_field_resolve.h",
+  ]
+
+  deps = [
+    "//compiler/frontend/ast",
+    "//compiler/frontend/types",
+    "//compiler/backend/vm",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}

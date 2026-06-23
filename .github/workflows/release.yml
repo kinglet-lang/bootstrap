@@ -69,7 +69,7 @@ jobs:
           mkdir -p dist
           cp out/Release/kinglet dist/
           # Native backend links user programs against the static runtime; it must
-          # sit beside the kinglet binary (see resolve_rt_lib in src/kinglet/main.cc).
+          # sit beside the kinglet binary (see resolve_rt_lib in compiler/driver/kinglet/main.cc).
           cp out/Release/obj/runtime/libkinglet_rt.a dist/
           bash scripts/stage-klet-alias.sh dist
           cd dist && tar czf "../${{ matrix.artifact }}.tar.gz" *
