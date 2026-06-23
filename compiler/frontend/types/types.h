@@ -5,6 +5,7 @@
 
 #include "frontend/types/type_id.h"
 
+#include <cstdint>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -12,7 +13,7 @@
 
 namespace kinglet {
 
-enum class TypeKind {
+enum class TypeKind : std::uint8_t {
   Int,
   Float,
   Bool,

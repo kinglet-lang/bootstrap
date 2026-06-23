@@ -8,6 +8,8 @@
 #include "frontend/types/types.h"
 #include "frontend/sema/semantic_context.h"
 
+#include <cstdint>
+
 namespace kinglet {
 class ModuleLoader;
 struct ParsedModule;
@@ -22,7 +24,7 @@ struct ParsedModule;
 
 namespace kinglet {
 
-enum class DiagnosticSeverity { Error = 1, Warning = 2, Info = 3, Hint = 4 };
+enum class DiagnosticSeverity : std::uint8_t { Error = 1, Warning = 2, Info = 3, Hint = 4 };
 
 struct TypeError {
   ast::SourceLocation location;

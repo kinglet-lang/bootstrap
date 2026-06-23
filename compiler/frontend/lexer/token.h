@@ -9,7 +9,7 @@
 
 namespace kinglet {
 
-enum class TokenType {
+enum class TokenType : std::uint8_t {
 
   /* clang-format off */
   

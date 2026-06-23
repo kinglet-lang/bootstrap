@@ -11,7 +11,7 @@
 
 namespace kinglet::ast {
 
-enum class BinaryOp {
+enum class BinaryOp : std::uint8_t {
   Add,
   Sub,
   Mul,
@@ -32,7 +32,7 @@ enum class BinaryOp {
   Shr,
 };
 
-enum class UnaryOp {
+enum class UnaryOp : std::uint8_t {
   Neg,
   Not,
   BitNot,
@@ -40,7 +40,7 @@ enum class UnaryOp {
   MutRef,
 };
 
-enum class AssignOp {
+enum class AssignOp : std::uint8_t {
   Assign,
   AddAssign,
   SubAssign,

@@ -3,11 +3,12 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace kinglet::lsp {
 
-enum class CompletionPosition {
+enum class CompletionPosition : std::uint8_t {
   None,
   TopLevelDecl,
   TypeExpr,
