@@ -2,6 +2,10 @@ static_library("parser") {
   sources = [
     "parser.cc",
     "parser.h",
+    "parse_decl.cc",
+    "parse_stmt.cc",
+    "parse_expr.cc",
+    "parse_type.cc",
   ]
 
   deps = [
