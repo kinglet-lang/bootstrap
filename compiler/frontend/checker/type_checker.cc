@@ -1524,299 +1524,314 @@ void TypeChecker::visit(const ast::TryCatchStmt &try_catch) {
   }
 }
 
-Type TypeChecker::check_expr(const ast::Expr &expr) {
-  if (const auto *lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
-    Type t = int_literal_type_from_suffix(lit->width_suffix, lit->value);
-    if (!integer_fits_width(lit->value, int_width_info(t))) {
-      error_at(lit->location, "Integer literal out of range for type '" +
-                                   integer_type_display_name(t) + "'.");
+Type TypeChecker::check_int_literal(const ast::IntLiteralExpr &lit) {
+  Type t = int_literal_type_from_suffix(lit.width_suffix, lit.value);
+  if (!integer_fits_width(lit.value, int_width_info(t))) {
+    error_at(lit.location, "Integer literal out of range for type '" +
+                                 integer_type_display_name(t) + "'.");
+  }
+  return t;
+}
+
+Type TypeChecker::check_char_literal(const ast::CharLiteralExpr &) {
+  return char_type();
+}
+
+Type TypeChecker::check_float_literal(const ast::FloatLiteralExpr &lit) {
+  return float_literal_type_from_suffix(lit.width_suffix);
+}
+
+Type TypeChecker::check_string_literal(const ast::StringLiteralExpr &) {
+  return string_type();
+}
+
+Type TypeChecker::check_bool_literal(const ast::BoolLiteralExpr &) {
+  return bool_type();
+}
+
+Type TypeChecker::check_null_literal(const ast::NullLiteralExpr &) {
+  return null_type();
+}
+
+Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_access) {
+  if (ns_access.namespace_name == "io") {
+    if (used_.count("io") == 0) {
+      error_at(ns_access.location,
+               "Module 'io' is not imported. Add 'using io;' at the top of the file.");
+      return void_type();
     }
-    return t;
+    if (ns_access.member_name == "out" || ns_access.member_name == "err") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(void_type());
+      return fn;
+    }
+    if (ns_access.member_name == "in") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(string_type());
+      return fn;
+    }
+  }
+  if (ns_access.namespace_name == "fs") {
+    if (used_.count("fs") == 0) {
+      error_at(ns_access.location,
+               "Module 'fs' is not imported. Add 'using fs;' at the top of the file.");
+      return void_type();
+    }
+    if (ns_access.member_name == "__read") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(string_type());
+      return fn;
+    }
+    if (ns_access.member_name == "__write") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(void_type());
+      return fn;
+    }
+    if (ns_access.member_name == "__listdir") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(array_type(string_type()));
+      return fn;
+    }
+  }
+  if (ns_access.namespace_name == "sys") {
+    if (used_.count("sys") == 0) {
+      error_at(ns_access.location,
+               "Module 'sys' is not imported. Add 'using sys;' at the top of the file.");
+      return void_type();
+    }
+    if (ns_access.member_name == "args") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(array_type(string_type()));
+      return fn;
+    }
+  }
+  // Check for imported function (e.g. math::add or parser::ast::Node)
+  {
+    const std::string qualified =
+        resolve_module_qualified(ns_access.namespace_name, ns_access.member_name);
+    auto imported = lookup_var(qualified);
+    if (imported.has_value()) {
+      return *imported;
+    }
   }
 
-  if (dynamic_cast<const ast::CharLiteralExpr *>(&expr)) {
-    return char_type();
+  auto enum_type = lookup_type(ns_access.namespace_name);
+  if (enum_type.has_value() && enum_type->kind == TypeKind::Enum) {
+    bool found = false;
+    for (const auto &v : enum_type->variants) {
+      if (v == ns_access.member_name) { found = true; break; }
+    }
+    if (!found) {
+      error_at(ns_access.location, "Enum '" + ns_access.namespace_name +
+                                        "' has no variant '" + ns_access.member_name + "'.");
+    }
+    return *enum_type;
+  }
+  // Check for concept namespace (e.g. Printable::to_string)
+  if (concept_registry_.count(ns_access.namespace_name)) {
+    return void_type();
+  }
+  return void_type();
+}
+
+Type TypeChecker::check_identifier(const ast::IdentifierExpr &identifier) {
+  if (identifier.name == "_") {
+    return null_type();
+  }
+  if (opened_.count("io") != 0) {
+    if (identifier.name == "out" || identifier.name == "err") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(void_type());
+      return fn;
+    }
+    if (identifier.name == "in") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(string_type());
+      return fn;
+    }
+  }
+  auto var_type = lookup_var(identifier.name);
+  if (!var_type.has_value()) {
+    error_at(identifier.location, "Undeclared variable '" + identifier.name + "'.");
+    return int_type();
+  }
+  check_referent_access(identifier.name, identifier.location, false);
+  return deref_ref_type(var_type.value());
+}
+
+Type TypeChecker::check_unary(const ast::UnaryExpr &unary) {
+  Type right_type = check_expr(*unary.right);
+  switch (unary.op) {
+  case ast::UnaryOp::Neg:
+    if (!right_type.is_numeric()) {
+      error_at(unary.location, "Cannot negate non-numeric type.");
+    }
+    return right_type;
+  case ast::UnaryOp::Not:
+    return bool_type();
+  case ast::UnaryOp::BitNot:
+    if (!is_integer_type(right_type)) {
+      error_at(unary.location, "Bitwise NOT requires an integer operand.");
+    }
+    return right_type;
+  case ast::UnaryOp::Ref:
+  case ast::UnaryOp::MutRef: {
+    if (!is_lvalue_expr(*unary.right)) {
+      error_at(unary.location, "Cannot borrow a non-lvalue expression.");
+      return void_type();
+    }
+    const bool mut = unary.op == ast::UnaryOp::MutRef;
+    if (mut && !is_mutable_lvalue(*unary.right)) {
+      error_at(unary.location, "Cannot mutably borrow an immutable lvalue.");
+      return void_type();
+    }
+    if (auto referent = referent_name_from_lvalue(*unary.right)) {
+      register_borrow(*referent, mut, unary.location);
+    }
+    Type inner = right_type;
+    Type ref{inner};
+    ref.kind = mut ? TypeKind::MutRef : TypeKind::Ref;
+    ref.name = (mut ? "&mut " : "&") + inner.name;
+    ref.element_type = std::make_shared<Type>(inner);
+    return ref;
+  }
+  default:
+    error_at(unary.location, "Unsupported unary operator.");
+    return int_type();
+  }
+}
+
+Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
+  Type left_type = check_expr(*binary.left);
+  Type right_type = check_expr(*binary.right);
+
+  switch (binary.op) {
+  case ast::BinaryOp::Add:
+    if (left_type.kind == TypeKind::String || right_type.kind == TypeKind::String) {
+      return string_type();
+    }
+    [[fallthrough]];
+  case ast::BinaryOp::Sub:
+  case ast::BinaryOp::Mul:
+  case ast::BinaryOp::Div:
+  case ast::BinaryOp::Mod:
+  {
+    if (!left_type.is_numeric() || !right_type.is_numeric()) {
+      error_at(binary.location, "Arithmetic operands must be numeric.");
+      return int_type();
+    }
+    if (is_float_type(left_type) || is_float_type(right_type)) {
+      if (is_integer_type(left_type) || is_integer_type(right_type)) {
+        error_at(binary.location, "Cannot mix integer and floating-point operands.");
+        return int_type();
+      }
+      return promote_float_binary(left_type, right_type);
+    }
+    const bool left_int_lit =
+        dynamic_cast<const ast::IntLiteralExpr *>(binary.left.get()) != nullptr;
+    const bool right_int_lit =
+        dynamic_cast<const ast::IntLiteralExpr *>(binary.right.get()) != nullptr;
+    if (auto promoted =
+            try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit)) {
+      return *promoted;
+    }
+    error_at(binary.location, "Arithmetic operands must have the same integer width.");
+    return int_type();
   }
 
-  if (const auto *lit = dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) {
-    return float_literal_type_from_suffix(lit->width_suffix);
-  }
-
-  if (dynamic_cast<const ast::StringLiteralExpr *>(&expr)) {
-    return string_type();
-  }
-
-  if (dynamic_cast<const ast::BoolLiteralExpr *>(&expr)) {
+  case ast::BinaryOp::Eq:
+  case ast::BinaryOp::Neq:
+  case ast::BinaryOp::Lt:
+  case ast::BinaryOp::Gt:
+  case ast::BinaryOp::Le:
+  case ast::BinaryOp::Ge: {
+    const bool left_int_lit =
+        dynamic_cast<const ast::IntLiteralExpr *>(binary.left.get()) != nullptr;
+    const bool right_int_lit =
+        dynamic_cast<const ast::IntLiteralExpr *>(binary.right.get()) != nullptr;
+    const bool int_ok =
+        try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit).has_value();
+    if (!left_type.is_compatible_with(right_type) && !int_ok) {
+      error_at(binary.location, "Cannot compare " + type_to_string(left_type) + " and " +
+                                     type_to_string(right_type) + ".");
+    }
     return bool_type();
   }
 
-  if (dynamic_cast<const ast::NullLiteralExpr *>(&expr)) {
-    return null_type();
+  case ast::BinaryOp::And:
+  case ast::BinaryOp::Or:
+    return bool_type();
+
+  case ast::BinaryOp::BitAnd:
+  case ast::BinaryOp::BitOr:
+  case ast::BinaryOp::BitXor:
+  case ast::BinaryOp::Shl:
+  case ast::BinaryOp::Shr: {
+    if (!is_integer_type(left_type) || !is_integer_type(right_type)) {
+      error_at(binary.location, "Bitwise operators require integer operands.");
+      return int_type();
+    }
+    const bool left_int_lit =
+        dynamic_cast<const ast::IntLiteralExpr *>(binary.left.get()) != nullptr;
+    const bool right_int_lit =
+        dynamic_cast<const ast::IntLiteralExpr *>(binary.right.get()) != nullptr;
+    if (auto promoted =
+            try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit)) {
+      return *promoted;
+    }
+    error_at(binary.location, "Bitwise operands must have the same integer width.");
+    return left_type;
   }
+  }
+}
 
-  if (const auto *ns_access = dynamic_cast<const ast::NamespaceAccessExpr *>(&expr)) {
-    if (ns_access->namespace_name == "io") {
-      if (used_.count("io") == 0) {
-        error_at(ns_access->location,
-                 "Module 'io' is not imported. Add 'using io;' at the top of the file.");
-        return void_type();
-      }
-      if (ns_access->member_name == "out" || ns_access->member_name == "err") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(void_type());
-        return fn;
-      }
-      if (ns_access->member_name == "in") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(string_type());
-        return fn;
-      }
-    }
-    if (ns_access->namespace_name == "fs") {
-      if (used_.count("fs") == 0) {
-        error_at(ns_access->location,
-                 "Module 'fs' is not imported. Add 'using fs;' at the top of the file.");
-        return void_type();
-      }
-      if (ns_access->member_name == "__read") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(string_type());
-        return fn;
-      }
-      if (ns_access->member_name == "__write") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(void_type());
-        return fn;
-      }
-      if (ns_access->member_name == "__listdir") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(array_type(string_type()));
-        return fn;
-      }
-    }
-    if (ns_access->namespace_name == "sys") {
-      if (used_.count("sys") == 0) {
-        error_at(ns_access->location,
-                 "Module 'sys' is not imported. Add 'using sys;' at the top of the file.");
-        return void_type();
-      }
-      if (ns_access->member_name == "args") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(array_type(string_type()));
-        return fn;
-      }
-    }
-    // Check for imported function (e.g. math::add or parser::ast::Node)
-    {
-      const std::string qualified =
-          resolve_module_qualified(ns_access->namespace_name, ns_access->member_name);
-      auto imported = lookup_var(qualified);
-      if (imported.has_value()) {
-        return *imported;
-      }
-    }
-
-    auto enum_type = lookup_type(ns_access->namespace_name);
-    if (enum_type.has_value() && enum_type->kind == TypeKind::Enum) {
-      bool found = false;
-      for (const auto &v : enum_type->variants) {
-        if (v == ns_access->member_name) { found = true; break; }
-      }
-      if (!found) {
-        error_at(ns_access->location, "Enum '" + ns_access->namespace_name +
-                                          "' has no variant '" + ns_access->member_name + "'.");
-      }
-      return *enum_type;
-    }
-    // Check for concept namespace (e.g. Printable::to_string)
-    if (concept_registry_.count(ns_access->namespace_name)) {
-      return void_type();
-    }
+Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
+  auto var_type = lookup_var(assign.name);
+  if (!var_type.has_value()) {
+    error_at(assign.location, "Assignment to undeclared variable '" + assign.name + "'.");
+    return int_type();
+  }
+  check_referent_access(assign.name, assign.location, true);
+  Type slot_type = var_type.value();
+  if (slot_type.kind == TypeKind::Ref) {
+    error_at(assign.location, "Cannot assign through a shared reference.");
     return void_type();
   }
-
-  if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
-    if (identifier->name == "_") {
-      return null_type();
-    }
-    if (opened_.count("io") != 0) {
-      if (identifier->name == "out" || identifier->name == "err") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(void_type());
-        return fn;
-      }
-      if (identifier->name == "in") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(string_type());
-        return fn;
-      }
-    }
-    auto var_type = lookup_var(identifier->name);
-    if (!var_type.has_value()) {
-      error_at(identifier->location, "Undeclared variable '" + identifier->name + "'.");
-      return int_type();
-    }
-    check_referent_access(identifier->name, identifier->location, false);
-    return deref_ref_type(var_type.value());
+  const Type target_type =
+      slot_type.kind == TypeKind::MutRef && slot_type.element_type
+          ? *slot_type.element_type
+          : slot_type;
+  Type value_type = check_expr(*assign.value);
+  if (!types_assignable(value_type, target_type)) {
+    error_at(assign.location, "Cannot assign " + type_to_string(value_type) + " to " +
+                                   type_to_string(target_type) + ".");
   }
+  return target_type;
+}
 
-  if (const auto *unary = dynamic_cast<const ast::UnaryExpr *>(&expr)) {
-    Type right_type = check_expr(*unary->right);
-    switch (unary->op) {
-    case ast::UnaryOp::Neg:
-      if (!right_type.is_numeric()) {
-        error_at(unary->location, "Cannot negate non-numeric type.");
-      }
-      return right_type;
-    case ast::UnaryOp::Not:
-      return bool_type();
-    case ast::UnaryOp::BitNot:
-      if (!is_integer_type(right_type)) {
-        error_at(unary->location, "Bitwise NOT requires an integer operand.");
-      }
-      return right_type;
-    case ast::UnaryOp::Ref:
-    case ast::UnaryOp::MutRef: {
-      if (!is_lvalue_expr(*unary->right)) {
-        error_at(unary->location, "Cannot borrow a non-lvalue expression.");
-        return void_type();
-      }
-      const bool mut = unary->op == ast::UnaryOp::MutRef;
-      if (mut && !is_mutable_lvalue(*unary->right)) {
-        error_at(unary->location, "Cannot mutably borrow an immutable lvalue.");
-        return void_type();
-      }
-      if (auto referent = referent_name_from_lvalue(*unary->right)) {
-        register_borrow(*referent, mut, unary->location);
-      }
-      Type inner = right_type;
-      Type ref{inner};
-      ref.kind = mut ? TypeKind::MutRef : TypeKind::Ref;
-      ref.name = (mut ? "&mut " : "&") + inner.name;
-      ref.element_type = std::make_shared<Type>(inner);
-      return ref;
-    }
-    default:
-      error_at(unary->location, "Unsupported unary operator.");
-      return int_type();
-    }
-  }
+Type TypeChecker::check_expr(const ast::Expr &expr) {
+  if (const auto *lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) return check_int_literal(*lit);
+  if (const auto *e = dynamic_cast<const ast::CharLiteralExpr *>(&expr)) return check_char_literal(*e);
+  if (const auto *lit = dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) return check_float_literal(*lit);
+  if (const auto *e = dynamic_cast<const ast::StringLiteralExpr *>(&expr)) return check_string_literal(*e);
+  if (const auto *e = dynamic_cast<const ast::BoolLiteralExpr *>(&expr)) return check_bool_literal(*e);
+  if (const auto *e = dynamic_cast<const ast::NullLiteralExpr *>(&expr)) return check_null_literal(*e);
+  if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(&expr)) return check_namespace_access(*ns);
+  if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(&expr)) return check_identifier(*id);
 
-  if (const auto *binary = dynamic_cast<const ast::BinaryExpr *>(&expr)) {
-    Type left_type = check_expr(*binary->left);
-    Type right_type = check_expr(*binary->right);
+  if (const auto *unary = dynamic_cast<const ast::UnaryExpr *>(&expr)) return check_unary(*unary);
 
-    switch (binary->op) {
-    case ast::BinaryOp::Add:
-      if (left_type.kind == TypeKind::String || right_type.kind == TypeKind::String) {
-        return string_type();
-      }
-      [[fallthrough]];
-    case ast::BinaryOp::Sub:
-    case ast::BinaryOp::Mul:
-    case ast::BinaryOp::Div:
-    case ast::BinaryOp::Mod:
-    {
-      if (!left_type.is_numeric() || !right_type.is_numeric()) {
-        error_at(binary->location, "Arithmetic operands must be numeric.");
-        return int_type();
-      }
-      if (is_float_type(left_type) || is_float_type(right_type)) {
-        if (is_integer_type(left_type) || is_integer_type(right_type)) {
-          error_at(binary->location, "Cannot mix integer and floating-point operands.");
-          return int_type();
-        }
-        return promote_float_binary(left_type, right_type);
-      }
-      const bool left_int_lit =
-          dynamic_cast<const ast::IntLiteralExpr *>(binary->left.get()) != nullptr;
-      const bool right_int_lit =
-          dynamic_cast<const ast::IntLiteralExpr *>(binary->right.get()) != nullptr;
-      if (auto promoted =
-              try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit)) {
-        return *promoted;
-      }
-      error_at(binary->location, "Arithmetic operands must have the same integer width.");
-      return int_type();
-    }
+  if (const auto *binary = dynamic_cast<const ast::BinaryExpr *>(&expr)) return check_binary(*binary);
 
-    case ast::BinaryOp::Eq:
-    case ast::BinaryOp::Neq:
-    case ast::BinaryOp::Lt:
-    case ast::BinaryOp::Gt:
-    case ast::BinaryOp::Le:
-    case ast::BinaryOp::Ge: {
-      const bool left_int_lit =
-          dynamic_cast<const ast::IntLiteralExpr *>(binary->left.get()) != nullptr;
-      const bool right_int_lit =
-          dynamic_cast<const ast::IntLiteralExpr *>(binary->right.get()) != nullptr;
-      const bool int_ok =
-          try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit).has_value();
-      if (!left_type.is_compatible_with(right_type) && !int_ok) {
-        error_at(binary->location, "Cannot compare " + type_to_string(left_type) + " and " +
-                                       type_to_string(right_type) + ".");
-      }
-      return bool_type();
-    }
-
-    case ast::BinaryOp::And:
-    case ast::BinaryOp::Or:
-      return bool_type();
-
-    case ast::BinaryOp::BitAnd:
-    case ast::BinaryOp::BitOr:
-    case ast::BinaryOp::BitXor:
-    case ast::BinaryOp::Shl:
-    case ast::BinaryOp::Shr: {
-      if (!is_integer_type(left_type) || !is_integer_type(right_type)) {
-        error_at(binary->location, "Bitwise operators require integer operands.");
-        return int_type();
-      }
-      const bool left_int_lit =
-          dynamic_cast<const ast::IntLiteralExpr *>(binary->left.get()) != nullptr;
-      const bool right_int_lit =
-          dynamic_cast<const ast::IntLiteralExpr *>(binary->right.get()) != nullptr;
-      if (auto promoted =
-              try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit)) {
-        return *promoted;
-      }
-      error_at(binary->location, "Bitwise operands must have the same integer width.");
-      return left_type;
-    }
-    }
-  }
-
-  if (const auto *assign = dynamic_cast<const ast::AssignExpr *>(&expr)) {
-    auto var_type = lookup_var(assign->name);
-    if (!var_type.has_value()) {
-      error_at(assign->location, "Assignment to undeclared variable '" + assign->name + "'.");
-      return int_type();
-    }
-    check_referent_access(assign->name, assign->location, true);
-    Type slot_type = var_type.value();
-    if (slot_type.kind == TypeKind::Ref) {
-      error_at(assign->location, "Cannot assign through a shared reference.");
-      return void_type();
-    }
-    const Type target_type =
-        slot_type.kind == TypeKind::MutRef && slot_type.element_type
-            ? *slot_type.element_type
-            : slot_type;
-    Type value_type = check_expr(*assign->value);
-    if (!types_assignable(value_type, target_type)) {
-      error_at(assign->location, "Cannot assign " + type_to_string(value_type) + " to " +
-                                     type_to_string(target_type) + ".");
-    }
-    return target_type;
-  }
+  if (const auto *assign = dynamic_cast<const ast::AssignExpr *>(&expr)) return check_assign(*assign);
 
   if (const auto *call_expr = dynamic_cast<const ast::CallExpr *>(&expr)) {
     // Intercept built-in functions

@@ -58,6 +58,20 @@ private:
 
   void check_function(const ast::FunctionDecl &function);
   void check_stmt(const ast::Stmt &stmt, const Type &expected_return);
+  // Per-expression-type check helpers. check_expr() dispatches to these; each
+  // returns the inferred type of its node. Extracted from the former monolithic
+  // check_expr dynamic_cast chain, one node type per method.
+  Type check_int_literal(const ast::IntLiteralExpr &lit);
+  Type check_char_literal(const ast::CharLiteralExpr &lit);
+  Type check_float_literal(const ast::FloatLiteralExpr &lit);
+  Type check_string_literal(const ast::StringLiteralExpr &lit);
+  Type check_bool_literal(const ast::BoolLiteralExpr &lit);
+  Type check_null_literal(const ast::NullLiteralExpr &lit);
+  Type check_namespace_access(const ast::NamespaceAccessExpr &ns);
+  Type check_identifier(const ast::IdentifierExpr &id);
+  Type check_unary(const ast::UnaryExpr &unary);
+  Type check_binary(const ast::BinaryExpr &binary);
+  Type check_assign(const ast::AssignExpr &assign);
   Type check_expr(const ast::Expr &expr);
 
   void push_scope();
