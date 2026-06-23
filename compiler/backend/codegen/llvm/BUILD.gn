@@ -12,6 +12,8 @@ if (enable_llvm) {
     sources = [
       "kir_to_llvm.cc",
       "kir_to_llvm.h",
+      "llvm_module_cache.cc",
+      "llvm_module_cache_internal.h",
     ]
 
     public = [
