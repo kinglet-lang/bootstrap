@@ -40,10 +40,23 @@ See [compiler/README.md](compiler/README.md) for the pipeline diagram and GN dep
 
 ```
 compiler/                         # the bootstrap compiler (C++20)
-├── frontend/                     # lexer, parser, ast, types, checker, module
-├── ir/                           # KIR (shared middle-end IR)
-├── backend/                      # compiler (AST→KIR), vm (types/opcodes), codegen/llvm (optional)
-└── driver/                       # kinglet (main, cli_driver), preen (formatter)
+├── frontend/
+│   ├── lexer/                    # Scanner, Token
+│   ├── parser/                   # recursive-descent parser (split into parse_expr/stmt/decl/type)
+│   ├── ast/                      # AST nodes + ExprVisitor/StmtVisitor
+│   ├── types/                    # TypeKind, TypeId, numeric width helpers
+│   ├── checker/                  # TypeChecker (split into check_expr/stmt/call/… per-concern files)
+│   ├── sema/                     # SemanticContext (shared state: imports, generics, concepts)
+│   └── module/                   # ModuleLoader, project_config
+├── ir/                           # KIR structs, recorder, typing, specialize passes
+├── backend/
+│   ├── compiler/                 # AST→KIR compiler (split into compile_expr/stmt/… per-concern files)
+│   ├── vm/                       # Value/ValueType (types only; execution backend removed)
+│   └── codegen/llvm/             # KirToLlvm — optional (enable_llvm=true)
+└── driver/
+    ├── kinglet/                  # CLI: cli_driver (dispatch), cli_ui, cli_spawn,
+    │                             #      cmd_init, cmd_build, cmd_run, cmd_prune, cmd_fmt
+    └── preen/                    # kinglet fmt formatter
 
 runtime/                          # libkinglet_rt (user program native RT; ABI-stable, independent)
 build/                            # GN toolchains, llvm.gni, embed.gni
@@ -54,8 +67,9 @@ tests/                            # ADR 0012 layout (see tests/README.md)
 
 - C++20, GN + ninja; system clang on macOS
 - `-Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion`
+- Static analysis: `.clang-format` (LLVM base, 100-col) and `.clang-tidy` at repo root
 - Namespace: `kinglet`, `kinglet::ast`
-- `dynamic_cast` for AST dispatch (no visitor yet)
+- AST dispatch via `ExprVisitor` / `StmtVisitor` (see `frontend/ast/visitor.h`)
 - Each module: `compiler/<tier>/<name>/BUILD.gn` static_library; wire new libs in root `BUILD.gn`
 - `include_dirs = ["//compiler"]` — includes are `"frontend/lexer/scanner.h"` style
 
@@ -66,9 +80,3 @@ tests/                            # ADR 0012 layout (see tests/README.md)
 | Role | Ref, fast, authoritative for `kinglet build` | Shadow, `kinglet prove` |
 | Sources | C++ | Kinglet `.kl` under `core/`, `compiler/`, … |
 | Parity | — | Native output identity (ADR 0013) |
-
-## Large Files (split when touching)
-
-- `frontend/checker/type_checker.cc`
-- `backend/compiler/compiler.cc`
-- `frontend/parser/parser.cc`

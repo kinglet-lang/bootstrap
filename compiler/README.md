@@ -19,26 +19,28 @@ Source is organized into four tiers: `frontend/` (parse + semantics),
        └→ backend/codegen/llvm/   link libkinglet_rt → native executable
 ```
 
-User-facing CLI: `driver/kinglet/` (`cli_driver` for init/build/run/prune/fmt;
-`main` for dev flags). Formatting: `driver/preen/` (`kinglet::preen`) — parse-then-emit
-formatter used by `kinglet fmt` and intended for in-process LSP integration.
+User-facing CLI: `driver/kinglet/` — `cli_driver` dispatches subcommands to
+`cmd_init`, `cmd_build`, `cmd_run`, `cmd_prune`, `cmd_fmt`; terminal styling in
+`cli_ui`; process management in `cli_spawn`. `main.cc` handles dev flags
+(`--check`, `--ir`, `--native`, etc.). Formatting: `driver/preen/` (`kinglet::preen`).
 
 ## Directories
 
 | Path | Tier | Role |
 |------|------|------|
-| `frontend/lexer/` | frontend | `Token`, `Scanner` |
-| `frontend/parser/` | frontend | Recursive-descent parser → `ast::Program` |
-| `frontend/ast/` | frontend | AST node definitions |
-| `frontend/types/` | frontend | `TypeExpr`, width helpers (`numeric`) |
-| `frontend/checker/` | frontend | `TypeChecker` — inference, match exhaustiveness, warnings |
-| `frontend/module/` | frontend | `ModuleLoader` (imports), `project_config` (`kinglet.toml`) |
+| `frontend/lexer/` | frontend | `Token` (`uint8_t` base), `Scanner` |
+| `frontend/parser/` | frontend | Recursive-descent parser (`parse_expr`, `parse_stmt`, `parse_decl`, `parse_type`) |
+| `frontend/ast/` | frontend | AST node definitions, `ExprVisitor` / `StmtVisitor` |
+| `frontend/types/` | frontend | `TypeKind`, `TypeId` (canonical enum), width helpers (`numeric`) |
+| `frontend/checker/` | frontend | `TypeChecker` — split into per-concern files (`check_call`, `check_binary`, …) |
+| `frontend/sema/` | frontend | `SemanticContext` — shared import/generic/concept state |
+| `frontend/module/` | frontend | `ModuleLoader` (imports), `project_config` (`kinglet.nest`) |
 | `driver/preen/` | driver | `kinglet::preen` formatter (`format_string`, extensions, `[fmt]` config) |
-| `ir/` | ir | KIR structs, record from compiler, typing/specialize passes |
-| `backend/compiler/` | backend | Main compile driver, dense array helpers |
-| `backend/vm/` | backend | `Chunk` (opcode/metadata types), RC/COW `Value` |
-| `backend/codegen/llvm/` | backend | `KirToLlvm` — optional (`enable_llvm=true`) |
-| `driver/kinglet/` | driver | `main.cc`, `cli_driver.cc` |
+| `ir/` | ir | KIR structs, recorder, typing/specialize passes |
+| `backend/compiler/` | backend | AST→KIR compiler, split into per-concern files (`compile_call`, `compile_binary`, …) |
+| `backend/vm/` | backend | `Chunk` opcode/metadata types, RC/COW `Value` (execution backend removed) |
+| `backend/codegen/llvm/` | backend | `KirToLlvm` — optional (`enable_llvm=true`), split into `llvm_function_lowerer` + helpers |
+| `driver/kinglet/` | driver | `main.cc`, `cli_driver` (dispatch), `cli_ui`, `cli_spawn`, `cmd_{init,build,run,prune,fmt}` |
 
 Top-level sibling: `runtime/` (`libkinglet_rt`) — linked into **user** native
 binaries, not into the compiler itself (except LLVM link step).
@@ -50,14 +52,14 @@ frontend/ast
 frontend/lexer → frontend/parser
 frontend/ast + frontend/lexer + frontend/parser → frontend/module
 frontend/ast + frontend/lexer + frontend/parser + frontend/module → driver/preen
-frontend/ast + frontend/types + frontend/module + ir → frontend/checker
-frontend/ast + frontend/types + backend/vm + frontend/module + ir → backend/compiler
+frontend/ast + frontend/types + frontend/sema + frontend/module + ir → frontend/checker
+frontend/ast + frontend/types + frontend/sema + backend/vm + frontend/module + ir → backend/compiler
 frontend/ast + frontend/types + backend/vm → ir
 ir → backend/codegen/llvm (optional)
 ```
 
-Note: `ir/` currently includes `backend/vm/chunk.h` for KIR recording — a known coupling;
-VM opcodes and KIR share representation during bootstrap.
+Note: `backend/vm/` retains type and opcode definitions used during bootstrap
+(RC/COW `Value`, `Chunk` metadata); the execution backend has been removed.
 
 ## Binaries (`//BUILD.gn`)
 
