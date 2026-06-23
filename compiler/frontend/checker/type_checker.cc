@@ -719,8 +719,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   method_registry_.clear();
   kir_function_sigs_.clear();
 
-  ast::Program &mutable_program = const_cast<ast::Program &>(program);
-  ast::desugar_pipes(mutable_program);
+  // Pipe-desugaring is the caller's responsibility (run once after parse,
+  // before check) so that check() can take a const Program without casting.
 
   push_scope();
 

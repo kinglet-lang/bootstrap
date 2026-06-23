@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 #include "driver/kinglet/cli_driver.h"
+#include "driver/pipeline/pipeline.h"
+#include "frontend/ast/ast.h"
 #include "frontend/checker/type_checker.h"
 #include "backend/compiler/compiler.h"
 #ifdef KINGLET_HAVE_LLVM
 #include "backend/codegen/llvm/kir_to_llvm.h"
 #endif
 #include "ir/kir.h"
-#include "ir/kir_specialize.h"
-#include "ir/kir_typing.h"
 #include "frontend/module/module_loader.h"
 #include "frontend/lexer/scanner.h"
 #include "frontend/lexer/token.h"
@@ -466,6 +466,10 @@ int main(int argc, char **argv) {
 
   kinglet::TypeChecker checker;
   checker.set_module_loader(&module_loader);
+  // Desugar pipe expressions once, after parse and before any downstream pass,
+  // so check() and compile() receive identical already-normalized ASTs without
+  // each having to mutate (and cast away const on) the program.
+  kinglet::ast::desugar_pipes(*result.program);
   kinglet::TypeCheckResult type_result = checker.check(*result.program);
   bool has_type_errors = false;
   for (const kinglet::TypeError &error : type_result.errors) {
@@ -506,9 +510,7 @@ int main(int argc, char **argv) {
               << ": warning: " << warning.message << '\n';
   }
 
-  checker.populate_kir_types(&compile_result.kir);
-  infer_kir_types(&compile_result.kir);
-  specialize_kir_arithmetic(&compile_result.kir);
+  kinglet::prepare_kir(compile_result.kir, checker);
 
   if (mode == Mode::Bytecode) {
     compile_result.chunk.disassemble(std::cout);

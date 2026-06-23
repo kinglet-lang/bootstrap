@@ -1,0 +1,18 @@
+static_library("pipeline") {
+  sources = [
+    "pipeline.cc",
+    "pipeline.h",
+  ]
+
+  # prepare_kir() ties the type checker's signatures to the KIR typing and
+  # specialization passes, so it depends on both the frontend checker and the
+  # shared IR layer.
+  deps = [
+    "//compiler/frontend/checker",
+    "//compiler/ir",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}

@@ -40,6 +40,7 @@ executable("kinglet") {
     "//compiler/frontend/lexer",
     "//compiler/frontend/module",
     "//compiler/frontend/parser",
+    "//compiler/driver/pipeline",
     "//compiler/driver/preen",
     "//compiler/backend/vm",
   ]
