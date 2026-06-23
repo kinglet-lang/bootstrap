@@ -66,14 +66,150 @@ struct Node {
   SourceLocation location;
 };
 
+// ---------------------------------------------------------------------------
+// Visitor infrastructure
+//
+// Const reading visitors: each concrete node implements accept() to dispatch
+// to the matching visit() overload. These cover the read-only passes (type
+// checking, compilation) that previously used long dynamic_cast chains.
+// Mutating passes that rewrite owning pointers (e.g. pipe desugaring) keep
+// their own recursive walk and do not use these bases.
+//
+// Adding a new AST node: declare it below, add a pure-virtual visit() to the
+// matching visitor, implement accept() on the node — the compiler then forces
+// every visitor subclass to handle it.
+// ---------------------------------------------------------------------------
+
+struct IntLiteralExpr;
+struct CharLiteralExpr;
+struct FloatLiteralExpr;
+struct StringLiteralExpr;
+struct BoolLiteralExpr;
+struct NullLiteralExpr;
+struct ArrayLiteralExpr;
+struct MapLiteralExpr;
+struct IdentifierExpr;
+struct UnaryExpr;
+struct BinaryExpr;
+struct AssignExpr;
+struct CallExpr;
+struct PipeExpr;
+struct CastExpr;
+struct TernaryExpr;
+struct NullCoalesceExpr;
+struct PropagateExpr;
+struct BindingPattern;
+struct ArrayPattern;
+struct EnumPattern;
+struct StructPattern;
+struct MatchExpr;
+struct NamespaceAccessExpr;
+struct FieldAccessExpr;
+struct FieldAssignExpr;
+struct IndexExpr;
+struct IndexAssignExpr;
+struct StructLiteralExpr;
+
+struct ExprStmt;
+struct TryCatchStmt;
+struct ReturnStmt;
+struct VarDeclStmt;
+struct UnpackDeclStmt;
+struct BlockStmt;
+struct IfStmt;
+struct GuardStmt;
+struct WhileStmt;
+struct ForStmt;
+struct BreakStmt;
+struct ContinueStmt;
+
+struct FunctionDecl;
+struct ImportDecl;
+struct LogicalImportDecl;
+struct ExportModuleDecl;
+struct ImportBlockDecl;
+struct UsingDecl;
+struct UsingAliasDecl;
+struct StructDecl;
+struct EnumDecl;
+struct ConceptDecl;
+struct TopLevelStmtDecl;
+
+struct ExprVisitor {
+  virtual ~ExprVisitor() = default;
+  virtual void visit(const IntLiteralExpr &) = 0;
+  virtual void visit(const CharLiteralExpr &) = 0;
+  virtual void visit(const FloatLiteralExpr &) = 0;
+  virtual void visit(const StringLiteralExpr &) = 0;
+  virtual void visit(const BoolLiteralExpr &) = 0;
+  virtual void visit(const NullLiteralExpr &) = 0;
+  virtual void visit(const ArrayLiteralExpr &) = 0;
+  virtual void visit(const MapLiteralExpr &) = 0;
+  virtual void visit(const IdentifierExpr &) = 0;
+  virtual void visit(const UnaryExpr &) = 0;
+  virtual void visit(const BinaryExpr &) = 0;
+  virtual void visit(const AssignExpr &) = 0;
+  virtual void visit(const CallExpr &) = 0;
+  virtual void visit(const PipeExpr &) = 0;
+  virtual void visit(const CastExpr &) = 0;
+  virtual void visit(const TernaryExpr &) = 0;
+  virtual void visit(const NullCoalesceExpr &) = 0;
+  virtual void visit(const PropagateExpr &) = 0;
+  virtual void visit(const BindingPattern &) = 0;
+  virtual void visit(const ArrayPattern &) = 0;
+  virtual void visit(const EnumPattern &) = 0;
+  virtual void visit(const StructPattern &) = 0;
+  virtual void visit(const MatchExpr &) = 0;
+  virtual void visit(const NamespaceAccessExpr &) = 0;
+  virtual void visit(const FieldAccessExpr &) = 0;
+  virtual void visit(const FieldAssignExpr &) = 0;
+  virtual void visit(const IndexExpr &) = 0;
+  virtual void visit(const IndexAssignExpr &) = 0;
+  virtual void visit(const StructLiteralExpr &) = 0;
+};
+
+struct StmtVisitor {
+  virtual ~StmtVisitor() = default;
+  virtual void visit(const ExprStmt &) = 0;
+  virtual void visit(const TryCatchStmt &) = 0;
+  virtual void visit(const ReturnStmt &) = 0;
+  virtual void visit(const VarDeclStmt &) = 0;
+  virtual void visit(const UnpackDeclStmt &) = 0;
+  virtual void visit(const BlockStmt &) = 0;
+  virtual void visit(const IfStmt &) = 0;
+  virtual void visit(const GuardStmt &) = 0;
+  virtual void visit(const WhileStmt &) = 0;
+  virtual void visit(const ForStmt &) = 0;
+  virtual void visit(const BreakStmt &) = 0;
+  virtual void visit(const ContinueStmt &) = 0;
+};
+
+struct DeclVisitor {
+  virtual ~DeclVisitor() = default;
+  virtual void visit(const FunctionDecl &) = 0;
+  virtual void visit(const ImportDecl &) = 0;
+  virtual void visit(const LogicalImportDecl &) = 0;
+  virtual void visit(const ExportModuleDecl &) = 0;
+  virtual void visit(const ImportBlockDecl &) = 0;
+  virtual void visit(const UsingDecl &) = 0;
+  virtual void visit(const UsingAliasDecl &) = 0;
+  virtual void visit(const StructDecl &) = 0;
+  virtual void visit(const EnumDecl &) = 0;
+  virtual void visit(const ConceptDecl &) = 0;
+  virtual void visit(const TopLevelStmtDecl &) = 0;
+};
+
 struct Expr : Node {
   using Node::Node;
+  virtual void accept(ExprVisitor &v) const = 0;
 };
 struct Stmt : Node {
   using Node::Node;
+  virtual void accept(StmtVisitor &v) const = 0;
 };
 struct Decl : Node {
   using Node::Node;
+  virtual void accept(DeclVisitor &v) const = 0;
 };
 
 using ExprPtr = std::unique_ptr<Expr>;
@@ -89,6 +225,7 @@ struct TypeExpr {
 struct IntLiteralExpr final : Expr {
   IntLiteralExpr(SourceLocation location, int64_t value, std::string width_suffix = {});
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   int64_t value;
   std::string width_suffix;
@@ -97,6 +234,7 @@ struct IntLiteralExpr final : Expr {
 struct CharLiteralExpr final : Expr {
   CharLiteralExpr(SourceLocation location, int8_t value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   int8_t value;
 };
@@ -104,6 +242,7 @@ struct CharLiteralExpr final : Expr {
 struct FloatLiteralExpr final : Expr {
   FloatLiteralExpr(SourceLocation location, double value, std::string width_suffix = {});
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   double value;
   std::string width_suffix;
@@ -112,6 +251,7 @@ struct FloatLiteralExpr final : Expr {
 struct StringLiteralExpr final : Expr {
   StringLiteralExpr(SourceLocation location, std::string value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::string value;
 };
@@ -119,6 +259,7 @@ struct StringLiteralExpr final : Expr {
 struct BoolLiteralExpr final : Expr {
   BoolLiteralExpr(SourceLocation location, bool value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   bool value;
 };
@@ -126,11 +267,13 @@ struct BoolLiteralExpr final : Expr {
 struct NullLiteralExpr final : Expr {
   explicit NullLiteralExpr(SourceLocation location);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 };
 
 struct ArrayLiteralExpr final : Expr {
   ArrayLiteralExpr(SourceLocation location, std::vector<ExprPtr> elements);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::vector<ExprPtr> elements;
 };
@@ -140,6 +283,7 @@ struct MapLiteralExpr final : Expr {
   MapLiteralExpr(SourceLocation location, std::vector<ExprPtr> keys,
                  std::vector<ExprPtr> values);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::vector<ExprPtr> keys;
   std::vector<ExprPtr> values;
@@ -148,6 +292,7 @@ struct MapLiteralExpr final : Expr {
 struct IdentifierExpr final : Expr {
   IdentifierExpr(SourceLocation location, std::string name);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::string name;
 };
@@ -155,6 +300,7 @@ struct IdentifierExpr final : Expr {
 struct UnaryExpr final : Expr {
   UnaryExpr(SourceLocation location, UnaryOp op, ExprPtr right);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   UnaryOp op;
   ExprPtr right;
@@ -163,6 +309,7 @@ struct UnaryExpr final : Expr {
 struct BinaryExpr final : Expr {
   BinaryExpr(SourceLocation location, ExprPtr left, BinaryOp op, ExprPtr right);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr left;
   BinaryOp op;
@@ -172,6 +319,7 @@ struct BinaryExpr final : Expr {
 struct AssignExpr final : Expr {
   AssignExpr(SourceLocation location, std::string name, AssignOp op, ExprPtr value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::string name;
   AssignOp op;
@@ -182,6 +330,7 @@ struct CallExpr final : Expr {
   CallExpr(SourceLocation location, ExprPtr callee, std::vector<TypeExpr> type_args,
            std::vector<ExprPtr> args);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr callee;
   std::vector<TypeExpr> type_args;
@@ -192,6 +341,7 @@ struct CallExpr final : Expr {
 struct PipeExpr final : Expr {
   PipeExpr(SourceLocation location, ExprPtr left, ExprPtr right);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr left;
   ExprPtr right;
@@ -200,6 +350,7 @@ struct PipeExpr final : Expr {
 struct CastExpr final : Expr {
   CastExpr(SourceLocation location, TypeExpr target_type, ExprPtr value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   TypeExpr target_type;
   ExprPtr value;
@@ -209,6 +360,7 @@ struct CastExpr final : Expr {
 struct TernaryExpr final : Expr {
   TernaryExpr(SourceLocation location, ExprPtr condition, ExprPtr then_expr, ExprPtr else_expr);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr condition;
   ExprPtr then_expr;
@@ -219,6 +371,7 @@ struct TernaryExpr final : Expr {
 struct NullCoalesceExpr final : Expr {
   NullCoalesceExpr(SourceLocation location, ExprPtr left, std::string err_binding, ExprPtr right);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr left;
   std::string err_binding;
@@ -231,6 +384,7 @@ struct NullCoalesceExpr final : Expr {
 struct PropagateExpr final : Expr {
   PropagateExpr(SourceLocation location, ExprPtr value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr value;
 };
@@ -238,6 +392,7 @@ struct PropagateExpr final : Expr {
 struct BindingPattern final : Expr {
   BindingPattern(SourceLocation location, std::string name);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::string name;
 };
@@ -245,6 +400,7 @@ struct BindingPattern final : Expr {
 struct ArrayPattern final : Expr {
   ArrayPattern(SourceLocation location, std::vector<ExprPtr> elements);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::vector<ExprPtr> elements;
 };
@@ -253,6 +409,7 @@ struct EnumPattern final : Expr {
   EnumPattern(SourceLocation location, std::string enum_name, std::string variant_name,
               std::vector<ExprPtr> fields);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::string enum_name;
   std::string variant_name;
@@ -268,6 +425,7 @@ struct StructPattern final : Expr {
   StructPattern(SourceLocation location, std::string struct_name,
                 std::vector<StructPatternField> fields);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::string struct_name;
   std::vector<StructPatternField> fields;
@@ -288,6 +446,7 @@ struct CatchArm {
 struct MatchExpr final : Expr {
   MatchExpr(SourceLocation location, ExprPtr value, std::vector<MatchArm> arms);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr value;
   std::vector<MatchArm> arms;
@@ -296,6 +455,7 @@ struct MatchExpr final : Expr {
 struct ExprStmt final : Stmt {
   ExprStmt(SourceLocation location, ExprPtr expr);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   ExprPtr expr;
 };
@@ -303,6 +463,7 @@ struct ExprStmt final : Stmt {
 struct TryCatchStmt final : Stmt {
   TryCatchStmt(SourceLocation location, StmtPtr body, std::vector<CatchArm> catches);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   StmtPtr body;
   std::vector<CatchArm> catches;
@@ -311,6 +472,7 @@ struct TryCatchStmt final : Stmt {
 struct ReturnStmt final : Stmt {
   ReturnStmt(SourceLocation location, ExprPtr value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   ExprPtr value;
 };
@@ -319,6 +481,7 @@ struct VarDeclStmt final : Stmt {
   VarDeclStmt(SourceLocation location, std::string storage, TypeExpr type, std::string name,
               ExprPtr init);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   std::string storage;
   TypeExpr type;
@@ -330,6 +493,7 @@ struct UnpackDeclStmt final : Stmt {
   UnpackDeclStmt(SourceLocation location, std::vector<std::string> names,
                  std::string rest_name, ExprPtr init);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   std::vector<std::string> names;
   std::string rest_name;
@@ -339,6 +503,7 @@ struct UnpackDeclStmt final : Stmt {
 struct BlockStmt final : Stmt {
   BlockStmt(SourceLocation location, std::vector<StmtPtr> statements);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   std::vector<StmtPtr> statements;
 };
@@ -346,6 +511,7 @@ struct BlockStmt final : Stmt {
 struct IfStmt final : Stmt {
   IfStmt(SourceLocation location, ExprPtr condition, StmtPtr then_branch, StmtPtr else_branch);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   ExprPtr condition;
   StmtPtr then_branch;
@@ -355,6 +521,7 @@ struct IfStmt final : Stmt {
 struct GuardStmt final : Stmt {
   GuardStmt(SourceLocation location, ExprPtr condition, StmtPtr else_body);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   ExprPtr condition;
   StmtPtr else_body;
@@ -363,6 +530,7 @@ struct GuardStmt final : Stmt {
 struct WhileStmt final : Stmt {
   WhileStmt(SourceLocation location, ExprPtr condition, StmtPtr body);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   ExprPtr condition;
   StmtPtr body;
@@ -371,6 +539,7 @@ struct WhileStmt final : Stmt {
 struct ForStmt final : Stmt {
   ForStmt(SourceLocation location, StmtPtr init, ExprPtr condition, StmtPtr step, StmtPtr body);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 
   StmtPtr init;
   ExprPtr condition;
@@ -381,11 +550,13 @@ struct ForStmt final : Stmt {
 struct BreakStmt final : Stmt {
   explicit BreakStmt(SourceLocation location);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 };
 
 struct ContinueStmt final : Stmt {
   explicit ContinueStmt(SourceLocation location);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(StmtVisitor &v) const override { v.visit(*this); }
 };
 
 struct Parameter {
@@ -397,6 +568,7 @@ struct FunctionDecl final : Decl {
   FunctionDecl(SourceLocation location, TypeExpr return_type, std::string name,
                std::vector<std::string> type_params, std::vector<Parameter> params, StmtPtr body);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   TypeExpr return_type;
   std::string name;
@@ -410,6 +582,7 @@ struct ImportDecl final : Decl {
   ImportDecl(SourceLocation location, std::string path, std::string alias,
              std::vector<std::string> selected_symbols);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::string path;
   std::string alias;
@@ -419,6 +592,7 @@ struct ImportDecl final : Decl {
 struct LogicalImportDecl final : Decl {
   LogicalImportDecl(SourceLocation location, std::string module_id);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::string module_id;
 };
@@ -426,6 +600,7 @@ struct LogicalImportDecl final : Decl {
 struct ExportModuleDecl final : Decl {
   ExportModuleDecl(SourceLocation location, std::string name);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::string name;
 };
@@ -433,6 +608,7 @@ struct ExportModuleDecl final : Decl {
 struct ImportBlockDecl final : Decl {
   ImportBlockDecl(SourceLocation location, std::vector<DeclPtr> imports);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::vector<DeclPtr> imports;
 };
@@ -440,6 +616,7 @@ struct ImportBlockDecl final : Decl {
 struct UsingDecl final : Decl {
   UsingDecl(SourceLocation location, std::string namespace_name, bool is_namespace);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::string namespace_name;
   bool is_namespace;
@@ -448,6 +625,7 @@ struct UsingDecl final : Decl {
 struct UsingAliasDecl final : Decl {
   UsingAliasDecl(SourceLocation location, std::string alias, std::string module_id);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::string alias;
   std::string module_id;
@@ -457,6 +635,7 @@ struct NamespaceAccessExpr final : Expr {
   NamespaceAccessExpr(SourceLocation location, std::string namespace_name,
                       std::string member_name);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   std::string namespace_name;
   std::string member_name;
@@ -465,6 +644,7 @@ struct NamespaceAccessExpr final : Expr {
 struct FieldAccessExpr final : Expr {
   FieldAccessExpr(SourceLocation location, ExprPtr object, std::string field_name);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr object;
   std::string field_name;
@@ -473,6 +653,7 @@ struct FieldAccessExpr final : Expr {
 struct FieldAssignExpr final : Expr {
   FieldAssignExpr(SourceLocation location, ExprPtr object, std::string field_name, ExprPtr value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr object;
   std::string field_name;
@@ -482,6 +663,7 @@ struct FieldAssignExpr final : Expr {
 struct IndexExpr final : Expr {
   IndexExpr(SourceLocation location, ExprPtr object, ExprPtr index);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr object;
   ExprPtr index;
@@ -490,6 +672,7 @@ struct IndexExpr final : Expr {
 struct IndexAssignExpr final : Expr {
   IndexAssignExpr(SourceLocation location, ExprPtr object, ExprPtr index, ExprPtr value);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr object;
   ExprPtr index;
@@ -509,6 +692,7 @@ struct StructLiteralExpr final : Expr {
   StructLiteralExpr(SourceLocation location, TypeExpr struct_type,
                     std::vector<FieldInit> fields);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   TypeExpr struct_type;
   std::vector<FieldInit> fields;
@@ -518,6 +702,7 @@ struct StructDecl final : Decl {
   StructDecl(SourceLocation location, std::string name, std::vector<std::string> type_params,
              std::vector<FieldDef> fields);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::string name;
   std::vector<std::string> type_params;
@@ -533,6 +718,7 @@ struct EnumVariantDecl {
 struct EnumDecl final : Decl {
   EnumDecl(SourceLocation location, std::string name, std::vector<EnumVariantDecl> variants);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::string name;
   std::vector<EnumVariantDecl> variants;
@@ -550,6 +736,7 @@ struct ConceptDecl final : Decl {
               std::vector<std::string> type_params,
               std::vector<ConceptMethodDecl> methods);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   std::string name;
   std::vector<std::string> type_params;
@@ -560,6 +747,7 @@ struct ConceptDecl final : Decl {
 struct TopLevelStmtDecl final : Decl {
   TopLevelStmtDecl(SourceLocation location, StmtPtr stmt);
   void print(std::ostream &out, int indent = 0) const override;
+  void accept(DeclVisitor &v) const override { v.visit(*this); }
 
   StmtPtr stmt;
 };
