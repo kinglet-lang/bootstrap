@@ -1817,6 +1817,224 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
   return target_type;
 }
 
+Type TypeChecker::check_binding_pattern(const ast::BindingPattern &) {
+  return null_type();
+}
+
+Type TypeChecker::check_array_pattern(const ast::ArrayPattern &) {
+  return null_type();
+}
+
+Type TypeChecker::check_struct_pattern(const ast::StructPattern &) {
+  return null_type();
+}
+
+Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
+  Type value_type = check_expr(*match_expr.value);
+  Type element_type = (value_type.kind == TypeKind::Array && value_type.element_type)
+                          ? *value_type.element_type
+                          : int_type();
+  Type result_type = null_type();
+  for (const ast::MatchArm &arm : match_expr.arms) {
+    const auto *binding = dynamic_cast<const ast::BindingPattern *>(arm.pattern.get());
+    const auto *arr_pat = dynamic_cast<const ast::ArrayPattern *>(arm.pattern.get());
+    const auto *enum_pat = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get());
+    const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(arm.pattern.get());
+    if (binding) {
+      push_scope();
+      declare_var(binding->name, value_type, false, binding->location);
+    } else if (arr_pat) {
+      push_scope();
+      for (const auto &elem : arr_pat->elements) {
+        const auto *elem_binding = dynamic_cast<const ast::BindingPattern *>(elem.get());
+        if (elem_binding) {
+          declare_var(elem_binding->name, element_type, false, elem_binding->location);
+        }
+      }
+    } else if (enum_pat) {
+      push_scope();
+      auto type_opt = lookup_type(enum_pat->enum_name);
+      if (!type_opt.has_value() || type_opt->kind != TypeKind::Enum) {
+        error_at(enum_pat->location, "'" + enum_pat->enum_name + "' is not an enum type.");
+      } else {
+        int variant_idx = -1;
+        for (std::size_t i = 0; i < type_opt->variants.size(); ++i) {
+          if (type_opt->variants[i] == enum_pat->variant_name) {
+            variant_idx = static_cast<int>(i);
+            break;
+          }
+        }
+        if (variant_idx < 0) {
+          error_at(enum_pat->location, "Enum '" + enum_pat->enum_name + "' has no variant '" + enum_pat->variant_name + "'.");
+        } else {
+          const auto &param_types = type_opt->variant_param_types[static_cast<std::size_t>(variant_idx)];
+          if (enum_pat->fields.size() != param_types.size()) {
+            error_at(enum_pat->location, "Variant '" + enum_pat->variant_name + "' expects " + std::to_string(param_types.size()) + " field(s), got " + std::to_string(enum_pat->fields.size()) + ".");
+          } else {
+            for (std::size_t i = 0; i < enum_pat->fields.size(); ++i) {
+              const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(enum_pat->fields[i].get());
+              if (field_binding) {
+                declare_var(field_binding->name, param_types[i], false, field_binding->location);
+              }
+            }
+          }
+        }
+      }
+    } else if (struct_pat) {
+      push_scope();
+      if (value_type.kind != TypeKind::Struct || value_type.name != struct_pat->struct_name) {
+        error_at(struct_pat->location, "Struct pattern '" + struct_pat->struct_name +
+                                            "' does not match scrutinee type " +
+                                            type_to_string(value_type) + ".");
+      } else {
+        for (std::size_t i = 0; i < struct_pat->fields.size(); ++i) {
+          const auto &pf = struct_pat->fields[i];
+          std::size_t field_idx = i;
+          if (!pf.name.empty()) {
+            field_idx = value_type.fields.size();
+            for (std::size_t j = 0; j < value_type.fields.size(); ++j) {
+              if (value_type.fields[j].name == pf.name) {
+                field_idx = j;
+                break;
+              }
+            }
+            if (field_idx >= value_type.fields.size()) {
+              error_at(struct_pat->location, "Struct '" + struct_pat->struct_name + "' has no field '" +
+                                                  pf.name + "'.");
+              continue;
+            }
+          } else if (field_idx >= value_type.fields.size()) {
+            error_at(struct_pat->location, "Struct pattern has too many fields for '" +
+                                                struct_pat->struct_name + "'.");
+            continue;
+          }
+          Type field_type = value_type.fields[field_idx].type
+                                ? *value_type.fields[field_idx].type
+                                : resolve_type_name(value_type.fields[field_idx].type_name);
+          const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(pf.pattern.get());
+          const auto *field_wildcard = dynamic_cast<const ast::IdentifierExpr *>(pf.pattern.get());
+          if (field_binding) {
+            declare_var(field_binding->name, field_type, false, field_binding->location);
+          } else if (field_wildcard && field_wildcard->name == "_") {
+            continue;
+          } else {
+            Type pattern_type = check_expr(*pf.pattern);
+            if (pattern_type.kind != TypeKind::Null &&
+                !types_assignable(pattern_type, field_type) &&
+                !types_assignable(field_type, pattern_type) &&
+                !pattern_type.is_compatible_with(field_type)) {
+              error_at(pf.pattern->location, "Pattern type " + type_to_string(pattern_type) +
+                                                  " does not match field type " +
+                                                  type_to_string(field_type) + ".");
+            }
+          }
+        }
+      }
+    }
+    if (!binding && !arr_pat && !enum_pat && !struct_pat) {
+      Type pattern_type = check_expr(*arm.pattern);
+      if (pattern_type.kind != TypeKind::Null &&
+          !types_assignable(pattern_type, value_type) &&
+          !types_assignable(value_type, pattern_type) &&
+          !pattern_type.is_compatible_with(value_type)) {
+        error_at(arm.pattern->location, "Pattern type " + type_to_string(pattern_type) +
+                                            " does not match value type " +
+                                            type_to_string(value_type) + ".");
+      }
+    }
+    if (arm.guard) {
+      Type guard_type = check_expr(*arm.guard);
+      if (guard_type.kind != TypeKind::Bool) {
+        error_at(arm.guard->location, "Guard expression must be bool.");
+      }
+    }
+    Type body_type = check_expr(*arm.body);
+    if (binding || arr_pat || enum_pat || struct_pat) {
+      pop_scope();
+    }
+    if (result_type.kind == TypeKind::Null) {
+      result_type = body_type;
+    }
+  }
+
+  if (value_type.nullable) {
+    if (auto err = check_nullable_arms_exhaustive(match_expr.arms, value_type)) {
+      error_at(match_expr.location, *err);
+    }
+  } else if (value_type.kind == TypeKind::Bool) {
+    bool missing_true = false;
+    bool missing_false = false;
+    if (!arms_cover_bool(match_expr.arms, missing_true, missing_false)) {
+      std::string missing;
+      if (missing_true) missing = "true";
+      if (missing_false) {
+        if (!missing.empty()) missing += ", ";
+        missing += "false";
+      }
+      error_at(match_expr.location, "Non-exhaustive match on bool. Missing case(s): " + missing + ".");
+    }
+  } else if (value_type.kind == TypeKind::Enum) {
+    if (auto err = check_enum_arms_exhaustive(match_expr.arms, value_type)) {
+      error_at(match_expr.location, *err);
+    }
+  } else if (value_type.kind == TypeKind::Int || value_type.kind == TypeKind::Char ||
+             value_type.kind == TypeKind::Float) {
+    bool covered = false;
+    for (const ast::MatchArm &arm : match_expr.arms) {
+      if (match_arm_is_catchall(arm)) { covered = true; break; }
+    }
+    if (!covered) {
+      error_at(match_expr.location,
+               "Non-exhaustive match on int. Add a catch-all pattern (`_` or `let x`).");
+    }
+  } else if (value_type.kind == TypeKind::String) {
+    bool covered = false;
+    for (const ast::MatchArm &arm : match_expr.arms) {
+      if (match_arm_is_catchall(arm)) { covered = true; break; }
+    }
+    if (!covered) {
+      error_at(match_expr.location,
+               "Non-exhaustive match on string. Add a catch-all pattern (`_` or `let x`).");
+    }
+  } else if (value_type.kind == TypeKind::Struct) {
+    if (auto err = check_struct_arms_exhaustive(match_expr.arms, value_type)) {
+      error_at(match_expr.location, *err);
+    }
+  }
+
+  bool past_catchall = false;
+  std::unordered_set<std::string> seen_enum_arms;
+  bool seen_null_arm = false;
+  for (const ast::MatchArm &arm : match_expr.arms) {
+    if (past_catchall) {
+      warn_at(arm.pattern->location, "Unreachable match arm.");
+      continue;
+    }
+    if (match_arm_is_catchall(arm)) {
+      past_catchall = true;
+      continue;
+    }
+    if (!arm.guard) {
+      if (pattern_is_null_literal(arm.pattern.get())) {
+        if (seen_null_arm) {
+          warn_at(arm.pattern->location, "Duplicate match arm for 'null'.");
+        }
+        seen_null_arm = true;
+      }
+      if (const auto *ep = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get())) {
+        const std::string key = ep->enum_name + "::" + ep->variant_name;
+        if (seen_enum_arms.count(key)) {
+          warn_at(ep->location, "Duplicate match arm for variant '" + ep->variant_name + "'.");
+        } else {
+          seen_enum_arms.insert(key);
+        }
+      }
+    }
+  }
+
+  return result_type;
+}
+
 Type TypeChecker::check_expr(const ast::Expr &expr) {
   if (const auto *lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) return check_int_literal(*lit);
   if (const auto *e = dynamic_cast<const ast::CharLiteralExpr *>(&expr)) return check_char_literal(*e);
@@ -2516,236 +2734,11 @@ Type TypeChecker::check_expr(const ast::Expr &expr) {
     return callee_type.return_type ? *callee_type.return_type : int_type();
   }
 
-  if (const auto *binding = dynamic_cast<const ast::BindingPattern *>(&expr)) {
-    (void)binding;
-    return null_type();
-  }
+  if (const auto *binding = dynamic_cast<const ast::BindingPattern *>(&expr)) return check_binding_pattern(*binding);
+  if (const auto *pat = dynamic_cast<const ast::ArrayPattern *>(&expr)) return check_array_pattern(*pat);
+  if (const auto *pat = dynamic_cast<const ast::StructPattern *>(&expr)) return check_struct_pattern(*pat);
 
-  if (const auto *arr_pat = dynamic_cast<const ast::ArrayPattern *>(&expr)) {
-    (void)arr_pat;
-    return null_type();
-  }
-
-  if (const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(&expr)) {
-    (void)struct_pat;
-    return null_type();
-  }
-
-  if (const auto *match_expr = dynamic_cast<const ast::MatchExpr *>(&expr)) {
-    Type value_type = check_expr(*match_expr->value);
-    Type element_type = (value_type.kind == TypeKind::Array && value_type.element_type)
-                            ? *value_type.element_type
-                            : int_type();
-    Type result_type = null_type();
-    for (const ast::MatchArm &arm : match_expr->arms) {
-      const auto *binding = dynamic_cast<const ast::BindingPattern *>(arm.pattern.get());
-      const auto *arr_pat = dynamic_cast<const ast::ArrayPattern *>(arm.pattern.get());
-      const auto *enum_pat = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get());
-      const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(arm.pattern.get());
-      if (binding) {
-        push_scope();
-        declare_var(binding->name, value_type, false, binding->location);
-      } else if (arr_pat) {
-        push_scope();
-        for (const auto &elem : arr_pat->elements) {
-          const auto *elem_binding = dynamic_cast<const ast::BindingPattern *>(elem.get());
-          if (elem_binding) {
-            declare_var(elem_binding->name, element_type, false, elem_binding->location);
-          }
-        }
-      } else if (enum_pat) {
-        push_scope();
-        auto type_opt = lookup_type(enum_pat->enum_name);
-        if (!type_opt.has_value() || type_opt->kind != TypeKind::Enum) {
-          error_at(enum_pat->location, "'" + enum_pat->enum_name + "' is not an enum type.");
-        } else {
-          int variant_idx = -1;
-          for (std::size_t i = 0; i < type_opt->variants.size(); ++i) {
-            if (type_opt->variants[i] == enum_pat->variant_name) {
-              variant_idx = static_cast<int>(i);
-              break;
-            }
-          }
-          if (variant_idx < 0) {
-            error_at(enum_pat->location, "Enum '" + enum_pat->enum_name + "' has no variant '" + enum_pat->variant_name + "'.");
-          } else {
-            const auto &param_types = type_opt->variant_param_types[static_cast<std::size_t>(variant_idx)];
-            if (enum_pat->fields.size() != param_types.size()) {
-              error_at(enum_pat->location, "Variant '" + enum_pat->variant_name + "' expects " + std::to_string(param_types.size()) + " field(s), got " + std::to_string(enum_pat->fields.size()) + ".");
-            } else {
-              for (std::size_t i = 0; i < enum_pat->fields.size(); ++i) {
-                const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(enum_pat->fields[i].get());
-                if (field_binding) {
-                  declare_var(field_binding->name, param_types[i], false, field_binding->location);
-                }
-              }
-            }
-          }
-        }
-      } else if (struct_pat) {
-        push_scope();
-        if (value_type.kind != TypeKind::Struct || value_type.name != struct_pat->struct_name) {
-          error_at(struct_pat->location, "Struct pattern '" + struct_pat->struct_name +
-                                              "' does not match scrutinee type " +
-                                              type_to_string(value_type) + ".");
-        } else {
-          for (std::size_t i = 0; i < struct_pat->fields.size(); ++i) {
-            const auto &pf = struct_pat->fields[i];
-            std::size_t field_idx = i;
-            if (!pf.name.empty()) {
-              field_idx = value_type.fields.size();
-              for (std::size_t j = 0; j < value_type.fields.size(); ++j) {
-                if (value_type.fields[j].name == pf.name) {
-                  field_idx = j;
-                  break;
-                }
-              }
-              if (field_idx >= value_type.fields.size()) {
-                error_at(struct_pat->location, "Struct '" + struct_pat->struct_name + "' has no field '" +
-                                                    pf.name + "'.");
-                continue;
-              }
-            } else if (field_idx >= value_type.fields.size()) {
-              error_at(struct_pat->location, "Struct pattern has too many fields for '" +
-                                                  struct_pat->struct_name + "'.");
-              continue;
-            }
-            Type field_type = value_type.fields[field_idx].type
-                                  ? *value_type.fields[field_idx].type
-                                  : resolve_type_name(value_type.fields[field_idx].type_name);
-            const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(pf.pattern.get());
-            const auto *field_wildcard = dynamic_cast<const ast::IdentifierExpr *>(pf.pattern.get());
-            if (field_binding) {
-              declare_var(field_binding->name, field_type, false, field_binding->location);
-            } else if (field_wildcard && field_wildcard->name == "_") {
-              continue;
-            } else {
-              Type pattern_type = check_expr(*pf.pattern);
-              if (pattern_type.kind != TypeKind::Null &&
-                  !types_assignable(pattern_type, field_type) &&
-                  !types_assignable(field_type, pattern_type) &&
-                  !pattern_type.is_compatible_with(field_type)) {
-                error_at(pf.pattern->location, "Pattern type " + type_to_string(pattern_type) +
-                                                    " does not match field type " +
-                                                    type_to_string(field_type) + ".");
-              }
-            }
-          }
-        }
-      }
-      if (!binding && !arr_pat && !enum_pat && !struct_pat) {
-        Type pattern_type = check_expr(*arm.pattern);
-        if (pattern_type.kind != TypeKind::Null &&
-            !types_assignable(pattern_type, value_type) &&
-            !types_assignable(value_type, pattern_type) &&
-            !pattern_type.is_compatible_with(value_type)) {
-          error_at(arm.pattern->location, "Pattern type " + type_to_string(pattern_type) +
-                                              " does not match value type " +
-                                              type_to_string(value_type) + ".");
-        }
-      }
-      if (arm.guard) {
-        Type guard_type = check_expr(*arm.guard);
-        if (guard_type.kind != TypeKind::Bool) {
-          error_at(arm.guard->location, "Guard expression must be bool.");
-        }
-      }
-      Type body_type = check_expr(*arm.body);
-      if (binding || arr_pat || enum_pat || struct_pat) {
-        pop_scope();
-      }
-      if (result_type.kind == TypeKind::Null) {
-        result_type = body_type;
-      }
-    }
-
-    if (value_type.nullable) {
-      if (auto err = check_nullable_arms_exhaustive(match_expr->arms, value_type)) {
-        error_at(match_expr->location, *err);
-      }
-    } else if (value_type.kind == TypeKind::Bool) {
-      bool missing_true = false;
-      bool missing_false = false;
-      if (!arms_cover_bool(match_expr->arms, missing_true, missing_false)) {
-        std::string missing;
-        if (missing_true) {
-          missing = "true";
-        }
-        if (missing_false) {
-          if (!missing.empty()) {
-            missing += ", ";
-          }
-          missing += "false";
-        }
-        error_at(match_expr->location, "Non-exhaustive match on bool. Missing case(s): " + missing + ".");
-      }
-    } else if (value_type.kind == TypeKind::Enum) {
-      if (auto err = check_enum_arms_exhaustive(match_expr->arms, value_type)) {
-        error_at(match_expr->location, *err);
-      }
-    } else if (value_type.kind == TypeKind::Int || value_type.kind == TypeKind::Char ||
-               value_type.kind == TypeKind::Float) {
-      bool covered = false;
-      for (const ast::MatchArm &arm : match_expr->arms) {
-        if (match_arm_is_catchall(arm)) {
-          covered = true;
-          break;
-        }
-      }
-      if (!covered) {
-        error_at(match_expr->location,
-                 "Non-exhaustive match on int. Add a catch-all pattern (`_` or `let x`).");
-      }
-    } else if (value_type.kind == TypeKind::String) {
-      bool covered = false;
-      for (const ast::MatchArm &arm : match_expr->arms) {
-        if (match_arm_is_catchall(arm)) {
-          covered = true;
-          break;
-        }
-      }
-      if (!covered) {
-        error_at(match_expr->location,
-                 "Non-exhaustive match on string. Add a catch-all pattern (`_` or `let x`).");
-      }
-    } else if (value_type.kind == TypeKind::Struct) {
-      if (auto err = check_struct_arms_exhaustive(match_expr->arms, value_type)) {
-        error_at(match_expr->location, *err);
-      }
-    }
-
-    bool past_catchall = false;
-    std::unordered_set<std::string> seen_enum_arms;
-    bool seen_null_arm = false;
-    for (const ast::MatchArm &arm : match_expr->arms) {
-      if (past_catchall) {
-        warn_at(arm.pattern->location, "Unreachable match arm.");
-        continue;
-      }
-      if (match_arm_is_catchall(arm)) {
-        past_catchall = true;
-        continue;
-      }
-      if (!arm.guard) {
-        if (pattern_is_null_literal(arm.pattern.get())) {
-          if (seen_null_arm) {
-            warn_at(arm.pattern->location, "Duplicate match arm for 'null'.");
-          }
-          seen_null_arm = true;
-        }
-        if (const auto *ep = dynamic_cast<const ast::EnumPattern *>(arm.pattern.get())) {
-          const std::string key = ep->enum_name + "::" + ep->variant_name;
-          if (seen_enum_arms.count(key)) {
-            warn_at(ep->location, "Duplicate match arm for variant '" + ep->variant_name + "'.");
-          } else {
-            seen_enum_arms.insert(key);
-          }
-        }
-      }
-    }
-
-    return result_type;
-  }
+  if (const auto *match_expr = dynamic_cast<const ast::MatchExpr *>(&expr)) return check_match(*match_expr);
 
   if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(&expr)) {
     // A generic struct literal written without type arguments (e.g. `Box { 7 }`)

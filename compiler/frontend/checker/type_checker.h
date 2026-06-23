@@ -72,6 +72,10 @@ private:
   Type check_unary(const ast::UnaryExpr &unary);
   Type check_binary(const ast::BinaryExpr &binary);
   Type check_assign(const ast::AssignExpr &assign);
+  Type check_binding_pattern(const ast::BindingPattern &binding);
+  Type check_array_pattern(const ast::ArrayPattern &pat);
+  Type check_struct_pattern(const ast::StructPattern &pat);
+  Type check_match(const ast::MatchExpr &match);
   Type check_expr(const ast::Expr &expr);
 
   void push_scope();
