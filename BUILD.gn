@@ -28,6 +28,13 @@ if (embed_compiler_path != "") {
 executable("kinglet") {
   sources = [
     "compiler/driver/kinglet/cli_driver.cc",
+    "compiler/driver/kinglet/cli_spawn.cc",
+    "compiler/driver/kinglet/cli_ui.cc",
+    "compiler/driver/kinglet/cmd_build.cc",
+    "compiler/driver/kinglet/cmd_fmt.cc",
+    "compiler/driver/kinglet/cmd_init.cc",
+    "compiler/driver/kinglet/cmd_prune.cc",
+    "compiler/driver/kinglet/cmd_run.cc",
     "compiler/driver/kinglet/main.cc",
   ]
 
