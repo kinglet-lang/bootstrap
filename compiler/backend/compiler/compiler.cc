@@ -46,16 +46,13 @@ CompileResult Compiler::compile(const ast::Program &program) {
   locals_.clear();
   errors_.clear();
   warnings_.clear();
-  used_.clear();
-  opened_.clear();
+  sema_.clear();
   function_indices_.clear();
   struct_indices_.clear();
   enum_indices_.clear();
   processed_modules_.clear();
   namespace_source_paths_.clear();
   function_source_paths_.clear();
-  concept_registry_.clear();
-  concept_generic_func_decls_.clear();
   func_first_param_.clear();
   global_const_inits_.clear();
 
@@ -89,16 +86,16 @@ CompileResult Compiler::compile(const ast::Program &program) {
 
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
-      used_.insert(using_decl->namespace_name);
+      sema_.used_.insert(using_decl->namespace_name);
       if (using_decl->is_namespace) {
-        opened_.insert(using_decl->namespace_name);
-        if (imported_namespaces_.count(using_decl->namespace_name)) {
+        sema_.opened_.insert(using_decl->namespace_name);
+        if (sema_.imported_namespaces_.count(using_decl->namespace_name)) {
           open_imported_namespace(using_decl->namespace_name);
         }
       }
     }
     if (const auto *using_alias = dynamic_cast<const ast::UsingAliasDecl *>(declaration.get())) {
-      module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
+      sema_.module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
     }
   }
 
@@ -106,7 +103,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(declaration.get())) {
       if (!struct_decl->type_params.empty()) {
-        generic_struct_decls_[struct_decl->name] = struct_decl;
+        sema_.generic_structs_[struct_decl->name] = struct_decl;
         continue;
       }
       StructMeta meta;
@@ -133,7 +130,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
 
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(declaration.get())) {
-      concept_registry_[concept_decl->name] = concept_decl;
+      sema_.concept_registry_[concept_decl->name] = concept_decl;
     }
     if (const auto *top = dynamic_cast<const ast::TopLevelStmtDecl *>(declaration.get())) {
       if (const auto *var = dynamic_cast<const ast::VarDeclStmt *>(top->stmt.get())) {
@@ -149,11 +146,11 @@ CompileResult Compiler::compile(const ast::Program &program) {
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *function = dynamic_cast<const ast::FunctionDecl *>(declaration.get())) {
       if (!function->type_params.empty()) {
-        generic_func_decls_[function->name] = function;
+        sema_.generic_functions_[function->name] = function;
         continue;
       }
       if (function_uses_concept_params(*function)) {
-        concept_generic_func_decls_[function->name] = function;
+        sema_.concept_generic_functions_[function->name] = function;
         continue;
       }
       int idx = static_cast<int>(function_infos_.size());
@@ -240,8 +237,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   locals_.clear();
   errors_.clear();
   warnings_.clear();
-  used_.clear();
-  opened_.clear();
+  sema_.clear();
   function_indices_.clear();
   struct_indices_.clear();
   enum_indices_.clear();
@@ -260,16 +256,16 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
 
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(declaration.get())) {
-      used_.insert(using_decl->namespace_name);
+      sema_.used_.insert(using_decl->namespace_name);
       if (using_decl->is_namespace) {
-        opened_.insert(using_decl->namespace_name);
-        if (imported_namespaces_.count(using_decl->namespace_name)) {
+        sema_.opened_.insert(using_decl->namespace_name);
+        if (sema_.imported_namespaces_.count(using_decl->namespace_name)) {
           open_imported_namespace(using_decl->namespace_name);
         }
       }
     }
     if (const auto *using_alias = dynamic_cast<const ast::UsingAliasDecl *>(declaration.get())) {
-      module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
+      sema_.module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
     }
   }
 
@@ -277,7 +273,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(declaration.get())) {
       if (!struct_decl->type_params.empty()) {
-        generic_struct_decls_[struct_decl->name] = struct_decl;
+        sema_.generic_structs_[struct_decl->name] = struct_decl;
         continue;
       }
       StructMeta meta;
@@ -304,7 +300,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
 
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(declaration.get())) {
-      concept_registry_[concept_decl->name] = concept_decl;
+      sema_.concept_registry_[concept_decl->name] = concept_decl;
     }
   }
 
@@ -313,11 +309,11 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   for (const ast::DeclPtr &declaration : program.declarations) {
     if (const auto *function = dynamic_cast<const ast::FunctionDecl *>(declaration.get())) {
       if (!function->type_params.empty()) {
-        generic_func_decls_[function->name] = function;
+        sema_.generic_functions_[function->name] = function;
         continue;
       }
       if (function_uses_concept_params(*function)) {
-        concept_generic_func_decls_[function->name] = function;
+        sema_.concept_generic_functions_[function->name] = function;
         continue;
       }
       int idx = static_cast<int>(function_infos_.size());
@@ -1039,7 +1035,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
 
   const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get());
   // Handle bare io:: members when 'using namespace io;' is in effect
-  if (callee_id && opened_.count("io") != 0) {
+  if (callee_id && sema_.opened_.count("io") != 0) {
     if (callee_id->name == "out") {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
@@ -1084,7 +1080,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     emit(OpCode::BitsToFloat, call_expr.location);
     return;
   }
-  if (ns_callee && used_.count(ns_callee->namespace_name) != 0 &&
+  if (ns_callee && sema_.used_.count(ns_callee->namespace_name) != 0 &&
       ns_callee->namespace_name == "io") {
     if (ns_callee->member_name == "out") {
       for (const ast::ExprPtr &arg : call_expr.args) {
@@ -1133,7 +1129,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   }
 
   // Handle fs::__read(...) / fs::__write(...) direct calls.
-  if (ns_callee && used_.count("fs") != 0 && ns_callee->namespace_name == "fs") {
+  if (ns_callee && sema_.used_.count("fs") != 0 && ns_callee->namespace_name == "fs") {
     if (ns_callee->member_name == "__read") {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
@@ -1161,7 +1157,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   }
 
   // Handle sys::args() direct call.
-  if (ns_callee && used_.count("sys") != 0 && ns_callee->namespace_name == "sys") {
+  if (ns_callee && sema_.used_.count("sys") != 0 && ns_callee->namespace_name == "sys") {
     if (ns_callee->member_name == "args") {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
@@ -1199,7 +1195,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     }
   }
 
-  if (ns_callee && concept_registry_.count(ns_callee->namespace_name)) {
+  if (ns_callee && sema_.concept_registry_.count(ns_callee->namespace_name)) {
     if (call_expr.args.empty()) {
       error_at(call_expr.location, "Concept method '" + ns_callee->namespace_name + "::" +
                                       ns_callee->member_name + "' expects at least one argument.");
@@ -1227,7 +1223,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   if (field_callee) {
     const auto *ns_obj =
         dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
-    if (ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
+    if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
       if (ns_obj->member_name == "out" && field_callee->field_name == "line") {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
@@ -1259,7 +1255,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   if (field_callee) {
     const auto *id_obj =
         dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
-    if (id_obj && opened_.count("io") != 0) {
+    if (id_obj && sema_.opened_.count("io") != 0) {
       if (id_obj->name == "out" && field_callee->field_name == "line") {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
@@ -1436,8 +1432,8 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
 
   // Generic function call — type arguments are explicit, or inferred from the
   // argument expressions (matching parameters written as bare type params).
-  if (callee_id && generic_func_decls_.count(callee_id->name)) {
-    const ast::FunctionDecl *decl = generic_func_decls_.at(callee_id->name);
+  if (callee_id && sema_.generic_functions_.count(callee_id->name)) {
+    const ast::FunctionDecl *decl = sema_.generic_functions_.at(callee_id->name);
     std::vector<std::string> type_arg_names;
     if (!call_expr.type_args.empty()) {
       for (const auto &arg : call_expr.type_args) {
@@ -1495,12 +1491,12 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   }
 
   // Concept-generic function call — infer concrete type from concept-typed params.
-  if (callee_id && concept_generic_func_decls_.count(callee_id->name)) {
-    const ast::FunctionDecl *decl = concept_generic_func_decls_.at(callee_id->name);
+  if (callee_id && sema_.concept_generic_functions_.count(callee_id->name)) {
+    const ast::FunctionDecl *decl = sema_.concept_generic_functions_.at(callee_id->name);
     std::string concrete_ty;
     for (std::size_t i = 0; i < decl->params.size() && i < call_expr.args.size(); ++i) {
       const ast::TypeExpr &pt = decl->params[i].type;
-      if (pt.type_args.empty() && concept_registry_.count(pt.name)) {
+      if (pt.type_args.empty() && sema_.concept_registry_.count(pt.name)) {
         const std::string ty = infer_arg_type_name(*call_expr.args[i]);
         if (!ty.empty()) {
           concrete_ty = ty;
@@ -1547,8 +1543,8 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       func_it = function_indices_.find(callee_id->name);
     }
     if (func_it == function_indices_.end()) {
-      std::vector<std::string> ns_sorted(imported_namespaces_.begin(),
-                                         imported_namespaces_.end());
+      std::vector<std::string> ns_sorted(sema_.imported_namespaces_.begin(),
+                                         sema_.imported_namespaces_.end());
       std::sort(ns_sorted.begin(), ns_sorted.end());
       for (const auto &ns : ns_sorted) {
         auto qit = function_indices_.find(module_id_to_qualifier(ns) + "::" + callee_id->name);
@@ -1844,7 +1840,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
     emit_operand(OpCode::EnumVariant, operand, ns_access.location);
     return;
   }
-  if (ns_access.namespace_name == "io" && used_.count("io") != 0) {
+  if (ns_access.namespace_name == "io" && sema_.used_.count("io") != 0) {
     NativeFn fn;
     if (ns_access.member_name == "out") {
       fn = NativeFn::IoOut;
@@ -1859,7 +1855,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
     emit_constant(Value::native_function_value(fn), ns_access.location);
     return;
   }
-  if (ns_access.namespace_name == "fs" && used_.count("fs") != 0) {
+  if (ns_access.namespace_name == "fs" && sema_.used_.count("fs") != 0) {
     NativeFn fn;
     if (ns_access.member_name == "__read") {
       fn = NativeFn::FsRead;
@@ -1872,7 +1868,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
     emit_constant(Value::native_function_value(fn), ns_access.location);
     return;
   }
-  if (ns_access.namespace_name == "sys" && used_.count("sys") != 0) {
+  if (ns_access.namespace_name == "sys" && sema_.used_.count("sys") != 0) {
     NativeFn fn;
     if (ns_access.member_name == "args") {
       fn = NativeFn::SysArgs;
@@ -1884,7 +1880,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
     return;
   }
   // Check concept namespaces for fully-qualified calls (Printable::to_string)
-  if (concept_registry_.count(ns_access.namespace_name)) {
+  if (sema_.concept_registry_.count(ns_access.namespace_name)) {
     // Defer to calling context: the callee will resolve the trait method
     // based on the argument type. For now, emit the member as a name lookup
     // so the call site can mangle it as Type::method.
@@ -1895,7 +1891,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
     const std::string qualified =
         resolve_module_qualified(ns_access.namespace_name, ns_access.member_name);
     const std::string prefix = qualified.substr(0, qualified.rfind("::"));
-    if (imported_qualifiers_.count(prefix)) {
+    if (sema_.imported_qualifiers_.count(prefix)) {
       auto it = function_indices_.find(qualified);
       if (it != function_indices_.end()) {
         emit_constant(Value::function_value(
@@ -1908,7 +1904,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
       return;
     }
   }
-  if (used_.count(ns_access.namespace_name) != 0) {
+  if (sema_.used_.count(ns_access.namespace_name) != 0) {
     return;
   }
   if (ns_access.namespace_name == "io") {
@@ -1926,8 +1922,8 @@ void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) 
   // Infer omitted type arguments for a generic struct literal from its field
   // values (e.g. `Box { 7 }` -> `Box<int>`), mirroring the checker.
   ast::TypeExpr lit_type = struct_lit.struct_type;
-  if (lit_type.type_args.empty() && generic_struct_decls_.count(lit_type.name)) {
-    const ast::StructDecl *decl = generic_struct_decls_.at(lit_type.name);
+  if (lit_type.type_args.empty() && sema_.generic_structs_.count(lit_type.name)) {
+    const ast::StructDecl *decl = sema_.generic_structs_.at(lit_type.name);
     std::unordered_map<std::string, std::string> inferred;
     for (size_t i = 0; i < decl->fields.size() && i < struct_lit.fields.size(); ++i) {
       const ast::TypeExpr &ft = decl->fields[i].type;
@@ -1977,7 +1973,7 @@ void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) 
 void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
 
   if (const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
-      ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
+      ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
     NativeFn fn;
     if (ns_obj->member_name == "out" && field_access.field_name == "line") {
       fn = NativeFn::IoOutLine;
@@ -2307,8 +2303,8 @@ int Compiler::resolve_struct(const ast::TypeExpr &type) {
   }
   auto it = struct_indices_.find(mangled);
   if (it != struct_indices_.end()) return it->second;
-  auto gen_it = generic_struct_decls_.find(type.name);
-  if (gen_it == generic_struct_decls_.end()) return -1;
+  auto gen_it = sema_.generic_structs_.find(type.name);
+  if (gen_it == sema_.generic_structs_.end()) return -1;
   const ast::StructDecl *decl = gen_it->second;
   StructMeta meta;
   meta.name = mangled;
@@ -2394,7 +2390,7 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
 
   std::string ns = import_decl.alias.empty() ? mod.namespace_name : import_decl.alias;
 
-  imported_namespaces_.insert(ns);
+  sema_.imported_namespaces_.insert(ns);
   namespace_source_paths_[ns] = mod.resolved_path;
 
   for (const auto *func : mod.public_functions) {
@@ -2553,8 +2549,8 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
 
   const std::string ns = mod.namespace_name;
   const std::string qual = module_id_to_qualifier(ns);
-  imported_namespaces_.insert(ns);
-  imported_qualifiers_.insert(qual);
+  sema_.imported_namespaces_.insert(ns);
+  sema_.imported_qualifiers_.insert(qual);
   namespace_source_paths_[ns] = mod.resolved_path;
 
   for (const auto *func : mod.public_functions) {
@@ -2632,13 +2628,13 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
 
 std::string Compiler::resolve_module_qualified(const std::string &ns,
                                                const std::string &member) const {
-  auto it = module_aliases_.find(ns);
-  const std::string prefix = it != module_aliases_.end() ? it->second : ns;
+  auto it = sema_.module_aliases_.find(ns);
+  const std::string prefix = it != sema_.module_aliases_.end() ? it->second : ns;
   return prefix + "::" + member;
 }
 
 void Compiler::open_imported_namespace(const std::string &module_id) {
-  if (!imported_namespaces_.count(module_id)) {
+  if (!sema_.imported_namespaces_.count(module_id)) {
     return;
   }
   const std::string prefix = module_id_to_qualifier(module_id) + "::";
@@ -2660,12 +2656,7 @@ void Compiler::open_imported_namespace(const std::string &module_id) {
 }
 
 bool Compiler::function_uses_concept_params(const ast::FunctionDecl &function) const {
-  for (const auto &param : function.params) {
-    if (param.type.type_args.empty() && concept_registry_.count(param.type.name)) {
-      return true;
-    }
-  }
-  return false;
+  return sema_.function_uses_concept_params(function);
 }
 
 void Compiler::visit(const ast::IntLiteralExpr &x) { compile_int_literal(x); }

@@ -7,6 +7,7 @@
 #include "ir/kir.h"
 #include "ir/kir_recorder.h"
 #include "frontend/module/module_loader.h"
+#include "frontend/sema/semantic_context.h"
 #include "backend/vm/chunk.h"
 
 #include <memory>
@@ -164,21 +165,14 @@ private:
   std::vector<CompileError> errors_;
   std::vector<CompileWarning> warnings_;
   std::vector<LoopInfo> loop_stack_;
-  std::unordered_set<std::string> used_;
-  std::unordered_set<std::string> opened_;
+  SemanticContext sema_;
   std::unordered_map<std::string, int> function_indices_;
   std::unordered_map<std::string, int> struct_indices_;
   std::unordered_map<std::string, int> enum_indices_;
-  std::unordered_map<std::string, const ast::StructDecl *> generic_struct_decls_;
-  std::unordered_map<std::string, const ast::FunctionDecl *> generic_func_decls_;
-  std::unordered_map<std::string, const ast::FunctionDecl *> concept_generic_func_decls_;
   std::vector<std::pair<std::string, const ast::FunctionDecl *>> pending_generic_funcs_;
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
   ModuleLoader *module_loader_ = nullptr;
   std::unordered_map<std::string, std::string> namespace_aliases_;
-  std::unordered_map<std::string, std::string> module_aliases_;
-  std::unordered_set<std::string> imported_namespaces_;
-  std::unordered_set<std::string> imported_qualifiers_;
   std::unordered_map<std::string, std::vector<const ast::FunctionDecl *>> imported_function_decls_;
   // Resolved paths of modules already processed by process_import_from, so a
   // module reached through several import paths (diamond deps) is registered
@@ -189,7 +183,6 @@ private:
   std::string compiling_namespace_;
   std::vector<std::string> function_source_paths_;
   std::unordered_map<std::string, std::string> local_types_;
-  std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
   std::unordered_map<std::string, std::string> method_return_types_;
   std::unordered_map<std::string, std::string> func_first_param_;
   std::unordered_map<std::string, const ast::Expr *> global_const_inits_;

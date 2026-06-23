@@ -13,6 +13,7 @@ static_library("compiler") {
     "//compiler/ir",
     "//compiler/frontend/module",
     "//compiler/frontend/types",
+    "//compiler/frontend/sema",
     "//compiler/backend/vm",
   ]
 

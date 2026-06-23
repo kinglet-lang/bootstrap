@@ -611,7 +611,7 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
     return ref;
   }
   if (expr.type_args.empty()) {
-    if (concept_registry_.count(expr.name)) {
+    if (sema_.concept_registry_.count(expr.name)) {
       Type concept_type(TypeKind::Concept);
       concept_type.name = expr.name;
       return concept_type;
@@ -627,8 +627,8 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
   if (it != type_registry_.end()) {
     return it->second;
   }
-  auto gen_it = generic_structs_.find(expr.name);
-  if (gen_it != generic_structs_.end()) {
+  auto gen_it = sema_.generic_structs_.find(expr.name);
+  if (gen_it != sema_.generic_structs_.end()) {
     instantiate_generic_struct(gen_it->second, expr.type_args);
     auto inst_it = type_registry_.find(mangled);
     if (inst_it != type_registry_.end()) {
@@ -710,11 +710,8 @@ void TypeChecker::forward_declare_imported_types(const ParsedModule &mod) {
 TypeCheckResult TypeChecker::check(const ast::Program &program) {
   errors_.clear();
   scopes_.clear();
-  used_.clear();
-  opened_.clear();
+  sema_.clear();
   type_registry_.clear();
-  concept_registry_.clear();
-  concept_generic_functions_.clear();
   free_functions_.clear();
   method_registry_.clear();
   kir_function_sigs_.clear();
@@ -726,7 +723,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
   for (const ast::DeclPtr &decl : program.declarations) {
     if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(decl.get())) {
-      concept_registry_[concept_decl->name] = concept_decl;
+      sema_.concept_registry_[concept_decl->name] = concept_decl;
     }
   }
 
@@ -836,7 +833,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         continue;
       }
       if (!struct_decl->type_params.empty()) {
-        generic_structs_[struct_decl->name] = struct_decl;
+        sema_.generic_structs_[struct_decl->name] = struct_decl;
       } else {
         // Insert a forward-declaration placeholder so self-referencing
         // fields can resolve the struct type by name.
@@ -882,11 +879,11 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     }
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
       if (!func->type_params.empty()) {
-        generic_functions_[func->name] = func;
+        sema_.generic_functions_[func->name] = func;
         continue;
       }
       if (function_uses_concept_params(*func)) {
-        concept_generic_functions_[func->name] = func;
+        sema_.concept_generic_functions_[func->name] = func;
         continue;
       }
       free_functions_.push_back(func);
@@ -945,7 +942,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
                       }
                       type_registry_.insert_or_assign(sd->name, st);
                     } else {
-                      generic_structs_[sd->name] = sd;
+                      sema_.generic_structs_[sd->name] = sd;
                     }
                   }
                   for (const auto *ed : inner_mod.public_enums) {
@@ -964,7 +961,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             }
           }
           std::string ns = import_decl->alias.empty() ? mod.namespace_name : import_decl->alias;
-          imported_namespaces_.insert(ns);
+          sema_.imported_namespaces_.insert(ns);
           // Record exported / private symbol names so `using mod { sym };` can
           // diagnose a missing or non-pub symbol precisely.
           {
@@ -1008,7 +1005,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               }
               type_registry_.insert_or_assign(sd->name, struct_type);
             } else {
-              generic_structs_[sd->name] = sd;
+              sema_.generic_structs_[sd->name] = sd;
             }
           }
           for (const auto *ed : mod.public_enums) {
@@ -1042,7 +1039,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               }
               type_registry_.insert_or_assign(sd->name, st);
             } else {
-              generic_structs_[sd->name] = sd;
+              sema_.generic_structs_[sd->name] = sd;
             }
           }
           for (const auto *ed : mod.private_enums) {
@@ -1095,8 +1092,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           const auto &mod = *mod_ptr;
           const std::string ns = mod.namespace_name;
           const std::string qual = module_id_to_qualifier(ns);
-          imported_namespaces_.insert(ns);
-          imported_qualifiers_.insert(qual);
+          sema_.imported_namespaces_.insert(ns);
+          sema_.imported_qualifiers_.insert(qual);
           {
             auto &pub_set = module_public_symbols_[ns];
             for (const auto *fn : mod.public_functions) pub_set.insert(fn->name);
@@ -1118,7 +1115,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               }
               type_registry_.insert_or_assign(sd->name, struct_type);
             } else {
-              generic_structs_[sd->name] = sd;
+              sema_.generic_structs_[sd->name] = sd;
             }
           }
           for (const auto *ed : mod.public_enums) {
@@ -1162,7 +1159,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             if (result.module) {
               const auto &mod = *result.module;
               std::string ns = import_decl->alias.empty() ? mod.namespace_name : import_decl->alias;
-              imported_namespaces_.insert(ns);
+              sema_.imported_namespaces_.insert(ns);
               // Record exported / private symbol names so `using mod { sym };`
               // diagnostics work for the block-import form too (without this,
               // `using mod { SomeStruct }` misreports the type as missing).
@@ -1187,7 +1184,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
                   }
                   type_registry_.insert_or_assign(sd->name, struct_type);
                 } else {
-                  generic_structs_[sd->name] = sd;
+                  sema_.generic_structs_[sd->name] = sd;
                 }
               }
               for (const auto *ed : mod.public_enums) {
@@ -1226,12 +1223,12 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
                               using_decl->namespace_name == "fs" ||
                               using_decl->namespace_name == "sys" ||
                               using_decl->namespace_name == "rt";
-      if (!runtime_ns && !imported_namespaces_.count(using_decl->namespace_name)) {
+      if (!runtime_ns && !sema_.imported_namespaces_.count(using_decl->namespace_name)) {
         error_at(using_decl->location, "Unknown module '" + using_decl->namespace_name + "'.");
       }
-      used_.insert(using_decl->namespace_name);
+      sema_.used_.insert(using_decl->namespace_name);
       if (using_decl->is_namespace) {
-        if (imported_namespaces_.count(using_decl->namespace_name)) {
+        if (sema_.imported_namespaces_.count(using_decl->namespace_name)) {
           const auto pub_it = module_public_symbols_.find(using_decl->namespace_name);
           if (pub_it != module_public_symbols_.end()) {
             for (const auto &sym : pub_it->second) {
@@ -1244,15 +1241,15 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           }
           open_imported_namespace(using_decl->namespace_name);
         }
-        opened_.insert(using_decl->namespace_name);
+        sema_.opened_.insert(using_decl->namespace_name);
       }
       continue;
     }
     if (const auto *using_alias = dynamic_cast<const ast::UsingAliasDecl *>(decl.get())) {
-      if (!imported_namespaces_.count(using_alias->module_id)) {
+      if (!sema_.imported_namespaces_.count(using_alias->module_id)) {
         error_at(using_alias->location, "Unknown module '" + using_alias->module_id + "'.");
       } else {
-        module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
+        sema_.module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
       }
     }
   }
@@ -1405,7 +1402,7 @@ void TypeChecker::visit(const ast::ExprStmt &expr_stmt) {
     if (suppress) {
       if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr_stmt.expr.get())) {
         if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get())) {
-          if (imported_namespaces_.count(ns->namespace_name))
+          if (sema_.imported_namespaces_.count(ns->namespace_name))
             suppress = false;
         } else if (const auto *var = dynamic_cast<const ast::IdentifierExpr *>(call->callee.get())) {
           if (imported_bare_names_.count(var->name))
@@ -1555,7 +1552,7 @@ Type TypeChecker::check_null_literal(const ast::NullLiteralExpr &) {
 
 Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_access) {
   if (ns_access.namespace_name == "io") {
-    if (used_.count("io") == 0) {
+    if (sema_.used_.count("io") == 0) {
       error_at(ns_access.location,
                "Module 'io' is not imported. Add 'using io;' at the top of the file.");
       return void_type();
@@ -1574,7 +1571,7 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
     }
   }
   if (ns_access.namespace_name == "fs") {
-    if (used_.count("fs") == 0) {
+    if (sema_.used_.count("fs") == 0) {
       error_at(ns_access.location,
                "Module 'fs' is not imported. Add 'using fs;' at the top of the file.");
       return void_type();
@@ -1599,7 +1596,7 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
     }
   }
   if (ns_access.namespace_name == "sys") {
-    if (used_.count("sys") == 0) {
+    if (sema_.used_.count("sys") == 0) {
       error_at(ns_access.location,
                "Module 'sys' is not imported. Add 'using sys;' at the top of the file.");
       return void_type();
@@ -1634,7 +1631,7 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
     return *enum_type;
   }
   // Check for concept namespace (e.g. Printable::to_string)
-  if (concept_registry_.count(ns_access.namespace_name)) {
+  if (sema_.concept_registry_.count(ns_access.namespace_name)) {
     return void_type();
   }
   return void_type();
@@ -1644,7 +1641,7 @@ Type TypeChecker::check_identifier(const ast::IdentifierExpr &identifier) {
   if (identifier.name == "_") {
     return null_type();
   }
-  if (opened_.count("io") != 0) {
+  if (sema_.opened_.count("io") != 0) {
     if (identifier.name == "out" || identifier.name == "err") {
       Type fn(TypeKind::Function);
       fn.name = "native_fn";
@@ -2039,7 +2036,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   // Intercept built-in functions
   const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get());
   // Handle bare io:: members when 'using namespace io;' is in effect
-  if (callee_id && opened_.count("io") != 0) {
+  if (callee_id && sema_.opened_.count("io") != 0) {
   if (callee_id->name == "out") {
     for (const ast::ExprPtr &arg : call_expr.args) {
       check_expr(*arg);
@@ -2091,7 +2088,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   return float_type();
   }
   if (ns_callee && ns_callee->namespace_name == "io") {
-  if (used_.count("io") == 0) {
+  if (sema_.used_.count("io") == 0) {
     error_at(ns_callee->location,
              "Module 'io' is not imported. Add 'using io;' at the top of the file.");
     return void_type();
@@ -2130,7 +2127,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
 
   // Handle fs::__read(path) -> string, fs::__write(path, content) -> void.
   if (ns_callee && ns_callee->namespace_name == "fs") {
-  if (used_.count("fs") == 0) {
+  if (sema_.used_.count("fs") == 0) {
     error_at(ns_callee->location,
              "Module 'fs' is not imported. Add 'using fs;' at the top of the file.");
     return void_type();
@@ -2170,7 +2167,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
 
   // Handle sys::args() -> string[].
   if (ns_callee && ns_callee->namespace_name == "sys") {
-  if (used_.count("sys") == 0) {
+  if (sema_.used_.count("sys") == 0) {
     error_at(ns_callee->location,
              "Module 'sys' is not imported. Add 'using sys;' at the top of the file.");
     return void_type();
@@ -2214,7 +2211,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   }
   }
 
-  if (ns_callee && concept_registry_.count(ns_callee->namespace_name)) {
+  if (ns_callee && sema_.concept_registry_.count(ns_callee->namespace_name)) {
   if (call_expr.args.empty()) {
     error_at(call_expr.location, "Concept method '" + ns_callee->namespace_name + "::" +
                                     ns_callee->member_name + "' expects at least one argument.");
@@ -2238,7 +2235,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   if (field_callee) {
   const auto *id_obj =
       dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
-  if (id_obj && opened_.count("io") != 0) {
+  if (id_obj && sema_.opened_.count("io") != 0) {
     if ((id_obj->name == "out" || id_obj->name == "err") &&
         field_callee->field_name == "line") {
       for (const ast::ExprPtr &arg : call_expr.args) {
@@ -2256,7 +2253,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   }
   const auto *ns_obj =
       dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
-  if (ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
+  if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
     if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
         field_callee->field_name == "line") {
       for (const ast::ExprPtr &arg : call_expr.args) {
@@ -2272,7 +2269,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       return string_type();
     }
   }
-  if (ns_obj && used_.count(ns_obj->namespace_name) == 0) {
+  if (ns_obj && sema_.used_.count(ns_obj->namespace_name) == 0) {
     error_at(ns_obj->location,
              "Module '" + ns_obj->namespace_name +
                  "' is not imported. Add 'using " + ns_obj->namespace_name +
@@ -2535,8 +2532,8 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   {
   const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get());
   if (callee_id) {
-    auto gen_it = generic_functions_.find(callee_id->name);
-    if (gen_it != generic_functions_.end()) {
+    auto gen_it = sema_.generic_functions_.find(callee_id->name);
+    if (gen_it != sema_.generic_functions_.end()) {
       const ast::FunctionDecl *decl = gen_it->second;
 
       // Check arguments once: their types both drive inference (when no
@@ -2603,8 +2600,8 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       }
       return ret;
     }
-    auto concept_gen_it = concept_generic_functions_.find(callee_id->name);
-    if (concept_gen_it != concept_generic_functions_.end()) {
+    auto concept_gen_it = sema_.concept_generic_functions_.find(callee_id->name);
+    if (concept_gen_it != sema_.concept_generic_functions_.end()) {
       const ast::FunctionDecl *decl = concept_gen_it->second;
       std::vector<Type> arg_types;
       arg_types.reserve(call_expr.args.size());
@@ -2631,8 +2628,8 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       }
 
       for (const auto &[concept_name, concrete] : concept_bindings) {
-        auto cd_it = concept_registry_.find(concept_name);
-        if (cd_it != concept_registry_.end()) {
+        auto cd_it = sema_.concept_registry_.find(concept_name);
+        if (cd_it != sema_.concept_registry_.end()) {
           type_satisfies_concept(cd_it->second, concrete, call_expr.location);
         }
       }
@@ -2640,8 +2637,8 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       std::function<ast::TypeExpr(const ast::TypeExpr &)> substitute_concepts;
       substitute_concepts = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
         if (te.type_args.empty()) {
-          auto concept_it = concept_registry_.find(te.name);
-          if (concept_it != concept_registry_.end()) {
+          auto concept_it = sema_.concept_registry_.find(te.name);
+          if (concept_it != sema_.concept_registry_.end()) {
             auto binding_it = concept_bindings.find(te.name);
             if (binding_it != concept_bindings.end()) {
               return type_to_type_expr(binding_it->second);
@@ -2681,12 +2678,12 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   Type callee_type = check_expr(*call_expr.callee);
   if (callee_type.kind != TypeKind::Function) {
   if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
-      ns && used_.count(ns->namespace_name) == 0) {
+      ns && sema_.used_.count(ns->namespace_name) == 0) {
     return void_type();
   }
   if (const auto *fa = dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get())) {
     if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(fa->object.get());
-        ns && used_.count(ns->namespace_name) == 0) {
+        ns && sema_.used_.count(ns->namespace_name) == 0) {
       return void_type();
     }
   }
@@ -2727,8 +2724,8 @@ Type TypeChecker::check_struct_literal(const ast::StructLiteralExpr &struct_lit)
   // through the normal instantiation path.
   ast::TypeExpr lit_type = struct_lit.struct_type;
   if (lit_type.type_args.empty()) {
-  auto gen_it = generic_structs_.find(lit_type.name);
-  if (gen_it != generic_structs_.end()) {
+  auto gen_it = sema_.generic_structs_.find(lit_type.name);
+  if (gen_it != sema_.generic_structs_.end()) {
     const ast::StructDecl *decl = gen_it->second;
     std::unordered_map<std::string, ast::TypeExpr> inferred;
     for (size_t i = 0; i < decl->fields.size() && i < struct_lit.fields.size(); ++i) {
@@ -2792,7 +2789,7 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
   // Handle io::out.line, io::err.line, io::in.secret as callable methods
   const auto *ns_obj =
     dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
-  if (ns_obj && ns_obj->namespace_name == "io" && used_.count("io") != 0) {
+  if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
   if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
       field_access.field_name == "line") {
     Type fn(TypeKind::Function);
@@ -2810,7 +2807,7 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
 
   // Handle `using namespace io;` bare out.line / err.line / in.secret.
   if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_access.object.get())) {
-  if (opened_.count("io") != 0) {
+  if (sema_.opened_.count("io") != 0) {
     if ((id_obj->name == "out" || id_obj->name == "err") &&
         field_access.field_name == "line") {
       Type fn(TypeKind::Function);
@@ -2860,7 +2857,7 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
   }
   if (obj_type.kind != TypeKind::Struct) {
   if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
-      ns && used_.count(ns->namespace_name) == 0) {
+      ns && sema_.used_.count(ns->namespace_name) == 0) {
     return void_type();
   }
   error_at(field_access.location, "Cannot access field on non-struct type.");
@@ -3435,8 +3432,8 @@ void TypeChecker::check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::Sou
 
 std::string TypeChecker::resolve_module_qualified(const std::string &ns,
                                                   const std::string &member) const {
-  auto it = module_aliases_.find(ns);
-  const std::string prefix = it != module_aliases_.end() ? it->second : ns;
+  auto it = sema_.module_aliases_.find(ns);
+  const std::string prefix = it != sema_.module_aliases_.end() ? it->second : ns;
   return prefix + "::" + member;
 }
 
@@ -3456,12 +3453,7 @@ void TypeChecker::open_imported_namespace(const std::string &module_id) {
 }
 
 bool TypeChecker::function_uses_concept_params(const ast::FunctionDecl &function) const {
-  for (const auto &param : function.params) {
-    if (param.type.type_args.empty() && concept_registry_.count(param.type.name)) {
-      return true;
-    }
-  }
-  return false;
+  return sema_.function_uses_concept_params(function);
 }
 
 std::string TypeChecker::type_match_key(const Type &type) const {
@@ -3535,8 +3527,8 @@ std::optional<Type> TypeChecker::lookup_concept_method(const std::string &concep
                                                        const std::string &method_name,
                                                        const Type &arg_ty,
                                                        ast::SourceLocation loc) {
-  auto concept_it = concept_registry_.find(concept_name);
-  if (concept_it == concept_registry_.end()) {
+  auto concept_it = sema_.concept_registry_.find(concept_name);
+  if (concept_it == sema_.concept_registry_.end()) {
     error_at(loc, "Unknown concept '" + concept_name + "'.");
     return std::nullopt;
   }

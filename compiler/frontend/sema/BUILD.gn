@@ -1,0 +1,14 @@
+static_library("sema") {
+  sources = [
+    "semantic_context.cc",
+    "semantic_context.h",
+  ]
+
+  deps = [
+    "//compiler/frontend/ast",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}

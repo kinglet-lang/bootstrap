@@ -9,6 +9,7 @@ static_library("checker") {
     "//compiler/ir",
     "//compiler/frontend/module",
     "//compiler/frontend/types",
+    "//compiler/frontend/sema",
   ]
 
   include_dirs = [

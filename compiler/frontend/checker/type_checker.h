@@ -6,6 +6,7 @@
 #include "frontend/ast/ast.h"
 #include "ir/kir.h"
 #include "frontend/types/types.h"
+#include "frontend/sema/semantic_context.h"
 
 namespace kinglet {
 class ModuleLoader;
@@ -175,9 +176,7 @@ private:
   std::vector<ActiveBorrow> active_borrows_;
   std::vector<std::unordered_map<std::string, VarInfo>> scopes_;
   std::unordered_map<std::string, Type> type_registry_;
-  std::unordered_map<std::string, const ast::StructDecl *> generic_structs_;
-  std::unordered_map<std::string, const ast::FunctionDecl *> generic_functions_;
-  std::unordered_map<std::string, const ast::FunctionDecl *> concept_generic_functions_;
+  SemanticContext sema_;
   std::vector<const ast::FunctionDecl *> free_functions_;
   std::unordered_set<std::string> instantiated_;
 
@@ -187,16 +186,9 @@ private:
   };
   std::unordered_map<std::string, MethodInfo> method_registry_;
 
-  std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
-
   std::vector<TypeError> errors_;
   std::unordered_map<std::string, KirFunctionSig> kir_function_sigs_;
-  std::unordered_set<std::string> used_;    // using io;
-  std::unordered_set<std::string> opened_;  // using namespace io;
-  std::unordered_set<std::string> imported_namespaces_;
   std::unordered_set<std::string> imported_bare_names_;  // for selective imports
-  std::unordered_map<std::string, std::string> module_aliases_;
-  std::unordered_set<std::string> imported_qualifiers_;
   // Per-namespace exported / private symbol names, populated when an import is
   // processed. Used to give a precise diagnostic for `using mod { sym };` when
   // a symbol is missing from the module or exists but is not pub.
