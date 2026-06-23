@@ -11,6 +11,37 @@ namespace kinglet {
 
 Type::Type(TypeKind kind) : kind(kind) {}
 
+TypeId Type::type_id() const {
+  switch (kind) {
+  case TypeKind::Int:
+    if (name == "int8") return TypeId::Int8;
+    if (name == "int16") return TypeId::Int16;
+    if (name == "int32") return TypeId::Int32;
+    if (name == "uint8") return TypeId::UInt8;
+    if (name == "uint16") return TypeId::UInt16;
+    if (name == "uint32") return TypeId::UInt32;
+    if (name == "uint64") return TypeId::UInt64;
+    return TypeId::Int64; // default (int / int64)
+  case TypeKind::Float:
+    if (name == "float32") return TypeId::Float32;
+    return TypeId::Float64; // default (float64)
+  case TypeKind::Bool:    return TypeId::Bool;
+  case TypeKind::Char:    return TypeId::Char;
+  case TypeKind::String:  return TypeId::String;
+  case TypeKind::Void:    return TypeId::Void;
+  case TypeKind::Null:    return TypeId::Null;
+  case TypeKind::Array:   return TypeId::Array;
+  case TypeKind::Map:     return TypeId::Map;
+  case TypeKind::Struct:  return TypeId::Struct;
+  case TypeKind::Enum:    return TypeId::Enum;
+  case TypeKind::Function:return TypeId::Function;
+  case TypeKind::Ref:     return TypeId::Ref;
+  case TypeKind::MutRef:  return TypeId::MutRef;
+  case TypeKind::Concept: return TypeId::Concept;
+  }
+  return TypeId::Unknown;
+}
+
 Type::Type(const Type &other)
     : kind(other.kind), name(other.name), param_types(other.param_types),
       return_type(other.return_type ? std::make_shared<Type>(*other.return_type) : nullptr),
@@ -45,11 +76,11 @@ bool Type::is_compatible_with(const Type &other) const {
       return name == other.name;
     }
     if (kind == TypeKind::Float) {
-      return name == other.name || name == "float32" || other.name == "float32";
+      return type_id() == other.type_id() || type_id() == TypeId::Float32 ||
+             other.type_id() == TypeId::Float32;
     }
     if (kind == TypeKind::Char) {
-      return other.kind == TypeKind::Char ||
-             (other.kind == TypeKind::Int && other.name == "int8");
+      return other.kind == TypeKind::Char || other.type_id() == TypeId::Int8;
     }
     if (kind == TypeKind::Struct || kind == TypeKind::Enum) {
       return name == other.name;
@@ -92,10 +123,10 @@ bool Type::is_compatible_with(const Type &other) const {
     return element_type->is_compatible_with(*other.element_type);
   }
   if (kind == TypeKind::Int && other.kind == TypeKind::Char) {
-    return name == "int8";
+    return type_id() == TypeId::Int8;
   }
   if (kind == TypeKind::Char && other.kind == TypeKind::Int) {
-    return other.name == "int8";
+    return other.type_id() == TypeId::Int8;
   }
   if (kind == TypeKind::Null || other.kind == TypeKind::Null) {
     return true;

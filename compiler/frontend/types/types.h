@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "frontend/types/type_id.h"
+
 #include <memory>
 #include <ostream>
 #include <string>
@@ -48,6 +50,9 @@ struct Type {
   bool is_numeric() const;
   bool is_compatible_with(const Type &other) const;
   static Type promote(const Type &a, const Type &b);
+
+  // Returns the canonical TypeId for this type, combining kind and name.
+  TypeId type_id() const;
 
   TypeKind kind;
   std::string name;

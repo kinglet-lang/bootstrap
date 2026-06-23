@@ -337,10 +337,10 @@ std::optional<std::string> check_nullable_arms_exhaustive(const std::vector<ast:
 }
 
 Type widen_for_generic_inference(const Type &t) {
-  if (t.kind == TypeKind::Int && t.name == "int32") {
+  if (t.type_id() == TypeId::Int32) {
     return int_type();
   }
-  if (t.kind == TypeKind::Float && t.name == "float32") {
+  if (t.type_id() == TypeId::Float32) {
     return float_type();
   }
   return t;
@@ -368,10 +368,10 @@ bool types_assignable(const Type &from, const Type &to) {
   if (from.kind == TypeKind::Char && to.kind == TypeKind::Char) {
     return true;
   }
-  if (from.kind == TypeKind::Char && to.kind == TypeKind::Int && to.name == "int8") {
+  if (from.kind == TypeKind::Char && to.type_id() == TypeId::Int8) {
     return true;
   }
-  if (from.kind == TypeKind::Int && from.name == "int8" && to.kind == TypeKind::Char) {
+  if (from.type_id() == TypeId::Int8 && to.kind == TypeKind::Char) {
     return true;
   }
   if (from.kind == TypeKind::Map && to.kind == TypeKind::Map) {
