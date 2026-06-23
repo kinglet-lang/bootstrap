@@ -1,0 +1,59 @@
+---
+# clang-tidy configuration for kinglet bootstrap compiler
+# C++20, GN + ninja, system clang on macOS.
+# Focuses on: modernize, readability, performance. Avoids overly pedantic checks.
+
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-implicit-widening-of-multiplication-result,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-named-parameter,
+  -readability-function-cognitive-complexity,
+  -readability-avoid-unconditional-preprocessor-if,
+  performance-*,
+  -performance-avoid-endl,
+  clang-analyzer-core.*,
+  clang-analyzer-cplusplus.*,
+  -clang-analyzer-cplusplus.NewDeleteLeaks,
+  misc-non-private-member-variables-in-classes,
+  misc-unused-parameters,
+  misc-use-anonymous-namespace,
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '^compiler/.*'
+
+ExcludeHeaderFilterRegex: '^out/.*'
+
+FormatStyle: file
+
+# macOS: clang-tidy from Homebrew needs the Xcode SDK path for system headers.
+# Set CLANG_TIDY_FLAGS="-extra-arg=-isysroot$(xcrun --show-sdk-path)" when
+# invoking manually, or pass --extra-arg to the clang-tidy invocation.
+# CI handles this via the native toolchain that already has the correct sysroot.
+
+CheckOptions:
+  # modernize
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: modernize-loop-convert.MinConfidence
+    value: reasonable
+  - key: modernize-use-default-member-init.UseAssignment
+    value: '1'
+
+  # readability
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: '2'
+  - key: readability-qualified-auto.AddConstToQualified
+    value: '1'
+
+  # misc
+  - key: misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: '1'

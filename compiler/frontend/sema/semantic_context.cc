@@ -3,15 +3,14 @@
 
 #include "frontend/sema/semantic_context.h"
 
+#include <algorithm>
+
 namespace kinglet {
 
 bool SemanticContext::function_uses_concept_params(const ast::FunctionDecl &function) const {
-  for (const auto &param : function.params) {
-    if (param.type.type_args.empty() && concept_registry_.count(param.type.name)) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(function.params, [this](const ast::Parameter &param) {
+    return param.type.type_args.empty() && concept_registry_.contains(param.type.name);
+  });
 }
 
 void SemanticContext::clear() {

@@ -1,0 +1,78 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 2
+ContinuationIndentWidth: 4
+TabWidth: 2
+UseTab: Never
+
+# Column limit — long function signatures and template lines routinely hit ~110
+ColumnLimit: 100
+
+# Brace wrapping: Attach style (same line as control statements and functions)
+BreakBeforeBraces: Attach
+
+# Pointer / reference alignment — keep them right (int *p, const T &r)
+PointerAlignment: Right
+ReferenceAlignment: Right
+
+# Include sorting — preserve existing groupings, no automatic resorting
+IncludeBlocks: Preserve
+SortIncludes: Never
+
+# Namespace end comments: add "// namespace foo" after closing brace
+FixNamespaceComments: true
+ShortNamespaceLines: 0
+
+# Short constructs
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: Inline
+AllowShortBlocksOnASingleLine: Empty
+
+# Break before binary operators: keep them at the end of lines (C++ norm here)
+BreakBeforeBinaryOperators: None
+
+# Constructor initializer lists — break after colon, indent 4
+ConstructorInitializerIndentWidth: 4
+BreakConstructorInitializers: BeforeColon
+PackConstructorInitializers: NextLine
+
+# Template declarations
+AlwaysBreakTemplateDeclarations: Yes
+
+# Trailing commas
+InsertTrailingCommas: None
+
+# Penalties (tune to prefer breaking at arguments over column overruns)
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyExcessCharacter: 40
+
+# Access modifier indentation
+AccessModifierOffset: -2
+IndentAccessModifiers: false
+
+# Spaces
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesInAngles: Never
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceAfterCStyleCast: false
+
+# Align
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignOperands: Align
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+
+# Misc
+ReflowComments: true
+SortUsingDeclarations: LexicographicNumeric
