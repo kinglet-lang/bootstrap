@@ -1320,216 +1320,207 @@ void TypeChecker::check_function(const ast::FunctionDecl &function) {
 }
 
 void TypeChecker::check_stmt(const ast::Stmt &stmt, const Type &expected_return) {
-  if (const auto *block = dynamic_cast<const ast::BlockStmt *>(&stmt)) {
-    push_scope();
-    bool returned = false;
-    for (const ast::StmtPtr &statement : block->statements) {
-      if (returned) {
-        warn_at(statement->location, "Unreachable code.");
-        break;
-      }
-      check_stmt(*statement, expected_return);
-      if (dynamic_cast<const ast::ReturnStmt *>(statement.get()) ||
-          dynamic_cast<const ast::BreakStmt *>(statement.get()) ||
-          dynamic_cast<const ast::ContinueStmt *>(statement.get())) {
-        returned = true;
-      }
+  stmt_expected_return_ = expected_return;
+  stmt.accept(*this);
+}
+
+void TypeChecker::visit(const ast::BlockStmt &block) {
+  push_scope();
+  bool returned = false;
+  for (const ast::StmtPtr &statement : block.statements) {
+    if (returned) {
+      warn_at(statement->location, "Unreachable code.");
+      break;
     }
-    pop_scope();
+    check_stmt(*statement, stmt_expected_return_);
+    if (dynamic_cast<const ast::ReturnStmt *>(statement.get()) ||
+        dynamic_cast<const ast::BreakStmt *>(statement.get()) ||
+        dynamic_cast<const ast::ContinueStmt *>(statement.get())) {
+      returned = true;
+    }
+  }
+  pop_scope();
+}
+
+void TypeChecker::visit(const ast::ReturnStmt &return_stmt) {
+  if (return_stmt.value) {
+    Type value_type = check_expr(*return_stmt.value);
+    check_reference_escape(value_type, return_stmt.location);
+    if (!types_assignable(value_type, stmt_expected_return_)) {
+      error_at(return_stmt.location,
+               "Cannot return " + type_to_string(value_type) + " from function returning " +
+                   type_to_string(stmt_expected_return_) + ".");
+    }
+  } else if (stmt_expected_return_.kind != TypeKind::Void) {
+    error_at(return_stmt.location, "Non-void function must return a value.");
+  }
+}
+
+void TypeChecker::visit(const ast::VarDeclStmt &var_decl) {
+  if (var_decl.type.name == "auto" && !var_decl.init) {
+    error_at(var_decl.location, "auto requires an initializer.");
     return;
   }
-
-  if (const auto *return_stmt = dynamic_cast<const ast::ReturnStmt *>(&stmt)) {
-    if (return_stmt->value) {
-      Type value_type = check_expr(*return_stmt->value);
-      check_reference_escape(value_type, return_stmt->location);
-      if (!types_assignable(value_type, expected_return)) {
-        error_at(return_stmt->location,
-                 "Cannot return " + type_to_string(value_type) + " from function returning " +
-                     type_to_string(expected_return) + ".");
-      }
-    } else if (expected_return.kind != TypeKind::Void) {
-      error_at(return_stmt->location, "Non-void function must return a value.");
+  Type var_type = resolve_type_expr(var_decl.type, var_decl.location);
+  if (var_decl.init) {
+    Type init_type = check_expr(*var_decl.init);
+    check_reference_escape(init_type, var_decl.location);
+    if (var_decl.type.name == "auto") {
+      var_type = init_type;
+    } else if (!types_assignable(init_type, var_type)) {
+      error_at(var_decl.location,
+               "Cannot assign " + type_to_string(init_type) + " to variable of type " +
+                   type_to_string(var_type) + ".");
     }
+  }
+  bool is_mutable = var_decl.storage != "const";
+  declare_var(var_decl.name, var_type, is_mutable, var_decl.location);
+}
+
+void TypeChecker::visit(const ast::UnpackDeclStmt &unpack) {
+  Type init_type = check_expr(*unpack.init);
+  if (init_type.kind != TypeKind::Array) {
+    error_at(unpack.location, "Destructuring requires an array value.");
     return;
   }
-
-  if (const auto *var_decl = dynamic_cast<const ast::VarDeclStmt *>(&stmt)) {
-    if (var_decl->type.name == "auto" && !var_decl->init) {
-      error_at(var_decl->location, "auto requires an initializer.");
-      return;
-    }
-    Type var_type = resolve_type_expr(var_decl->type, var_decl->location);
-    if (var_decl->init) {
-      Type init_type = check_expr(*var_decl->init);
-      check_reference_escape(init_type, var_decl->location);
-      if (var_decl->type.name == "auto") {
-        var_type = init_type;
-      } else if (!types_assignable(init_type, var_type)) {
-        error_at(var_decl->location,
-                 "Cannot assign " + type_to_string(init_type) + " to variable of type " +
-                     type_to_string(var_type) + ".");
-      }
-    }
-    bool is_mutable = var_decl->storage != "const";
-    declare_var(var_decl->name, var_type, is_mutable, var_decl->location);
-    return;
+  Type elem_type = init_type.element_type ? *init_type.element_type : int_type();
+  for (const auto &name : unpack.names) {
+    declare_var(name, elem_type, true, unpack.location);
   }
-
-  if (const auto *unpack = dynamic_cast<const ast::UnpackDeclStmt *>(&stmt)) {
-    Type init_type = check_expr(*unpack->init);
-    if (init_type.kind != TypeKind::Array) {
-      error_at(unpack->location, "Destructuring requires an array value.");
-      return;
-    }
-    Type elem_type = init_type.element_type ? *init_type.element_type : int_type();
-    for (const auto &name : unpack->names) {
-      declare_var(name, elem_type, true, unpack->location);
-    }
-    if (!unpack->rest_name.empty()) {
-      declare_var(unpack->rest_name, init_type, true, unpack->location);
-    }
-    return;
+  if (!unpack.rest_name.empty()) {
+    declare_var(unpack.rest_name, init_type, true, unpack.location);
   }
+}
 
-  if (const auto *expr_stmt = dynamic_cast<const ast::ExprStmt *>(&stmt)) {
-    Type result_type = check_expr(*expr_stmt->expr);
-    if (result_type.kind != TypeKind::Void) {
-      bool suppress = false;
-      if (expr_stmt == implicit_return_stmt_) {
-        suppress = true;
-        implicit_return_value_type_ = result_type;
-      }
-      // Don't suppress for imported function calls — the semicolon
-      // suggests intentional discard, even when auto-returned.
-      if (suppress) {
-        if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr_stmt->expr.get())) {
-          if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get())) {
-            if (imported_namespaces_.count(ns->namespace_name))
-              suppress = false;
-          } else if (const auto *var = dynamic_cast<const ast::IdentifierExpr *>(call->callee.get())) {
-            if (imported_bare_names_.count(var->name))
-              suppress = false;
-          }
+void TypeChecker::visit(const ast::ExprStmt &expr_stmt) {
+  Type result_type = check_expr(*expr_stmt.expr);
+  if (result_type.kind != TypeKind::Void) {
+    bool suppress = false;
+    if (&expr_stmt == implicit_return_stmt_) {
+      suppress = true;
+      implicit_return_value_type_ = result_type;
+    }
+    // Don't suppress for imported function calls — the semicolon
+    // suggests intentional discard, even when auto-returned.
+    if (suppress) {
+      if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr_stmt.expr.get())) {
+        if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get())) {
+          if (imported_namespaces_.count(ns->namespace_name))
+            suppress = false;
+        } else if (const auto *var = dynamic_cast<const ast::IdentifierExpr *>(call->callee.get())) {
+          if (imported_bare_names_.count(var->name))
+            suppress = false;
         }
       }
-      if (dynamic_cast<const ast::AssignExpr *>(expr_stmt->expr.get()))
-        suppress = true;
-      if (dynamic_cast<const ast::FieldAssignExpr *>(expr_stmt->expr.get()))
-        suppress = true;
-      if (dynamic_cast<const ast::IndexAssignExpr *>(expr_stmt->expr.get()))
-        suppress = true;
-      if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr_stmt->expr.get())) {
-        if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get())) {
+    }
+    if (dynamic_cast<const ast::AssignExpr *>(expr_stmt.expr.get()))
+      suppress = true;
+    if (dynamic_cast<const ast::FieldAssignExpr *>(expr_stmt.expr.get()))
+      suppress = true;
+    if (dynamic_cast<const ast::IndexAssignExpr *>(expr_stmt.expr.get()))
+      suppress = true;
+    if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr_stmt.expr.get())) {
+      if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get())) {
+        if (ns->namespace_name == "io" && (ns->member_name == "out" || ns->member_name == "err"))
+          suppress = true;
+      }
+      if (const auto *fa = dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
+        if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(fa->object.get())) {
           if (ns->namespace_name == "io" && (ns->member_name == "out" || ns->member_name == "err"))
             suppress = true;
         }
-        if (const auto *fa = dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
-          if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(fa->object.get())) {
-            if (ns->namespace_name == "io" && (ns->member_name == "out" || ns->member_name == "err"))
-              suppress = true;
-          }
-          const std::string &m = fa->field_name;
-          if (m == "push" || m == "pop" || m == "remove" || m == "clear" ||
-              m == "insert" || m == "reverse" || m == "line")
-            suppress = true;
-        }
-      }
-      if (!suppress)
-        warn_at(expr_stmt->location, "Expression result is unused.");
-    }
-    return;
-  }
-
-  if (const auto *if_stmt = dynamic_cast<const ast::IfStmt *>(&stmt)) {
-    Type cond_type = check_expr(*if_stmt->condition);
-    if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
-      error_at(if_stmt->location, "Condition must be Bool or Int.");
-    }
-    if (const auto *lit = dynamic_cast<const ast::BoolLiteralExpr *>(if_stmt->condition.get())) {
-      warn_at(if_stmt->condition->location,
-              std::string("Condition is always ") + (lit->value ? "true" : "false") + ".");
-    }
-    check_stmt(*if_stmt->then_branch, expected_return);
-    if (if_stmt->else_branch) {
-      check_stmt(*if_stmt->else_branch, expected_return);
-    }
-    return;
-  }
-
-  if (const auto *guard_stmt = dynamic_cast<const ast::GuardStmt *>(&stmt)) {
-    Type cond_type = check_expr(*guard_stmt->condition);
-    if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
-      error_at(guard_stmt->location, "Guard condition must be Bool or Int.");
-    }
-    check_stmt(*guard_stmt->else_body, expected_return);
-    return;
-  }
-
-  if (const auto *while_stmt = dynamic_cast<const ast::WhileStmt *>(&stmt)) {
-    Type cond_type = check_expr(*while_stmt->condition);
-    if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
-      error_at(while_stmt->location, "Condition must be Bool or Int.");
-    }
-    if (const auto *lit = dynamic_cast<const ast::BoolLiteralExpr *>(while_stmt->condition.get())) {
-      if (!lit->value) {
-        warn_at(while_stmt->condition->location, "Condition is always false; loop body never executes.");
+        const std::string &m = fa->field_name;
+        if (m == "push" || m == "pop" || m == "remove" || m == "clear" ||
+            m == "insert" || m == "reverse" || m == "line")
+          suppress = true;
       }
     }
-    ++loop_depth_;
-    check_stmt(*while_stmt->body, expected_return);
-    --loop_depth_;
-    return;
+    if (!suppress)
+      warn_at(expr_stmt.location, "Expression result is unused.");
   }
+}
 
-  if (const auto *for_stmt = dynamic_cast<const ast::ForStmt *>(&stmt)) {
+void TypeChecker::visit(const ast::IfStmt &if_stmt) {
+  Type cond_type = check_expr(*if_stmt.condition);
+  if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
+    error_at(if_stmt.location, "Condition must be Bool or Int.");
+  }
+  if (const auto *lit = dynamic_cast<const ast::BoolLiteralExpr *>(if_stmt.condition.get())) {
+    warn_at(if_stmt.condition->location,
+            std::string("Condition is always ") + (lit->value ? "true" : "false") + ".");
+  }
+  check_stmt(*if_stmt.then_branch, stmt_expected_return_);
+  if (if_stmt.else_branch) {
+    check_stmt(*if_stmt.else_branch, stmt_expected_return_);
+  }
+}
+
+void TypeChecker::visit(const ast::GuardStmt &guard_stmt) {
+  Type cond_type = check_expr(*guard_stmt.condition);
+  if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
+    error_at(guard_stmt.location, "Guard condition must be Bool or Int.");
+  }
+  check_stmt(*guard_stmt.else_body, stmt_expected_return_);
+}
+
+void TypeChecker::visit(const ast::WhileStmt &while_stmt) {
+  Type cond_type = check_expr(*while_stmt.condition);
+  if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
+    error_at(while_stmt.location, "Condition must be Bool or Int.");
+  }
+  if (const auto *lit = dynamic_cast<const ast::BoolLiteralExpr *>(while_stmt.condition.get())) {
+    if (!lit->value) {
+      warn_at(while_stmt.condition->location, "Condition is always false; loop body never executes.");
+    }
+  }
+  ++loop_depth_;
+  check_stmt(*while_stmt.body, stmt_expected_return_);
+  --loop_depth_;
+}
+
+void TypeChecker::visit(const ast::ForStmt &for_stmt) {
+  push_scope();
+  if (for_stmt.init) {
+    check_stmt(*for_stmt.init, stmt_expected_return_);
+  }
+  if (for_stmt.condition) {
+    Type cond_type = check_expr(*for_stmt.condition);
+    if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
+      error_at(for_stmt.location, "Condition must be Bool or Int.");
+    }
+  }
+  if (for_stmt.step) {
+    check_stmt(*for_stmt.step, stmt_expected_return_);
+  }
+  ++loop_depth_;
+  check_stmt(*for_stmt.body, stmt_expected_return_);
+  --loop_depth_;
+  pop_scope();
+}
+
+void TypeChecker::visit(const ast::BreakStmt &stmt) {
+  if (loop_depth_ <= 0) {
+    error_at(stmt.location, "break must be inside a loop.");
+  }
+}
+
+void TypeChecker::visit(const ast::ContinueStmt &stmt) {
+  if (loop_depth_ <= 0) {
+    error_at(stmt.location, "continue must be inside a loop.");
+  }
+}
+
+void TypeChecker::visit(const ast::TryCatchStmt &try_catch) {
+  check_stmt(*try_catch.body, stmt_expected_return_);
+  for (const ast::CatchArm &arm : try_catch.catches) {
     push_scope();
-    if (for_stmt->init) {
-      check_stmt(*for_stmt->init, expected_return);
-    }
-    if (for_stmt->condition) {
-      Type cond_type = check_expr(*for_stmt->condition);
-      if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
-        error_at(for_stmt->location, "Condition must be Bool or Int.");
-      }
-    }
-    if (for_stmt->step) {
-      check_stmt(*for_stmt->step, expected_return);
-    }
-    ++loop_depth_;
-    check_stmt(*for_stmt->body, expected_return);
-    --loop_depth_;
+    // Accept any resolvable type as the caught error type: builtins such as
+    // `string`, user-declared enums, and the built-in CastError. An
+    // unresolvable name is reported by resolve_type_expr itself.
+    Type err_type = resolve_type_expr(arm.error_type, try_catch.location);
+    declare_var(arm.binding_name, err_type, false, try_catch.location);
+    check_stmt(*arm.body, stmt_expected_return_);
     pop_scope();
-    return;
-  }
-
-  if (dynamic_cast<const ast::BreakStmt *>(&stmt)) {
-    if (loop_depth_ <= 0) {
-      error_at(stmt.location, "break must be inside a loop.");
-    }
-    return;
-  }
-
-  if (dynamic_cast<const ast::ContinueStmt *>(&stmt)) {
-    if (loop_depth_ <= 0) {
-      error_at(stmt.location, "continue must be inside a loop.");
-    }
-    return;
-  }
-
-  if (const auto *try_catch = dynamic_cast<const ast::TryCatchStmt *>(&stmt)) {
-    check_stmt(*try_catch->body, expected_return);
-    for (const ast::CatchArm &arm : try_catch->catches) {
-      push_scope();
-      // Accept any resolvable type as the caught error type: builtins such as
-      // `string`, user-declared enums, and the built-in CastError. An
-      // unresolvable name is reported by resolve_type_expr itself.
-      Type err_type = resolve_type_expr(arm.error_type, stmt.location);
-      declare_var(arm.binding_name, err_type, false, stmt.location);
-      check_stmt(*arm.body, expected_return);
-      pop_scope();
-    }
-    return;
   }
 }
 

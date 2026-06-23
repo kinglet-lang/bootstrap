@@ -33,13 +33,29 @@ struct TypeCheckResult {
   std::vector<TypeError> errors;
 };
 
-class TypeChecker {
+class TypeChecker : public ast::StmtVisitor {
 public:
   TypeCheckResult check(const ast::Program &program);
   void set_module_loader(ModuleLoader *loader) { module_loader_ = loader; }
   void populate_kir_types(KirModule *module) const;
 
 private:
+  // StmtVisitor overrides. check_stmt() stashes the current expected return
+  // type in stmt_expected_return_ and dispatches via accept(); each override
+  // reads that member where it needs the enclosing function's return type.
+  void visit(const ast::ExprStmt &stmt) override;
+  void visit(const ast::TryCatchStmt &stmt) override;
+  void visit(const ast::ReturnStmt &stmt) override;
+  void visit(const ast::VarDeclStmt &stmt) override;
+  void visit(const ast::UnpackDeclStmt &stmt) override;
+  void visit(const ast::BlockStmt &stmt) override;
+  void visit(const ast::IfStmt &stmt) override;
+  void visit(const ast::GuardStmt &stmt) override;
+  void visit(const ast::WhileStmt &stmt) override;
+  void visit(const ast::ForStmt &stmt) override;
+  void visit(const ast::BreakStmt &stmt) override;
+  void visit(const ast::ContinueStmt &stmt) override;
+
   void check_function(const ast::FunctionDecl &function);
   void check_stmt(const ast::Stmt &stmt, const Type &expected_return);
   Type check_expr(const ast::Expr &expr);
@@ -127,6 +143,7 @@ private:
   int loop_depth_ = 0;
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
   Type implicit_return_value_type_{TypeKind::Void};
+  Type stmt_expected_return_{TypeKind::Void};
   ModuleLoader *module_loader_ = nullptr;
 };
 
