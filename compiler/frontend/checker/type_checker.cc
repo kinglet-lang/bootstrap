@@ -3147,44 +3147,42 @@ Type TypeChecker::check_index_assign(const ast::IndexAssignExpr &index_assign) {
   return *object_type.element_type;
 
 }
+void TypeChecker::visit(const ast::IntLiteralExpr &x) { expr_result_ = check_int_literal(x); }
+void TypeChecker::visit(const ast::CharLiteralExpr &x) { expr_result_ = check_char_literal(x); }
+void TypeChecker::visit(const ast::FloatLiteralExpr &x) { expr_result_ = check_float_literal(x); }
+void TypeChecker::visit(const ast::StringLiteralExpr &x) { expr_result_ = check_string_literal(x); }
+void TypeChecker::visit(const ast::BoolLiteralExpr &x) { expr_result_ = check_bool_literal(x); }
+void TypeChecker::visit(const ast::NullLiteralExpr &x) { expr_result_ = check_null_literal(x); }
+void TypeChecker::visit(const ast::ArrayLiteralExpr &x) { expr_result_ = check_array_literal(x); }
+void TypeChecker::visit(const ast::MapLiteralExpr &x) { expr_result_ = check_map_literal(x); }
+void TypeChecker::visit(const ast::IdentifierExpr &x) { expr_result_ = check_identifier(x); }
+void TypeChecker::visit(const ast::UnaryExpr &x) { expr_result_ = check_unary(x); }
+void TypeChecker::visit(const ast::BinaryExpr &x) { expr_result_ = check_binary(x); }
+void TypeChecker::visit(const ast::AssignExpr &x) { expr_result_ = check_assign(x); }
+void TypeChecker::visit(const ast::CallExpr &x) { expr_result_ = check_call(x); }
+void TypeChecker::visit(const ast::CastExpr &x) { expr_result_ = check_cast(x); }
+void TypeChecker::visit(const ast::TernaryExpr &x) { expr_result_ = check_ternary(x); }
+void TypeChecker::visit(const ast::NullCoalesceExpr &x) { expr_result_ = check_null_coalesce(x); }
+void TypeChecker::visit(const ast::PropagateExpr &x) { expr_result_ = check_propagate(x); }
+void TypeChecker::visit(const ast::BindingPattern &x) { expr_result_ = check_binding_pattern(x); }
+void TypeChecker::visit(const ast::ArrayPattern &x) { expr_result_ = check_array_pattern(x); }
+void TypeChecker::visit(const ast::StructPattern &x) { expr_result_ = check_struct_pattern(x); }
+void TypeChecker::visit(const ast::MatchExpr &x) { expr_result_ = check_match(x); }
+void TypeChecker::visit(const ast::NamespaceAccessExpr &x) { expr_result_ = check_namespace_access(x); }
+void TypeChecker::visit(const ast::FieldAccessExpr &x) { expr_result_ = check_field_access(x); }
+void TypeChecker::visit(const ast::FieldAssignExpr &x) { expr_result_ = check_field_assign(x); }
+void TypeChecker::visit(const ast::IndexExpr &x) { expr_result_ = check_index(x); }
+void TypeChecker::visit(const ast::IndexAssignExpr &x) { expr_result_ = check_index_assign(x); }
+void TypeChecker::visit(const ast::StructLiteralExpr &x) { expr_result_ = check_struct_literal(x); }
+void TypeChecker::visit(const ast::PipeExpr &) { expr_result_ = int_type(); }
+void TypeChecker::visit(const ast::EnumPattern &) { expr_result_ = int_type(); }
+
 
 
 Type TypeChecker::check_expr(const ast::Expr &expr) {
-  if (const auto *lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) return check_int_literal(*lit);
-  if (const auto *e = dynamic_cast<const ast::CharLiteralExpr *>(&expr)) return check_char_literal(*e);
-  if (const auto *lit = dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) return check_float_literal(*lit);
-  if (const auto *e = dynamic_cast<const ast::StringLiteralExpr *>(&expr)) return check_string_literal(*e);
-  if (const auto *e = dynamic_cast<const ast::BoolLiteralExpr *>(&expr)) return check_bool_literal(*e);
-  if (const auto *e = dynamic_cast<const ast::NullLiteralExpr *>(&expr)) return check_null_literal(*e);
-  if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(&expr)) return check_namespace_access(*ns);
-  if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(&expr)) return check_identifier(*id);
-
-  if (const auto *unary = dynamic_cast<const ast::UnaryExpr *>(&expr)) return check_unary(*unary);
-
-  if (const auto *binary = dynamic_cast<const ast::BinaryExpr *>(&expr)) return check_binary(*binary);
-
-  if (const auto *assign = dynamic_cast<const ast::AssignExpr *>(&expr)) return check_assign(*assign);
-
-  if (const auto *call_expr = dynamic_cast<const ast::CallExpr *>(&expr)) return check_call(*call_expr);
-  if (const auto *binding = dynamic_cast<const ast::BindingPattern *>(&expr)) return check_binding_pattern(*binding);
-  if (const auto *pat = dynamic_cast<const ast::ArrayPattern *>(&expr)) return check_array_pattern(*pat);
-  if (const auto *pat = dynamic_cast<const ast::StructPattern *>(&expr)) return check_struct_pattern(*pat);
-  if (const auto *match_expr = dynamic_cast<const ast::MatchExpr *>(&expr)) return check_match(*match_expr);
-  if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(&expr)) return check_struct_literal(*struct_lit);
-  if (const auto *field_access = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) return check_field_access(*field_access);
-  if (const auto *field_assign = dynamic_cast<const ast::FieldAssignExpr *>(&expr)) return check_field_assign(*field_assign);
-  if (const auto *array_lit = dynamic_cast<const ast::ArrayLiteralExpr *>(&expr)) return check_array_literal(*array_lit);
-  if (const auto *map_lit = dynamic_cast<const ast::MapLiteralExpr *>(&expr)) return check_map_literal(*map_lit);
-  if (const auto *index_expr = dynamic_cast<const ast::IndexExpr *>(&expr)) return check_index(*index_expr);
-  if (const auto *cast = dynamic_cast<const ast::CastExpr *>(&expr)) return check_cast(*cast);
-  if (const auto *ternary = dynamic_cast<const ast::TernaryExpr *>(&expr)) return check_ternary(*ternary);
-  if (const auto *null_coalesce = dynamic_cast<const ast::NullCoalesceExpr *>(&expr)) return check_null_coalesce(*null_coalesce);
-  if (const auto *prop = dynamic_cast<const ast::PropagateExpr *>(&expr)) return check_propagate(*prop);
-  if (const auto *index_assign = dynamic_cast<const ast::IndexAssignExpr *>(&expr)) return check_index_assign(*index_assign);
-
-  return int_type();
+  expr.accept(*this);
+  return expr_result_;
 }
-
 std::optional<std::string> TypeChecker::referent_name_from_lvalue(const ast::Expr &expr) {
   if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
     return identifier->name;

@@ -33,7 +33,7 @@ struct TypeCheckResult {
   std::vector<TypeError> errors;
 };
 
-class TypeChecker : public ast::StmtVisitor {
+class TypeChecker : public ast::StmtVisitor, public ast::ExprVisitor {
 public:
   TypeCheckResult check(const ast::Program &program);
   void set_module_loader(ModuleLoader *loader) { module_loader_ = loader; }
@@ -55,6 +55,38 @@ private:
   void visit(const ast::ForStmt &stmt) override;
   void visit(const ast::BreakStmt &stmt) override;
   void visit(const ast::ContinueStmt &stmt) override;
+
+  // ExprVisitor overrides — each forwards to the corresponding check_X()
+  // helper and stores the result in expr_result_.
+  void visit(const ast::IntLiteralExpr &x) override;
+  void visit(const ast::CharLiteralExpr &x) override;
+  void visit(const ast::FloatLiteralExpr &x) override;
+  void visit(const ast::StringLiteralExpr &x) override;
+  void visit(const ast::BoolLiteralExpr &x) override;
+  void visit(const ast::NullLiteralExpr &x) override;
+  void visit(const ast::ArrayLiteralExpr &x) override;
+  void visit(const ast::MapLiteralExpr &x) override;
+  void visit(const ast::IdentifierExpr &x) override;
+  void visit(const ast::UnaryExpr &x) override;
+  void visit(const ast::BinaryExpr &x) override;
+  void visit(const ast::AssignExpr &x) override;
+  void visit(const ast::CallExpr &x) override;
+  void visit(const ast::PipeExpr &x) override;
+  void visit(const ast::CastExpr &x) override;
+  void visit(const ast::TernaryExpr &x) override;
+  void visit(const ast::NullCoalesceExpr &x) override;
+  void visit(const ast::PropagateExpr &x) override;
+  void visit(const ast::BindingPattern &x) override;
+  void visit(const ast::ArrayPattern &x) override;
+  void visit(const ast::EnumPattern &x) override;
+  void visit(const ast::StructPattern &x) override;
+  void visit(const ast::MatchExpr &x) override;
+  void visit(const ast::NamespaceAccessExpr &x) override;
+  void visit(const ast::FieldAccessExpr &x) override;
+  void visit(const ast::FieldAssignExpr &x) override;
+  void visit(const ast::IndexExpr &x) override;
+  void visit(const ast::IndexAssignExpr &x) override;
+  void visit(const ast::StructLiteralExpr &x) override;
 
   void check_function(const ast::FunctionDecl &function);
   void check_stmt(const ast::Stmt &stmt, const Type &expected_return);
@@ -174,6 +206,7 @@ private:
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
   Type implicit_return_value_type_{TypeKind::Void};
   Type stmt_expected_return_{TypeKind::Void};
+  Type expr_result_{TypeKind::Void};
   ModuleLoader *module_loader_ = nullptr;
 };
 
