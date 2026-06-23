@@ -76,6 +76,18 @@ private:
   Type check_array_pattern(const ast::ArrayPattern &pat);
   Type check_struct_pattern(const ast::StructPattern &pat);
   Type check_match(const ast::MatchExpr &match);
+  Type check_call(const ast::CallExpr &call);
+  Type check_struct_literal(const ast::StructLiteralExpr &lit);
+  Type check_field_access(const ast::FieldAccessExpr &fa);
+  Type check_field_assign(const ast::FieldAssignExpr &fa);
+  Type check_array_literal(const ast::ArrayLiteralExpr &lit);
+  Type check_map_literal(const ast::MapLiteralExpr &lit);
+  Type check_index(const ast::IndexExpr &idx);
+  Type check_cast(const ast::CastExpr &cast);
+  Type check_ternary(const ast::TernaryExpr &ternary);
+  Type check_null_coalesce(const ast::NullCoalesceExpr &nc);
+  Type check_propagate(const ast::PropagateExpr &prop);
+  Type check_index_assign(const ast::IndexAssignExpr &idx);
   Type check_expr(const ast::Expr &expr);
 
   void push_scope();
