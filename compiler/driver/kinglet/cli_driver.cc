@@ -15,10 +15,6 @@
 #include <iostream>
 #include <string_view>
 
-#ifndef KINGLET_VERSION
-#define KINGLET_VERSION "0.1.0-dev"
-#endif
-
 namespace kinglet {
 
 namespace fs = std::filesystem;
