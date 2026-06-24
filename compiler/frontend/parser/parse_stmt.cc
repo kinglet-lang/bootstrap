@@ -307,6 +307,10 @@ ast::StmtPtr Parser::var_declaration() {
 
 ast::StmtPtr Parser::expression_statement() {
   ast::ExprPtr expr = expression();
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::ExpressionStart, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
   if (has_completion()) return nullptr;
   const ast::SourceLocation location = expr->location;
   consume(TokenType::SEMICOLON, "Expected ';' after expression.");
