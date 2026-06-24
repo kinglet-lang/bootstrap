@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [canon]
   pull_request:
-    branches: [main]
+    branches: [canon]
 
 jobs:
   build-and-test-unix:
