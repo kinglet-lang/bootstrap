@@ -70,6 +70,12 @@ ast::StmtPtr Parser::block_statement() {
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
     statements.push_back(statement());
   }
+  if (at_completion()) {
+    // Cursor landed inside the block (e.g. '{ █ }') but before any
+    // statement parser ran, so set the context here.
+    set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
   if (has_completion()) return nullptr;
   consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
   return std::make_unique<ast::BlockStmt>(location_of(left_brace), std::move(statements));
