@@ -337,7 +337,7 @@ std::string Emitter::emit_expr(const ast::Expr &expr) {
     return id->name;
   }
   if (const auto *binding = dynamic_cast<const ast::BindingPattern *>(&expr)) {
-    return binding->name;
+    return "let " + binding->name;
   }
   if (const auto *pipe = dynamic_cast<const ast::PipeExpr *>(&expr)) {
     const std::string left = emit_expr(*pipe->left);
