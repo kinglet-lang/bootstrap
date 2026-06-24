@@ -60,6 +60,13 @@ ast::StmtPtr Parser::statement() {
   if (is_declaration_start()) {
     return var_declaration();
   }
+  if (match(TokenType::LET)) {
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::ExpressionStart, {}, {}, {}, {}, {}});
+      return nullptr;
+    }
+    return expression_statement();
+  }
   return expression_statement();
 }
 
