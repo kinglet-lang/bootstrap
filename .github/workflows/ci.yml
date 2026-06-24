@@ -102,4 +102,4 @@ jobs:
         shell: bash
         run: |
           ./out/Debug/kinglet.exe --check tests/exec/cases/structs_basic.kl
-          ./out/Debug/kinglet.exe --bytecode tests/exec/cases/structs_basic.kl >/dev/null
+          ./out/Debug/kinglet.exe --ir tests/exec/cases/structs_basic.kl >/dev/null
