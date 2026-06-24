@@ -124,6 +124,11 @@ bool Parser::completion_after_dangling_access() const {
 }
 
 void Parser::set_completion(lsp::CompletionInfo info) {
+  // First-wins: deeper code paths (e.g. NamespaceAccess inside
+  // primary()) set a more specific context than the fallbacks in
+  // expression_statement / block_statement.  Once set, keep the
+  // first (most specific) context and ignore later generic ones.
+  if (completion_result_.has_value()) return;
   completion_result_ = std::move(info);
 }
 
