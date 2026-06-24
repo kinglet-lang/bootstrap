@@ -264,12 +264,15 @@ ast::DeclPtr Parser::concept_declaration() {
     error_at(previous(), "Concept must declare at least one type parameter.");
   }
   consume(TokenType::LEFT_BRACE, "Expected '{' after concept name.");
+  // Guard before the body loop so an empty body ('{ █ }') still sets a
+  // completion context.  ParameterType filters out 'auto' — concept
+  // method signatures require explicit return types, not type deduction.
+  if (at_completion()) {
+    set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
   std::vector<ast::ConceptMethodDecl> methods;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
-    if (at_completion()) {
-      set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}});
-      return nullptr;
-    }
     ast::TypeExpr ret_type = parse_type_expr();
     const Token &method_name = consume(TokenType::IDENTIFIER, "Expected method name in concept.");
     consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
