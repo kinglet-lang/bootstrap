@@ -265,7 +265,11 @@ ast::DeclPtr Parser::concept_declaration() {
   }
   consume(TokenType::LEFT_BRACE, "Expected '{' after concept name.");
   std::vector<ast::ConceptMethodDecl> methods;
-  while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
+    if (at_completion()) {
+      set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}});
+      return nullptr;
+    }
     ast::TypeExpr ret_type = parse_type_expr();
     const Token &method_name = consume(TokenType::IDENTIFIER, "Expected method name in concept.");
     consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
@@ -274,6 +278,7 @@ ast::DeclPtr Parser::concept_declaration() {
     consume(TokenType::SEMICOLON, "Expected ';' after concept method signature.");
     methods.push_back(ast::ConceptMethodDecl{ret_type, token_text(method_name), std::move(params)});
   }
+  if (has_completion()) return nullptr;
   consume(TokenType::RIGHT_BRACE, "Expected '}' after concept body.");
   return std::make_unique<ast::ConceptDecl>(location_of(concept_token), token_text(name),
                                             std::move(type_params), std::move(methods));
