@@ -145,6 +145,13 @@ ast::DeclPtr Parser::export_module_declaration() {
 ast::DeclPtr Parser::import_declaration() {
   const Token &import_token = previous();
 
+  if (at_completion()) {
+    // `import █` — offer module names from kinglet.nest. We leave
+    // import_path empty so the resolver knows it's the path slot itself.
+    set_completion({lsp::CompletionPosition::ImportPath, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
+
   if (match(TokenType::LEFT_BRACE)) {
     error_at(previous(), "Import block syntax `import { ... }` is removed; use `import module-id;` "
                           "with kinglet.nest.");

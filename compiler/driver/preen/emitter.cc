@@ -195,6 +195,24 @@ std::string Emitter::emit_program(const ast::Program &program) {
     emit_top_level_decl(*program.declarations[i]);
     if (i + 1 < program.declarations.size()) {
       newline();
+      // Preserve user-authored grouping: if the source kept at least one
+      // blank line between two top-level decls, emit one blank line in the
+      // output too. Multiple blank lines collapse to one (the usual
+      // formatter contract). We compare the source line of the *last token*
+      // of the current decl with the *first line* of the next decl so the
+      // measurement isn't fooled by multi-line decl bodies.
+      const ast::Decl &cur = *program.declarations[i];
+      const ast::Decl &next = *program.declarations[i + 1];
+      int cur_end_line = cur.location.line;
+      if (spans_ != nullptr && tokens_ != nullptr && spans_->has(cur)) {
+        const TokenSpan span = spans_->span(cur);
+        if (span.end > span.start && span.end <= tokens_->size()) {
+          cur_end_line = (*tokens_)[span.end - 1].line;
+        }
+      }
+      if (next.location.line - cur_end_line > 1) {
+        newline();
+      }
     }
   }
   if (!out_.empty() && out_.back() != '\n') {
@@ -382,7 +400,7 @@ std::string Emitter::emit_expr(const ast::Expr &expr) {
     return callee + "(" + join(args, ", ") + ")";
   }
   if (const auto *cast = dynamic_cast<const ast::CastExpr *>(&expr)) {
-    return "Cast<" + emit_type(cast->target_type) + ">(" + emit_expr(*cast->value) + ")";
+    return emit_type(cast->target_type) + "(" + emit_expr(*cast->value) + ")";
   }
   if (const auto *ternary = dynamic_cast<const ast::TernaryExpr *>(&expr)) {
     return emit_expr(*ternary->condition) + " ? " + emit_expr(*ternary->then_expr) + " : " +
