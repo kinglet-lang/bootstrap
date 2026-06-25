@@ -1,0 +1,8 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+int main() {
+  int n = int("xyz") ?: -1;
+  return n;
+}

@@ -359,6 +359,19 @@ std::string normalize_generic_mangle(std::string name) {
 }
 
 bool types_assignable(const Type &from, const Type &to) {
+  if (to.nullable) {
+    if (from.kind == TypeKind::Null) {
+      return true;
+    }
+    Type from_inner = from;
+    Type to_inner = to;
+    from_inner.nullable = false;
+    to_inner.nullable = false;
+    return types_assignable(from_inner, to_inner);
+  }
+  if (from.nullable) {
+    return false;
+  }
   if (from.kind == TypeKind::Int && to.kind == TypeKind::Int) {
     return integer_assignable(from, to);
   }
@@ -401,45 +414,51 @@ bool types_assignable(const Type &from, const Type &to) {
 }
 
 std::string type_to_string(const Type &type) {
-  if (type.kind == TypeKind::Struct || type.kind == TypeKind::Enum) {
-    return type.name;
+  Type display = type;
+  const bool nullable = display.nullable;
+  display.nullable = false;
+  auto with_nullable = [&](std::string text) {
+    return nullable ? text + "?" : text;
+  };
+  if (display.kind == TypeKind::Struct || display.kind == TypeKind::Enum) {
+    return with_nullable(display.name);
   }
-  if (type.kind == TypeKind::Array && type.element_type) {
-    return type_to_string(*type.element_type) + "[]";
+  if (display.kind == TypeKind::Array && display.element_type) {
+    return with_nullable(type_to_string(*display.element_type) + "[]");
   }
-  if (type.kind == TypeKind::Int) {
-    return integer_type_display_name(type);
+  if (display.kind == TypeKind::Int) {
+    return with_nullable(integer_type_display_name(display));
   }
-  if (type.kind == TypeKind::Float) {
-    return float_type_display_name(type);
+  if (display.kind == TypeKind::Float) {
+    return with_nullable(float_type_display_name(display));
   }
-  if (type.kind == TypeKind::Char) {
-    return "char";
+  if (display.kind == TypeKind::Char) {
+    return with_nullable("char");
   }
-  if (type.kind == TypeKind::Bool) {
-    return "bool";
+  if (display.kind == TypeKind::Bool) {
+    return with_nullable("bool");
   }
-  if (type.kind == TypeKind::String) {
-    return "string";
+  if (display.kind == TypeKind::String) {
+    return with_nullable("string");
   }
-  if (type.kind == TypeKind::Void) {
-    return "void";
+  if (display.kind == TypeKind::Void) {
+    return with_nullable("void");
   }
-  if (type.kind == TypeKind::Ref && type.element_type) {
-    return "&" + type_to_string(*type.element_type);
+  if (display.kind == TypeKind::Ref && display.element_type) {
+    return with_nullable("&" + type_to_string(*display.element_type));
   }
-  if (type.kind == TypeKind::MutRef && type.element_type) {
-    return "&mut " + type_to_string(*type.element_type);
+  if (display.kind == TypeKind::MutRef && display.element_type) {
+    return with_nullable("&mut " + type_to_string(*display.element_type));
   }
-  if (type.kind == TypeKind::Null) {
+  if (display.kind == TypeKind::Null) {
     return "null";
   }
-  if (type.kind == TypeKind::Concept) {
-    return type.name;
+  if (display.kind == TypeKind::Concept) {
+    return with_nullable(display.name);
   }
   std::ostringstream oss;
-  oss << type.kind;
-  return oss.str();
+  oss << display.kind;
+  return with_nullable(oss.str());
 }
 
 // Recursively replace type-parameter names with their concrete arguments
@@ -3019,32 +3038,45 @@ Type TypeChecker::check_cast(const ast::CastExpr &cast) {
   const std::string &target = cast.target_type.name;
   TypeKind src_k = src.kind;
   auto src_is = [&](TypeKind k) { return src_k == k; };
+  const bool string_source = src_is(TypeKind::String);
+
+  auto reject_unhandled_fallible = [&]() {
+    if (string_source && allow_fallible_cast_depth_ == 0) {
+      error_at(cast.location,
+               "Fallible cast from string to " + target +
+                   " must be handled with '?:' or postfix '?'.");
+    }
+  };
+
   if (auto int_target = canonical_int_type_name(target)) {
-  if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
-      src_is(TypeKind::Char) || src_is(TypeKind::Enum)) {
-    return make_int_type(*int_target);
-  }
+    if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
+        src_is(TypeKind::Char) || src_is(TypeKind::Enum)) {
+      reject_unhandled_fallible();
+      return make_int_type(*int_target);
+    }
   } else if (auto float_target = canonical_float_type_name(target)) {
-  if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
-    return make_float_type(*float_target);
-  }
+    if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
+      reject_unhandled_fallible();
+      return make_float_type(*float_target);
+    }
   } else if (target == "string") {
-  if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
-      src_is(TypeKind::Char) || src_is(TypeKind::Bool) || src_is(TypeKind::Null)) {
-    return string_type();
-  }
+    if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
+        src_is(TypeKind::Char) || src_is(TypeKind::Bool) || src_is(TypeKind::Null)) {
+      return string_type();
+    }
   } else if (target == "char" || target == "byte") {
-  // char/byte ↔ int: infallible; string → char: fallible (empty → CastError)
-  if (src_is(TypeKind::Int) || src_is(TypeKind::Char) || src_is(TypeKind::String)) {
-    return char_type();
-  }
+    // char/byte ↔ int: infallible; string → char: fallible (empty → CastError)
+    if (src_is(TypeKind::Int) || src_is(TypeKind::Char) || src_is(TypeKind::String)) {
+      reject_unhandled_fallible();
+      return target == "byte" ? byte_type() : char_type();
+    }
   } else {
-  error_at(cast.location,
-           "Cast target '" + target + "' is not supported. Use int, float, or string.");
-  return null_type();
+    error_at(cast.location,
+             "Cast target '" + target + "' is not supported. Use int, float, or string.");
+    return null_type();
   }
   error_at(cast.location,
-         "Cannot cast " + type_to_string(src) + " to " + target + ".");
+           "Cannot cast " + type_to_string(src) + " to " + target + ".");
   return null_type();
 
 }
@@ -3070,10 +3102,23 @@ Type TypeChecker::check_ternary(const ast::TernaryExpr &ternary) {
 
 Type TypeChecker::check_null_coalesce(const ast::NullCoalesceExpr &null_coalesce) {
 
+  const auto *cast_lhs = dynamic_cast<const ast::CastExpr *>(null_coalesce.left.get());
+  if (cast_lhs != nullptr) {
+    ++allow_fallible_cast_depth_;
+  }
   Type left_type = check_expr(*null_coalesce.left);
+  if (cast_lhs != nullptr) {
+    --allow_fallible_cast_depth_;
+  }
+  Type result_type = left_type;
+  // For a fallible cast, `?:` handles the failure path but preserves the
+  // fact that the expression came from a fallible operation; callers must
+  // store it in T? or explicitly propagate/handle it.  For ordinary nullable
+  // values, `x ?: fallback` unwraps to the non-null inner type.
+  result_type.nullable = cast_lhs != nullptr;
+
   const bool has_binding = !null_coalesce.err_binding.empty();
   if (has_binding) {
-  const auto *cast_lhs = dynamic_cast<const ast::CastExpr *>(null_coalesce.left.get());
   if (cast_lhs == nullptr) {
     error_at(null_coalesce.location,
              "?: let-binding requires a fallible cast on the left-hand side.");
@@ -3084,28 +3129,30 @@ Type TypeChecker::check_null_coalesce(const ast::NullCoalesceExpr &null_coalesce
     declare_var(null_coalesce.err_binding, err_ty, false, null_coalesce.location);
     Type right_type = check_expr(*null_coalesce.right);
     pop_scope();
-    if (!types_assignable(right_type, left_type) &&
-        !right_type.is_compatible_with(left_type)) {
+    if (!types_assignable(right_type, result_type) &&
+        !right_type.is_compatible_with(result_type)) {
       error_at(null_coalesce.right->location,
                "?: fallback type " + type_to_string(right_type) +
-                   " does not match left-hand type " + type_to_string(left_type) + ".");
+                   " does not match left-hand type " + type_to_string(result_type) + ".");
     }
-    return left_type;
+    return result_type;
   }
   }
   Type right_type = check_expr(*null_coalesce.right);
-  if (!types_assignable(right_type, left_type) && !right_type.is_compatible_with(left_type)) {
+  if (!types_assignable(right_type, result_type) && !right_type.is_compatible_with(result_type)) {
   error_at(null_coalesce.right->location,
            "?: fallback type " + type_to_string(right_type) +
-               " does not match left-hand type " + type_to_string(left_type) + ".");
+               " does not match left-hand type " + type_to_string(result_type) + ".");
   }
-  return left_type;
+  return result_type;
 
 }
 
 Type TypeChecker::check_propagate(const ast::PropagateExpr &prop) {
 
+  ++allow_fallible_cast_depth_;
   Type inner = check_expr(*prop.value);
+  --allow_fallible_cast_depth_;
   return inner;
 
 }

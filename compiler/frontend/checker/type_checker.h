@@ -201,6 +201,7 @@ private:
   Type implicit_return_value_type_{TypeKind::Void};
   Type stmt_expected_return_{TypeKind::Void};
   Type expr_result_{TypeKind::Void};
+  int allow_fallible_cast_depth_ = 0;
   ModuleLoader *module_loader_ = nullptr;
 };
 

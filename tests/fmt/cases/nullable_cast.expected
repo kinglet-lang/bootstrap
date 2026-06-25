@@ -1,0 +1,6 @@
+using io;
+int main() {
+  int? a = int("123") ?: -1;
+  int? b = int("xyz") ?: -1;
+  return 0;
+}

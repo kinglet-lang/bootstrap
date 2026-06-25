@@ -230,6 +230,9 @@ std::string Emitter::emit_type(const ast::TypeExpr &type) {
   if (type.name == "Array" && type.type_args.size() == 1) {
     return emit_type(type.type_args[0]) + "[]";
   }
+  if (type.name == "Nullable" && type.type_args.size() == 1) {
+    return emit_type(type.type_args[0]) + "?";
+  }
   if (type.type_args.empty()) {
     return type.name;
   }

@@ -13,23 +13,23 @@ int main() {
   io::out.line("string(99) = {}", string(99));
 
   // Cast — fallible + bare ?:
-  int a = int("123") ?: -1;
+  int? a = int("123") ?: -1;
   io::out.line("a = {}", a);
-  int b = int("xyz") ?: -1;
+  int? b = int("xyz") ?: -1;
   io::out.line("b = {}", b);
-  int c = int("") ?: -1;
+  int? c = int("") ?: -1;
   io::out.line("c = {}", c);
 
   // Chained ?:
   string s1 = "bad";
   string s2 = "7";
-  int d = int(s1) ?: int(s2) ?: -1;
+  int? d = int(s1) ?: int(s2) ?: -1;
   io::out.line("d = {}", d);
 
   // Postfix ? in T?-returning function
-  int f = parse_int("5") ?: 0;
+  int? f = parse_int("5") ?: 0;
   io::out.line("f = {}", f);
-  int g = parse_int("bad") ?: 0;
+  int? g = parse_int("bad") ?: 0;
   io::out.line("g = {}", g);
 
   // try / catch — error path
