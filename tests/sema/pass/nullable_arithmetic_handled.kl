@@ -1,0 +1,7 @@
+// RUN: check
+
+int main() {
+  int? a = 7;
+  int? b = null;
+  return (a ?: 0) + (b ?: 0);
+}

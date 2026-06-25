@@ -1,0 +1,9 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+int main() {
+  int? a = 7;
+  int? b = null;
+  return a + b;
+}

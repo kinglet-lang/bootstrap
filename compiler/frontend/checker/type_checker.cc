@@ -1728,9 +1728,21 @@ Type TypeChecker::check_unary(const ast::UnaryExpr &unary) {
 Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
   Type left_type = check_expr(*binary.left);
   Type right_type = check_expr(*binary.right);
+  auto reject_nullable_operand = [&]() {
+    if (left_type.nullable || right_type.nullable) {
+      error_at(binary.location,
+               "Nullable value must be handled before using it in a binary expression; "
+               "use '?:', match, or postfix '?'.");
+      return true;
+    }
+    return false;
+  };
 
   switch (binary.op) {
   case ast::BinaryOp::Add:
+    if (reject_nullable_operand()) {
+      return int_type();
+    }
     if (left_type.kind == TypeKind::String || right_type.kind == TypeKind::String) {
       return string_type();
     }
@@ -1740,6 +1752,9 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
   case ast::BinaryOp::Div:
   case ast::BinaryOp::Mod:
   {
+    if (reject_nullable_operand()) {
+      return int_type();
+    }
     if (!left_type.is_numeric() || !right_type.is_numeric()) {
       error_at(binary.location, "Arithmetic operands must be numeric.");
       return int_type();
@@ -1791,6 +1806,9 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
   case ast::BinaryOp::BitXor:
   case ast::BinaryOp::Shl:
   case ast::BinaryOp::Shr: {
+    if (reject_nullable_operand()) {
+      return int_type();
+    }
     if (!is_integer_type(left_type) || !is_integer_type(right_type)) {
       error_at(binary.location, "Bitwise operators require integer operands.");
       return int_type();
