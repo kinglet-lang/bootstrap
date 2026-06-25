@@ -690,6 +690,12 @@ std::string Emitter::emit_decl(const ast::Decl &decl, bool top_level) {
         parts.push_back(emit_stmt(*stmt, true));
       }
       out << "{ " << join(parts, " ") << " }";
+    } else if (const auto *ret = dynamic_cast<const ast::ReturnStmt *>(fn->body.get());
+               ret != nullptr && ret->value) {
+      // Expression-body function: 'T f() => expr;'.  The parser lowers the
+      // sugar to a bare ReturnStmt (not wrapped in a block), so a non-block
+      // body that is a value-returning ReturnStmt round-trips back to '=>'.
+      out << "=> " << emit_expr(*ret->value) << ";";
     } else {
       out << emit_stmt(*fn->body);
     }
