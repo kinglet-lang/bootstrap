@@ -1728,14 +1728,52 @@ Type TypeChecker::check_unary(const ast::UnaryExpr &unary) {
 Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
   Type left_type = check_expr(*binary.left);
   Type right_type = check_expr(*binary.right);
-  auto reject_nullable_operand = [&]() {
-    if (left_type.nullable || right_type.nullable) {
-      error_at(binary.location,
-               "Nullable value must be handled before using it in a binary expression; "
-               "use '?:', match, or postfix '?'.");
-      return true;
+  auto op_text = [&]() -> const char * {
+    switch (binary.op) {
+    case ast::BinaryOp::Add: return "+";
+    case ast::BinaryOp::Sub: return "-";
+    case ast::BinaryOp::Mul: return "*";
+    case ast::BinaryOp::Div: return "/";
+    case ast::BinaryOp::Mod: return "%";
+    case ast::BinaryOp::Eq: return "==";
+    case ast::BinaryOp::Neq: return "!=";
+    case ast::BinaryOp::Lt: return "<";
+    case ast::BinaryOp::Gt: return ">";
+    case ast::BinaryOp::Le: return "<=";
+    case ast::BinaryOp::Ge: return ">=";
+    case ast::BinaryOp::And: return "&&";
+    case ast::BinaryOp::Or: return "||";
+    case ast::BinaryOp::BitAnd: return "&";
+    case ast::BinaryOp::BitOr: return "|";
+    case ast::BinaryOp::BitXor: return "^";
+    case ast::BinaryOp::Shl: return "<<";
+    case ast::BinaryOp::Shr: return ">>";
     }
-    return false;
+    return "binary operator";
+  };
+  auto reject_nullable_operand = [&]() {
+    if (!left_type.nullable && !right_type.nullable) {
+      return false;
+    }
+    const std::string op = op_text();
+    if (left_type.nullable && right_type.nullable) {
+      error_at(binary.location,
+               "Both operands of '" + op + "' are nullable (" + type_to_string(left_type) +
+                   " and " + type_to_string(right_type) +
+                   "). Handle them first, for example '(left ?: 0) " + op +
+                   " (right ?: 0)' or use match/postfix '?'.");
+    } else if (left_type.nullable) {
+      error_at(binary.location,
+               "Left operand of '" + op + "' has nullable type " + type_to_string(left_type) +
+                   ". Handle it first, for example '(left ?: 0) " + op +
+                   " right' or use match/postfix '?'.");
+    } else {
+      error_at(binary.location,
+               "Right operand of '" + op + "' has nullable type " + type_to_string(right_type) +
+                   ". Handle it first, for example 'left " + op +
+                   " (right ?: 0)' or use match/postfix '?'.");
+    }
+    return true;
   };
 
   switch (binary.op) {

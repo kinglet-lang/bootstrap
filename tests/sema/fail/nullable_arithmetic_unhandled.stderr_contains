@@ -1,1 +1,1 @@
-Nullable value must be handled before using it in a binary expression
+Both operands of '+' are nullable
