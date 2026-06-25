@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace kinglet::lsp {
 
@@ -34,6 +35,9 @@ struct CompletionInfo {
   std::string ns_name;
   std::string import_path;
   std::string struct_name;
+  // Generic type parameters in scope at the cursor (e.g. concept/struct
+  // <T, U>), so type-position completion can offer them.
+  std::vector<std::string> type_params;
 };
 
 } // namespace kinglet::lsp

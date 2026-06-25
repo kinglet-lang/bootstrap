@@ -48,7 +48,8 @@ std::vector<ast::Parameter> Parser::parameters() {
 
   do {
     if (at_completion()) {
-      set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {}});
+      set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {},
+                      active_type_params_});
       return params;
     }
     ast::TypeExpr type = parse_type_expr();
@@ -82,7 +83,8 @@ ast::StmtPtr Parser::function_body() {
 
 ast::TypeExpr Parser::parse_type_expr() {
   if (at_completion()) {
-    set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}});
+    set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {},
+                    active_type_params_});
     return ast::TypeExpr{"<error>", {}};
   }
   if (match(TokenType::AMP)) {

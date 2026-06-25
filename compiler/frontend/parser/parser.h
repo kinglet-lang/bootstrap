@@ -127,6 +127,10 @@ private:
   bool completion_mode_ = false;
   std::size_t completion_index_ = 0;
   std::optional<lsp::CompletionInfo> completion_result_;
+  // Generic type parameters of the declaration currently being parsed
+  // (concept/struct/enum/function <...>), so completion in a nested type
+  // position can surface them. Set on entry, cleared on exit.
+  std::vector<std::string> active_type_params_;
 };
 
 } // namespace kinglet

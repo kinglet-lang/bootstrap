@@ -263,12 +263,17 @@ ast::DeclPtr Parser::concept_declaration() {
   if (type_params.empty()) {
     error_at(previous(), "Concept must declare at least one type parameter.");
   }
+  // Expose the concept's type params to nested type-position completion
+  // (method return types and parameter types reference them, e.g. 'T value').
+  active_type_params_ = type_params;
   consume(TokenType::LEFT_BRACE, "Expected '{' after concept name.");
   // Guard before the body loop so an empty body ('{ █ }') still sets a
   // completion context.  ParameterType filters out 'auto' — concept
   // method signatures require explicit return types, not type deduction.
   if (at_completion()) {
-    set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {}});
+    set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {},
+                    active_type_params_});
+    active_type_params_.clear();
     return nullptr;
   }
   std::vector<ast::ConceptMethodDecl> methods;
@@ -281,6 +286,7 @@ ast::DeclPtr Parser::concept_declaration() {
     consume(TokenType::SEMICOLON, "Expected ';' after concept method signature.");
     methods.push_back(ast::ConceptMethodDecl{ret_type, token_text(method_name), std::move(params)});
   }
+  active_type_params_.clear();
   if (has_completion()) return nullptr;
   consume(TokenType::RIGHT_BRACE, "Expected '}' after concept body.");
   return std::make_unique<ast::ConceptDecl>(location_of(concept_token), token_text(name),
