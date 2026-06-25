@@ -572,18 +572,21 @@ ast::ExprPtr Parser::parse_match_pattern() {
     std::string variant_name(token_text(variant_token));
     std::vector<ast::ExprPtr> fields;
     if (match(TokenType::LEFT_PAREN)) {
-      while (!check(TokenType::RIGHT_PAREN) && !is_at_end()) {
+      while (!check(TokenType::RIGHT_PAREN) && !is_at_end() && !has_completion()) {
         if (match(TokenType::LET)) {
           const Token &name_tok = consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
           fields.push_back(std::make_unique<ast::BindingPattern>(location_of(name_tok), std::string(name_tok.lexeme)));
         } else {
           fields.push_back(parse_match_pattern());
         }
+        if (has_completion()) break;
         if (!check(TokenType::RIGHT_PAREN)) {
           consume(TokenType::COMMA, "Expected ',' between enum pattern fields.");
         }
       }
-      consume(TokenType::RIGHT_PAREN, "Expected ')' after enum pattern fields.");
+      if (!has_completion()) {
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after enum pattern fields.");
+      }
     }
     return std::make_unique<ast::EnumPattern>(location_of(enum_token), std::move(enum_name), std::move(variant_name),
                                               std::move(fields));
@@ -602,17 +605,19 @@ ast::ExprPtr Parser::parse_match_pattern() {
 ast::ExprPtr Parser::parse_array_pattern() {
   const Token &bracket = previous();
   std::vector<ast::ExprPtr> elements;
-  while (!check(TokenType::RIGHT_BRACKET) && !is_at_end()) {
+  while (!check(TokenType::RIGHT_BRACKET) && !is_at_end() && !has_completion()) {
     if (match(TokenType::LET)) {
       const Token &name_token = consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
       elements.push_back(std::make_unique<ast::BindingPattern>(location_of(name_token), std::string(name_token.lexeme)));
     } else {
       elements.push_back(parse_match_pattern());
     }
+    if (has_completion()) break;
     if (!check(TokenType::RIGHT_BRACKET)) {
       consume(TokenType::COMMA, "Expected ',' between array pattern elements.");
     }
   }
+  if (has_completion()) return std::make_unique<ast::ArrayPattern>(location_of(bracket), std::move(elements));
   consume(TokenType::RIGHT_BRACKET, "Expected ']' after array pattern.");
   return std::make_unique<ast::ArrayPattern>(location_of(bracket), std::move(elements));
 }
@@ -622,7 +627,7 @@ ast::ExprPtr Parser::parse_struct_pattern(const Token &struct_token) {
   std::string struct_name(token_text(struct_token));
   consume(TokenType::LEFT_BRACE, "Expected '{' after struct name in pattern.");
   std::vector<ast::StructPatternField> fields;
-  while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
     std::string field_name;
     ast::ExprPtr pattern;
     if (match(TokenType::LET)) {
@@ -638,11 +643,14 @@ ast::ExprPtr Parser::parse_struct_pattern(const Token &struct_token) {
       pattern = parse_match_pattern();
     }
     fields.push_back(ast::StructPatternField{std::move(field_name), std::move(pattern)});
+    if (has_completion()) break;
     if (!check(TokenType::RIGHT_BRACE)) {
       consume(TokenType::COMMA, "Expected ',' between struct pattern fields.");
     }
   }
-  consume(TokenType::RIGHT_BRACE, "Expected '}' after struct pattern.");
+  if (!has_completion()) {
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after struct pattern.");
+  }
   return std::make_unique<ast::StructPattern>(location_of(struct_token), std::move(struct_name), std::move(fields));
 }
 
