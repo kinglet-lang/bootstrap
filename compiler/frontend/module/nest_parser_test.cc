@@ -29,7 +29,6 @@ modules {
 
 build {
   default = "demo"
-  backend = native
   out = ".kinglet/out"
 }
 )";
@@ -42,7 +41,6 @@ build {
   expect(config.modules.at("math") == "lib/core/math.kl", "math path");
   expect(config.modules.at("app") == "apps/demo/main.kl", "app path");
   expect(config.build_default == "demo", "build default");
-  expect(config.default_backend == "native", "build backend");
   expect(config.out_dir == ".kinglet/out", "build out");
 }
 

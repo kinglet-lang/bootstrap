@@ -142,7 +142,6 @@ int cmd_init(int argc, char **argv) {
         << "\n"
         << "build {\n"
         << "  default = \"app\"\n"
-        << "  backend = native\n"
         << "  cache = \".kinglet/cache\"\n"
         << "  out = \".kinglet/out\"\n"
         << "}\n";

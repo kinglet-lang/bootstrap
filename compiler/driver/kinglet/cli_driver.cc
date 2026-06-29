@@ -52,7 +52,7 @@ void print_cli_help(std::ostream &out) {
   out << p.bold("USAGE") << "\n";
   cmd(g_prog + " <file.kl> [args...]", "Compile and run (default)");
   cmd(g_prog + " init [path]", "Scaffold a new project (name = last segment)");
-  cmd(g_prog + " build [--backend native]", "Build the project (--quiet, [root])");
+  cmd(g_prog + " build [--quiet] [root]", "Build the project");
   cmd(g_prog + " run [<file.kl> | args...]", "Run the built binary or a source file");
   cmd(g_prog + " prune [--all] [-n]", "Prune unreferenced Klos objects");
   cmd(g_prog + " fmt [--check] [paths...]", "Format sources (CI check or write)");

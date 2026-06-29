@@ -28,7 +28,6 @@ struct ProjectConfig {
   std::string build_root = "src/main.kl";
   std::string cache_dir = ".kinglet/cache";
   std::string out_dir = ".kinglet/out";
-  std::string default_backend = "native";
   std::string build_default;
   std::unordered_map<std::string, std::string> modules; // logical id → path (nest)
   ProjectFmtSection fmt;

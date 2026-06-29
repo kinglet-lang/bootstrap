@@ -49,21 +49,11 @@ std::string build_output_name(const ProjectConfig &config) {
 
 int cmd_build(int argc, char **argv, const std::string &self_executable) {
   bool quiet = false;
-  std::string backend;
   std::string root_arg;
   for (int i = 2; i < argc; ++i) {
     const std::string_view arg(argv[i]);
     if (arg == "--quiet") {
       quiet = true;
-      continue;
-    }
-    if (arg == "--backend") {
-      if (i + 1 >= argc || std::string_view(argv[i + 1]) != "native") {
-        print_error("build", "--backend requires native");
-        return 64;
-      }
-      backend = "native";
-      ++i;
       continue;
     }
     if (arg.starts_with('-')) {
@@ -80,13 +70,6 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
   if (!config) {
     print_error("build", "no kinglet.nest found (run kinglet init)");
     return 2;
-  }
-  if (backend.empty()) {
-    backend = config->default_backend;
-  }
-  if (backend != "native") {
-    print_error("build", "only native backend is supported (vm removed)");
-    return 64;
   }
 
   const auto entry_path = resolve_build_entry_path(*config);
@@ -114,8 +97,7 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
 #else
   const fs::path obj_cache = fs::path(config->root_dir) / ".kinglet/objects/native";
   ensure_dir(obj_cache);
-  args = {"--backend", "native", "-o", out_path.string(), "--obj-cache", obj_cache.string(),
-          entry.string()};
+  args = {"-o", out_path.string(), "--obj-cache", obj_cache.string(), entry.string()};
 #endif
   if (args.empty()) {
     return 78;
@@ -123,8 +105,7 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
 
   const ui::Painter &p = ui::g_err;
   if (!quiet) {
-    std::cerr << p.dim("›") << "  Building " << p.bold(out_name) << "  "
-              << p.dim("(" + backend + " backend)") << "\n";
+    std::cerr << p.dim("›") << "  Building " << p.bold(out_name) << "\n";
   }
 
   const auto t0 = std::chrono::steady_clock::now();

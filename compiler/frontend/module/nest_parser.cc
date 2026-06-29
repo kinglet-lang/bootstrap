@@ -160,8 +160,6 @@ void parse_block_body(const std::string &body, const std::string &block_name, Pr
     } else if (block_name == "build") {
       if (key == "default") {
         config.build_default = value;
-      } else if (key == "backend") {
-        config.default_backend = value;
       } else if (key == "out") {
         config.out_dir = value;
       } else if (key == "cache") {

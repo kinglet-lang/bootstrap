@@ -14,7 +14,6 @@
 #include "frontend/lexer/scanner.h"
 #include "frontend/lexer/token.h"
 #include "frontend/parser/parser.h"
-#include "backend/vm/value.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -203,7 +202,7 @@ std::string compiler_identity(const char *argv0) {
 #endif
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache <dir>] | --backend native -o <out>] [file.kl] [args...]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache <dir>] | -o <out>] [file.kl] [args...]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles to a native executable and runs main() (requires LLVM build).\n"
@@ -337,16 +336,6 @@ int main(int argc, char **argv) {
       }
       continue;
     }
-    if (arg == "--backend") {
-      if (i + 1 < argc && std::string_view(argv[i + 1]) == "native") {
-        mode = Mode::Native;
-        ++i;
-      } else {
-        std::cerr << "kinglet: --backend requires 'native'\n";
-        return 64;
-      }
-      continue;
-    }
     if (arg == "-o") {
       if (i + 1 < argc) {
         ++i;
@@ -364,10 +353,6 @@ int main(int argc, char **argv) {
       mode = Mode::Check;
       continue;
     }
-    if (arg == "--strip-debug") {
-      std::cerr << "kinglet: --strip-debug is only supported with legacy bytecode tooling (removed)\n";
-      return 64;
-    }
     if (arg == "-g") {
       native_debug_info = true;
       continue;
@@ -381,10 +366,6 @@ int main(int argc, char **argv) {
         return 64;
       }
       continue;
-    }
-    if (arg == "--run" || arg == "--save-bytecode" || arg == "--repl" || arg == "--bytecode") {
-      std::cerr << "kinglet: " << arg << " removed (VM backend deleted; use --ir or native build)\n";
-      return 64;
     }
     input_path = std::string(arg);
   }
