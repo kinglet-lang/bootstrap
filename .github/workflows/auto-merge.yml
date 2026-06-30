@@ -1,0 +1,37 @@
+name: Auto Merge
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.AUTOMERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Batch enable auto-merge
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Get all open PRs where all completed checks passed
+          prs=$(gh pr list -R "$REPO" --state open --json number,statusCheckRollup \
+            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | .number')
+          if [ -z "$prs" ]; then
+            echo "No PRs with all checks passed."
+            exit 0
+          fi
+          echo "PRs ready to auto-merge: $prs"
+          for num in $prs; do
+            echo "Enabling auto-merge for PR #$num..."
+            gh pr merge "$num" --auto --squash
+          done
