@@ -19,8 +19,6 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
-          # Must match: type(optional-scope): description
-          # type: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert
           pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9/._-]+\))?!?: .+'
           if echo "$TITLE" | grep -qE "$pattern"; then
             echo "✓ PR title is valid: $TITLE"
@@ -32,9 +30,67 @@ jobs:
             exit 1
           fi
 
+      - name: Validate PR body
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ -z "$BODY" ]; then
+            echo "✗ PR body is empty."
+            echo "  A description with the following sections is required:"
+            echo ""
+            echo "    ## Summary"
+            echo "    <overview of the change>"
+            echo ""
+            echo "    ## Changes"
+            echo "    - <change 1>"
+            echo "    - <change 2>"
+            echo ""
+            echo "    ## Testing"
+            echo "    <how the change was verified>"
+            exit 1
+          fi
+
+          body_len=$(printf '%s' "$BODY" | wc -c)
+          if [ "$body_len" -lt 50 ]; then
+            echo "✗ PR body is too short ($body_len chars, minimum 50 chars)."
+            echo "  A meaningful description helps reviewers and produces"
+            echo "  a readable squash merge commit message."
+            exit 1
+          fi
+
+          missing=""
+          if ! echo "$BODY" | grep -qi '^## *summary'; then
+            missing="$missing  ## Summary\n"
+          fi
+          if ! echo "$BODY" | grep -qi '^## *changes'; then
+            missing="$missing  ## Changes\n"
+          fi
+          if ! echo "$BODY" | grep -qi '^## *testing'; then
+            missing="$missing  ## Testing\n"
+          fi
+
+          if [ -n "$missing" ]; then
+            echo "✗ PR body is missing required section(s):"
+            printf '%b' "$missing"
+            echo ""
+            echo "  Expected format:"
+            echo ""
+            echo "    ## Summary"
+            echo "    <overview of the change>"
+            echo ""
+            echo "    ## Changes"
+            echo "    - <change 1>"
+            echo "    - <change 2>"
+            echo ""
+            echo "    ## Testing"
+            echo "    <how the change was verified>"
+            exit 1
+          fi
+
+          echo "✓ PR body is valid ($body_len chars, all sections present)."
+
       - name: Validate commit messages
         run: |
-          # Check all commits in PR that are not already on canon
           base_ref="${{ github.event.pull_request.base.sha }}"
           pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9/._-]+\))?!?: .+'
 
