@@ -1,15 +1,12 @@
 name: Auto Merge
 on:
-  pull_request_target:
-    types:
-      - labeled
-      - synchronize
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 jobs:
   automerge:
-    if: contains(github.event.pull_request.labels.*.name, 'automerge')
     runs-on: ubuntu-latest
     steps:
       - name: Generate GitHub App token
@@ -20,8 +17,18 @@ jobs:
           private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
-      - name: Enable auto-merge
+      - name: Batch enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
         run: |
-          gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
+          prs=$(gh pr list --label automerge --state open --json number --jq '.[].number')
+          if [ -z "$prs" ]; then
+            echo "No PRs with automerge label."
+            exit 0
+          fi
+          echo "Found PRs: $prs"
+          for num in $prs; do
+            echo "Enabling auto-merge for PR #$num..."
+            gh pr merge "$num" --auto --squash
+          done
