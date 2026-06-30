@@ -51,6 +51,8 @@ jobs:
               fi
             fi
 
-            echo "  Enabling auto-merge..."
-            gh pr merge "$num" --auto --squash
+            # Preserve PR body in squash merge commit
+            pr_body=$(gh api "repos/$REPO/pulls/$num" --jq '.body')
+            echo "  Enabling auto-merge with PR body as commit message..."
+            gh pr merge "$num" --auto --squash --body "$pr_body"
           done
