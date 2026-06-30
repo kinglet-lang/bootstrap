@@ -43,8 +43,8 @@ Editor extensions live in [kinglet-lang/lsp](https://github.com/kinglet-lang/lsp
 ## Build
 
 ```bash
-bash scripts/bootstrap.sh && source tools/env.sh   # pinned GN+Ninja+LLVM (Windows: pwsh scripts/bootstrap.ps1)
-gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$PWD/tools/llvm/bin/llvm-config"'
+bash scripts/bootstrap.sh && source tools/env.sh   # pinned GN+Ninja (Windows: pwsh scripts/bootstrap.ps1)
+gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
 ninja -C out/Default kinglet kinglet_rt
 ./out/Default/kinglet --check file.kl
 ```

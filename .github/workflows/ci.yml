@@ -17,22 +17,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Cache the source-built LLVM (tools/llvm). First run builds (~30 min),
-      # later runs restore in seconds. Key bumps with LLVM version or bootstrap
-      # changes so a stale cache never masks a logic change.
-      - uses: actions/cache@v4
-        with:
-          path: tools/llvm
-          key: llvm-src-22.1.8-${{ runner.os }}-${{ hashFiles('scripts/bootstrap.sh') }}
-
-      # Pinned GN + Ninja + LLVM (source-built) via scripts/bootstrap.sh.
-      # bootstrap.sh skips the LLVM build when tools/llvm is restored above.
-      - name: Set up pinned toolchain (GN + Ninja + LLVM)
+      # Pinned GN + Ninja via scripts/bootstrap.sh. LLVM: installed from
+      # system packages below (see docs/BUILD.md for supported versions).
+      - name: Set up pinned GN + Ninja
         shell: bash
         run: |
           bash scripts/bootstrap.sh
           echo "$PWD/tools/bin" >> "$GITHUB_PATH"
-          echo "LLVM_CONFIG=$PWD/tools/llvm/bin/llvm-config" >> "$GITHUB_ENV"
+
+      - name: Install LLVM
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            brew install llvm
+            echo "LLVM_CONFIG=$(brew --prefix llvm)/bin/llvm-config" >> "$GITHUB_ENV"
+          else
+            sudo apt-get update
+            sudo apt-get install -y llvm-dev clang
+            echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
+          fi
 
       - name: Generate build files
         shell: bash

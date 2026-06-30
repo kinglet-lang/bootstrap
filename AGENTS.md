@@ -18,7 +18,7 @@ pinned toolchain (one-time per machine):
 bash scripts/bootstrap.sh     # Unix; on Windows: pwsh -File scripts/bootstrap.ps1
 source tools/env.sh           # Windows: .\tools\env.ps1
 
-gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$PWD/tools/llvm/bin/llvm-config"'
+gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
 ninja -C out/Default kinglet kinglet_rt
 # Optional short name (same binary, Windows: hard link — not .cmd):
 #   bash scripts/stage-klet-alias.sh out/Default

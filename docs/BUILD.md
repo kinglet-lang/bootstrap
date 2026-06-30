@@ -7,9 +7,10 @@ and running the test suite.
 > TL;DR — Unix with native backend:
 >
 > ```bash
-> bash scripts/bootstrap.sh        # one-time: pinned GN + Ninja + LLVM into ./tools
-> source tools/env.sh
-> gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$PWD/tools/llvm/bin/llvm-config"'
+> bash scripts/bootstrap.sh        # one-time: pinned GN + Ninja into ./tools/bin
+> source tools/env.sh              # adds ./tools/bin to PATH
+> # Install LLVM (see versions below), then:
+> gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
 > ninja -C out/Default kinglet kinglet_rt
 > ```
 
@@ -20,30 +21,34 @@ and running the test suite.
 | Python 3 | GN runs build-time scripts (`build/scripts/*.py`) | Already required by GN. |
 | A C/C++ compiler | Toolchain for the build | System `clang` on macOS; `clang`/`gcc` on Linux; MSVC or Clang on Windows. |
 | `curl` or `wget` | `bootstrap` downloads | One is enough. |
-| `unzip`, `tar` | `bootstrap` extracts archives | Standard on Unix. |
+| `unzip` | `bootstrap` extracts archives | Standard on Unix. |
 
-GN, Ninja, and (on Unix) LLVM are **fetched in pinned versions** by the
-bootstrap scripts below — you do **not** need to install them system-wide.
+### LLVM (optional, for native backend)
+
+The native backend requires **LLVM 18 or later**. Install via your system package
+manager:
+
+| Platform | Command | Typical version |
+|---|---|---|
+| macOS | `brew install llvm` | latest Homebrew (22.x) |
+| Ubuntu 24.04 | `sudo apt-get install llvm-dev clang` | 18.x |
+| Ubuntu 22.04 | `sudo apt-get install llvm-18-dev clang-18` (add LLVM APT repo) | 18.x |
+
+> `build/scripts/find_llvm_config.py` searches `$LLVM_CONFIG`, Homebrew paths,
+> then `PATH`. Set `LLVM_CONFIG` explicitly if auto-detection fails.
 
 ## One-time toolchain setup
 
-The bootstrap scripts fetch pinned GN and Ninja, and (on Unix) build LLVM from
-source into `./tools/` (gitignored), so every developer and CI runner uses the
-same toolchain — built for the host it runs on, with no prebuilt
-system-library mismatch.
+The bootstrap script fetches **pinned GN and Ninja** into `./tools/bin/`
+(gitignored), so every developer and CI runner uses the same build-system
+versions.
 
 **Unix** (macOS / Linux):
 
 ```bash
 bash scripts/bootstrap.sh
-source tools/env.sh   # prepends ./tools/bin to PATH, sets LLVM_CONFIG
+source tools/env.sh   # prepends ./tools/bin to PATH
 ```
-
-`bootstrap.sh` fetches GN + Ninja, then **builds LLVM 22.1.8 from source** into
-`tools/llvm` (pinned via the `llvmorg-22.1.8` git tag). The first build takes
-roughly 20–40 minutes; `tools/llvm` is reused on later runs (and CI caches it),
-so subsequent bootstraps skip the build. Requires `cmake` and `git` on the host
-(preinstalled on GitHub runners and most dev machines).
 
 **Windows**:
 
@@ -55,9 +60,8 @@ pwsh -File scripts/bootstrap.ps1
 Windows mirrors the CI policy: **GN + Ninja only, no LLVM** — builds are
 compile-only (the native LLVM backend is not supported on Windows yet).
 
-If you already have GN/Ninja/LLVM on your machine and prefer to use those, skip
-bootstrap — the build picks up whatever is on `PATH` (and `LLVM_CONFIG` / the
-`llvm_config` arg for LLVM).
+If you already have GN/Ninja on `PATH`, skip bootstrap — the build picks up
+whatever is available.
 
 ## Generating a build
 
@@ -73,8 +77,8 @@ ninja -C out/Debug
 **Release with LLVM native backend** (the recommended configuration):
 
 ```bash
-gn gen out/Default \
-  --args='is_debug=false enable_llvm=true llvm_config="'"$PWD"'/tools/llvm/bin/llvm-config"'
+# Assumes llvm-config is on PATH (or set LLVM_CONFIG)
+gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
 ninja -C out/Default kinglet kinglet_rt
 ```
 
@@ -112,8 +116,9 @@ See [`tests/README.md`](../tests/README.md) for the suite layout.
 ## Troubleshooting
 
 **`llvm-config not found` / `enable_llvm=true` fails to generate**
-Run `bash scripts/bootstrap.sh` and `source tools/env.sh`, or point `llvm_config`
-explicitly: `gn gen out/Default --args='enable_llvm=true llvm_config="/path/to/llvm-config"'`.
+Install LLVM 18+ via your system package manager (see Prerequisites above),
+or point `llvm_config` explicitly:
+`gn gen out/Default --args='enable_llvm=true llvm_config="/path/to/llvm-config"'`.
 `build/scripts/find_llvm_config.py --help` shows the search order.
 
 **`gn: command not found` after bootstrap**
