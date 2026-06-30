@@ -23,12 +23,14 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
         run: |
-          prs=$(gh pr list -R "$REPO" --label automerge --state open --json number --jq '.[].number')
+          # Get all open PRs where all completed checks passed
+          prs=$(gh pr list -R "$REPO" --state open --json number,statusCheckRollup \
+            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | .number')
           if [ -z "$prs" ]; then
-            echo "No PRs with automerge label."
+            echo "No PRs with all checks passed."
             exit 0
           fi
-          echo "Found PRs: $prs"
+          echo "PRs ready to auto-merge: $prs"
           for num in $prs; do
             echo "Enabling auto-merge for PR #$num..."
             gh pr merge "$num" --auto --squash
