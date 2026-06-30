@@ -1,0 +1,62 @@
+name: Validate PR
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  commit-style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate PR title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Must match: type(optional-scope): description
+          # type: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert
+          pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9/._-]+\))?!?: .+'
+          if echo "$TITLE" | grep -qE "$pattern"; then
+            echo "✓ PR title is valid: $TITLE"
+          else
+            echo "✗ PR title does not follow conventional commits format."
+            echo "  Expected: type(scope): description"
+            echo "  Example:  feat(parser): add expression folding"
+            echo "  Got:      $TITLE"
+            exit 1
+          fi
+
+      - name: Validate commit messages
+        run: |
+          # Check all commits in PR that are not already on canon
+          base_ref="${{ github.event.pull_request.base.sha }}"
+          pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9/._-]+\))?!?: .+'
+
+          bad_commits=""
+          while IFS= read -r commit_msg; do
+            if ! echo "$commit_msg" | grep -qE "$pattern"; then
+              bad_commits="$bad_commits\n  $commit_msg"
+            fi
+          done < <(git log --format=%s --no-merges "$base_ref..HEAD")
+
+          if [ -n "$bad_commits" ]; then
+            echo "✗ The following commit messages do not follow conventional commits format:"
+            echo -e "$bad_commits"
+            echo ""
+            echo "  Expected: type(scope): description"
+            echo "  Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+            echo "  Examples:"
+            echo "    feat(parser): add pattern matching for fold expressions"
+            echo "    fix: correct SFINAE constraint on decay_t"
+            echo "    docs: add API reference for when()"
+            exit 1
+          fi
+
+          commit_count=$(git log --format=%s --no-merges "$base_ref..HEAD" | wc -l)
+          echo "✓ All $commit_count commit messages follow conventional commits format."
