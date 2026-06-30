@@ -43,7 +43,7 @@ jobs:
             if ! echo "$commit_msg" | grep -qE "$pattern"; then
               bad_commits="$bad_commits\n  $commit_msg"
             fi
-          done < <(git log --format=%s "$base_ref..HEAD")
+          done < <(git log --format=%s --no-merges "$base_ref..HEAD")
 
           if [ -n "$bad_commits" ]; then
             echo "✗ The following commit messages do not follow conventional commits format:"
@@ -58,5 +58,5 @@ jobs:
             exit 1
           fi
 
-          commit_count=$(git log --format=%s "$base_ref..HEAD" | wc -l)
+          commit_count=$(git log --format=%s --no-merges "$base_ref..HEAD" | wc -l)
           echo "✓ All $commit_count commit messages follow conventional commits format."
