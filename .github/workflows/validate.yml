@@ -38,14 +38,14 @@ jobs:
             echo "✗ PR body is empty."
             echo "  A description with the following sections is required:"
             echo ""
-            echo "    ## Summary"
+            echo "    **Summary**"
             echo "    <overview of the change>"
             echo ""
-            echo "    ## Changes"
+            echo "    **Changes**"
             echo "    - <change 1>"
             echo "    - <change 2>"
             echo ""
-            echo "    ## Testing"
+            echo "    **Testing**"
             echo "    <how the change was verified>"
             exit 1
           fi
@@ -59,14 +59,14 @@ jobs:
           fi
 
           missing=""
-          if ! echo "$BODY" | grep -qi '^## *summary'; then
-            missing="$missing  ## Summary\n"
+          if ! echo "$BODY" | grep -qi '^\*\*[Ss]ummary\*\*'; then
+            missing="$missing  **Summary**\n"
           fi
-          if ! echo "$BODY" | grep -qi '^## *changes'; then
-            missing="$missing  ## Changes\n"
+          if ! echo "$BODY" | grep -qi '^\*\*[Cc]hanges\*\*'; then
+            missing="$missing  **Changes**\n"
           fi
-          if ! echo "$BODY" | grep -qi '^## *testing'; then
-            missing="$missing  ## Testing\n"
+          if ! echo "$BODY" | grep -qi '^\*\*[Tt]esting\*\*'; then
+            missing="$missing  **Testing**\n"
           fi
 
           if [ -n "$missing" ]; then
@@ -75,14 +75,14 @@ jobs:
             echo ""
             echo "  Expected format:"
             echo ""
-            echo "    ## Summary"
+            echo "    **Summary**"
             echo "    <overview of the change>"
             echo ""
-            echo "    ## Changes"
+            echo "    **Changes**"
             echo "    - <change 1>"
             echo "    - <change 2>"
             echo ""
-            echo "    ## Testing"
+            echo "    **Testing**"
             echo "    <how the change was verified>"
             exit 1
           fi
