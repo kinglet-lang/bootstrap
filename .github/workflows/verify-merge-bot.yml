@@ -1,0 +1,26 @@
+name: Verify Merge Bot
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.AUTOMERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Verify token can access this repository
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh auth status
+          gh api "repos/$REPO" --jq '.full_name'
+          gh api installation/repositories --jq '.repositories[].full_name' | grep -Fx "$REPO"
+          echo "GitHub App token can access $REPO"
