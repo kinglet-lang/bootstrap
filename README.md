@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/kinglet-lang/bootstrap/releases"><img src="https://img.shields.io/github/v/tag/kinglet-lang/bootstrap?label=version&sort=semver" alt="Version"></a>
-  <a href="https://github.com/kinglet-lang/bootstrap/actions"><img src="https://img.shields.io/github/actions/workflow/status/kinglet-lang/bootstrap/ci.yml?branch=main" alt="CI"></a>
+  <a href="https://github.com/kinglet-lang/bootstrap/actions"><img src="https://img.shields.io/github/actions/workflow/status/kinglet-lang/bootstrap/ci.yml?branch=canon" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/kinglet-lang/bootstrap" alt="License"></a>
 </p>
 
