@@ -9,6 +9,7 @@ jobs:
   automerge:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@v3
@@ -22,7 +23,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
         run: |
-          prs=$(gh pr list --label automerge --state open --json number --jq '.[].number')
+          prs=$(gh pr list -R "$REPO" --label automerge --state open --json number --jq '.[].number')
           if [ -z "$prs" ]; then
             echo "No PRs with automerge label."
             exit 0
