@@ -36,6 +36,31 @@ Run:
 
 Test suites: `bash tests/run_all.sh` (see [tests/README.md](tests/README.md))
 
+## Contributing (Fork Workflow)
+
+External contributions use a fork-based flow. The repo has no `main` branch —
+work lands on `canon` via pull request.
+
+Remotes:
+
+- `origin` → your fork (`github.com/<you>/bootstrap`)
+- `upstream` → `kinglet-lang/bootstrap`
+
+```bash
+# One-time: point origin at your fork, keep upstream on the source repo.
+git remote rename origin upstream
+git remote add origin git@github.com:<you>/bootstrap.git
+git fetch origin
+
+# Work on a branch off canon, push to your fork, open a PR to kinglet-lang:canon.
+git checkout -b feat/your-change canon
+git push -u origin feat/your-change
+
+# Sync with upstream.
+git fetch upstream
+git rebase upstream/canon
+```
+
 ## Directory Structure
 
 See [compiler/README.md](compiler/README.md) for the pipeline diagram and GN deps.
