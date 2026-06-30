@@ -43,10 +43,13 @@ Editor extensions live in [kinglet-lang/lsp](https://github.com/kinglet-lang/lsp
 ## Build
 
 ```bash
-gn gen out/Release --args='is_debug=false'
-ninja -C out/Release
-./out/Release/kinglet [--tokens | --ast | --ir | --native <out>] <file.kl>
+bash scripts/bootstrap.sh && source tools/env.sh   # pinned GN+Ninja (Windows: pwsh scripts/bootstrap.ps1)
+gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
+ninja -C out/Default kinglet kinglet_rt
+./out/Default/kinglet --check file.kl
 ```
+
+See [docs/BUILD.md](docs/BUILD.md) for prerequisites, Windows, and troubleshooting.
 
 ## Quick Example
 

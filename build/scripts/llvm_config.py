@@ -10,7 +10,7 @@ import sys
 
 def main() -> int:
     if len(sys.argv) != 3:
-        sys.stderr.write("usage: llvm_config.py <llvm-config> <cxxflags|ldflags|libs>\n")
+        sys.stderr.write("usage: llvm_config.py <llvm-config> <cxxflags|ldflags|libs|systemlibs>\n")
         return 1
 
     llvm_config = sys.argv[1]
@@ -21,6 +21,8 @@ def main() -> int:
         args = ["--ldflags"]
     elif what == "libs":
         args = ["--libs", "core", "native"]
+    elif what == "systemlibs":
+        args = ["--system-libs"]
     else:
         sys.stderr.write(f"unknown llvm_config mode: {what}\n")
         return 1

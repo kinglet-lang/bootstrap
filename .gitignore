@@ -6,3 +6,6 @@ out/
 .DS_Store
 node_modules/
 *.lock
+
+# Pinned build tools — downloaded by scripts/bootstrap.py, not checked in.
+tools/

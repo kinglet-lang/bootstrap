@@ -25,6 +25,9 @@ if (enable_llvm) {
                               "list lines")
   llvm_ldflags = exec_script("//build/scripts/llvm_config.py",
                               [ llvm_config_bin, "ldflags" ],
+                              "list lines") +
+                 exec_script("//build/scripts/llvm_config.py",
+                              [ llvm_config_bin, "systemlibs" ],
                               "list lines")
   llvm_libs = exec_script("//build/scripts/llvm_config.py",
                           [ llvm_config_bin, "libs" ],
