@@ -23,15 +23,31 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
         run: |
-          # Get all open PRs where all completed checks passed
-          prs=$(gh pr list -R "$REPO" --state open --json number,statusCheckRollup \
-            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | .number')
+          # Get all open PRs where all completed checks passed, with mergeable state
+          prs=$(gh pr list -R "$REPO" --state open \
+            --json number,statusCheckRollup,mergeable \
+            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | select(.mergeable == "MERGEABLE") | .number')
           if [ -z "$prs" ]; then
             echo "No PRs with all checks passed."
             exit 0
           fi
           echo "PRs ready to auto-merge: $prs"
           for num in $prs; do
-            echo "Enabling auto-merge for PR #$num..."
+            echo "--- Processing PR #$num ---"
+
+            # Rebase if behind
+            state=$(gh api "repos/$REPO/pulls/$num" --jq '.mergeable_state')
+            echo "  mergeable_state: $state"
+            if [ "$state" = "behind" ]; then
+              echo "  Branch is behind canon, updating..."
+              if gh api "repos/$REPO/pulls/$num/update-branch" -X PUT --jq '.message' 2>&1; then
+                echo "  Branch updated. Waiting for mergeability recalculation..."
+                sleep 10
+              else
+                echo "  Failed to update branch (may need rebase after CI re-run in next tick)"
+              fi
+            fi
+
+            echo "  Enabling auto-merge..."
             gh pr merge "$num" --auto --squash
           done
