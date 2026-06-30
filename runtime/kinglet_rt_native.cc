@@ -96,25 +96,37 @@ void kl_set_program_args(int32_t argc, const char **argv) {
 
 kl_h kl_native_out(int32_t argc, const kl_h *args) {
   write_formatted(std::cout, argc, args);
-  std::cout << std::flush;
   return 0;
 }
 
 kl_h kl_native_out_ln(int32_t argc, const kl_h *args) {
   write_formatted(std::cout, argc, args);
-  std::cout << '\n' << std::flush;
+  std::cout << '\n';
   return 0;
 }
 
 kl_h kl_native_err(int32_t argc, const kl_h *args) {
   write_formatted(std::cerr, argc, args);
-  std::cerr << std::flush;
   return 0;
 }
 
 kl_h kl_native_err_ln(int32_t argc, const kl_h *args) {
   write_formatted(std::cerr, argc, args);
-  std::cerr << '\n' << std::flush;
+  std::cerr << '\n';
+  return 0;
+}
+
+// Explicit stdout/stderr flush exposed to Kinglet as io::out.flush() /
+// io::err.flush(). Plain io::out / io::err are block-buffered for throughput;
+// callers force a sync point here when they need output visible immediately
+// (e.g. before a blocking read on another channel, or progress reporting).
+kl_h kl_native_out_flush(void) {
+  std::cout.flush();
+  return 0;
+}
+
+kl_h kl_native_err_flush(void) {
+  std::cerr.flush();
   return 0;
 }
 
@@ -243,6 +255,10 @@ kl_h kl_invoke_native(kl_h callee, int32_t argc, const kl_h *args) {
     return argc == 2 ? kl_native_fs_write(args[0], args[1]) : 0;
   case 8:
     return kl_native_sys_args();
+  case 9:
+    return kl_native_out_flush();
+  case 10:
+    return kl_native_err_flush();
   default:
     return 0;
   }

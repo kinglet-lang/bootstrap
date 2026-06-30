@@ -1,0 +1,15 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // out is block-buffered; flush forces an early sync point. Buffered content
+  // and post-flush content must both appear, in order, on normal exit.
+  io::out("partial");
+  io::out.flush();
+  io::out.line(" then line");
+  io::err.line("diagnostic");
+  io::err.flush();
+  io::out.line("last");
+  return 0;
+}

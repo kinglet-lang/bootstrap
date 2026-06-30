@@ -1979,6 +1979,10 @@ void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
       fn = NativeFn::IoOutLine;
     } else if (ns_obj->member_name == "err" && field_access.field_name == "line") {
       fn = NativeFn::IoErrLine;
+    } else if (ns_obj->member_name == "out" && field_access.field_name == "flush") {
+      fn = NativeFn::IoOutFlush;
+    } else if (ns_obj->member_name == "err" && field_access.field_name == "flush") {
+      fn = NativeFn::IoErrFlush;
     } else if (ns_obj->member_name == "in" && field_access.field_name == "secret") {
       fn = NativeFn::IoInSecret;
     } else {

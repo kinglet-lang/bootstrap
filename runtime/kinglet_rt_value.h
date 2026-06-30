@@ -58,6 +58,8 @@ kl_h kl_native_out(int32_t argc, const kl_h *args);
 kl_h kl_native_out_ln(int32_t argc, const kl_h *args);
 kl_h kl_native_err(int32_t argc, const kl_h *args);
 kl_h kl_native_err_ln(int32_t argc, const kl_h *args);
+kl_h kl_native_out_flush(void);
+kl_h kl_native_err_flush(void);
 kl_h kl_native_in(int32_t argc, const kl_h *args, int32_t secret);
 kl_h kl_native_fs_read(kl_h path);
 kl_h kl_native_fs_write(kl_h path, kl_h content);

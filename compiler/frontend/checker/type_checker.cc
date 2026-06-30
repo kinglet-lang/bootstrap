@@ -2325,6 +2325,13 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       }
       return string_type();
     }
+    if ((id_obj->name == "out" || id_obj->name == "err") &&
+        field_callee->field_name == "flush") {
+      if (!call_expr.args.empty()) {
+        error_at(call_expr.location, "io::" + id_obj->name + ".flush() takes no arguments.");
+      }
+      return void_type();
+    }
   }
   const auto *ns_obj =
       dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
@@ -2342,6 +2349,13 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
         check_expr(*arg);
       }
       return string_type();
+    }
+    if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
+        field_callee->field_name == "flush") {
+      if (!call_expr.args.empty()) {
+        error_at(call_expr.location, "io::" + ns_obj->member_name + ".flush() takes no arguments.");
+      }
+      return void_type();
     }
   }
   if (ns_obj && sema_.used_.count(ns_obj->namespace_name) == 0) {
@@ -2878,6 +2892,13 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
     fn.return_type = std::make_shared<Type>(string_type());
     return fn;
   }
+  if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
+      field_access.field_name == "flush") {
+    Type fn(TypeKind::Function);
+    fn.name = "native_fn";
+    fn.return_type = std::make_shared<Type>(void_type());
+    return fn;
+  }
   }
 
   // Handle `using namespace io;` bare out.line / err.line / in.secret.
@@ -2894,6 +2915,13 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
       Type fn(TypeKind::Function);
       fn.name = "native_fn";
       fn.return_type = std::make_shared<Type>(string_type());
+      return fn;
+    }
+    if ((id_obj->name == "out" || id_obj->name == "err") &&
+        field_access.field_name == "flush") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      fn.return_type = std::make_shared<Type>(void_type());
       return fn;
     }
   }

@@ -34,6 +34,10 @@ enum class NativeFn {
   FsRead,
   FsWrite,
   SysArgs,
+  // Appended after SysArgs so ordinals stay stable: KirRecorder encodes
+  // native_fn by enum ordinal, matched by kl_invoke_native's switch (case 9/10).
+  IoOutFlush,
+  IoErrFlush,
 };
 
 // ── Reference-counted heap infrastructure ──────────────────────────────
