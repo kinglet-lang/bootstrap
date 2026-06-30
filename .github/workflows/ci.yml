@@ -17,31 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GN
+      # Cache the source-built LLVM (tools/llvm). First run builds (~30 min),
+      # later runs restore in seconds. Key bumps with LLVM version or bootstrap
+      # changes so a stale cache never masks a logic change.
+      - uses: actions/cache@v4
+        with:
+          path: tools/llvm
+          key: llvm-src-22.1.8-${{ runner.os }}-${{ hashFiles('scripts/bootstrap.sh') }}
+
+      # Pinned GN + Ninja + LLVM (source-built) via scripts/bootstrap.sh.
+      # bootstrap.sh skips the LLVM build when tools/llvm is restored above.
+      - name: Set up pinned toolchain (GN + Ninja + LLVM)
         shell: bash
         run: |
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/mac-arm64/+/latest"
-          else
-            curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/linux-amd64/+/latest"
-          fi
-          unzip gn.zip -d "$HOME/bin"
-          echo "$HOME/bin" >> "$GITHUB_PATH"
-
-      - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
-
-      - name: Install LLVM
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            brew install llvm
-            echo "LLVM_CONFIG=$(brew --prefix llvm)/bin/llvm-config" >> "$GITHUB_ENV"
-          else
-            sudo apt-get update
-            sudo apt-get install -y llvm-dev clang python-is-python3
-            echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
-          fi
+          bash scripts/bootstrap.sh
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
+          echo "LLVM_CONFIG=$PWD/tools/llvm/bin/llvm-config" >> "$GITHUB_ENV"
 
       - name: Generate build files
         shell: bash
@@ -68,15 +59,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GN
-        shell: bash
+      - name: Set up pinned toolchain (GN + Ninja)
+        shell: pwsh
         run: |
-          curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
-          unzip gn.zip -d "$HOME/bin"
-          echo "$HOME/bin" >> "$GITHUB_PATH"
-
-      - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+          pwsh -File scripts/bootstrap.ps1
+          Add-Content -Path $env:GITHUB_PATH -Value "$PWD\tools\bin"
 
       - name: Generate build files
         shell: bash

@@ -11,12 +11,14 @@ here — those belong in a separate `lsp` repo.
 
 ## Build
 
-```bash
-gn gen out/Debug
-ninja -C out/Debug
+See [docs/BUILD.md](docs/BUILD.md) for the full guide. Quick start with the
+pinned toolchain (one-time per machine):
 
-# Native backend (LLVM):
-gn gen out/Default --args='enable_llvm=true llvm_config="/opt/homebrew/opt/llvm/bin/llvm-config"'
+```bash
+bash scripts/bootstrap.sh     # Unix; on Windows: pwsh -File scripts/bootstrap.ps1
+source tools/env.sh           # Windows: .\tools\env.ps1
+
+gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$PWD/tools/llvm/bin/llvm-config"'
 ninja -C out/Default kinglet kinglet_rt
 # Optional short name (same binary, Windows: hard link — not .cmd):
 #   bash scripts/stage-klet-alias.sh out/Default
