@@ -1,12 +1,14 @@
 name: Auto Merge
 on:
-  schedule:
-    - cron: '*/30 * * * *'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   automerge:
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +20,7 @@ jobs:
           private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
+          permission-workflows: write
       - name: Batch enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
