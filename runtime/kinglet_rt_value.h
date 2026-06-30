@@ -70,6 +70,11 @@ kl_h kl_native_fs_write(kl_h path, kl_h content);
 kl_h kl_native_fs_listdir(kl_h path);
 kl_h kl_native_sys_args(void);
 kl_h kl_invoke_native(kl_h callee, int32_t argc, const kl_h *args);
+// Reference counting for heap values. No-ops on plain integers and inline
+// enums (non-heap wire values). At zero refcount kl_release frees the object,
+// cascading into container elements/fields.
+void kl_retain(kl_h value);
+void kl_release(kl_h value);
 int32_t kl_value_len(kl_h value);
 
 kl_h kl_array_new(int32_t count, const kl_h *elements);
