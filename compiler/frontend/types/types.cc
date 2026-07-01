@@ -14,41 +14,66 @@ Type::Type(TypeKind kind) : kind(kind) {}
 TypeId Type::type_id() const {
   switch (kind) {
   case TypeKind::Int:
-    if (name == "int8") return TypeId::Int8;
-    if (name == "int16") return TypeId::Int16;
-    if (name == "int32") return TypeId::Int32;
-    if (name == "uint8") return TypeId::UInt8;
-    if (name == "uint16") return TypeId::UInt16;
-    if (name == "uint32") return TypeId::UInt32;
-    if (name == "uint64") return TypeId::UInt64;
+    if (name == "int8")
+      return TypeId::Int8;
+    if (name == "int16")
+      return TypeId::Int16;
+    if (name == "int32")
+      return TypeId::Int32;
+    if (name == "uint8")
+      return TypeId::UInt8;
+    if (name == "uint16")
+      return TypeId::UInt16;
+    if (name == "uint32")
+      return TypeId::UInt32;
+    if (name == "uint64")
+      return TypeId::UInt64;
     return TypeId::Int64; // default (int / int64)
   case TypeKind::Float:
-    if (name == "float32") return TypeId::Float32;
+    if (name == "float32")
+      return TypeId::Float32;
     return TypeId::Float64; // default (float64)
-  case TypeKind::Bool:    return TypeId::Bool;
-  case TypeKind::Char:    return TypeId::Char;
-  case TypeKind::String:  return TypeId::String;
-  case TypeKind::Void:    return TypeId::Void;
-  case TypeKind::Null:    return TypeId::Null;
-  case TypeKind::Array:   return TypeId::Array;
-  case TypeKind::Map:     return TypeId::Map;
-  case TypeKind::Struct:  return TypeId::Struct;
-  case TypeKind::Enum:    return TypeId::Enum;
-  case TypeKind::Function:return TypeId::Function;
-  case TypeKind::Ref:     return TypeId::Ref;
-  case TypeKind::MutRef:  return TypeId::MutRef;
-  case TypeKind::Concept: return TypeId::Concept;
+  case TypeKind::Bool:
+    return TypeId::Bool;
+  case TypeKind::Char:
+    return TypeId::Char;
+  case TypeKind::String:
+    return TypeId::String;
+  case TypeKind::Void:
+    return TypeId::Void;
+  case TypeKind::Null:
+    return TypeId::Null;
+  case TypeKind::Array:
+    return TypeId::Array;
+  case TypeKind::Map:
+    return TypeId::Map;
+  case TypeKind::Struct:
+    return TypeId::Struct;
+  case TypeKind::Enum:
+    return TypeId::Enum;
+  case TypeKind::Function:
+    return TypeId::Function;
+  case TypeKind::Ref:
+    return TypeId::Ref;
+  case TypeKind::MutRef:
+    return TypeId::MutRef;
+  case TypeKind::Concept:
+    return TypeId::Concept;
   }
   return TypeId::Unknown;
 }
 
 Type::Type(const Type &other)
-    : kind(other.kind), name(other.name), param_types(other.param_types),
+    : kind(other.kind),
+      name(other.name),
+      param_types(other.param_types),
       return_type(other.return_type ? std::make_shared<Type>(*other.return_type) : nullptr),
       element_type(other.element_type ? std::make_shared<Type>(*other.element_type) : nullptr),
       key_type(other.key_type ? std::make_shared<Type>(*other.key_type) : nullptr),
-      fields(other.fields), variants(other.variants),
-      variant_param_types(other.variant_param_types), nullable(other.nullable) {}
+      fields(other.fields),
+      variants(other.variants),
+      variant_param_types(other.variant_param_types),
+      nullable(other.nullable) {}
 
 Type &Type::operator=(const Type &other) {
   if (this != &other) {
@@ -100,8 +125,7 @@ bool Type::is_compatible_with(const Type &other) const {
       if (!key_type || !other.key_type || !element_type || !other.element_type) {
         return true;
       }
-      bool key_ok = key_type->kind == TypeKind::Null ||
-                    other.key_type->kind == TypeKind::Null ||
+      bool key_ok = key_type->kind == TypeKind::Null || other.key_type->kind == TypeKind::Null ||
                     key_type->is_compatible_with(*other.key_type);
       bool val_ok = element_type->kind == TypeKind::Null ||
                     other.element_type->kind == TypeKind::Null ||
@@ -139,7 +163,8 @@ Type Type::promote(const Type &a, const Type &b) {
     return promote_float_binary(a, b);
   }
   if (a.kind == TypeKind::Int && b.kind == TypeKind::Int) {
-    if (a.name == b.name) return a;
+    if (a.name == b.name)
+      return a;
     return make_int_type("int64");
   }
   return a;

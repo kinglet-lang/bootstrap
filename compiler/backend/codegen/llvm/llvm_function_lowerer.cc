@@ -106,8 +106,7 @@ llvm::Value *const_double(llvm::IRBuilder<> &builder, const KirInstr *instr) {
   int64_t bits = 0;
   const int32_t low = instr->operands[0];
   const int32_t high = instr->operands.size() > 1 ? instr->operands[1] : (low < 0 ? -1 : 0);
-  bits = (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) |
-         static_cast<uint32_t>(low);
+  bits = (static_cast<uint64_t>(static_cast<uint32_t>(high)) << 32) | static_cast<uint32_t>(low);
   double value = 0.0;
   std::memcpy(&value, &bits, sizeof(value));
   return llvm::ConstantFP::get(builder.getDoubleTy(), value);
@@ -196,112 +195,115 @@ RtFns declare_runtime(llvm::Module *module) {
   llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
 
   RtFns rt;
-  rt.string_new = llvm::Function::Create(
-      llvm::FunctionType::get(i64, {i8p, i32}, false), llvm::Function::ExternalLinkage,
-      "kl_string_new", module);
-  rt.array_new = llvm::Function::Create(
-      llvm::FunctionType::get(i64, {i32, i64p}, false), llvm::Function::ExternalLinkage,
-      "kl_array_new", module);
-  rt.dense_array_new = llvm::Function::Create(
-      llvm::FunctionType::get(i64, {i32, i32, i64p}, false), llvm::Function::ExternalLinkage,
-      "kl_dense_array_new", module);
-  rt.dense2d_get = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i32}, false),
-                                          llvm::Function::ExternalLinkage, "kl_dense2d_get", module);
+  rt.string_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i8p, i32}, false),
+                                         llvm::Function::ExternalLinkage, "kl_string_new", module);
+  rt.array_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
+                                        llvm::Function::ExternalLinkage, "kl_array_new", module);
+  rt.dense_array_new =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32, i64p}, false),
+                             llvm::Function::ExternalLinkage, "kl_dense_array_new", module);
+  rt.dense2d_get =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i32}, false),
+                             llvm::Function::ExternalLinkage, "kl_dense2d_get", module);
   rt.array_get = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
                                         llvm::Function::ExternalLinkage, "kl_array_get", module);
   rt.value_len = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_value_len", module);
-  rt.struct_new = llvm::Function::Create(
-      llvm::FunctionType::get(i64, {i32, i32, i64p}, false), llvm::Function::ExternalLinkage,
-      "kl_struct_new", module);
-  rt.struct_type_index = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
-                                               llvm::Function::ExternalLinkage,
-                                               "kl_struct_type_index", module);
-  rt.struct_field_at = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
-                                              llvm::Function::ExternalLinkage,
-                                              "kl_struct_field_at", module);
-  rt.struct_field_set = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i64}, false),
-                                               llvm::Function::ExternalLinkage,
-                                               "kl_struct_field_set", module);
-  rt.field_mut_ref_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
-                                              llvm::Function::ExternalLinkage,
-                                              "kl_field_mut_ref_new", module);
+  rt.struct_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32, i64p}, false),
+                                         llvm::Function::ExternalLinkage, "kl_struct_new", module);
+  rt.struct_type_index =
+      llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_struct_type_index", module);
+  rt.struct_field_at =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
+                             llvm::Function::ExternalLinkage, "kl_struct_field_at", module);
+  rt.struct_field_set =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_struct_field_set", module);
+  rt.field_mut_ref_new =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
+                             llvm::Function::ExternalLinkage, "kl_field_mut_ref_new", module);
   rt.ref_load = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                                        llvm::Function::ExternalLinkage, "kl_ref_load", module);
-  rt.ref_store = llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), {i64, i64}, false),
-                                        llvm::Function::ExternalLinkage, "kl_ref_store", module);
+  rt.ref_store =
+      llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), {i64, i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_ref_store", module);
   rt.slice = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64, i64}, false),
-                                      llvm::Function::ExternalLinkage, "kl_slice", module);
+                                    llvm::Function::ExternalLinkage, "kl_slice", module);
   rt.enum_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32}, false),
                                        llvm::Function::ExternalLinkage, "kl_enum_new", module);
-  rt.enum_new_payload = llvm::Function::Create(
-      llvm::FunctionType::get(i64, {i32, i32, i32, i64p}, false), llvm::Function::ExternalLinkage,
-      "kl_enum_new_payload", module);
-  rt.enum_payload_at = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
-                                              llvm::Function::ExternalLinkage, "kl_enum_payload_at",
-                                              module);
-  rt.cast_to_int = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                          llvm::Function::ExternalLinkage, "kl_cast_to_int", module);
-  rt.cast_to_float = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                            llvm::Function::ExternalLinkage, "kl_cast_to_float", module);
-  rt.cast_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                              llvm::Function::ExternalLinkage, "kl_cast_to_string",
-                                              module);
-  rt.cast_to_char = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                           llvm::Function::ExternalLinkage, "kl_cast_to_char", module);
+  rt.enum_new_payload =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32, i32, i64p}, false),
+                             llvm::Function::ExternalLinkage, "kl_enum_new_payload", module);
+  rt.enum_payload_at =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
+                             llvm::Function::ExternalLinkage, "kl_enum_payload_at", module);
+  rt.cast_to_int =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_cast_to_int", module);
+  rt.cast_to_float =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_cast_to_float", module);
+  rt.cast_to_string =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_cast_to_string", module);
+  rt.cast_to_char =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_cast_to_char", module);
   rt.native_out = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
                                          llvm::Function::ExternalLinkage, "kl_native_out", module);
-  rt.native_out_ln = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
-                                            llvm::Function::ExternalLinkage, "kl_native_out_ln",
-                                            module);
+  rt.native_out_ln =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_out_ln", module);
   rt.native_err = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
                                          llvm::Function::ExternalLinkage, "kl_native_err", module);
-  rt.native_err_ln = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
-                                           llvm::Function::ExternalLinkage, "kl_native_err_ln",
-                                           module);
+  rt.native_err_ln =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_err_ln", module);
   rt.native_in = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i64p, i32}, false),
                                         llvm::Function::ExternalLinkage, "kl_native_in", module);
-  rt.native_fs_read = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                             llvm::Function::ExternalLinkage, "kl_native_fs_read",
-                                             module);
-  rt.native_fs_write = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
-                                              llvm::Function::ExternalLinkage, "kl_native_fs_write",
-                                              module);
-  rt.native_sys_args = llvm::Function::Create(llvm::FunctionType::get(i64, false),
-                                               llvm::Function::ExternalLinkage, "kl_native_sys_args",
-                                               module);
-  rt.invoke_native = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i64p}, false),
-                                            llvm::Function::ExternalLinkage, "kl_invoke_native",
-                                            module);
+  rt.native_fs_read =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_read", module);
+  rt.native_fs_write =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_write", module);
+  rt.native_sys_args =
+      llvm::Function::Create(llvm::FunctionType::get(i64, false), llvm::Function::ExternalLinkage,
+                             "kl_native_sys_args", module);
+  rt.invoke_native =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i64p}, false),
+                             llvm::Function::ExternalLinkage, "kl_invoke_native", module);
   rt.value_eq = llvm::Function::Create(llvm::FunctionType::get(i32, {i64, i64}, false),
                                        llvm::Function::ExternalLinkage, "kl_value_eq", module);
-  rt.value_is_err = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
-                                           llvm::Function::ExternalLinkage, "kl_value_is_err", module);
+  rt.value_is_err =
+      llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_value_is_err", module);
   rt.exit_code = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_exit_code", module);
-  rt.float_from_bits = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                              llvm::Function::ExternalLinkage,
-                                              "kl_float_from_bits", module);
-  rt.float_to_bits = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                            llvm::Function::ExternalLinkage,
-                                            "kl_float_to_bits", module);
+  rt.float_from_bits =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_float_from_bits", module);
+  rt.float_to_bits =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_float_to_bits", module);
   llvm::Type *f64 = llvm::Type::getDoubleTy(ctx);
   rt.float_new = llvm::Function::Create(llvm::FunctionType::get(i64, {f64}, false),
                                         llvm::Function::ExternalLinkage, "kl_float_new", module);
   rt.float_get = llvm::Function::Create(llvm::FunctionType::get(f64, {i64}, false),
-                                         llvm::Function::ExternalLinkage, "kl_float_get", module);
-  rt.bool_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                              llvm::Function::ExternalLinkage, "kl_bool_to_string",
-                                              module);
-  rt.null_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {}, false),
-                                              llvm::Function::ExternalLinkage, "kl_null_to_string",
-                                              module);
-  rt.int_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                             llvm::Function::ExternalLinkage, "kl_int_to_string",
-                                             module);
-  rt.char_to_string = llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                                              llvm::Function::ExternalLinkage, "kl_char_to_string",
-                                              module);
+                                        llvm::Function::ExternalLinkage, "kl_float_get", module);
+  rt.bool_to_string =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_bool_to_string", module);
+  rt.null_to_string =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {}, false),
+                             llvm::Function::ExternalLinkage, "kl_null_to_string", module);
+  rt.int_to_string =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_int_to_string", module);
+  rt.char_to_string =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_char_to_string", module);
   rt.value_add = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_value_add", module);
   rt.value_sub = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
@@ -361,10 +363,11 @@ llvm::Value *const_i64(llvm::IRBuilder<> &builder, const KirInstr *instr) {
   llvm::Type *i64 = builder.getInt64Ty();
   const int32_t low = instr->operands[0];
   const int32_t high = instr->operands.size() > 1 ? instr->operands[1] : (low < 0 ? -1 : 0);
-  llvm::Value *lo = builder.CreateZExt(llvm::ConstantInt::get(i32, static_cast<uint32_t>(low)), i64);
-  llvm::Value *hi =
-      builder.CreateShl(builder.CreateZExt(llvm::ConstantInt::get(i32, static_cast<uint32_t>(high)), i64),
-                        llvm::ConstantInt::get(i64, 32));
+  llvm::Value *lo =
+      builder.CreateZExt(llvm::ConstantInt::get(i32, static_cast<uint32_t>(low)), i64);
+  llvm::Value *hi = builder.CreateShl(
+      builder.CreateZExt(llvm::ConstantInt::get(i32, static_cast<uint32_t>(high)), i64),
+      llvm::ConstantInt::get(i64, 32));
   return builder.CreateOr(lo, hi);
 }
 
@@ -382,7 +385,7 @@ int field_index_for_name(const KirStructMeta &meta, const std::string &field_nam
 }
 
 llvm::Value *resolve_field_index(llvm::IRBuilder<> &builder, llvm::Value *type_idx,
-                                const KirModule &kir_module, const std::string &field_name) {
+                                 const KirModule &kir_module, const std::string &field_name) {
   llvm::Type *i32 = builder.getInt32Ty();
   llvm::Value *result = llvm::ConstantInt::get(i32, 0);
   for (std::size_t t = 0; t < kir_module.struct_metas.size(); ++t) {
@@ -399,8 +402,8 @@ llvm::Value *resolve_field_index(llvm::IRBuilder<> &builder, llvm::Value *type_i
 
 // Arithmetic dispatches through the runtime: string concat for `+`, IEEE
 // double math when either operand is a boxed float, plain int64 otherwise.
-llvm::Value *binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op,
-                   llvm::Value *left, llvm::Value *right) {
+llvm::Value *binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op, llvm::Value *left,
+                   llvm::Value *right) {
   switch (op) {
   case KirOpcode::IAdd:
     return builder.CreateCall(rt.value_add, {left, right});
@@ -467,8 +470,8 @@ struct UnboxedScalar {
   bool is_double = false;
 };
 
-llvm::Value *wire_for_string_display(llvm::IRBuilder<> &builder, const RtFns &rt,
-                                     llvm::Value *wire, KirType type) {
+llvm::Value *wire_for_string_display(llvm::IRBuilder<> &builder, const RtFns &rt, llvm::Value *wire,
+                                     KirType type) {
   switch (type) {
   case KirType::Bool:
     return builder.CreateCall(rt.bool_to_string, {wire});
@@ -592,8 +595,7 @@ llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode 
       break;
     }
   }
-  if (op == KirOpcode::IAdd &&
-      (lhs_ty == KirType::String || rhs_ty == KirType::String)) {
+  if (op == KirOpcode::IAdd && (lhs_ty == KirType::String || rhs_ty == KirType::String)) {
     llvm::Value *wl = wire_for_string_display(builder, rt, lhs, lhs_ty);
     llvm::Value *wr = wire_for_string_display(builder, rt, rhs, rhs_ty);
     return builder.CreateCall(rt.value_add, {wl, wr});
@@ -605,8 +607,8 @@ llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode 
 
 // Relational compares go through kl_value_cmp so strings and boxed floats
 // order correctly; the three-way result is then compared against zero.
-llvm::Value *icmp(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op,
-                  llvm::Value *left, llvm::Value *right) {
+llvm::Value *icmp(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode op, llvm::Value *left,
+                  llvm::Value *right) {
   llvm::Value *zero32 = llvm::ConstantInt::get(builder.getInt32Ty(), 0);
   llvm::Value *cmp = nullptr;
   switch (op) {
@@ -638,8 +640,7 @@ void rebuild_phi_predecessors(llvm::Function *fn) {
     if (phis.empty()) {
       continue;
     }
-    const llvm::SmallVector<llvm::BasicBlock *, 8> preds(llvm::pred_begin(&bb),
-                                                        llvm::pred_end(&bb));
+    const llvm::SmallVector<llvm::BasicBlock *, 8> preds(llvm::pred_begin(&bb), llvm::pred_end(&bb));
     for (llvm::PHINode *phi : phis) {
       llvm::SmallVector<llvm::Value *, 8> values;
       values.reserve(preds.size());
@@ -955,7 +956,7 @@ public:
       type_stack.assign(max_depth, KirType::Any);
       for (std::size_t d = 0; d < max_depth; ++d) {
         llvm::PHINode *phi = phi_builder.CreatePHI(i64, static_cast<unsigned>(preds.size()),
-                                                     "stk" + std::to_string(d));
+                                                   "stk" + std::to_string(d));
         KirType merged_ty = KirType::Any;
         bool have_ty = false;
         for (llvm::BasicBlock *pred : preds) {
@@ -1035,8 +1036,7 @@ public:
           stack.pop_back();
           type_stack.pop_back();
           elem = wire_for_string_display(builder, rt_, elem, elem_ty);
-          llvm::Value *slot =
-              builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ai));
+          llvm::Value *slot = builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ai));
           builder.CreateStore(elem, slot);
         }
         return builder.CreateBitCast(elements, llvm::PointerType::getUnqual(i64));
@@ -1080,8 +1080,7 @@ public:
         }
         llvm::Value *result = nullptr;
         if (op == KirOpcode::ICmpEq || op == KirOpcode::ICmpNeq) {
-          llvm::Value *eq =
-              builder.CreateCall(rt_.value_eq, {lhs, rhs});
+          llvm::Value *eq = builder.CreateCall(rt_.value_eq, {lhs, rhs});
           if (op == KirOpcode::ICmpNeq) {
             eq = builder.CreateXor(eq, llvm::ConstantInt::get(builder.getInt32Ty(), 1));
           }
@@ -1148,8 +1147,7 @@ public:
           temp_types[i] = KirType::Float;
           push(builder.CreateCall(rt_.float_new, {dbl}));
         } else {
-          llvm::Value *value =
-              builder.CreateCall(rt_.float_from_bits, {const_i64(builder, instr)});
+          llvm::Value *value = builder.CreateCall(rt_.float_from_bits, {const_i64(builder, instr)});
           push(value);
           temps[i] = value;
           temp_types[i] = KirType::Float;
@@ -1171,14 +1169,12 @@ public:
             static_cast<std::size_t>(pool_idx) >= kir_module_.constant_strings.size()) {
           *error = "const_string pool index " + std::to_string(pool_idx) +
                    " out of range (pool size " +
-                   std::to_string(kir_module_.constant_strings.size()) + ") in " +
-                   g_lower_context;
+                   std::to_string(kir_module_.constant_strings.size()) + ") in " + g_lower_context;
           return false;
         }
         const std::string &text = kir_module_.constant_strings[static_cast<std::size_t>(pool_idx)];
         llvm::Value *data = builder.CreateGlobalStringPtr(text);
-        llvm::Value *len =
-            llvm::ConstantInt::get(i32, static_cast<int>(text.size()));
+        llvm::Value *len = llvm::ConstantInt::get(i32, static_cast<int>(text.size()));
         llvm::Value *handle = builder.CreateCall(rt_.string_new, {data, len});
         push(handle);
         temps[i] = handle;
@@ -1186,7 +1182,8 @@ public:
       }
       case KirOpcode::ConstFn: {
         const int fn_index = instr->operands[0];
-        if (fn_index < 0 || static_cast<std::size_t>(fn_index) >= kir_module_.function_names.size()) {
+        if (fn_index < 0 ||
+            static_cast<std::size_t>(fn_index) >= kir_module_.function_names.size()) {
           *error = "const_fn index out of range";
           return false;
         }
@@ -1202,8 +1199,7 @@ public:
         }
         llvm::Value *loaded = builder.CreateLoad(i64, local_slots_[static_cast<std::size_t>(slot)]);
         const KirType local_ty = kir_local_type(fn, slot);
-        const UnboxedScalar scalar =
-            unbox_wire_scalar(builder, rt_, loaded, local_ty, i64, i32);
+        const UnboxedScalar scalar = unbox_wire_scalar(builder, rt_, loaded, local_ty, i64, i32);
         if (scalar.is_double) {
           push(builder.CreateCall(rt_.float_new, {scalar.value}));
           temps[i] = stack.back();
@@ -1302,14 +1298,14 @@ public:
           llvm::Value *rhs = temps[static_cast<std::size_t>(rhs_i)];
           const KirType lhs_ty = temp_types[static_cast<std::size_t>(lhs_i)];
           const KirType rhs_ty = temp_types[static_cast<std::size_t>(rhs_i)];
-          llvm::Value *result =
-              typed_binop(builder, rt_, instr->op, lhs, rhs, lhs_ty, rhs_ty);
+          llvm::Value *result = typed_binop(builder, rt_, instr->op, lhs, rhs, lhs_ty, rhs_ty);
           if (result == nullptr) {
             *error = "unsupported indexed binop";
             return false;
           }
-          const KirType result_ty =
-              static_cast<std::size_t>(i) < fn.instr_types.size() ? fn.instr_types[i] : KirType::Any;
+          const KirType result_ty = static_cast<std::size_t>(i) < fn.instr_types.size()
+                                        ? fn.instr_types[i]
+                                        : KirType::Any;
           temps[i] = result;
           temp_types[i] = result_ty;
           if (result->getType()->isDoubleTy()) {
@@ -1336,8 +1332,8 @@ public:
         if (v == nullptr) {
           return false;
         }
-        llvm::Value *result = bool_to_i64(
-            builder, builder.CreateICmpEQ(v, llvm::ConstantInt::get(i64, 0)));
+        llvm::Value *result =
+            bool_to_i64(builder, builder.CreateICmpEQ(v, llvm::ConstantInt::get(i64, 0)));
         push(result);
         temps[i] = result;
         break;
@@ -1380,13 +1376,10 @@ public:
           return false;
         }
         // The VM clamps out-of-range shift amounts to a zero result.
-        llvm::Value *in_range =
-            builder.CreateICmpULT(rhs, llvm::ConstantInt::get(i64, 64));
-        llvm::Value *amount =
-            builder.CreateSelect(in_range, rhs, llvm::ConstantInt::get(i64, 0));
-        llvm::Value *shifted = instr->op == KirOpcode::Shl
-                                   ? builder.CreateShl(lhs, amount)
-                                   : builder.CreateLShr(lhs, amount);
+        llvm::Value *in_range = builder.CreateICmpULT(rhs, llvm::ConstantInt::get(i64, 64));
+        llvm::Value *amount = builder.CreateSelect(in_range, rhs, llvm::ConstantInt::get(i64, 0));
+        llvm::Value *shifted = instr->op == KirOpcode::Shl ? builder.CreateShl(lhs, amount)
+                                                           : builder.CreateLShr(lhs, amount);
         llvm::Value *result =
             builder.CreateSelect(in_range, shifted, llvm::ConstantInt::get(i64, 0));
         push(result);
@@ -1425,15 +1418,13 @@ public:
             llvm::AllocaInst *elements =
                 builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, argc), "call_args");
             for (int ai = 0; ai < argc; ++ai) {
-              llvm::Value *slot =
-                  builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ai));
+              llvm::Value *slot = builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ai));
               builder.CreateStore(args[static_cast<std::size_t>(ai)], slot);
             }
             argv = builder.CreateBitCast(elements, i64p);
           }
           llvm::Value *result = builder.CreateCall(
-              rt_.invoke_native,
-              {callee_tag, llvm::ConstantInt::get(i32, argc), argv});
+              rt_.invoke_native, {callee_tag, llvm::ConstantInt::get(i32, argc), argv});
           push(result);
           temps[i] = result;
           if (static_cast<std::size_t>(i) < fn.instr_types.size()) {
@@ -1463,8 +1454,8 @@ public:
               kir_module_.function_param_counts[static_cast<std::size_t>(fn_index)];
           std::vector<llvm::Type *> param_types(static_cast<std::size_t>(param_count), i64);
           auto *fn_type = llvm::FunctionType::get(i64, param_types, false);
-          target = llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage,
-                                          target_symbol, llvm_module);
+          target = llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage, target_symbol,
+                                          llvm_module);
         }
         llvm::Value *result = builder.CreateCall(target, args);
         push(result);
@@ -1490,14 +1481,13 @@ public:
           if (field == nullptr) {
             return false;
           }
-          llvm::Value *slot =
-              builder.CreateGEP(i64, fields, llvm::ConstantInt::get(i32, fi));
+          llvm::Value *slot = builder.CreateGEP(i64, fields, llvm::ConstantInt::get(i32, fi));
           builder.CreateStore(field, slot);
         }
-        llvm::Value *obj = builder.CreateCall(
-            rt_.struct_new,
-            {llvm::ConstantInt::get(i32, type_idx), llvm::ConstantInt::get(i32, field_count),
-             builder.CreateBitCast(fields, i64p)});
+        llvm::Value *obj =
+            builder.CreateCall(rt_.struct_new, {llvm::ConstantInt::get(i32, type_idx),
+                                                llvm::ConstantInt::get(i32, field_count),
+                                                builder.CreateBitCast(fields, i64p)});
         push(obj);
         temps[i] = obj;
         break;
@@ -1560,8 +1550,7 @@ public:
           }
         }
         llvm::Value *wire = builder.CreateCall(rt_.struct_field_at, {obj, field_idx});
-        const UnboxedScalar scalar =
-            unbox_wire_scalar(builder, rt_, wire, field_ty, i64, i32);
+        const UnboxedScalar scalar = unbox_wire_scalar(builder, rt_, wire, field_ty, i64, i32);
         if (scalar.is_double) {
           push(builder.CreateCall(rt_.float_new, {scalar.value}));
           temps[i] = stack.back();
@@ -1598,8 +1587,7 @@ public:
               kir_module_.constant_strings[static_cast<std::size_t>(operand)];
           field_idx = resolve_field_index(builder, type_idx, kir_module_, field_name);
         }
-        llvm::Value *updated =
-            builder.CreateCall(rt_.struct_field_set, {obj, field_idx, value});
+        llvm::Value *updated = builder.CreateCall(rt_.struct_field_set, {obj, field_idx, value});
         push(updated);
         temps[i] = updated;
         break;
@@ -1611,21 +1599,19 @@ public:
           return false;
         }
         llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
-        llvm::AllocaInst *elements = builder.CreateAlloca(
-            i64, llvm::ConstantInt::get(i32, element_count), "array_elems");
+        llvm::AllocaInst *elements =
+            builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, element_count), "array_elems");
         for (int ei = element_count - 1; ei >= 0; --ei) {
           llvm::Value *elem = pop_value(&stack, error, &type_stack);
           if (elem == nullptr) {
             return false;
           }
-          llvm::Value *slot =
-              builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ei));
+          llvm::Value *slot = builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ei));
           builder.CreateStore(elem, slot);
         }
-        llvm::Value *arr = builder.CreateCall(
-            rt_.array_new,
-            {llvm::ConstantInt::get(i32, element_count),
-             builder.CreateBitCast(elements, i64p)});
+        llvm::Value *arr =
+            builder.CreateCall(rt_.array_new, {llvm::ConstantInt::get(i32, element_count),
+                                               builder.CreateBitCast(elements, i64p)});
         push(arr);
         temps[i] = arr;
         break;
@@ -1643,21 +1629,20 @@ public:
         }
         const int element_count = rows * cols;
         llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
-        llvm::AllocaInst *elements = builder.CreateAlloca(
-            i64, llvm::ConstantInt::get(i32, element_count), "dense_elems");
+        llvm::AllocaInst *elements =
+            builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, element_count), "dense_elems");
         for (int ei = element_count - 1; ei >= 0; --ei) {
           llvm::Value *elem = pop_value(&stack, error, &type_stack);
           if (elem == nullptr) {
             return false;
           }
-          llvm::Value *slot =
-              builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ei));
+          llvm::Value *slot = builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, ei));
           builder.CreateStore(elem, slot);
         }
-        llvm::Value *arr = builder.CreateCall(
-            rt_.dense_array_new,
-            {llvm::ConstantInt::get(i32, rows), llvm::ConstantInt::get(i32, cols),
-             builder.CreateBitCast(elements, i64p)});
+        llvm::Value *arr =
+            builder.CreateCall(rt_.dense_array_new, {llvm::ConstantInt::get(i32, rows),
+                                                     llvm::ConstantInt::get(i32, cols),
+                                                     builder.CreateBitCast(elements, i64p)});
         push(arr);
         temps[i] = arr;
         break;
@@ -1670,11 +1655,9 @@ public:
         }
         llvm::Value *wire = builder.CreateCall(rt_.index_get, {array, index});
         const KirType element_ty =
-            static_cast<std::size_t>(i) < fn.instr_types.size() ? fn.instr_types[i]
-                                                                 : KirType::Any;
+            static_cast<std::size_t>(i) < fn.instr_types.size() ? fn.instr_types[i] : KirType::Any;
         if (kir_type_is_scalar(element_ty)) {
-          const UnboxedScalar scalar =
-              unbox_wire_scalar(builder, rt_, wire, element_ty, i64, i32);
+          const UnboxedScalar scalar = unbox_wire_scalar(builder, rt_, wire, element_ty, i64, i32);
           if (scalar.is_double) {
             push(builder.CreateCall(rt_.float_new, {scalar.value}));
             temps[i] = stack.back();
@@ -1703,8 +1686,7 @@ public:
           return false;
         }
         llvm::Value *wire_value = to_wire_i64(builder, rt_, value, value_ty);
-        llvm::Value *result =
-            builder.CreateCall(rt_.index_set, {object, index, wire_value});
+        llvm::Value *result = builder.CreateCall(rt_.index_set, {object, index, wire_value});
         push(result);
         temps[i] = result;
         break;
@@ -1732,8 +1714,7 @@ public:
         if (default_value == nullptr || count == nullptr || array == nullptr) {
           return false;
         }
-        llvm::Value *result =
-            builder.CreateCall(rt_.array_resize, {array, count, default_value});
+        llvm::Value *result = builder.CreateCall(rt_.array_resize, {array, count, default_value});
         push(result);
         temps[i] = result;
         break;
@@ -1788,8 +1769,7 @@ public:
         if (value == nullptr || index == nullptr || array == nullptr) {
           return false;
         }
-        llvm::Value *result =
-            builder.CreateCall(rt_.array_insert, {array, index, value});
+        llvm::Value *result = builder.CreateCall(rt_.array_insert, {array, index, value});
         push(result);
         temps[i] = result;
         break;
@@ -1822,9 +1802,8 @@ public:
         if (needle == nullptr || str == nullptr) {
           return false;
         }
-        llvm::Function *fn = instr->op == KirOpcode::StrStartsWith
-                                 ? rt_.str_starts_with
-                                 : rt_.str_ends_with;
+        llvm::Function *fn =
+            instr->op == KirOpcode::StrStartsWith ? rt_.str_starts_with : rt_.str_ends_with;
         llvm::Value *found32 = builder.CreateCall(fn, {str, needle});
         llvm::Value *result = builder.CreateZExt(found32, i64);
         push(result);
@@ -1838,8 +1817,7 @@ public:
         if (new_str == nullptr || old_str == nullptr || str == nullptr) {
           return false;
         }
-        llvm::Value *result =
-            builder.CreateCall(rt_.str_replace, {str, old_str, new_str});
+        llvm::Value *result = builder.CreateCall(rt_.str_replace, {str, old_str, new_str});
         push(result);
         temps[i] = result;
         break;
@@ -1880,8 +1858,8 @@ public:
           return false;
         }
         llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
-        llvm::AllocaInst *pairs = builder.CreateAlloca(
-            i64, llvm::ConstantInt::get(i32, pair_count * 2), "map_pairs");
+        llvm::AllocaInst *pairs =
+            builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, pair_count * 2), "map_pairs");
         for (int pi = pair_count - 1; pi >= 0; --pi) {
           llvm::Value *value = pop_value(&stack, error, &type_stack);
           llvm::Value *key = pop_value(&stack, error, &type_stack);
@@ -1895,9 +1873,8 @@ public:
           builder.CreateStore(key, key_slot);
           builder.CreateStore(value, value_slot);
         }
-        llvm::Value *map = builder.CreateCall(
-            rt_.map_new, {llvm::ConstantInt::get(i32, pair_count),
-                          builder.CreateBitCast(pairs, i64p)});
+        llvm::Value *map = builder.CreateCall(rt_.map_new, {llvm::ConstantInt::get(i32, pair_count),
+                                                            builder.CreateBitCast(pairs, i64p)});
         push(map);
         temps[i] = map;
         break;
@@ -1958,8 +1935,7 @@ public:
         if (v == nullptr) {
           return false;
         }
-        llvm::Value *neg =
-            builder.CreateCall(rt_.value_sub, {llvm::ConstantInt::get(i64, 0), v});
+        llvm::Value *neg = builder.CreateCall(rt_.value_sub, {llvm::ConstantInt::get(i64, 0), v});
         push(neg);
         temps[i] = neg;
         break;
@@ -1991,9 +1967,8 @@ public:
         const int packed = instr->operands[0];
         const int type_idx = packed >> 16;
         const int variant_idx = packed & 0xFFFF;
-        const uint64_t wire = (0xFFFDULL << 48) |
-                            (static_cast<uint64_t>(type_idx & 0xFFFF) << 16) |
-                            static_cast<uint64_t>(variant_idx & 0xFFFF);
+        const uint64_t wire = (0xFFFDULL << 48) | (static_cast<uint64_t>(type_idx & 0xFFFF) << 16) |
+                              static_cast<uint64_t>(variant_idx & 0xFFFF);
         llvm::Value *value = llvm::ConstantInt::get(i64, wire);
         push(value);
         temps[i] = value;
@@ -2004,14 +1979,11 @@ public:
         const int type_idx = packed >> 16;
         const int variant_idx = packed & 0xFFFF;
         int param_count = 0;
-        if (type_idx >= 0 &&
-            static_cast<std::size_t>(type_idx) < kir_module_.enum_metas.size()) {
-          const KirEnumMeta &meta =
-              kir_module_.enum_metas[static_cast<std::size_t>(type_idx)];
+        if (type_idx >= 0 && static_cast<std::size_t>(type_idx) < kir_module_.enum_metas.size()) {
+          const KirEnumMeta &meta = kir_module_.enum_metas[static_cast<std::size_t>(type_idx)];
           if (variant_idx >= 0 &&
               static_cast<std::size_t>(variant_idx) < meta.variant_param_counts.size()) {
-            param_count =
-                meta.variant_param_counts[static_cast<std::size_t>(variant_idx)];
+            param_count = meta.variant_param_counts[static_cast<std::size_t>(variant_idx)];
           }
         }
         if (param_count < 0) {
@@ -2021,22 +1993,20 @@ public:
         llvm::Type *i64p = llvm::PointerType::getUnqual(i64);
         llvm::AllocaInst *elements = nullptr;
         if (param_count > 0) {
-          elements = builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, param_count),
-                                          "enum_payload");
+          elements =
+              builder.CreateAlloca(i64, llvm::ConstantInt::get(i32, param_count), "enum_payload");
           for (int pi = param_count - 1; pi >= 0; --pi) {
             llvm::Value *elem = pop_value(&stack, error, &type_stack);
             if (elem == nullptr) {
               return false;
             }
-            llvm::Value *slot =
-                builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, pi));
+            llvm::Value *slot = builder.CreateGEP(i64, elements, llvm::ConstantInt::get(i32, pi));
             builder.CreateStore(elem, slot);
           }
         }
         llvm::Value *payload_ptr =
-            param_count > 0
-                ? builder.CreateBitCast(elements, i64p)
-                : llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(i64));
+            param_count > 0 ? builder.CreateBitCast(elements, i64p)
+                            : llvm::ConstantPointerNull::get(llvm::PointerType::getUnqual(i64));
         llvm::Value *value = builder.CreateCall(
             rt_.enum_new_payload,
             {llvm::ConstantInt::get(i32, type_idx), llvm::ConstantInt::get(i32, variant_idx),
@@ -2052,8 +2022,7 @@ public:
           return false;
         }
         llvm::Value *payload = builder.CreateCall(
-            rt_.enum_payload_at,
-            {enum_val, llvm::ConstantInt::get(i32, payload_idx)});
+            rt_.enum_payload_at, {enum_val, llvm::ConstantInt::get(i32, payload_idx)});
         push(payload);
         temps[i] = payload;
         break;
@@ -2077,31 +2046,30 @@ public:
           if (src_ty == KirType::Float && src->getType()->isDoubleTy()) {
             result = builder.CreateCall(rt_.float_new, {src});
           } else {
-            result = builder.CreateCall(rt_.cast_to_float,
-                                        {to_wire_i64(builder, rt_, src, src_ty)});
+            result =
+                builder.CreateCall(rt_.cast_to_float, {to_wire_i64(builder, rt_, src, src_ty)});
           }
         } else if (kind == 2) {
           if (src_ty == KirType::Bool) {
-            result = builder.CreateCall(rt_.bool_to_string,
-                                        {to_wire_i64(builder, rt_, src, src_ty)});
+            result =
+                builder.CreateCall(rt_.bool_to_string, {to_wire_i64(builder, rt_, src, src_ty)});
           } else if (src_ty == KirType::Null) {
             result = builder.CreateCall(rt_.null_to_string, {});
           } else if (src_ty == KirType::Char) {
             // string(char) yields the character byte, not its code point.
-            result = builder.CreateCall(rt_.char_to_string,
-                                        {to_wire_i64(builder, rt_, src, src_ty)});
+            result =
+                builder.CreateCall(rt_.char_to_string, {to_wire_i64(builder, rt_, src, src_ty)});
           } else if (kir_type_is_integer(kir_type_normalize(src_ty))) {
             // string(int): format unconditionally so ints whose high bits land
             // on the heap/inline-enum mark are not misread by kl_cast_to_string.
-            result = builder.CreateCall(rt_.int_to_string,
-                                        {to_wire_i64(builder, rt_, src, src_ty)});
+            result =
+                builder.CreateCall(rt_.int_to_string, {to_wire_i64(builder, rt_, src, src_ty)});
           } else {
-            result = builder.CreateCall(rt_.cast_to_string,
-                                        {to_wire_i64(builder, rt_, src, src_ty)});
+            result =
+                builder.CreateCall(rt_.cast_to_string, {to_wire_i64(builder, rt_, src, src_ty)});
           }
         } else if (kind == 3) {
-          result = builder.CreateCall(rt_.cast_to_char,
-                                      {to_wire_i64(builder, rt_, src, src_ty)});
+          result = builder.CreateCall(rt_.cast_to_char, {to_wire_i64(builder, rt_, src, src_ty)});
         } else {
           *error = "unsupported CastTo target kind in native lowering";
           return false;
@@ -2142,9 +2110,8 @@ public:
         }
         const int secret = instr->op == KirOpcode::NativeInSecret ? 1 : 0;
         llvm::Value *line =
-            builder.CreateCall(rt_.native_in,
-                               {llvm::ConstantInt::get(i32, argc), args,
-                                llvm::ConstantInt::get(i32, secret)});
+            builder.CreateCall(rt_.native_in, {llvm::ConstantInt::get(i32, argc), args,
+                                               llvm::ConstantInt::get(i32, secret)});
         push(line);
         temps[i] = line;
         break;
@@ -2197,8 +2164,7 @@ public:
           if (idx >= 0 && static_cast<std::size_t>(idx) < i) {
             retv = temps[static_cast<std::size_t>(idx)];
             ret_ty = temp_types[static_cast<std::size_t>(idx)];
-            if (ret_ty == KirType::Void &&
-                static_cast<std::size_t>(idx) < fn.instr_types.size()) {
+            if (ret_ty == KirType::Void && static_cast<std::size_t>(idx) < fn.instr_types.size()) {
               ret_ty = fn.instr_types[static_cast<std::size_t>(idx)];
             }
           }
@@ -2248,8 +2214,7 @@ public:
           return false;
         }
         llvm::Value *top = stack.back();
-        llvm::Value *is_err =
-            builder.CreateCall(rt_.value_is_err, {top});
+        llvm::Value *is_err = builder.CreateCall(rt_.value_is_err, {top});
         llvm::Value *cond = builder.CreateICmpNE(is_err, llvm::ConstantInt::get(i32, 0));
         const int rel = instr->operands[0];
         const std::size_t err_target = i + 1 + static_cast<std::size_t>(rel);
@@ -2285,8 +2250,7 @@ public:
           return false;
         }
         llvm::Value *top = stack.back();
-        llvm::Value *is_err =
-            builder.CreateCall(rt_.value_is_err, {top});
+        llvm::Value *is_err = builder.CreateCall(rt_.value_is_err, {top});
         llvm::Value *cond = builder.CreateICmpNE(is_err, llvm::ConstantInt::get(i32, 0));
         const std::size_t catch_target = handler_pcs.back();
         const std::size_t ok_target = i + 1;
@@ -2329,7 +2293,6 @@ private:
   std::vector<const KirInstr *> linear_;
 };
 
-
 bool lower_user_functions(llvm::Module *module, const KirModule &functions,
                           const KirModule &metadata, bool debug_info, std::string *error) {
   llvm::LLVMContext &context = module->getContext();
@@ -2338,8 +2301,7 @@ bool lower_user_functions(llvm::Module *module, const KirModule &functions,
 
   std::unique_ptr<llvm::DIBuilder> di;
   if (debug_info) {
-    module->addModuleFlag(llvm::Module::Warning, "Debug Info Version",
-                          llvm::DEBUG_METADATA_VERSION);
+    module->addModuleFlag(llvm::Module::Warning, "Debug Info Version", llvm::DEBUG_METADATA_VERSION);
     module->addModuleFlag(llvm::Module::Warning, "Dwarf Version", 4);
     di = std::make_unique<llvm::DIBuilder>(*module);
     const std::string &cu_src = functions.functions.front().source_path;
@@ -2361,17 +2323,15 @@ bool lower_user_functions(llvm::Module *module, const KirModule &functions,
     llvm::Function *llvm_fn = module->getFunction(mangled_native_symbol(fn.name, fn.source_path));
     FunctionLowerer lowerer(&context, metadata, llvm_fn, rt);
     if (di) {
-      const std::filesystem::path src_path(fn.source_path.empty() ? "<entry>"
-                                                                  : fn.source_path);
+      const std::filesystem::path src_path(fn.source_path.empty() ? "<entry>" : fn.source_path);
       llvm::DIFile *file =
           di->createFile(src_path.filename().string(), src_path.parent_path().string());
-      llvm::DISubroutineType *sp_type =
-          di->createSubroutineType(di->getOrCreateTypeArray({}));
+      llvm::DISubroutineType *sp_type = di->createSubroutineType(di->getOrCreateTypeArray({}));
       const int line = first_instr_line(fn);
-      llvm::DISubprogram *sp = di->createFunction(
-          file, fn.name, llvm_fn->getName(), file, static_cast<unsigned>(line), sp_type,
-          static_cast<unsigned>(line), llvm::DINode::FlagZero,
-          llvm::DISubprogram::SPFlagDefinition);
+      llvm::DISubprogram *sp =
+          di->createFunction(file, fn.name, llvm_fn->getName(), file, static_cast<unsigned>(line),
+                             sp_type, static_cast<unsigned>(line), llvm::DINode::FlagZero,
+                             llvm::DISubprogram::SPFlagDefinition);
       llvm_fn->setSubprogram(sp);
       lowerer.set_debug_scope(sp);
     }
@@ -2389,21 +2349,20 @@ bool lower_entry_shim(llvm::Module *module, std::string *error) {
   llvm::LLVMContext &context = module->getContext();
   const RtFns rt = declare_runtime(module);
   auto *entry_type = llvm::FunctionType::get(llvm::Type::getInt32Ty(context), false);
-  auto *entry = llvm::Function::Create(entry_type, llvm::Function::ExternalLinkage, "kinglet_main",
-                                       module);
+  auto *entry =
+      llvm::Function::Create(entry_type, llvm::Function::ExternalLinkage, "kinglet_main", module);
   llvm::BasicBlock *entry_bb = llvm::BasicBlock::Create(context, "entry", entry);
   llvm::IRBuilder<> builder(entry_bb);
   llvm::Function *user_main = module->getFunction("kinglet_user_main");
   if (user_main == nullptr) {
-    user_main = llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getInt64Ty(context), false),
-                                       llvm::Function::ExternalLinkage, "kinglet_user_main", module);
+    user_main =
+        llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getInt64Ty(context), false),
+                               llvm::Function::ExternalLinkage, "kinglet_user_main", module);
   }
   llvm::Value *raw_result = builder.CreateCall(user_main, {});
   llvm::Value *exit_code = builder.CreateCall(rt.exit_code, {raw_result});
   builder.CreateRet(exit_code);
   return true;
 }
-
-
 
 } // namespace kinglet

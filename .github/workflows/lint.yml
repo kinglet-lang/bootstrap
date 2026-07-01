@@ -1,0 +1,48 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [canon]
+
+permissions:
+  contents: read
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: Check formatting
+        run: |
+          find compiler runtime -name '*.cc' -o -name '*.h' \
+            | xargs clang-format --dry-run --Werror
+
+  clang-tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy llvm-dev clang
+
+      - name: Set up pinned GN + Ninja
+        run: |
+          bash scripts/bootstrap.sh
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Generate compile_commands.json
+        run: |
+          LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)
+          gn gen out/lint --export-compile-commands \
+            --args='is_debug=false enable_llvm=true llvm_config="'"$LLVM_CONFIG"'"'
+
+      - name: Run clang-tidy
+        run: |
+          find compiler runtime -name '*.cc' \
+            | xargs -P"$(nproc)" -I{} clang-tidy {} -p out/lint --quiet

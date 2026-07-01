@@ -35,32 +35,50 @@ KirOpcode width_binop(KirOpcode generic, KirType width) {
   const KirType w = kir_type_normalize(width);
   switch (generic) {
   case KirOpcode::IAdd:
-    if (w == KirType::Int32) return KirOpcode::IAdd32;
-    if (w == KirType::Int64) return KirOpcode::IAdd64;
-    if (w == KirType::Float32) return KirOpcode::FAdd32;
-    if (w == KirType::Float64) return KirOpcode::FAdd64;
+    if (w == KirType::Int32)
+      return KirOpcode::IAdd32;
+    if (w == KirType::Int64)
+      return KirOpcode::IAdd64;
+    if (w == KirType::Float32)
+      return KirOpcode::FAdd32;
+    if (w == KirType::Float64)
+      return KirOpcode::FAdd64;
     break;
   case KirOpcode::ISub:
-    if (w == KirType::Int32) return KirOpcode::ISub32;
-    if (w == KirType::Int64) return KirOpcode::ISub64;
-    if (w == KirType::Float32) return KirOpcode::FSub32;
-    if (w == KirType::Float64) return KirOpcode::FSub64;
+    if (w == KirType::Int32)
+      return KirOpcode::ISub32;
+    if (w == KirType::Int64)
+      return KirOpcode::ISub64;
+    if (w == KirType::Float32)
+      return KirOpcode::FSub32;
+    if (w == KirType::Float64)
+      return KirOpcode::FSub64;
     break;
   case KirOpcode::IMul:
-    if (w == KirType::Int32) return KirOpcode::IMul32;
-    if (w == KirType::Int64) return KirOpcode::IMul64;
-    if (w == KirType::Float32) return KirOpcode::FMul32;
-    if (w == KirType::Float64) return KirOpcode::FMul64;
+    if (w == KirType::Int32)
+      return KirOpcode::IMul32;
+    if (w == KirType::Int64)
+      return KirOpcode::IMul64;
+    if (w == KirType::Float32)
+      return KirOpcode::FMul32;
+    if (w == KirType::Float64)
+      return KirOpcode::FMul64;
     break;
   case KirOpcode::IDiv:
-    if (w == KirType::Int32) return KirOpcode::IDiv32;
-    if (w == KirType::Int64) return KirOpcode::IDiv64;
-    if (w == KirType::Float32) return KirOpcode::FDiv32;
-    if (w == KirType::Float64) return KirOpcode::FDiv64;
+    if (w == KirType::Int32)
+      return KirOpcode::IDiv32;
+    if (w == KirType::Int64)
+      return KirOpcode::IDiv64;
+    if (w == KirType::Float32)
+      return KirOpcode::FDiv32;
+    if (w == KirType::Float64)
+      return KirOpcode::FDiv64;
     break;
   case KirOpcode::IMod:
-    if (w == KirType::Int32) return KirOpcode::IMod32;
-    if (w == KirType::Int64) return KirOpcode::IMod64;
+    if (w == KirType::Int32)
+      return KirOpcode::IMod32;
+    if (w == KirType::Int64)
+      return KirOpcode::IMod64;
     break;
   default:
     break;

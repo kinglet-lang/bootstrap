@@ -23,8 +23,7 @@ KirInstr make_instr(KirOpcode op, std::vector<int32_t> operands, ast::SourceLoca
 bool IrBuilder::build_expr_into(KirFunction *fn, KirBasicBlock *bb, const ast::Expr &expr,
                                 int *out_value) const {
   if (const auto *lit = dynamic_cast<const ast::IntLiteralExpr *>(&expr)) {
-    const KirType width =
-        kir_type_from_int_literal_suffix(lit->width_suffix, lit->value);
+    const KirType width = kir_type_from_int_literal_suffix(lit->width_suffix, lit->value);
     KirOpcode op = KirOpcode::ConstInt;
     std::vector<int32_t> operands;
     if (kir_type_normalize(width) == KirType::Int32) {
@@ -43,8 +42,7 @@ bool IrBuilder::build_expr_into(KirFunction *fn, KirBasicBlock *bb, const ast::E
   if (const auto *bin = dynamic_cast<const ast::BinaryExpr *>(&expr)) {
     int lhs = -1;
     int rhs = -1;
-    if (!build_expr_into(fn, bb, *bin->left, &lhs) ||
-        !build_expr_into(fn, bb, *bin->right, &rhs)) {
+    if (!build_expr_into(fn, bb, *bin->left, &lhs) || !build_expr_into(fn, bb, *bin->right, &rhs)) {
       return false;
     }
     KirOpcode op = KirOpcode::Nop;

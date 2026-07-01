@@ -14,7 +14,7 @@ namespace kinglet {
 enum class KirType : uint8_t {
   Void,
   Any,
-  Int, // alias: Int64
+  Int,   // alias: Int64
   Float, // alias: Float32
   Int8,
   Int16,

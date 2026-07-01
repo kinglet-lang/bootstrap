@@ -52,8 +52,7 @@ std::string parse_identifier(const std::string &s, size_t &i) {
     ++i;
   }
   size_t start = i;
-  while (i < s.size() &&
-         (std::isalnum(static_cast<unsigned char>(s[i])) || s[i] == '_')) {
+  while (i < s.size() && (std::isalnum(static_cast<unsigned char>(s[i])) || s[i] == '_')) {
     ++i;
   }
   if (start == i) {
@@ -142,7 +141,8 @@ bool parse_bool_token(const std::string &value, bool &out) {
   return false;
 }
 
-void parse_block_body(const std::string &body, const std::string &block_name, ProjectConfig &config) {
+void parse_block_body(const std::string &body, const std::string &block_name,
+                      ProjectConfig &config) {
   std::istringstream in(body);
   std::string line;
   while (std::getline(in, line)) {

@@ -21,8 +21,7 @@ TokenSpan merge_spans(const TokenSpan &a, const TokenSpan &b) {
 
 } // namespace
 
-SpanMap::SpanMap(const ast::Program &program, const std::vector<Token> &tokens)
-    : tokens_(tokens) {
+SpanMap::SpanMap(const ast::Program &program, const std::vector<Token> &tokens) : tokens_(tokens) {
   for (const ast::DeclPtr &decl : program.declarations) {
     build_decl(*decl);
   }

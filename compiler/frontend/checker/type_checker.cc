@@ -122,8 +122,8 @@ std::string join_csv(const std::vector<std::string> &items) {
   return out;
 }
 
-bool arms_cover_bool(const std::vector<ast::MatchArm> &arms, bool &missing_true, bool &missing_false,
-                     bool skip_null_patterns = false) {
+bool arms_cover_bool(const std::vector<ast::MatchArm> &arms, bool &missing_true,
+                     bool &missing_false, bool skip_null_patterns = false) {
   missing_true = missing_false = false;
   bool has_true = false;
   bool has_false = false;
@@ -241,7 +241,8 @@ Type struct_field_type(const Type &struct_type, const ast::StructPatternField &f
 }
 
 bool struct_pattern_is_exhaustive(const ast::StructPattern *sp, const Type &struct_type) {
-  if (sp == nullptr || struct_type.kind != TypeKind::Struct || sp->fields.size() != struct_type.fields.size()) {
+  if (sp == nullptr || struct_type.kind != TypeKind::Struct ||
+      sp->fields.size() != struct_type.fields.size()) {
     return false;
   }
   for (std::size_t i = 0; i < sp->fields.size(); ++i) {
@@ -465,12 +466,12 @@ std::string type_to_string(const Type &type) {
 // anywhere they appear in a TypeExpr, including nested positions like the
 // element of an array (`T[]` => `Array<T>`) or another generic's argument
 // (`Box<T>`). A non-recursive, top-level-only substitution misses these.
-ast::TypeExpr substitute_type_params(
-    const ast::TypeExpr &expr,
-    const std::unordered_map<std::string, ast::TypeExpr> &subst) {
+ast::TypeExpr substitute_type_params(const ast::TypeExpr &expr,
+                                     const std::unordered_map<std::string, ast::TypeExpr> &subst) {
   if (expr.type_args.empty()) {
     auto it = subst.find(expr.name);
-    if (it != subst.end()) return it->second;
+    if (it != subst.end())
+      return it->second;
     return expr;
   }
   ast::TypeExpr result;
@@ -488,24 +489,24 @@ ast::TypeExpr substitute_type_params(
 ast::TypeExpr type_to_type_expr(const Type &t) {
   ast::TypeExpr te;
   switch (t.kind) {
-    case TypeKind::Int:
-      te.name = integer_type_display_name(t);
-      break;
-    case TypeKind::Float:
-      te.name = float_type_display_name(t);
-      break;
-    case TypeKind::Bool:
-      te.name = "bool";
-      break;
-    case TypeKind::Char:
-      te.name = "char";
-      break;
-    case TypeKind::String:
-      te.name = "string";
-      break;
-    default:
-      te.name = t.name;
-      break;
+  case TypeKind::Int:
+    te.name = integer_type_display_name(t);
+    break;
+  case TypeKind::Float:
+    te.name = float_type_display_name(t);
+    break;
+  case TypeKind::Bool:
+    te.name = "bool";
+    break;
+  case TypeKind::Char:
+    te.name = "char";
+    break;
+  case TypeKind::String:
+    te.name = "string";
+    break;
+  default:
+    te.name = t.name;
+    break;
   }
   return te;
 }
@@ -662,7 +663,8 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
   return err;
 }
 
-std::string TypeChecker::mangle_name(const std::string &base, const std::vector<ast::TypeExpr> &args) const {
+std::string TypeChecker::mangle_name(const std::string &base,
+                                     const std::vector<ast::TypeExpr> &args) const {
   std::string result = base;
   for (const auto &arg : args) {
     result += "__" + arg.to_string();
@@ -670,14 +672,17 @@ std::string TypeChecker::mangle_name(const std::string &base, const std::vector<
   return result;
 }
 
-void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl, const std::vector<ast::TypeExpr> &args) {
+void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl,
+                                             const std::vector<ast::TypeExpr> &args) {
   std::string mangled = mangle_name(decl->name, args);
-  if (instantiated_.count(mangled)) return;
+  if (instantiated_.count(mangled))
+    return;
   instantiated_.insert(mangled);
 
   if (args.size() != decl->type_params.size()) {
-    errors_.push_back(TypeError{.location = decl->location,
-                                .message = "Wrong number of type arguments for '" + decl->name + "'."});
+    errors_.push_back(
+        TypeError{.location = decl->location,
+                  .message = "Wrong number of type arguments for '" + decl->name + "'."});
     return;
   }
 
@@ -703,13 +708,15 @@ void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl, const 
 // mirrors the local forward-declaration pass for imported modules.
 void TypeChecker::forward_declare_imported_types(const ParsedModule &mod) {
   for (const ast::StructDecl *sd : mod.public_structs) {
-    if (!sd->type_params.empty()) continue;
+    if (!sd->type_params.empty())
+      continue;
     Type fwd(TypeKind::Struct);
     fwd.name = sd->name;
     type_registry_.insert_or_assign(sd->name, fwd);
   }
   for (const ast::StructDecl *sd : mod.private_structs) {
-    if (!sd->type_params.empty()) continue;
+    if (!sd->type_params.empty())
+      continue;
     Type fwd(TypeKind::Struct);
     fwd.name = sd->name;
     type_registry_.insert_or_assign(sd->name, fwd);
@@ -752,7 +759,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   // earlier in the file (e.g. enum Expr referencing FieldInit[]).
   for (const ast::DeclPtr &decl : program.declarations) {
     if (const auto *sd = dynamic_cast<const ast::StructDecl *>(decl.get())) {
-      if (!sd->type_params.empty()) continue;
+      if (!sd->type_params.empty())
+        continue;
       Type fwd(TypeKind::Struct);
       fwd.name = sd->name;
       type_registry_.insert_or_assign(sd->name, fwd);
@@ -772,12 +780,10 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   // Covers both `import "x" {}` (ImportDecl) and `import { ... }`
   // (ImportBlockDecl) forms.
   if (module_loader_) {
-    auto collect_imports = [](const ast::Decl *decl,
-                              std::vector<const ast::ImportDecl *> &out) {
+    auto collect_imports = [](const ast::Decl *decl, std::vector<const ast::ImportDecl *> &out) {
       if (const auto *id = dynamic_cast<const ast::ImportDecl *>(decl)) {
         out.push_back(id);
-      } else if (const auto *ib =
-                     dynamic_cast<const ast::ImportBlockDecl *>(decl)) {
+      } else if (const auto *ib = dynamic_cast<const ast::ImportBlockDecl *>(decl)) {
         for (const auto &imp : ib->imports) {
           if (const auto *id = dynamic_cast<const ast::ImportDecl *>(imp.get())) {
             out.push_back(id);
@@ -793,15 +799,14 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
     for (const ast::ImportDecl *id : top_imports) {
       auto result = module_loader_->load(id->path);
-      if (!result.module) continue;
+      if (!result.module)
+        continue;
       forward_declare_imported_types(*result.module);
       // One level of transitive deps: a module's pub type may reference a type
       // that module itself imports.
       if (result.module->program) {
         std::string mod_dir =
-            std::filesystem::path(result.module->resolved_path)
-                .parent_path()
-                .string();
+            std::filesystem::path(result.module->resolved_path).parent_path().string();
         std::vector<const ast::ImportDecl *> inner_imports;
         for (const auto &inner : result.module->program->declarations) {
           collect_imports(inner.get(), inner_imports);
@@ -813,8 +818,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           }
         }
         for (const auto &inner : result.module->program->declarations) {
-          if (const auto *logical =
-                  dynamic_cast<const ast::LogicalImportDecl *>(inner.get())) {
+          if (const auto *logical = dynamic_cast<const ast::LogicalImportDecl *>(inner.get())) {
             auto inner_result = module_loader_->resolve_logical(logical->module_id);
             for (const ParsedModule *inner_mod : inner_result.modules) {
               forward_declare_imported_types(*inner_mod);
@@ -947,7 +951,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           if (mod.program) {
             std::string mod_dir = std::filesystem::path(mod.resolved_path).parent_path().string();
             for (const auto &inner_decl : mod.program->declarations) {
-              if (const auto *inner_import = dynamic_cast<const ast::ImportDecl *>(inner_decl.get())) {
+              if (const auto *inner_import =
+                      dynamic_cast<const ast::ImportDecl *>(inner_decl.get())) {
                 auto inner_result = module_loader_->load_from(inner_import->path, mod_dir);
                 if (inner_result.module) {
                   const auto &inner_mod = *inner_result.module;
@@ -957,7 +962,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
                       st.name = sd->name;
                       for (const auto &field : sd->fields) {
                         Type ft = resolve_type_expr(field.type);
-                        st.fields.push_back(FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft)});
+                        st.fields.push_back(
+                            FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft)});
                       }
                       type_registry_.insert_or_assign(sd->name, st);
                     } else {
@@ -970,7 +976,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
                     for (const auto &v : ed->variants) {
                       et.variants.push_back(v.name);
                       std::vector<Type> ptypes;
-                      for (const auto &pt : v.param_types) ptypes.push_back(resolve_type_expr(pt));
+                      for (const auto &pt : v.param_types)
+                        ptypes.push_back(resolve_type_expr(pt));
                       et.variant_param_types.push_back(std::move(ptypes));
                     }
                     type_registry_.insert_or_assign(ed->name, et);
@@ -985,23 +992,33 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           // diagnose a missing or non-pub symbol precisely.
           {
             auto &pub_set = module_public_symbols_[ns];
-            for (const auto *fn : mod.public_functions) pub_set.insert(fn->name);
-            for (const auto *sd : mod.public_structs) pub_set.insert(sd->name);
-            for (const auto *ed : mod.public_enums) pub_set.insert(ed->name);
+            for (const auto *fn : mod.public_functions)
+              pub_set.insert(fn->name);
+            for (const auto *sd : mod.public_structs)
+              pub_set.insert(sd->name);
+            for (const auto *ed : mod.public_enums)
+              pub_set.insert(ed->name);
             auto &priv_set = module_private_symbols_[ns];
-            for (const auto *fn : mod.private_functions) priv_set.insert(fn->name);
-            for (const auto *sd : mod.private_structs) priv_set.insert(sd->name);
-            for (const auto *ed : mod.private_enums) priv_set.insert(ed->name);
+            for (const auto *fn : mod.private_functions)
+              priv_set.insert(fn->name);
+            for (const auto *sd : mod.private_structs)
+              priv_set.insert(sd->name);
+            for (const auto *ed : mod.private_enums)
+              priv_set.insert(ed->name);
           }
           // Validate selected symbols exist as public exports
           if (!import_decl->selected_symbols.empty()) {
             std::unordered_set<std::string> pub_names;
-            for (const auto *fn : mod.public_functions) pub_names.insert(fn->name);
-            for (const auto *sd : mod.public_structs) pub_names.insert(sd->name);
-            for (const auto *ed : mod.public_enums) pub_names.insert(ed->name);
+            for (const auto *fn : mod.public_functions)
+              pub_names.insert(fn->name);
+            for (const auto *sd : mod.public_structs)
+              pub_names.insert(sd->name);
+            for (const auto *ed : mod.public_enums)
+              pub_names.insert(ed->name);
             for (const auto &s : import_decl->selected_symbols) {
               if (!pub_names.count(s)) {
-                error_at(import_decl->location, "'" + s + "' is not a public symbol in module '" + ns + "'.");
+                error_at(import_decl->location,
+                         "'" + s + "' is not a public symbol in module '" + ns + "'.");
               }
             }
           }
@@ -1010,9 +1027,13 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             if (!import_decl->selected_symbols.empty()) {
               bool found = false;
               for (const auto &s : import_decl->selected_symbols) {
-                if (s == sd->name) { found = true; break; }
+                if (s == sd->name) {
+                  found = true;
+                  break;
+                }
               }
-              if (!found) continue;
+              if (!found)
+                continue;
             }
             if (sd->type_params.empty()) {
               Type struct_type(TypeKind::Struct);
@@ -1031,9 +1052,13 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             if (!import_decl->selected_symbols.empty()) {
               bool found = false;
               for (const auto &s : import_decl->selected_symbols) {
-                if (s == ed->name) { found = true; break; }
+                if (s == ed->name) {
+                  found = true;
+                  break;
+                }
               }
-              if (!found) continue;
+              if (!found)
+                continue;
             }
             Type enum_type(TypeKind::Enum);
             enum_type.name = ed->name;
@@ -1054,7 +1079,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               st.name = sd->name;
               for (const auto &field : sd->fields) {
                 Type ft = resolve_type_expr(field.type);
-                st.fields.push_back(FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft)});
+                st.fields.push_back(
+                    FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft)});
               }
               type_registry_.insert_or_assign(sd->name, st);
             } else {
@@ -1067,7 +1093,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             for (const auto &v : ed->variants) {
               et.variants.push_back(v.name);
               std::vector<Type> ptypes;
-              for (const auto &pt : v.param_types) ptypes.push_back(resolve_type_expr(pt));
+              for (const auto &pt : v.param_types)
+                ptypes.push_back(resolve_type_expr(pt));
               et.variant_param_types.push_back(std::move(ptypes));
             }
             type_registry_.insert_or_assign(ed->name, et);
@@ -1077,9 +1104,13 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             if (!import_decl->selected_symbols.empty()) {
               bool found = false;
               for (const auto &s : import_decl->selected_symbols) {
-                if (s == fn->name) { found = true; break; }
+                if (s == fn->name) {
+                  found = true;
+                  break;
+                }
               }
-              if (!found) continue;
+              if (!found)
+                continue;
             }
             Type return_type = resolve_type_expr(fn->return_type);
             std::vector<Type> param_types;
@@ -1090,7 +1121,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             func_type.param_types = std::move(param_types);
             func_type.return_type = std::make_unique<Type>(return_type);
             declare_var(module_id_to_qualifier(ns) + "::" + fn->name, func_type, false);
-            kir_function_sigs_[module_id_to_qualifier(ns) + "::" + fn->name] = kir_sig_from(func_type);
+            kir_function_sigs_[module_id_to_qualifier(ns) + "::" + fn->name] =
+                kir_sig_from(func_type);
             if (!import_decl->selected_symbols.empty()) {
               Type ft2(TypeKind::Function);
               ft2.param_types = func_type.param_types;
@@ -1115,13 +1147,19 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           sema_.imported_qualifiers_.insert(qual);
           {
             auto &pub_set = module_public_symbols_[ns];
-            for (const auto *fn : mod.public_functions) pub_set.insert(fn->name);
-            for (const auto *sd : mod.public_structs) pub_set.insert(sd->name);
-            for (const auto *ed : mod.public_enums) pub_set.insert(ed->name);
+            for (const auto *fn : mod.public_functions)
+              pub_set.insert(fn->name);
+            for (const auto *sd : mod.public_structs)
+              pub_set.insert(sd->name);
+            for (const auto *ed : mod.public_enums)
+              pub_set.insert(ed->name);
             auto &priv_set = module_private_symbols_[ns];
-            for (const auto *fn : mod.private_functions) priv_set.insert(fn->name);
-            for (const auto *sd : mod.private_structs) priv_set.insert(sd->name);
-            for (const auto *ed : mod.private_enums) priv_set.insert(ed->name);
+            for (const auto *fn : mod.private_functions)
+              priv_set.insert(fn->name);
+            for (const auto *sd : mod.private_structs)
+              priv_set.insert(sd->name);
+            for (const auto *ed : mod.private_enums)
+              priv_set.insert(ed->name);
           }
           for (const auto *sd : mod.public_structs) {
             if (sd->type_params.empty()) {
@@ -1143,7 +1181,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             for (const auto &v : ed->variants) {
               enum_type.variants.push_back(v.name);
               std::vector<Type> ptypes;
-              for (const auto &pt : v.param_types) ptypes.push_back(resolve_type_expr(pt));
+              for (const auto &pt : v.param_types)
+                ptypes.push_back(resolve_type_expr(pt));
               enum_type.variant_param_types.push_back(std::move(ptypes));
             }
             type_registry_.insert_or_assign(ed->name, enum_type);
@@ -1184,13 +1223,19 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               // `using mod { SomeStruct }` misreports the type as missing).
               {
                 auto &pub_set = module_public_symbols_[ns];
-                for (const auto *fn : mod.public_functions) pub_set.insert(fn->name);
-                for (const auto *sd : mod.public_structs) pub_set.insert(sd->name);
-                for (const auto *ed : mod.public_enums) pub_set.insert(ed->name);
+                for (const auto *fn : mod.public_functions)
+                  pub_set.insert(fn->name);
+                for (const auto *sd : mod.public_structs)
+                  pub_set.insert(sd->name);
+                for (const auto *ed : mod.public_enums)
+                  pub_set.insert(ed->name);
                 auto &priv_set = module_private_symbols_[ns];
-                for (const auto *fn : mod.private_functions) priv_set.insert(fn->name);
-                for (const auto *sd : mod.private_structs) priv_set.insert(sd->name);
-                for (const auto *ed : mod.private_enums) priv_set.insert(ed->name);
+                for (const auto *fn : mod.private_functions)
+                  priv_set.insert(fn->name);
+                for (const auto *sd : mod.private_structs)
+                  priv_set.insert(sd->name);
+                for (const auto *ed : mod.private_enums)
+                  priv_set.insert(ed->name);
               }
               for (const auto *sd : mod.public_structs) {
                 if (sd->type_params.empty()) {
@@ -1212,7 +1257,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
                 for (const auto &v : ed->variants) {
                   enum_type.variants.push_back(v.name);
                   std::vector<Type> ptypes;
-                  for (const auto &pt : v.param_types) ptypes.push_back(resolve_type_expr(pt));
+                  for (const auto &pt : v.param_types)
+                    ptypes.push_back(resolve_type_expr(pt));
                   enum_type.variant_param_types.push_back(std::move(ptypes));
                 }
                 type_registry_.insert_or_assign(ed->name, enum_type);
@@ -1238,10 +1284,9 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
   for (const ast::DeclPtr &decl : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
-      const bool runtime_ns = using_decl->namespace_name == "io" ||
-                              using_decl->namespace_name == "fs" ||
-                              using_decl->namespace_name == "sys" ||
-                              using_decl->namespace_name == "rt";
+      const bool runtime_ns =
+          using_decl->namespace_name == "io" || using_decl->namespace_name == "fs" ||
+          using_decl->namespace_name == "sys" || using_decl->namespace_name == "rt";
       if (!runtime_ns && !sema_.imported_namespaces_.count(using_decl->namespace_name)) {
         error_at(using_decl->location, "Unknown module '" + using_decl->namespace_name + "'.");
       }
@@ -1252,9 +1297,9 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           if (pub_it != module_public_symbols_.end()) {
             for (const auto &sym : pub_it->second) {
               if (lookup_var(sym)) {
-                error_at(using_decl->location,
-                         "Symbol '" + sym + "' already in scope; cannot `using namespace " +
-                             using_decl->namespace_name + "`.");
+                error_at(using_decl->location, "Symbol '" + sym +
+                                                   "' already in scope; cannot `using namespace " +
+                                                   using_decl->namespace_name + "`.");
               }
             }
           }
@@ -1316,17 +1361,16 @@ void TypeChecker::check_function(const ast::FunctionDecl &function) {
     if (return_type.kind != TypeKind::Void) {
       if (const auto *block = dynamic_cast<const ast::BlockStmt *>(function.body.get())) {
         if (!block->statements.empty()) {
-          if (const auto *last_expr = dynamic_cast<const ast::ExprStmt *>(block->statements.back().get())) {
+          if (const auto *last_expr =
+                  dynamic_cast<const ast::ExprStmt *>(block->statements.back().get())) {
             implicit_return_stmt_ = last_expr;
           }
         }
       }
     }
     check_stmt(*function.body, return_type);
-    if (function.return_type.name == "auto" &&
-        implicit_return_value_type_.kind != TypeKind::Void) {
-      kir_function_sigs_[function.name].return_type =
-          kir_type_from(implicit_return_value_type_);
+    if (function.return_type.name == "auto" && implicit_return_value_type_.kind != TypeKind::Void) {
+      kir_function_sigs_[function.name].return_type = kir_type_from(implicit_return_value_type_);
     }
     implicit_return_stmt_ = nullptr;
     implicit_return_value_type_ = Type(TypeKind::Void);
@@ -1363,9 +1407,9 @@ void TypeChecker::visit(const ast::ReturnStmt &return_stmt) {
     Type value_type = check_expr(*return_stmt.value);
     check_reference_escape(value_type, return_stmt.location);
     if (!types_assignable(value_type, stmt_expected_return_)) {
-      error_at(return_stmt.location,
-               "Cannot return " + type_to_string(value_type) + " from function returning " +
-                   type_to_string(stmt_expected_return_) + ".");
+      error_at(return_stmt.location, "Cannot return " + type_to_string(value_type) +
+                                         " from function returning " +
+                                         type_to_string(stmt_expected_return_) + ".");
     }
   } else if (stmt_expected_return_.kind != TypeKind::Void) {
     error_at(return_stmt.location, "Non-void function must return a value.");
@@ -1384,9 +1428,8 @@ void TypeChecker::visit(const ast::VarDeclStmt &var_decl) {
     if (var_decl.type.name == "auto") {
       var_type = init_type;
     } else if (!types_assignable(init_type, var_type)) {
-      error_at(var_decl.location,
-               "Cannot assign " + type_to_string(init_type) + " to variable of type " +
-                   type_to_string(var_type) + ".");
+      error_at(var_decl.location, "Cannot assign " + type_to_string(init_type) +
+                                      " to variable of type " + type_to_string(var_type) + ".");
     }
   }
   bool is_mutable = var_decl.storage != "const";
@@ -1446,8 +1489,8 @@ void TypeChecker::visit(const ast::ExprStmt &expr_stmt) {
             suppress = true;
         }
         const std::string &m = fa->field_name;
-        if (m == "push" || m == "pop" || m == "remove" || m == "clear" ||
-            m == "insert" || m == "reverse" || m == "line")
+        if (m == "push" || m == "pop" || m == "remove" || m == "clear" || m == "insert" ||
+            m == "reverse" || m == "line")
           suppress = true;
       }
     }
@@ -1486,7 +1529,8 @@ void TypeChecker::visit(const ast::WhileStmt &while_stmt) {
   }
   if (const auto *lit = dynamic_cast<const ast::BoolLiteralExpr *>(while_stmt.condition.get())) {
     if (!lit->value) {
-      warn_at(while_stmt.condition->location, "Condition is always false; loop body never executes.");
+      warn_at(while_stmt.condition->location,
+              "Condition is always false; loop body never executes.");
     }
   }
   ++loop_depth_;
@@ -1543,8 +1587,8 @@ void TypeChecker::visit(const ast::TryCatchStmt &try_catch) {
 Type TypeChecker::check_int_literal(const ast::IntLiteralExpr &lit) {
   Type t = int_literal_type_from_suffix(lit.width_suffix, lit.value);
   if (!integer_fits_width(lit.value, int_width_info(t))) {
-    error_at(lit.location, "Integer literal out of range for type '" +
-                                 integer_type_display_name(t) + "'.");
+    error_at(lit.location,
+             "Integer literal out of range for type '" + integer_type_display_name(t) + "'.");
   }
   return t;
 }
@@ -1641,11 +1685,14 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
   if (enum_type.has_value() && enum_type->kind == TypeKind::Enum) {
     bool found = false;
     for (const auto &v : enum_type->variants) {
-      if (v == ns_access.member_name) { found = true; break; }
+      if (v == ns_access.member_name) {
+        found = true;
+        break;
+      }
     }
     if (!found) {
-      error_at(ns_access.location, "Enum '" + ns_access.namespace_name +
-                                        "' has no variant '" + ns_access.member_name + "'.");
+      error_at(ns_access.location, "Enum '" + ns_access.namespace_name + "' has no variant '" +
+                                       ns_access.member_name + "'.");
     }
     return *enum_type;
   }
@@ -1730,24 +1777,42 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
   Type right_type = check_expr(*binary.right);
   auto op_text = [&]() -> const char * {
     switch (binary.op) {
-    case ast::BinaryOp::Add: return "+";
-    case ast::BinaryOp::Sub: return "-";
-    case ast::BinaryOp::Mul: return "*";
-    case ast::BinaryOp::Div: return "/";
-    case ast::BinaryOp::Mod: return "%";
-    case ast::BinaryOp::Eq: return "==";
-    case ast::BinaryOp::Neq: return "!=";
-    case ast::BinaryOp::Lt: return "<";
-    case ast::BinaryOp::Gt: return ">";
-    case ast::BinaryOp::Le: return "<=";
-    case ast::BinaryOp::Ge: return ">=";
-    case ast::BinaryOp::And: return "&&";
-    case ast::BinaryOp::Or: return "||";
-    case ast::BinaryOp::BitAnd: return "&";
-    case ast::BinaryOp::BitOr: return "|";
-    case ast::BinaryOp::BitXor: return "^";
-    case ast::BinaryOp::Shl: return "<<";
-    case ast::BinaryOp::Shr: return ">>";
+    case ast::BinaryOp::Add:
+      return "+";
+    case ast::BinaryOp::Sub:
+      return "-";
+    case ast::BinaryOp::Mul:
+      return "*";
+    case ast::BinaryOp::Div:
+      return "/";
+    case ast::BinaryOp::Mod:
+      return "%";
+    case ast::BinaryOp::Eq:
+      return "==";
+    case ast::BinaryOp::Neq:
+      return "!=";
+    case ast::BinaryOp::Lt:
+      return "<";
+    case ast::BinaryOp::Gt:
+      return ">";
+    case ast::BinaryOp::Le:
+      return "<=";
+    case ast::BinaryOp::Ge:
+      return ">=";
+    case ast::BinaryOp::And:
+      return "&&";
+    case ast::BinaryOp::Or:
+      return "||";
+    case ast::BinaryOp::BitAnd:
+      return "&";
+    case ast::BinaryOp::BitOr:
+      return "|";
+    case ast::BinaryOp::BitXor:
+      return "^";
+    case ast::BinaryOp::Shl:
+      return "<<";
+    case ast::BinaryOp::Shr:
+      return ">>";
     }
     return "binary operator";
   };
@@ -1758,20 +1823,19 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
     const std::string op = op_text();
     if (left_type.nullable && right_type.nullable) {
       error_at(binary.location,
-               "Both operands of '" + op + "' are nullable (" + type_to_string(left_type) +
-                   " and " + type_to_string(right_type) +
-                   "). Handle them first, for example '(left ?: 0) " + op +
-                   " (right ?: 0)' or use match/postfix '?'.");
+               "Both operands of '" + op + "' are nullable (" + type_to_string(left_type) + " and " +
+                   type_to_string(right_type) + "). Handle them first, for example '(left ?: 0) " +
+                   op + " (right ?: 0)' or use match/postfix '?'.");
     } else if (left_type.nullable) {
-      error_at(binary.location,
-               "Left operand of '" + op + "' has nullable type " + type_to_string(left_type) +
-                   ". Handle it first, for example '(left ?: 0) " + op +
-                   " right' or use match/postfix '?'.");
+      error_at(binary.location, "Left operand of '" + op + "' has nullable type " +
+                                    type_to_string(left_type) +
+                                    ". Handle it first, for example '(left ?: 0) " + op +
+                                    " right' or use match/postfix '?'.");
     } else {
-      error_at(binary.location,
-               "Right operand of '" + op + "' has nullable type " + type_to_string(right_type) +
-                   ". Handle it first, for example 'left " + op +
-                   " (right ?: 0)' or use match/postfix '?'.");
+      error_at(binary.location, "Right operand of '" + op + "' has nullable type " +
+                                    type_to_string(right_type) +
+                                    ". Handle it first, for example 'left " + op +
+                                    " (right ?: 0)' or use match/postfix '?'.");
     }
     return true;
   };
@@ -1788,8 +1852,7 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
   case ast::BinaryOp::Sub:
   case ast::BinaryOp::Mul:
   case ast::BinaryOp::Div:
-  case ast::BinaryOp::Mod:
-  {
+  case ast::BinaryOp::Mod: {
     if (reject_nullable_operand()) {
       return int_type();
     }
@@ -1830,7 +1893,7 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
         try_promote_integer_binary(left_type, right_type, left_int_lit, right_int_lit).has_value();
     if (!left_type.is_compatible_with(right_type) && !int_ok) {
       error_at(binary.location, "Cannot compare " + type_to_string(left_type) + " and " +
-                                     type_to_string(right_type) + ".");
+                                    type_to_string(right_type) + ".");
     }
     return bool_type();
   }
@@ -1877,14 +1940,13 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
     error_at(assign.location, "Cannot assign through a shared reference.");
     return void_type();
   }
-  const Type target_type =
-      slot_type.kind == TypeKind::MutRef && slot_type.element_type
-          ? *slot_type.element_type
-          : slot_type;
+  const Type target_type = slot_type.kind == TypeKind::MutRef && slot_type.element_type
+                               ? *slot_type.element_type
+                               : slot_type;
   Type value_type = check_expr(*assign.value);
   if (!types_assignable(value_type, target_type)) {
     error_at(assign.location, "Cannot assign " + type_to_string(value_type) + " to " +
-                                   type_to_string(target_type) + ".");
+                                  type_to_string(target_type) + ".");
   }
   return target_type;
 }
@@ -1937,14 +1999,19 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
           }
         }
         if (variant_idx < 0) {
-          error_at(enum_pat->location, "Enum '" + enum_pat->enum_name + "' has no variant '" + enum_pat->variant_name + "'.");
+          error_at(enum_pat->location, "Enum '" + enum_pat->enum_name + "' has no variant '" +
+                                           enum_pat->variant_name + "'.");
         } else {
-          const auto &param_types = type_opt->variant_param_types[static_cast<std::size_t>(variant_idx)];
+          const auto &param_types =
+              type_opt->variant_param_types[static_cast<std::size_t>(variant_idx)];
           if (enum_pat->fields.size() != param_types.size()) {
-            error_at(enum_pat->location, "Variant '" + enum_pat->variant_name + "' expects " + std::to_string(param_types.size()) + " field(s), got " + std::to_string(enum_pat->fields.size()) + ".");
+            error_at(enum_pat->location, "Variant '" + enum_pat->variant_name + "' expects " +
+                                             std::to_string(param_types.size()) + " field(s), got " +
+                                             std::to_string(enum_pat->fields.size()) + ".");
           } else {
             for (std::size_t i = 0; i < enum_pat->fields.size(); ++i) {
-              const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(enum_pat->fields[i].get());
+              const auto *field_binding =
+                  dynamic_cast<const ast::BindingPattern *>(enum_pat->fields[i].get());
               if (field_binding) {
                 declare_var(field_binding->name, param_types[i], false, field_binding->location);
               }
@@ -1956,8 +2023,8 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
       push_scope();
       if (value_type.kind != TypeKind::Struct || value_type.name != struct_pat->struct_name) {
         error_at(struct_pat->location, "Struct pattern '" + struct_pat->struct_name +
-                                            "' does not match scrutinee type " +
-                                            type_to_string(value_type) + ".");
+                                           "' does not match scrutinee type " +
+                                           type_to_string(value_type) + ".");
       } else {
         for (std::size_t i = 0; i < struct_pat->fields.size(); ++i) {
           const auto &pf = struct_pat->fields[i];
@@ -1971,13 +2038,13 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
               }
             }
             if (field_idx >= value_type.fields.size()) {
-              error_at(struct_pat->location, "Struct '" + struct_pat->struct_name + "' has no field '" +
-                                                  pf.name + "'.");
+              error_at(struct_pat->location,
+                       "Struct '" + struct_pat->struct_name + "' has no field '" + pf.name + "'.");
               continue;
             }
           } else if (field_idx >= value_type.fields.size()) {
-            error_at(struct_pat->location, "Struct pattern has too many fields for '" +
-                                                struct_pat->struct_name + "'.");
+            error_at(struct_pat->location,
+                     "Struct pattern has too many fields for '" + struct_pat->struct_name + "'.");
             continue;
           }
           Type field_type = value_type.fields[field_idx].type
@@ -1991,13 +2058,12 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
             continue;
           } else {
             Type pattern_type = check_expr(*pf.pattern);
-            if (pattern_type.kind != TypeKind::Null &&
-                !types_assignable(pattern_type, field_type) &&
+            if (pattern_type.kind != TypeKind::Null && !types_assignable(pattern_type, field_type) &&
                 !types_assignable(field_type, pattern_type) &&
                 !pattern_type.is_compatible_with(field_type)) {
               error_at(pf.pattern->location, "Pattern type " + type_to_string(pattern_type) +
-                                                  " does not match field type " +
-                                                  type_to_string(field_type) + ".");
+                                                 " does not match field type " +
+                                                 type_to_string(field_type) + ".");
             }
           }
         }
@@ -2005,8 +2071,7 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
     }
     if (!binding && !arr_pat && !enum_pat && !struct_pat) {
       Type pattern_type = check_expr(*arm.pattern);
-      if (pattern_type.kind != TypeKind::Null &&
-          !types_assignable(pattern_type, value_type) &&
+      if (pattern_type.kind != TypeKind::Null && !types_assignable(pattern_type, value_type) &&
           !types_assignable(value_type, pattern_type) &&
           !pattern_type.is_compatible_with(value_type)) {
         error_at(arm.pattern->location, "Pattern type " + type_to_string(pattern_type) +
@@ -2038,12 +2103,15 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
     bool missing_false = false;
     if (!arms_cover_bool(match_expr.arms, missing_true, missing_false)) {
       std::string missing;
-      if (missing_true) missing = "true";
+      if (missing_true)
+        missing = "true";
       if (missing_false) {
-        if (!missing.empty()) missing += ", ";
+        if (!missing.empty())
+          missing += ", ";
         missing += "false";
       }
-      error_at(match_expr.location, "Non-exhaustive match on bool. Missing case(s): " + missing + ".");
+      error_at(match_expr.location,
+               "Non-exhaustive match on bool. Missing case(s): " + missing + ".");
     }
   } else if (value_type.kind == TypeKind::Enum) {
     if (auto err = check_enum_arms_exhaustive(match_expr.arms, value_type)) {
@@ -2053,7 +2121,10 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
              value_type.kind == TypeKind::Float) {
     bool covered = false;
     for (const ast::MatchArm &arm : match_expr.arms) {
-      if (match_arm_is_catchall(arm)) { covered = true; break; }
+      if (match_arm_is_catchall(arm)) {
+        covered = true;
+        break;
+      }
     }
     if (!covered) {
       error_at(match_expr.location,
@@ -2062,7 +2133,10 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
   } else if (value_type.kind == TypeKind::String) {
     bool covered = false;
     for (const ast::MatchArm &arm : match_expr.arms) {
-      if (match_arm_is_catchall(arm)) { covered = true; break; }
+      if (match_arm_is_catchall(arm)) {
+        covered = true;
+        break;
+      }
     }
     if (!covered) {
       error_at(match_expr.location,
@@ -2112,697 +2186,692 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get());
   // Handle bare io:: members when 'using namespace io;' is in effect
   if (callee_id && sema_.opened_.count("io") != 0) {
-  if (callee_id->name == "out") {
-    for (const ast::ExprPtr &arg : call_expr.args) {
-      check_expr(*arg);
+    if (callee_id->name == "out") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        check_expr(*arg);
+      }
+      return void_type();
     }
-    return void_type();
-  }
-  if (callee_id->name == "err") {
-    for (const ast::ExprPtr &arg : call_expr.args) {
-      check_expr(*arg);
+    if (callee_id->name == "err") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        check_expr(*arg);
+      }
+      return void_type();
     }
-    return void_type();
-  }
-  if (callee_id->name == "in") {
-    for (const ast::ExprPtr &arg : call_expr.args) {
-      check_expr(*arg);
+    if (callee_id->name == "in") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        check_expr(*arg);
+      }
+      return string_type();
     }
-    return string_type();
-  }
   }
 
-  const auto *ns_callee =
-    dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
+  const auto *ns_callee = dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
   // Type-qualified methods: int::bits(float|double) -> uint64; float::from_bits(uint64) -> float
   if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
-  if (call_expr.args.size() != 1) {
-    error_at(call_expr.location, "int::bits() expects exactly 1 argument.");
+    if (call_expr.args.size() != 1) {
+      error_at(call_expr.location, "int::bits() expects exactly 1 argument.");
+      return make_int_type("uint64");
+    }
+    Type arg_type = check_expr(*call_expr.args[0]);
+    if (arg_type.kind != TypeKind::Float) {
+      error_at(call_expr.location,
+               "int::bits() expects a float argument, got " + type_to_string(arg_type) + ".");
+    }
     return make_int_type("uint64");
   }
-  Type arg_type = check_expr(*call_expr.args[0]);
-  if (arg_type.kind != TypeKind::Float) {
-    error_at(call_expr.location,
-             "int::bits() expects a float argument, got " + type_to_string(arg_type) + ".");
-  }
-  return make_int_type("uint64");
-  }
-  if (ns_callee && ns_callee->namespace_name == "float" &&
-    ns_callee->member_name == "from_bits") {
-  if (call_expr.args.size() != 1) {
-    error_at(call_expr.location, "float::from_bits() expects exactly 1 argument.");
+  if (ns_callee && ns_callee->namespace_name == "float" && ns_callee->member_name == "from_bits") {
+    if (call_expr.args.size() != 1) {
+      error_at(call_expr.location, "float::from_bits() expects exactly 1 argument.");
+      return float_type();
+    }
+    Type arg_type = check_expr(*call_expr.args[0]);
+    if (arg_type.kind != TypeKind::Int ||
+        (arg_type.name != "uint64" && arg_type.name != "int64" && arg_type.name != "int")) {
+      error_at(call_expr.location, "float::from_bits() expects a uint64 argument, got " +
+                                       type_to_string(arg_type) + ".");
+    }
     return float_type();
   }
-  Type arg_type = check_expr(*call_expr.args[0]);
-  if (arg_type.kind != TypeKind::Int ||
-      (arg_type.name != "uint64" && arg_type.name != "int64" && arg_type.name != "int")) {
-    error_at(call_expr.location,
-             "float::from_bits() expects a uint64 argument, got " +
-                 type_to_string(arg_type) + ".");
-  }
-  return float_type();
-  }
   if (ns_callee && ns_callee->namespace_name == "io") {
-  if (sema_.used_.count("io") == 0) {
-    error_at(ns_callee->location,
-             "Module 'io' is not imported. Add 'using io;' at the top of the file.");
-    return void_type();
-  }
-  if (ns_callee->member_name == "out" || ns_callee->member_name == "err") {
-    for (const ast::ExprPtr &arg : call_expr.args) {
-      check_expr(*arg);
+    if (sema_.used_.count("io") == 0) {
+      error_at(ns_callee->location,
+               "Module 'io' is not imported. Add 'using io;' at the top of the file.");
+      return void_type();
     }
-    check_fmt_args(call_expr.args, call_expr.location);
-    return void_type();
-  }
-  if (ns_callee->member_name == "in") {
-    for (const ast::ExprPtr &arg : call_expr.args) {
-      check_expr(*arg);
+    if (ns_callee->member_name == "out" || ns_callee->member_name == "err") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        check_expr(*arg);
+      }
+      check_fmt_args(call_expr.args, call_expr.location);
+      return void_type();
     }
-    return string_type();
-  }
+    if (ns_callee->member_name == "in") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        check_expr(*arg);
+      }
+      return string_type();
+    }
   }
 
   // rt::enum_payload_at(value, index) — compiler/runtime bridge.
   if (ns_callee && ns_callee->namespace_name == "rt") {
-  if (ns_callee->member_name == "enum_payload_at") {
-    if (call_expr.args.size() != 2) {
-      error_at(call_expr.location, "rt::enum_payload_at expects exactly two arguments.");
-    } else {
-      check_expr(*call_expr.args[0]);
-      const auto *idx_lit = dynamic_cast<const ast::IntLiteralExpr *>(call_expr.args[1].get());
-      if (!idx_lit || idx_lit->value < 0) {
-        error_at(call_expr.args[1]->location,
-                 "rt::enum_payload_at index must be a non-negative int literal.");
+    if (ns_callee->member_name == "enum_payload_at") {
+      if (call_expr.args.size() != 2) {
+        error_at(call_expr.location, "rt::enum_payload_at expects exactly two arguments.");
+      } else {
+        check_expr(*call_expr.args[0]);
+        const auto *idx_lit = dynamic_cast<const ast::IntLiteralExpr *>(call_expr.args[1].get());
+        if (!idx_lit || idx_lit->value < 0) {
+          error_at(call_expr.args[1]->location,
+                   "rt::enum_payload_at index must be a non-negative int literal.");
+        }
       }
+      return void_type();
     }
-    return void_type();
-  }
   }
 
   // Handle fs::__read(path) -> string, fs::__write(path, content) -> void.
   if (ns_callee && ns_callee->namespace_name == "fs") {
-  if (sema_.used_.count("fs") == 0) {
-    error_at(ns_callee->location,
-             "Module 'fs' is not imported. Add 'using fs;' at the top of the file.");
-    return void_type();
-  }
-  if (ns_callee->member_name == "__read") {
-    if (call_expr.args.size() != 1) {
-      error_at(call_expr.location, "fs::__read expects exactly one argument (path).");
-    } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
-      error_at(call_expr.args[0]->location, "fs::__read expects a string path.");
+    if (sema_.used_.count("fs") == 0) {
+      error_at(ns_callee->location,
+               "Module 'fs' is not imported. Add 'using fs;' at the top of the file.");
+      return void_type();
     }
-    return string_type();
-  }
-  if (ns_callee->member_name == "__write") {
-    if (call_expr.args.size() != 2) {
-      error_at(call_expr.location, "fs::__write expects exactly two arguments (path, content).");
-    } else {
-      if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
-        error_at(call_expr.args[0]->location, "fs::__write expects a string path.");
+    if (ns_callee->member_name == "__read") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::__read expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::__read expects a string path.");
       }
-      if (check_expr(*call_expr.args[1]).kind != TypeKind::String) {
-        error_at(call_expr.args[1]->location, "fs::__write expects string content.");
+      return string_type();
+    }
+    if (ns_callee->member_name == "__write") {
+      if (call_expr.args.size() != 2) {
+        error_at(call_expr.location, "fs::__write expects exactly two arguments (path, content).");
+      } else {
+        if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+          error_at(call_expr.args[0]->location, "fs::__write expects a string path.");
+        }
+        if (check_expr(*call_expr.args[1]).kind != TypeKind::String) {
+          error_at(call_expr.args[1]->location, "fs::__write expects string content.");
+        }
       }
+      return void_type();
     }
+    if (ns_callee->member_name == "__listdir") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::__listdir expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::__listdir expects a string path.");
+      }
+      return array_type(string_type());
+    }
+    error_at(ns_callee->location, "Unknown fs member '" + ns_callee->member_name + "'.");
     return void_type();
-  }
-  if (ns_callee->member_name == "__listdir") {
-    if (call_expr.args.size() != 1) {
-      error_at(call_expr.location, "fs::__listdir expects exactly one argument (path).");
-    } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
-      error_at(call_expr.args[0]->location, "fs::__listdir expects a string path.");
-    }
-    return array_type(string_type());
-  }
-  error_at(ns_callee->location, "Unknown fs member '" + ns_callee->member_name + "'.");
-  return void_type();
   }
 
   // Handle sys::args() -> string[].
   if (ns_callee && ns_callee->namespace_name == "sys") {
-  if (sema_.used_.count("sys") == 0) {
-    error_at(ns_callee->location,
-             "Module 'sys' is not imported. Add 'using sys;' at the top of the file.");
-    return void_type();
-  }
-  if (ns_callee->member_name == "args") {
-    if (!call_expr.args.empty()) {
-      error_at(call_expr.location, "sys::args expects no arguments.");
+    if (sema_.used_.count("sys") == 0) {
+      error_at(ns_callee->location,
+               "Module 'sys' is not imported. Add 'using sys;' at the top of the file.");
+      return void_type();
     }
-    return array_type(string_type());
-  }
-  error_at(ns_callee->location, "Unknown sys member '" + ns_callee->member_name + "'.");
-  return void_type();
+    if (ns_callee->member_name == "args") {
+      if (!call_expr.args.empty()) {
+        error_at(call_expr.location, "sys::args expects no arguments.");
+      }
+      return array_type(string_type());
+    }
+    error_at(ns_callee->location, "Unknown sys member '" + ns_callee->member_name + "'.");
+    return void_type();
   }
 
   // Handle enum variant construction with payload: Shape::Circle(1.0)
   if (ns_callee) {
-  auto enum_type = lookup_type(ns_callee->namespace_name);
-  if (enum_type.has_value() && enum_type->kind == TypeKind::Enum) {
-    int variant_idx = -1;
-    for (int i = 0; i < static_cast<int>(enum_type->variants.size()); ++i) {
-      if (enum_type->variants[static_cast<std::size_t>(i)] == ns_callee->member_name) {
-        variant_idx = i;
-        break;
+    auto enum_type = lookup_type(ns_callee->namespace_name);
+    if (enum_type.has_value() && enum_type->kind == TypeKind::Enum) {
+      int variant_idx = -1;
+      for (int i = 0; i < static_cast<int>(enum_type->variants.size()); ++i) {
+        if (enum_type->variants[static_cast<std::size_t>(i)] == ns_callee->member_name) {
+          variant_idx = i;
+          break;
+        }
       }
-    }
-    if (variant_idx < 0) {
-      error_at(ns_callee->location, "Enum '" + ns_callee->namespace_name +
-                                        "' has no variant '" + ns_callee->member_name + "'.");
+      if (variant_idx < 0) {
+        error_at(ns_callee->location, "Enum '" + ns_callee->namespace_name + "' has no variant '" +
+                                          ns_callee->member_name + "'.");
+        return *enum_type;
+      }
+      const auto &expected_params =
+          enum_type->variant_param_types[static_cast<std::size_t>(variant_idx)];
+      if (call_expr.args.size() != expected_params.size()) {
+        error_at(call_expr.location, "Enum variant '" + ns_callee->member_name + "' expects " +
+                                         std::to_string(expected_params.size()) +
+                                         " argument(s), got " +
+                                         std::to_string(call_expr.args.size()) + ".");
+      }
+      for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
+        check_expr(*call_expr.args[i]);
+      }
       return *enum_type;
     }
-    const auto &expected_params = enum_type->variant_param_types[static_cast<std::size_t>(variant_idx)];
-    if (call_expr.args.size() != expected_params.size()) {
-      error_at(call_expr.location, "Enum variant '" + ns_callee->member_name + "' expects " +
-               std::to_string(expected_params.size()) + " argument(s), got " +
-               std::to_string(call_expr.args.size()) + ".");
-    }
-    for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
-      check_expr(*call_expr.args[i]);
-    }
-    return *enum_type;
-  }
   }
 
   if (ns_callee && sema_.concept_registry_.count(ns_callee->namespace_name)) {
-  if (call_expr.args.empty()) {
-    error_at(call_expr.location, "Concept method '" + ns_callee->namespace_name + "::" +
-                                    ns_callee->member_name + "' expects at least one argument.");
-    return int_type();
-  }
-  Type arg_ty = check_expr(*call_expr.args[0]);
-  auto ret = lookup_concept_method(ns_callee->namespace_name, ns_callee->member_name, arg_ty,
-                                   call_expr.location);
-  if (!ret.has_value()) {
-    return int_type();
-  }
-  if (call_expr.args.size() > 1) {
-    error_at(call_expr.location, "Wrong number of arguments.");
-  }
-  return *ret;
+    if (call_expr.args.empty()) {
+      error_at(call_expr.location, "Concept method '" + ns_callee->namespace_name + "::" +
+                                       ns_callee->member_name + "' expects at least one argument.");
+      return int_type();
+    }
+    Type arg_ty = check_expr(*call_expr.args[0]);
+    auto ret = lookup_concept_method(ns_callee->namespace_name, ns_callee->member_name, arg_ty,
+                                     call_expr.location);
+    if (!ret.has_value()) {
+      return int_type();
+    }
+    if (call_expr.args.size() > 1) {
+      error_at(call_expr.location, "Wrong number of arguments.");
+    }
+    return *ret;
   }
 
   // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
-  const auto *field_callee =
-    dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get());
+  const auto *field_callee = dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get());
   if (field_callee) {
-  const auto *id_obj =
-      dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
-  if (id_obj && sema_.opened_.count("io") != 0) {
-    if ((id_obj->name == "out" || id_obj->name == "err") &&
-        field_callee->field_name == "line") {
-      for (const ast::ExprPtr &arg : call_expr.args) {
-        check_expr(*arg);
+    const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
+    if (id_obj && sema_.opened_.count("io") != 0) {
+      if ((id_obj->name == "out" || id_obj->name == "err") && field_callee->field_name == "line") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          check_expr(*arg);
+        }
+        check_fmt_args(call_expr.args, call_expr.location);
+        return void_type();
       }
-      check_fmt_args(call_expr.args, call_expr.location);
+      if (id_obj->name == "in" && field_callee->field_name == "secret") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          check_expr(*arg);
+        }
+        return string_type();
+      }
+      if ((id_obj->name == "out" || id_obj->name == "err") && field_callee->field_name == "flush") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "io::" + id_obj->name + ".flush() takes no arguments.");
+        }
+        return void_type();
+      }
+    }
+    const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
+    if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
+      if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
+          field_callee->field_name == "line") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          check_expr(*arg);
+        }
+        check_fmt_args(call_expr.args, call_expr.location);
+        return void_type();
+      }
+      if (ns_obj->member_name == "in" && field_callee->field_name == "secret") {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          check_expr(*arg);
+        }
+        return string_type();
+      }
+      if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
+          field_callee->field_name == "flush") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location,
+                   "io::" + ns_obj->member_name + ".flush() takes no arguments.");
+        }
+        return void_type();
+      }
+    }
+    if (ns_obj && sema_.used_.count(ns_obj->namespace_name) == 0) {
+      error_at(ns_obj->location, "Module '" + ns_obj->namespace_name +
+                                     "' is not imported. Add 'using " + ns_obj->namespace_name +
+                                     ";' at the top of the file.");
       return void_type();
     }
-    if (id_obj->name == "in" && field_callee->field_name == "secret") {
-      for (const ast::ExprPtr &arg : call_expr.args) {
-        check_expr(*arg);
-      }
-      return string_type();
-    }
-    if ((id_obj->name == "out" || id_obj->name == "err") &&
-        field_callee->field_name == "flush") {
-      if (!call_expr.args.empty()) {
-        error_at(call_expr.location, "io::" + id_obj->name + ".flush() takes no arguments.");
-      }
-      return void_type();
-    }
-  }
-  const auto *ns_obj =
-      dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
-  if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
-    if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
-        field_callee->field_name == "line") {
-      for (const ast::ExprPtr &arg : call_expr.args) {
-        check_expr(*arg);
-      }
-      check_fmt_args(call_expr.args, call_expr.location);
-      return void_type();
-    }
-    if (ns_obj->member_name == "in" && field_callee->field_name == "secret") {
-      for (const ast::ExprPtr &arg : call_expr.args) {
-        check_expr(*arg);
-      }
-      return string_type();
-    }
-    if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
-        field_callee->field_name == "flush") {
-      if (!call_expr.args.empty()) {
-        error_at(call_expr.location, "io::" + ns_obj->member_name + ".flush() takes no arguments.");
-      }
-      return void_type();
-    }
-  }
-  if (ns_obj && sema_.used_.count(ns_obj->namespace_name) == 0) {
-    error_at(ns_obj->location,
-             "Module '" + ns_obj->namespace_name +
-                 "' is not imported. Add 'using " + ns_obj->namespace_name +
-                 ";' at the top of the file.");
-    return void_type();
-  }
   }
 
   // Handle array method calls: arr.len(), arr.push(x), etc.
   if (field_callee) {
-  Type obj_type = check_expr(*field_callee->object);
-  if (obj_type.kind == TypeKind::Map) {
-    const std::string &method = field_callee->field_name;
-    if (method == "len") {
-      if (!call_expr.args.empty()) {
-        error_at(call_expr.location, "len() takes no arguments.");
+    Type obj_type = check_expr(*field_callee->object);
+    if (obj_type.kind == TypeKind::Map) {
+      const std::string &method = field_callee->field_name;
+      if (method == "len") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "len() takes no arguments.");
+        }
+        return int_type();
       }
+      if (method == "has" || method == "remove") {
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location, method + "() takes exactly 1 argument (key).");
+        } else {
+          Type k = check_expr(*call_expr.args[0]);
+          if (obj_type.key_type && !types_assignable(k, *obj_type.key_type)) {
+            error_at(call_expr.args[0]->location, method + "() key must be " +
+                                                      type_to_string(*obj_type.key_type) +
+                                                      ", got " + type_to_string(k) + ".");
+          }
+        }
+        return method == "has" ? bool_type() : void_type();
+      }
+      if (method == "keys") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "keys() takes no arguments.");
+        }
+        return array_type(obj_type.key_type ? *obj_type.key_type : string_type());
+      }
+      error_at(call_expr.location, "Map has no method '" + method + "'.");
       return int_type();
     }
-    if (method == "has" || method == "remove") {
-      if (call_expr.args.size() != 1) {
-        error_at(call_expr.location, method + "() takes exactly 1 argument (key).");
-      } else {
-        Type k = check_expr(*call_expr.args[0]);
-        if (obj_type.key_type && !types_assignable(k, *obj_type.key_type)) {
-          error_at(call_expr.args[0]->location,
-                   method + "() key must be " + type_to_string(*obj_type.key_type) +
-                       ", got " + type_to_string(k) + ".");
+    if (obj_type.kind == TypeKind::Array) {
+      const std::string &method = field_callee->field_name;
+      if (method == "len") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "len() takes no arguments.");
         }
+        return int_type();
       }
-      return method == "has" ? bool_type() : void_type();
-    }
-    if (method == "keys") {
-      if (!call_expr.args.empty()) {
-        error_at(call_expr.location, "keys() takes no arguments.");
+      if (method == "push") {
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location, "push() takes exactly 1 argument.");
+        } else if (obj_type.element_type) {
+          Type arg_type = check_expr(*call_expr.args[0]);
+          if (!types_assignable(arg_type, *obj_type.element_type)) {
+            error_at(call_expr.args[0]->location, "push() expects " +
+                                                      type_to_string(*obj_type.element_type) +
+                                                      ", got " + type_to_string(arg_type) + ".");
+          }
+        }
+        return void_type();
       }
-      return array_type(obj_type.key_type ? *obj_type.key_type : string_type());
-    }
-    error_at(call_expr.location, "Map has no method '" + method + "'.");
-    return int_type();
-  }
-  if (obj_type.kind == TypeKind::Array) {
-    const std::string &method = field_callee->field_name;
-    if (method == "len") {
-      if (!call_expr.args.empty()) {
-        error_at(call_expr.location, "len() takes no arguments.");
+      if (method == "resize") {
+        if (call_expr.args.size() != 2) {
+          error_at(call_expr.location, "resize() takes exactly 2 arguments (count, default).");
+        } else {
+          Type count_type = check_expr(*call_expr.args[0]);
+          if (count_type.kind != TypeKind::Int) {
+            error_at(call_expr.args[0]->location, "resize() count must be an Int.");
+          }
+          Type default_type = check_expr(*call_expr.args[1]);
+          if (obj_type.element_type && !types_assignable(default_type, *obj_type.element_type)) {
+            error_at(call_expr.args[1]->location,
+                     "resize() default expects " + type_to_string(*obj_type.element_type) +
+                         ", got " + type_to_string(default_type) + ".");
+          }
+        }
+        return void_type();
       }
+      if (method == "pop") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "pop() takes no arguments.");
+        }
+        if (obj_type.element_type)
+          return *obj_type.element_type;
+        return int_type();
+      }
+      if (method == "remove") {
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location, "remove() takes exactly 1 argument.");
+        } else {
+          Type arg_type = check_expr(*call_expr.args[0]);
+          if (arg_type.kind != TypeKind::Int) {
+            error_at(call_expr.args[0]->location, "remove() index must be Int.");
+          }
+        }
+        if (obj_type.element_type)
+          return *obj_type.element_type;
+        return int_type();
+      }
+      if (method == "contains") {
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location, "contains() takes exactly 1 argument.");
+        } else {
+          check_expr(*call_expr.args[0]);
+        }
+        return bool_type();
+      }
+      if (method == "clear") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "clear() takes no arguments.");
+        }
+        return void_type();
+      }
+      if (method == "insert") {
+        if (call_expr.args.size() != 2) {
+          error_at(call_expr.location, "insert() takes exactly 2 arguments (index, value).");
+        } else {
+          Type idx_type = check_expr(*call_expr.args[0]);
+          if (idx_type.kind != TypeKind::Int) {
+            error_at(call_expr.args[0]->location, "insert() index must be Int.");
+          }
+          check_expr(*call_expr.args[1]);
+        }
+        return void_type();
+      }
+      if (method == "index_of") {
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location, "index_of() takes exactly 1 argument.");
+        } else {
+          check_expr(*call_expr.args[0]);
+        }
+        return int_type();
+      }
+      if (method == "slice") {
+        if (call_expr.args.size() != 2) {
+          error_at(call_expr.location, "slice() takes exactly 2 arguments (start, end).");
+        } else {
+          Type start_type = check_expr(*call_expr.args[0]);
+          Type end_type = check_expr(*call_expr.args[1]);
+          if (start_type.kind != TypeKind::Int) {
+            error_at(call_expr.args[0]->location, "slice() start must be Int.");
+          }
+          if (end_type.kind != TypeKind::Int) {
+            error_at(call_expr.args[1]->location, "slice() end must be Int.");
+          }
+        }
+        return array_type(obj_type.element_type ? *obj_type.element_type : int_type());
+      }
+      if (method == "reverse") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "reverse() takes no arguments.");
+        }
+        return void_type();
+      }
+      error_at(call_expr.location, "Array has no method '" + method + "'.");
       return int_type();
     }
-    if (method == "push") {
-      if (call_expr.args.size() != 1) {
-        error_at(call_expr.location, "push() takes exactly 1 argument.");
-      } else if (obj_type.element_type) {
-        Type arg_type = check_expr(*call_expr.args[0]);
-        if (!types_assignable(arg_type, *obj_type.element_type)) {
-          error_at(call_expr.args[0]->location,
-                   "push() expects " + type_to_string(*obj_type.element_type) +
-                       ", got " + type_to_string(arg_type) + ".");
-        }
+    if (obj_type.kind == TypeKind::String) {
+      const std::string &method = field_callee->field_name;
+      if (method == "len") {
+        if (!call_expr.args.empty())
+          error_at(call_expr.location, "len() takes no arguments.");
+        return int_type();
       }
-      return void_type();
-    }
-    if (method == "resize") {
-      if (call_expr.args.size() != 2) {
-        error_at(call_expr.location, "resize() takes exactly 2 arguments (count, default).");
-      } else {
-        Type count_type = check_expr(*call_expr.args[0]);
-        if (count_type.kind != TypeKind::Int) {
-          error_at(call_expr.args[0]->location, "resize() count must be an Int.");
+      if (method == "contains" || method == "starts_with" || method == "ends_with") {
+        if (call_expr.args.size() != 1)
+          error_at(call_expr.location, method + "() takes exactly 1 argument.");
+        else {
+          Type arg = check_expr(*call_expr.args[0]);
+          if (arg.kind != TypeKind::String)
+            error_at(call_expr.args[0]->location, method + "() argument must be string.");
         }
-        Type default_type = check_expr(*call_expr.args[1]);
-        if (obj_type.element_type &&
-            !types_assignable(default_type, *obj_type.element_type)) {
-          error_at(call_expr.args[1]->location,
-                   "resize() default expects " + type_to_string(*obj_type.element_type) +
-                       ", got " + type_to_string(default_type) + ".");
+        return bool_type();
+      }
+      if (method == "index_of") {
+        if (call_expr.args.size() != 1)
+          error_at(call_expr.location, "index_of() takes exactly 1 argument.");
+        else {
+          Type arg = check_expr(*call_expr.args[0]);
+          if (arg.kind != TypeKind::String)
+            error_at(call_expr.args[0]->location, "index_of() argument must be string.");
         }
+        return int_type();
       }
-      return void_type();
-    }
-    if (method == "pop") {
-      if (!call_expr.args.empty()) {
-        error_at(call_expr.location, "pop() takes no arguments.");
+      if (method == "slice") {
+        if (call_expr.args.size() != 2)
+          error_at(call_expr.location, "slice() takes exactly 2 arguments.");
+        else {
+          Type s = check_expr(*call_expr.args[0]);
+          Type e = check_expr(*call_expr.args[1]);
+          if (s.kind != TypeKind::Int)
+            error_at(call_expr.args[0]->location, "slice() start must be Int.");
+          if (e.kind != TypeKind::Int)
+            error_at(call_expr.args[1]->location, "slice() end must be Int.");
+        }
+        return string_type();
       }
-      if (obj_type.element_type) return *obj_type.element_type;
+      if (method == "replace") {
+        if (call_expr.args.size() != 2)
+          error_at(call_expr.location, "replace() takes exactly 2 arguments.");
+        else {
+          Type a = check_expr(*call_expr.args[0]);
+          Type b = check_expr(*call_expr.args[1]);
+          if (a.kind != TypeKind::String)
+            error_at(call_expr.args[0]->location, "replace() arguments must be string.");
+          if (b.kind != TypeKind::String)
+            error_at(call_expr.args[1]->location, "replace() arguments must be string.");
+        }
+        return string_type();
+      }
+      if (method == "split") {
+        if (call_expr.args.size() != 1)
+          error_at(call_expr.location, "split() takes exactly 1 argument.");
+        else {
+          Type arg = check_expr(*call_expr.args[0]);
+          if (arg.kind != TypeKind::String)
+            error_at(call_expr.args[0]->location, "split() argument must be string.");
+        }
+        return array_type(string_type());
+      }
+      if (method == "trim" || method == "to_upper" || method == "to_lower") {
+        if (!call_expr.args.empty())
+          error_at(call_expr.location, method + "() takes no arguments.");
+        return string_type();
+      }
+      error_at(call_expr.location, "String has no method '" + method + "'.");
       return int_type();
     }
-    if (method == "remove") {
-      if (call_expr.args.size() != 1) {
-        error_at(call_expr.location, "remove() takes exactly 1 argument.");
-      } else {
-        Type arg_type = check_expr(*call_expr.args[0]);
-        if (arg_type.kind != TypeKind::Int) {
-          error_at(call_expr.args[0]->location, "remove() index must be Int.");
+    if (obj_type.kind == TypeKind::Struct) {
+      const std::string method_key = obj_type.name + "::" + field_callee->field_name;
+      auto method_it = method_registry_.find(method_key);
+      if (method_it != method_registry_.end() && method_it->second.decl) {
+        const ast::FunctionDecl *decl = method_it->second.decl;
+        if (call_expr.args.size() + 1 != decl->params.size()) {
+          error_at(call_expr.location, "Expected " + std::to_string(decl->params.size() - 1) +
+                                           " arguments, got " +
+                                           std::to_string(call_expr.args.size()) + ".");
         }
-      }
-      if (obj_type.element_type) return *obj_type.element_type;
-      return int_type();
-    }
-    if (method == "contains") {
-      if (call_expr.args.size() != 1) {
-        error_at(call_expr.location, "contains() takes exactly 1 argument.");
-      } else {
-        check_expr(*call_expr.args[0]);
-      }
-      return bool_type();
-    }
-    if (method == "clear") {
-      if (!call_expr.args.empty()) {
-        error_at(call_expr.location, "clear() takes no arguments.");
-      }
-      return void_type();
-    }
-    if (method == "insert") {
-      if (call_expr.args.size() != 2) {
-        error_at(call_expr.location, "insert() takes exactly 2 arguments (index, value).");
-      } else {
-        Type idx_type = check_expr(*call_expr.args[0]);
-        if (idx_type.kind != TypeKind::Int) {
-          error_at(call_expr.args[0]->location, "insert() index must be Int.");
+        Type receiver_type = check_expr(*field_callee->object);
+        if (!receiver_type.is_compatible_with(resolve_type_expr(decl->params[0].type))) {
+          error_at(field_callee->object->location, "UFCS receiver type mismatch.");
         }
-        check_expr(*call_expr.args[1]);
-      }
-      return void_type();
-    }
-    if (method == "index_of") {
-      if (call_expr.args.size() != 1) {
-        error_at(call_expr.location, "index_of() takes exactly 1 argument.");
-      } else {
-        check_expr(*call_expr.args[0]);
-      }
-      return int_type();
-    }
-    if (method == "slice") {
-      if (call_expr.args.size() != 2) {
-        error_at(call_expr.location, "slice() takes exactly 2 arguments (start, end).");
-      } else {
-        Type start_type = check_expr(*call_expr.args[0]);
-        Type end_type = check_expr(*call_expr.args[1]);
-        if (start_type.kind != TypeKind::Int) {
-          error_at(call_expr.args[0]->location, "slice() start must be Int.");
+        for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
+          Type arg_type = check_expr(*call_expr.args[i]);
+          Type param_type = resolve_type_expr(decl->params[i + 1].type);
+          if (!types_assignable(arg_type, param_type)) {
+            error_at(call_expr.args[i]->location, "Argument type mismatch.");
+          }
         }
-        if (end_type.kind != TypeKind::Int) {
-          error_at(call_expr.args[1]->location, "slice() end must be Int.");
-        }
+        return resolve_type_expr(decl->return_type);
       }
-      return array_type(obj_type.element_type ? *obj_type.element_type : int_type());
     }
-    if (method == "reverse") {
-      if (!call_expr.args.empty()) {
-        error_at(call_expr.location, "reverse() takes no arguments.");
-      }
-      return void_type();
+    auto ufcs_ret = lookup_ufcs_free_method(field_callee->field_name, obj_type, call_expr.args,
+                                            call_expr.location);
+    if (ufcs_ret.has_value()) {
+      return *ufcs_ret;
     }
-    error_at(call_expr.location, "Array has no method '" + method + "'.");
-    return int_type();
-  }
-  if (obj_type.kind == TypeKind::String) {
-    const std::string &method = field_callee->field_name;
-    if (method == "len") {
-      if (!call_expr.args.empty())
-        error_at(call_expr.location, "len() takes no arguments.");
-      return int_type();
-    }
-    if (method == "contains" || method == "starts_with" || method == "ends_with") {
-      if (call_expr.args.size() != 1)
-        error_at(call_expr.location, method + "() takes exactly 1 argument.");
-      else {
-        Type arg = check_expr(*call_expr.args[0]);
-        if (arg.kind != TypeKind::String)
-          error_at(call_expr.args[0]->location, method + "() argument must be string.");
-      }
-      return bool_type();
-    }
-    if (method == "index_of") {
-      if (call_expr.args.size() != 1)
-        error_at(call_expr.location, "index_of() takes exactly 1 argument.");
-      else {
-        Type arg = check_expr(*call_expr.args[0]);
-        if (arg.kind != TypeKind::String)
-          error_at(call_expr.args[0]->location, "index_of() argument must be string.");
-      }
-      return int_type();
-    }
-    if (method == "slice") {
-      if (call_expr.args.size() != 2)
-        error_at(call_expr.location, "slice() takes exactly 2 arguments.");
-      else {
-        Type s = check_expr(*call_expr.args[0]);
-        Type e = check_expr(*call_expr.args[1]);
-        if (s.kind != TypeKind::Int)
-          error_at(call_expr.args[0]->location, "slice() start must be Int.");
-        if (e.kind != TypeKind::Int)
-          error_at(call_expr.args[1]->location, "slice() end must be Int.");
-      }
-      return string_type();
-    }
-    if (method == "replace") {
-      if (call_expr.args.size() != 2)
-        error_at(call_expr.location, "replace() takes exactly 2 arguments.");
-      else {
-        Type a = check_expr(*call_expr.args[0]);
-        Type b = check_expr(*call_expr.args[1]);
-        if (a.kind != TypeKind::String)
-          error_at(call_expr.args[0]->location, "replace() arguments must be string.");
-        if (b.kind != TypeKind::String)
-          error_at(call_expr.args[1]->location, "replace() arguments must be string.");
-      }
-      return string_type();
-    }
-    if (method == "split") {
-      if (call_expr.args.size() != 1)
-        error_at(call_expr.location, "split() takes exactly 1 argument.");
-      else {
-        Type arg = check_expr(*call_expr.args[0]);
-        if (arg.kind != TypeKind::String)
-          error_at(call_expr.args[0]->location, "split() argument must be string.");
-      }
-      return array_type(string_type());
-    }
-    if (method == "trim" || method == "to_upper" || method == "to_lower") {
-      if (!call_expr.args.empty())
-        error_at(call_expr.location, method + "() takes no arguments.");
-      return string_type();
-    }
-    error_at(call_expr.location, "String has no method '" + method + "'.");
-    return int_type();
-  }
-  if (obj_type.kind == TypeKind::Struct) {
-    const std::string method_key = obj_type.name + "::" + field_callee->field_name;
-    auto method_it = method_registry_.find(method_key);
-    if (method_it != method_registry_.end() && method_it->second.decl) {
-      const ast::FunctionDecl *decl = method_it->second.decl;
-      if (call_expr.args.size() + 1 != decl->params.size()) {
-        error_at(call_expr.location,
-                 "Expected " + std::to_string(decl->params.size() - 1) + " arguments, got " +
-                     std::to_string(call_expr.args.size()) + ".");
-      }
-      Type receiver_type = check_expr(*field_callee->object);
-      if (!receiver_type.is_compatible_with(resolve_type_expr(decl->params[0].type))) {
-        error_at(field_callee->object->location, "UFCS receiver type mismatch.");
-      }
-      for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
-        Type arg_type = check_expr(*call_expr.args[i]);
-        Type param_type = resolve_type_expr(decl->params[i + 1].type);
-        if (!types_assignable(arg_type, param_type)) {
-          error_at(call_expr.args[i]->location, "Argument type mismatch.");
-        }
-      }
-      return resolve_type_expr(decl->return_type);
-    }
-  }
-  auto ufcs_ret = lookup_ufcs_free_method(field_callee->field_name, obj_type, call_expr.args,
-                                        call_expr.location);
-  if (ufcs_ret.has_value()) {
-    return *ufcs_ret;
-  }
   }
 
   {
-  const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get());
-  if (callee_id) {
-    auto gen_it = sema_.generic_functions_.find(callee_id->name);
-    if (gen_it != sema_.generic_functions_.end()) {
-      const ast::FunctionDecl *decl = gen_it->second;
+    const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get());
+    if (callee_id) {
+      auto gen_it = sema_.generic_functions_.find(callee_id->name);
+      if (gen_it != sema_.generic_functions_.end()) {
+        const ast::FunctionDecl *decl = gen_it->second;
 
-      // Check arguments once: their types both drive inference (when no
-      // explicit type arguments are written) and feed the compatibility
-      // check below.
-      std::vector<Type> arg_types;
-      arg_types.reserve(call_expr.args.size());
-      for (const auto &arg : call_expr.args) {
-        arg_types.push_back(check_expr(*arg));
-      }
+        // Check arguments once: their types both drive inference (when no
+        // explicit type arguments are written) and feed the compatibility
+        // check below.
+        std::vector<Type> arg_types;
+        arg_types.reserve(call_expr.args.size());
+        for (const auto &arg : call_expr.args) {
+          arg_types.push_back(check_expr(*arg));
+        }
 
-      // Type arguments are explicit, or inferred by matching each argument
-      // against a parameter written as a bare type parameter (e.g. `T x`).
-      std::vector<ast::TypeExpr> type_args = call_expr.type_args;
-      if (type_args.empty()) {
-        std::unordered_map<std::string, ast::TypeExpr> inferred;
-        for (size_t i = 0; i < decl->params.size() && i < arg_types.size(); ++i) {
-          const ast::TypeExpr &pt = decl->params[i].type;
-          if (!pt.type_args.empty() || inferred.count(pt.name)) continue;
-          if (std::find(decl->type_params.begin(), decl->type_params.end(), pt.name) !=
-              decl->type_params.end()) {
-            inferred[pt.name] =
-                type_to_type_expr(widen_for_generic_inference(arg_types[i]));
-          }
-        }
-        for (const std::string &tp : decl->type_params) {
-          auto it = inferred.find(tp);
-          if (it != inferred.end()) type_args.push_back(it->second);
-        }
-      }
-
-      if (type_args.size() != decl->type_params.size()) {
-        error_at(call_expr.location, "Wrong number of type arguments for '" + callee_id->name + "'.");
-        return int_type();
-      }
-      std::unordered_map<std::string, ast::TypeExpr> subst;
-      for (size_t i = 0; i < decl->type_params.size(); ++i) {
-        subst[decl->type_params[i]] = type_args[i];
-      }
-      auto substitute = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
-        if (te.type_args.empty()) {
-          auto s_it = subst.find(te.name);
-          if (s_it != subst.end()) return s_it->second;
-        }
-        return te;
-      };
-      Type ret = resolve_type_expr(substitute(decl->return_type));
-      std::vector<Type> param_types;
-      for (const auto &param : decl->params) {
-        param_types.push_back(resolve_type_expr(substitute(param.type)));
-      }
-      if (arg_types.size() != param_types.size()) {
-        error_at(call_expr.location,
-                 "Expected " + std::to_string(param_types.size()) + " arguments, got " +
-                     std::to_string(arg_types.size()) + ".");
-        return ret;
-      }
-      for (size_t i = 0; i < arg_types.size(); ++i) {
-        if (!types_assignable(arg_types[i], param_types[i])) {
-          error_at(call_expr.args[i]->location,
-                   "Expected " + type_to_string(param_types[i]) + ", got " +
-                       type_to_string(arg_types[i]) + ".");
-        }
-      }
-      return ret;
-    }
-    auto concept_gen_it = sema_.concept_generic_functions_.find(callee_id->name);
-    if (concept_gen_it != sema_.concept_generic_functions_.end()) {
-      const ast::FunctionDecl *decl = concept_gen_it->second;
-      std::vector<Type> arg_types;
-      arg_types.reserve(call_expr.args.size());
-      for (const auto &arg : call_expr.args) {
-        arg_types.push_back(check_expr(*arg));
-      }
-
-      std::unordered_map<std::string, Type> concept_bindings;
-      for (std::size_t i = 0; i < decl->params.size() && i < arg_types.size(); ++i) {
-        Type param_ty = resolve_type_expr(decl->params[i].type);
-        if (param_ty.kind != TypeKind::Concept) {
-          continue;
-        }
-        const std::string &concept_name = param_ty.name;
-        auto binding_it = concept_bindings.find(concept_name);
-        if (binding_it == concept_bindings.end()) {
-          concept_bindings.insert_or_assign(concept_name, arg_types[i]);
-          continue;
-        }
-        if (type_match_key(arg_types[i]) != type_match_key(binding_it->second)) {
-          error_at(call_expr.args[i]->location,
-                   "Concept parameter '" + concept_name + "' must use the same concrete type.");
-        }
-      }
-
-      for (const auto &[concept_name, concrete] : concept_bindings) {
-        auto cd_it = sema_.concept_registry_.find(concept_name);
-        if (cd_it != sema_.concept_registry_.end()) {
-          type_satisfies_concept(cd_it->second, concrete, call_expr.location);
-        }
-      }
-
-      std::function<ast::TypeExpr(const ast::TypeExpr &)> substitute_concepts;
-      substitute_concepts = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
-        if (te.type_args.empty()) {
-          auto concept_it = sema_.concept_registry_.find(te.name);
-          if (concept_it != sema_.concept_registry_.end()) {
-            auto binding_it = concept_bindings.find(te.name);
-            if (binding_it != concept_bindings.end()) {
-              return type_to_type_expr(binding_it->second);
+        // Type arguments are explicit, or inferred by matching each argument
+        // against a parameter written as a bare type parameter (e.g. `T x`).
+        std::vector<ast::TypeExpr> type_args = call_expr.type_args;
+        if (type_args.empty()) {
+          std::unordered_map<std::string, ast::TypeExpr> inferred;
+          for (size_t i = 0; i < decl->params.size() && i < arg_types.size(); ++i) {
+            const ast::TypeExpr &pt = decl->params[i].type;
+            if (!pt.type_args.empty() || inferred.count(pt.name))
+              continue;
+            if (std::find(decl->type_params.begin(), decl->type_params.end(), pt.name) !=
+                decl->type_params.end()) {
+              inferred[pt.name] = type_to_type_expr(widen_for_generic_inference(arg_types[i]));
             }
           }
+          for (const std::string &tp : decl->type_params) {
+            auto it = inferred.find(tp);
+            if (it != inferred.end())
+              type_args.push_back(it->second);
+          }
         }
-        ast::TypeExpr result = te;
-        for (ast::TypeExpr &arg : result.type_args) {
-          arg = substitute_concepts(arg);
-        }
-        return result;
-      };
 
-      Type ret = resolve_type_expr(substitute_concepts(decl->return_type));
-      std::vector<Type> param_types;
-      for (const auto &param : decl->params) {
-        param_types.push_back(resolve_type_expr(substitute_concepts(param.type)));
-      }
-      if (arg_types.size() != param_types.size()) {
-        error_at(call_expr.location,
-                 "Expected " + std::to_string(param_types.size()) + " arguments, got " +
-                     std::to_string(arg_types.size()) + ".");
+        if (type_args.size() != decl->type_params.size()) {
+          error_at(call_expr.location,
+                   "Wrong number of type arguments for '" + callee_id->name + "'.");
+          return int_type();
+        }
+        std::unordered_map<std::string, ast::TypeExpr> subst;
+        for (size_t i = 0; i < decl->type_params.size(); ++i) {
+          subst[decl->type_params[i]] = type_args[i];
+        }
+        auto substitute = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
+          if (te.type_args.empty()) {
+            auto s_it = subst.find(te.name);
+            if (s_it != subst.end())
+              return s_it->second;
+          }
+          return te;
+        };
+        Type ret = resolve_type_expr(substitute(decl->return_type));
+        std::vector<Type> param_types;
+        for (const auto &param : decl->params) {
+          param_types.push_back(resolve_type_expr(substitute(param.type)));
+        }
+        if (arg_types.size() != param_types.size()) {
+          error_at(call_expr.location, "Expected " + std::to_string(param_types.size()) +
+                                           " arguments, got " + std::to_string(arg_types.size()) +
+                                           ".");
+          return ret;
+        }
+        for (size_t i = 0; i < arg_types.size(); ++i) {
+          if (!types_assignable(arg_types[i], param_types[i])) {
+            error_at(call_expr.args[i]->location, "Expected " + type_to_string(param_types[i]) +
+                                                      ", got " + type_to_string(arg_types[i]) + ".");
+          }
+        }
         return ret;
       }
-      for (std::size_t i = 0; i < arg_types.size(); ++i) {
-        if (!types_assignable(arg_types[i], param_types[i])) {
-          error_at(call_expr.args[i]->location,
-                   "Expected " + type_to_string(param_types[i]) + ", got " +
-                       type_to_string(arg_types[i]) + ".");
+      auto concept_gen_it = sema_.concept_generic_functions_.find(callee_id->name);
+      if (concept_gen_it != sema_.concept_generic_functions_.end()) {
+        const ast::FunctionDecl *decl = concept_gen_it->second;
+        std::vector<Type> arg_types;
+        arg_types.reserve(call_expr.args.size());
+        for (const auto &arg : call_expr.args) {
+          arg_types.push_back(check_expr(*arg));
         }
+
+        std::unordered_map<std::string, Type> concept_bindings;
+        for (std::size_t i = 0; i < decl->params.size() && i < arg_types.size(); ++i) {
+          Type param_ty = resolve_type_expr(decl->params[i].type);
+          if (param_ty.kind != TypeKind::Concept) {
+            continue;
+          }
+          const std::string &concept_name = param_ty.name;
+          auto binding_it = concept_bindings.find(concept_name);
+          if (binding_it == concept_bindings.end()) {
+            concept_bindings.insert_or_assign(concept_name, arg_types[i]);
+            continue;
+          }
+          if (type_match_key(arg_types[i]) != type_match_key(binding_it->second)) {
+            error_at(call_expr.args[i]->location,
+                     "Concept parameter '" + concept_name + "' must use the same concrete type.");
+          }
+        }
+
+        for (const auto &[concept_name, concrete] : concept_bindings) {
+          auto cd_it = sema_.concept_registry_.find(concept_name);
+          if (cd_it != sema_.concept_registry_.end()) {
+            type_satisfies_concept(cd_it->second, concrete, call_expr.location);
+          }
+        }
+
+        std::function<ast::TypeExpr(const ast::TypeExpr &)> substitute_concepts;
+        substitute_concepts = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
+          if (te.type_args.empty()) {
+            auto concept_it = sema_.concept_registry_.find(te.name);
+            if (concept_it != sema_.concept_registry_.end()) {
+              auto binding_it = concept_bindings.find(te.name);
+              if (binding_it != concept_bindings.end()) {
+                return type_to_type_expr(binding_it->second);
+              }
+            }
+          }
+          ast::TypeExpr result = te;
+          for (ast::TypeExpr &arg : result.type_args) {
+            arg = substitute_concepts(arg);
+          }
+          return result;
+        };
+
+        Type ret = resolve_type_expr(substitute_concepts(decl->return_type));
+        std::vector<Type> param_types;
+        for (const auto &param : decl->params) {
+          param_types.push_back(resolve_type_expr(substitute_concepts(param.type)));
+        }
+        if (arg_types.size() != param_types.size()) {
+          error_at(call_expr.location, "Expected " + std::to_string(param_types.size()) +
+                                           " arguments, got " + std::to_string(arg_types.size()) +
+                                           ".");
+          return ret;
+        }
+        for (std::size_t i = 0; i < arg_types.size(); ++i) {
+          if (!types_assignable(arg_types[i], param_types[i])) {
+            error_at(call_expr.args[i]->location, "Expected " + type_to_string(param_types[i]) +
+                                                      ", got " + type_to_string(arg_types[i]) + ".");
+          }
+        }
+        return ret;
       }
-      return ret;
     }
-  }
   }
 
   Type callee_type = check_expr(*call_expr.callee);
   if (callee_type.kind != TypeKind::Function) {
-  if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
-      ns && sema_.used_.count(ns->namespace_name) == 0) {
-    return void_type();
-  }
-  if (const auto *fa = dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get())) {
-    if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(fa->object.get());
+    if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
         ns && sema_.used_.count(ns->namespace_name) == 0) {
       return void_type();
     }
-  }
-  error_at(call_expr.location, "Cannot call non-function type.");
-  return int_type();
+    if (const auto *fa = dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get())) {
+      if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(fa->object.get());
+          ns && sema_.used_.count(ns->namespace_name) == 0) {
+        return void_type();
+      }
+    }
+    error_at(call_expr.location, "Cannot call non-function type.");
+    return int_type();
   }
   if (callee_type.name == "native_fn") {
-  for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
-    check_expr(*call_expr.args[i]);
-  }
-  release_call_argument_borrows(call_expr.args);
-  return callee_type.return_type ? *callee_type.return_type : void_type();
+    for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
+      check_expr(*call_expr.args[i]);
+    }
+    release_call_argument_borrows(call_expr.args);
+    return callee_type.return_type ? *callee_type.return_type : void_type();
   }
   if (call_expr.args.size() != callee_type.param_types.size()) {
-  error_at(call_expr.location,
-           "Expected " + std::to_string(callee_type.param_types.size()) + " arguments, got " +
-               std::to_string(call_expr.args.size()) + ".");
-  return callee_type.return_type ? *callee_type.return_type : int_type();
+    error_at(call_expr.location, "Expected " + std::to_string(callee_type.param_types.size()) +
+                                     " arguments, got " + std::to_string(call_expr.args.size()) +
+                                     ".");
+    return callee_type.return_type ? *callee_type.return_type : int_type();
   }
   for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
-  Type arg_type = check_expr(*call_expr.args[i]);
-  if (!types_assignable(arg_type, callee_type.param_types[i])) {
-    error_at(call_expr.args[i]->location,
-             "Expected " + type_to_string(callee_type.param_types[i]) + ", got " +
-                 type_to_string(arg_type) + ".");
-  }
+    Type arg_type = check_expr(*call_expr.args[i]);
+    if (!types_assignable(arg_type, callee_type.param_types[i])) {
+      error_at(call_expr.args[i]->location, "Expected " +
+                                                type_to_string(callee_type.param_types[i]) +
+                                                ", got " + type_to_string(arg_type) + ".");
+    }
   }
   release_call_argument_borrows(call_expr.args);
   return callee_type.return_type ? *callee_type.return_type : int_type();
-
 }
 
 Type TypeChecker::check_struct_literal(const ast::StructLiteralExpr &struct_lit) {
@@ -2813,111 +2882,88 @@ Type TypeChecker::check_struct_literal(const ast::StructLiteralExpr &struct_lit)
   // through the normal instantiation path.
   ast::TypeExpr lit_type = struct_lit.struct_type;
   if (lit_type.type_args.empty()) {
-  auto gen_it = sema_.generic_structs_.find(lit_type.name);
-  if (gen_it != sema_.generic_structs_.end()) {
-    const ast::StructDecl *decl = gen_it->second;
-    std::unordered_map<std::string, ast::TypeExpr> inferred;
-    for (size_t i = 0; i < decl->fields.size() && i < struct_lit.fields.size(); ++i) {
-      const ast::TypeExpr &ft = decl->fields[i].type;
-      if (!ft.type_args.empty() || inferred.count(ft.name)) continue;
-      if (std::find(decl->type_params.begin(), decl->type_params.end(), ft.name) !=
-          decl->type_params.end()) {
-        inferred[ft.name] = type_to_type_expr(
-            widen_for_generic_inference(check_expr(*struct_lit.fields[i].value)));
+    auto gen_it = sema_.generic_structs_.find(lit_type.name);
+    if (gen_it != sema_.generic_structs_.end()) {
+      const ast::StructDecl *decl = gen_it->second;
+      std::unordered_map<std::string, ast::TypeExpr> inferred;
+      for (size_t i = 0; i < decl->fields.size() && i < struct_lit.fields.size(); ++i) {
+        const ast::TypeExpr &ft = decl->fields[i].type;
+        if (!ft.type_args.empty() || inferred.count(ft.name))
+          continue;
+        if (std::find(decl->type_params.begin(), decl->type_params.end(), ft.name) !=
+            decl->type_params.end()) {
+          inferred[ft.name] = type_to_type_expr(
+              widen_for_generic_inference(check_expr(*struct_lit.fields[i].value)));
+        }
       }
+      std::vector<ast::TypeExpr> targs;
+      for (const std::string &tp : decl->type_params) {
+        auto it = inferred.find(tp);
+        if (it != inferred.end())
+          targs.push_back(it->second);
+      }
+      if (targs.size() == decl->type_params.size())
+        lit_type.type_args = std::move(targs);
     }
-    std::vector<ast::TypeExpr> targs;
-    for (const std::string &tp : decl->type_params) {
-      auto it = inferred.find(tp);
-      if (it != inferred.end()) targs.push_back(it->second);
-    }
-    if (targs.size() == decl->type_params.size()) lit_type.type_args = std::move(targs);
-  }
   }
   Type resolved = resolve_type_expr(lit_type, struct_lit.location);
   std::string type_name = struct_lit.struct_type.to_string();
   auto type_opt = lookup_type(resolved.name);
   if (!type_opt.has_value()) {
-  error_at(struct_lit.location, "Unknown struct type '" + type_name + "'.");
-  return int_type();
+    error_at(struct_lit.location, "Unknown struct type '" + type_name + "'.");
+    return int_type();
   }
   if (type_opt->kind != TypeKind::Struct) {
-  error_at(struct_lit.location, "'" + type_name + "' is not a struct type.");
-  return int_type();
+    error_at(struct_lit.location, "'" + type_name + "' is not a struct type.");
+    return int_type();
   }
   const auto &fields_def = type_opt->fields;
   if (struct_lit.fields.size() != fields_def.size()) {
-  error_at(struct_lit.location,
-           "Struct '" + type_name + "' expects " + std::to_string(fields_def.size()) +
-               " field(s), got " + std::to_string(struct_lit.fields.size()) + ".");
+    error_at(struct_lit.location, "Struct '" + type_name + "' expects " +
+                                      std::to_string(fields_def.size()) + " field(s), got " +
+                                      std::to_string(struct_lit.fields.size()) + ".");
   }
   for (size_t i = 0; i < struct_lit.fields.size() && i < fields_def.size(); ++i) {
-  Type val_type = check_expr(*struct_lit.fields[i].value);
-  Type expected(fields_def[i].type_kind);
-  if (fields_def[i].type_kind == TypeKind::Struct && !fields_def[i].type_name.empty()) {
-    auto reg_it = type_registry_.find(fields_def[i].type_name);
-    if (reg_it != type_registry_.end()) expected = reg_it->second;
-  } else if (fields_def[i].type) {
-    expected = *fields_def[i].type;
-  }
-  if (!types_assignable(val_type, expected)) {
-    error_at(struct_lit.fields[i].value->location,
-             "Field '" + fields_def[i].name + "' expects " + type_to_string(expected) +
-                 ", got " + type_to_string(val_type) + ".");
-  }
+    Type val_type = check_expr(*struct_lit.fields[i].value);
+    Type expected(fields_def[i].type_kind);
+    if (fields_def[i].type_kind == TypeKind::Struct && !fields_def[i].type_name.empty()) {
+      auto reg_it = type_registry_.find(fields_def[i].type_name);
+      if (reg_it != type_registry_.end())
+        expected = reg_it->second;
+    } else if (fields_def[i].type) {
+      expected = *fields_def[i].type;
+    }
+    if (!types_assignable(val_type, expected)) {
+      error_at(struct_lit.fields[i].value->location, "Field '" + fields_def[i].name + "' expects " +
+                                                         type_to_string(expected) + ", got " +
+                                                         type_to_string(val_type) + ".");
+    }
   }
   for (size_t i = fields_def.size(); i < struct_lit.fields.size(); ++i) {
-  check_expr(*struct_lit.fields[i].value);
+    check_expr(*struct_lit.fields[i].value);
   }
   return *type_opt;
-
 }
 
 Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
 
   // Handle io::out.line, io::err.line, io::in.secret as callable methods
-  const auto *ns_obj =
-    dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
+  const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
   if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
-  if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
-      field_access.field_name == "line") {
-    Type fn(TypeKind::Function);
-    fn.name = "native_fn";
-    fn.return_type = std::make_shared<Type>(void_type());
-    return fn;
-  }
-  if (ns_obj->member_name == "in" && field_access.field_name == "secret") {
-    Type fn(TypeKind::Function);
-    fn.name = "native_fn";
-    fn.return_type = std::make_shared<Type>(string_type());
-    return fn;
-  }
-  if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
-      field_access.field_name == "flush") {
-    Type fn(TypeKind::Function);
-    fn.name = "native_fn";
-    fn.return_type = std::make_shared<Type>(void_type());
-    return fn;
-  }
-  }
-
-  // Handle `using namespace io;` bare out.line / err.line / in.secret.
-  if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_access.object.get())) {
-  if (sema_.opened_.count("io") != 0) {
-    if ((id_obj->name == "out" || id_obj->name == "err") &&
+    if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
         field_access.field_name == "line") {
       Type fn(TypeKind::Function);
       fn.name = "native_fn";
       fn.return_type = std::make_shared<Type>(void_type());
       return fn;
     }
-    if (id_obj->name == "in" && field_access.field_name == "secret") {
+    if (ns_obj->member_name == "in" && field_access.field_name == "secret") {
       Type fn(TypeKind::Function);
       fn.name = "native_fn";
       fn.return_type = std::make_shared<Type>(string_type());
       return fn;
     }
-    if ((id_obj->name == "out" || id_obj->name == "err") &&
+    if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
         field_access.field_name == "flush") {
       Type fn(TypeKind::Function);
       fn.name = "native_fn";
@@ -2925,80 +2971,103 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
       return fn;
     }
   }
+
+  // Handle `using namespace io;` bare out.line / err.line / in.secret.
+  if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_access.object.get())) {
+    if (sema_.opened_.count("io") != 0) {
+      if ((id_obj->name == "out" || id_obj->name == "err") && field_access.field_name == "line") {
+        Type fn(TypeKind::Function);
+        fn.name = "native_fn";
+        fn.return_type = std::make_shared<Type>(void_type());
+        return fn;
+      }
+      if (id_obj->name == "in" && field_access.field_name == "secret") {
+        Type fn(TypeKind::Function);
+        fn.name = "native_fn";
+        fn.return_type = std::make_shared<Type>(string_type());
+        return fn;
+      }
+      if ((id_obj->name == "out" || id_obj->name == "err") && field_access.field_name == "flush") {
+        Type fn(TypeKind::Function);
+        fn.name = "native_fn";
+        fn.return_type = std::make_shared<Type>(void_type());
+        return fn;
+      }
+    }
   }
 
   Type obj_type = deref_ref_type(check_expr(*field_access.object));
   if (obj_type.kind == TypeKind::Map) {
-  const std::string &method = field_access.field_name;
-  if (method == "len" || method == "has" || method == "remove" || method == "keys") {
-    return void_type();
-  }
-  error_at(field_access.location, "Map has no method '" + method + "'.");
-  return int_type();
+    const std::string &method = field_access.field_name;
+    if (method == "len" || method == "has" || method == "remove" || method == "keys") {
+      return void_type();
+    }
+    error_at(field_access.location, "Map has no method '" + method + "'.");
+    return int_type();
   }
   if (obj_type.kind == TypeKind::Array) {
-  const std::string &method = field_access.field_name;
-  if (method == "len" || method == "push" || method == "pop" ||
-      method == "remove" || method == "contains" || method == "clear" ||
-      method == "insert" || method == "index_of" || method == "slice" ||
-      method == "reverse" || method == "resize") {
-    return void_type();
-  }
-  error_at(field_access.location, "Array has no method '" + method + "'.");
-  return int_type();
+    const std::string &method = field_access.field_name;
+    if (method == "len" || method == "push" || method == "pop" || method == "remove" ||
+        method == "contains" || method == "clear" || method == "insert" || method == "index_of" ||
+        method == "slice" || method == "reverse" || method == "resize") {
+      return void_type();
+    }
+    error_at(field_access.location, "Array has no method '" + method + "'.");
+    return int_type();
   }
   if (obj_type.kind == TypeKind::String) {
-  const std::string &method = field_access.field_name;
-  if (method == "len" || method == "contains" || method == "starts_with" ||
-      method == "ends_with" || method == "index_of" || method == "slice" ||
-      method == "replace" || method == "split" || method == "trim" ||
-      method == "to_upper" || method == "to_lower") {
-    return void_type();
-  }
-  error_at(field_access.location, "String has no method '" + method + "'.");
-  return int_type();
+    const std::string &method = field_access.field_name;
+    if (method == "len" || method == "contains" || method == "starts_with" ||
+        method == "ends_with" || method == "index_of" || method == "slice" || method == "replace" ||
+        method == "split" || method == "trim" || method == "to_upper" || method == "to_lower") {
+      return void_type();
+    }
+    error_at(field_access.location, "String has no method '" + method + "'.");
+    return int_type();
   }
   if (obj_type.kind != TypeKind::Struct) {
-  if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
-      ns && sema_.used_.count(ns->namespace_name) == 0) {
-    return void_type();
-  }
-  error_at(field_access.location, "Cannot access field on non-struct type.");
-  return int_type();
+    if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
+        ns && sema_.used_.count(ns->namespace_name) == 0) {
+      return void_type();
+    }
+    error_at(field_access.location, "Cannot access field on non-struct type.");
+    return int_type();
   }
   for (const auto &f : obj_type.fields) {
-  if (f.name == field_access.field_name) {
-    if (f.type_kind == TypeKind::Struct && !f.type_name.empty()) {
-      auto reg_it = type_registry_.find(f.type_name);
-      if (reg_it != type_registry_.end()) return reg_it->second;
+    if (f.name == field_access.field_name) {
+      if (f.type_kind == TypeKind::Struct && !f.type_name.empty()) {
+        auto reg_it = type_registry_.find(f.type_name);
+        if (reg_it != type_registry_.end())
+          return reg_it->second;
+      }
+      // Prefer the full resolved type, which retains array element_type and
+      // other detail that type_kind alone drops.
+      if (f.type)
+        return *f.type;
+      return Type(f.type_kind);
     }
-    // Prefer the full resolved type, which retains array element_type and
-    // other detail that type_kind alone drops.
-    if (f.type) return *f.type;
-    return Type(f.type_kind);
-  }
   }
   std::string method_key = obj_type.name + "::" + field_access.field_name;
   auto method_it = method_registry_.find(method_key);
   if (method_it != method_registry_.end()) {
-  const auto *method_decl = method_it->second.decl;
-  Type fn(TypeKind::Function);
-  if (method_decl) {
-    fn.return_type = std::make_unique<Type>(resolve_type_expr(method_decl->return_type));
-    for (const auto &param : method_decl->params) {
-      if (param.name == "self") continue;
-      fn.param_types.push_back(resolve_type_expr(param.type));
+    const auto *method_decl = method_it->second.decl;
+    Type fn(TypeKind::Function);
+    if (method_decl) {
+      fn.return_type = std::make_unique<Type>(resolve_type_expr(method_decl->return_type));
+      for (const auto &param : method_decl->params) {
+        if (param.name == "self")
+          continue;
+        fn.param_types.push_back(resolve_type_expr(param.type));
+      }
     }
+    if (!fn.return_type) {
+      fn.return_type = std::make_unique<Type>(void_type());
+    }
+    return fn;
   }
-  if (!fn.return_type) {
-    fn.return_type = std::make_unique<Type>(void_type());
-  }
-  return fn;
-  }
-  error_at(field_access.location, "Struct '" + obj_type.name + "' has no field '" +
-                                     field_access.field_name + "'.");
+  error_at(field_access.location,
+           "Struct '" + obj_type.name + "' has no field '" + field_access.field_name + "'.");
   return int_type();
-
 }
 
 Type TypeChecker::check_field_assign(const ast::FieldAssignExpr &field_assign) {
@@ -3007,30 +3076,30 @@ Type TypeChecker::check_field_assign(const ast::FieldAssignExpr &field_assign) {
   Type value_type = check_expr(*field_assign.value);
   check_reference_escape(value_type, field_assign.location);
   if (obj_type.kind != TypeKind::Struct) {
-  error_at(field_assign.location, "Cannot assign field on non-struct type.");
-  return int_type();
+    error_at(field_assign.location, "Cannot assign field on non-struct type.");
+    return int_type();
   }
   for (const auto &f : obj_type.fields) {
-  if (f.name == field_assign.field_name) {
-    Type field_type(f.type_kind);
-    if (f.type_kind == TypeKind::Struct && !f.type_name.empty()) {
-      auto reg_it = type_registry_.find(f.type_name);
-      if (reg_it != type_registry_.end()) field_type = reg_it->second;
-    } else if (f.type) {
-      field_type = *f.type;
+    if (f.name == field_assign.field_name) {
+      Type field_type(f.type_kind);
+      if (f.type_kind == TypeKind::Struct && !f.type_name.empty()) {
+        auto reg_it = type_registry_.find(f.type_name);
+        if (reg_it != type_registry_.end())
+          field_type = reg_it->second;
+      } else if (f.type) {
+        field_type = *f.type;
+      }
+      if (!types_assignable(value_type, field_type)) {
+        error_at(field_assign.location, "Cannot assign " + type_to_string(value_type) +
+                                            " to field '" + f.name + "' of type " +
+                                            type_to_string(field_type) + ".");
+      }
+      return field_type;
     }
-    if (!types_assignable(value_type, field_type)) {
-      error_at(field_assign.location,
-               "Cannot assign " + type_to_string(value_type) + " to field '" +
-                   f.name + "' of type " + type_to_string(field_type) + ".");
-    }
-    return field_type;
   }
-  }
-  error_at(field_assign.location, "Struct '" + obj_type.name + "' has no field '" +
-                                     field_assign.field_name + "'.");
+  error_at(field_assign.location,
+           "Struct '" + obj_type.name + "' has no field '" + field_assign.field_name + "'.");
   return int_type();
-
 }
 
 Type TypeChecker::check_array_literal(const ast::ArrayLiteralExpr &array_lit) {
@@ -3038,25 +3107,24 @@ Type TypeChecker::check_array_literal(const ast::ArrayLiteralExpr &array_lit) {
   Type element_type = null_type();
   bool has_element_type = false;
   for (const ast::ExprPtr &element : array_lit.elements) {
-  Type current = check_expr(*element);
-  if (!has_element_type || element_type.kind == TypeKind::Null) {
-    element_type = current;
-    has_element_type = true;
-    continue;
-  }
-  if (types_assignable(current, element_type)) {
-    continue;
-  }
-  if (types_assignable(element_type, current)) {
-    element_type = current;
-    continue;
-  }
-  if (!current.is_compatible_with(element_type)) {
-    error_at(element->location, "Array elements must have compatible types.");
-  }
+    Type current = check_expr(*element);
+    if (!has_element_type || element_type.kind == TypeKind::Null) {
+      element_type = current;
+      has_element_type = true;
+      continue;
+    }
+    if (types_assignable(current, element_type)) {
+      continue;
+    }
+    if (types_assignable(element_type, current)) {
+      element_type = current;
+      continue;
+    }
+    if (!current.is_compatible_with(element_type)) {
+      error_at(element->location, "Array elements must have compatible types.");
+    }
   }
   return array_type(has_element_type ? element_type : null_type());
-
 }
 
 Type TypeChecker::check_map_literal(const ast::MapLiteralExpr &map_lit) {
@@ -3065,27 +3133,26 @@ Type TypeChecker::check_map_literal(const ast::MapLiteralExpr &map_lit) {
   Type val_type = null_type();
   bool has_kv = false;
   for (std::size_t i = 0; i < map_lit.keys.size(); ++i) {
-  Type k = check_expr(*map_lit.keys[i]);
-  Type v = check_expr(*map_lit.values[i]);
-  if (k.kind != TypeKind::String && k.kind != TypeKind::Int) {
-    error_at(map_lit.keys[i]->location, "Map key must be a string or int.");
-  }
-  if (!has_kv) {
-    key_type = k;
-    val_type = v;
-    has_kv = true;
-  } else {
-    if (!k.is_compatible_with(key_type)) {
-      error_at(map_lit.keys[i]->location, "Map keys must have compatible types.");
+    Type k = check_expr(*map_lit.keys[i]);
+    Type v = check_expr(*map_lit.values[i]);
+    if (k.kind != TypeKind::String && k.kind != TypeKind::Int) {
+      error_at(map_lit.keys[i]->location, "Map key must be a string or int.");
     }
-    if (!types_assignable(v, val_type) && !types_assignable(val_type, v) &&
-        !v.is_compatible_with(val_type)) {
-      error_at(map_lit.values[i]->location, "Map values must have compatible types.");
+    if (!has_kv) {
+      key_type = k;
+      val_type = v;
+      has_kv = true;
+    } else {
+      if (!k.is_compatible_with(key_type)) {
+        error_at(map_lit.keys[i]->location, "Map keys must have compatible types.");
+      }
+      if (!types_assignable(v, val_type) && !types_assignable(val_type, v) &&
+          !v.is_compatible_with(val_type)) {
+        error_at(map_lit.values[i]->location, "Map values must have compatible types.");
+      }
     }
-  }
   }
   return map_type(has_kv ? key_type : null_type(), has_kv ? val_type : null_type());
-
 }
 
 Type TypeChecker::check_index(const ast::IndexExpr &index_expr) {
@@ -3095,25 +3162,24 @@ Type TypeChecker::check_index(const ast::IndexExpr &index_expr) {
   // Map subscript: key type must match; value returned (null on missing key
   // at runtime, so the static type is the declared value type).
   if (object_type.kind == TypeKind::Map) {
-  if (object_type.key_type && !types_assignable(index_type, *object_type.key_type)) {
-    error_at(index_expr.index->location,
-             "Map key must be " + type_to_string(*object_type.key_type) + ", got " +
-                 type_to_string(index_type) + ".");
-  }
-  return object_type.element_type ? *object_type.element_type : null_type();
+    if (object_type.key_type && !types_assignable(index_type, *object_type.key_type)) {
+      error_at(index_expr.index->location, "Map key must be " +
+                                               type_to_string(*object_type.key_type) + ", got " +
+                                               type_to_string(index_type) + ".");
+    }
+    return object_type.element_type ? *object_type.element_type : null_type();
   }
   if (!is_integer_type(index_type)) {
-  error_at(index_expr.index->location, "Array index must be an integer.");
+    error_at(index_expr.index->location, "Array index must be an integer.");
   }
   if (object_type.kind == TypeKind::String) {
-  return char_type();
+    return char_type();
   }
   if (object_type.kind != TypeKind::Array || !object_type.element_type) {
-  error_at(index_expr.location, "Cannot index non-array type.");
-  return int_type();
+    error_at(index_expr.location, "Cannot index non-array type.");
+    return int_type();
   }
   return *object_type.element_type;
-
 }
 
 Type TypeChecker::check_cast(const ast::CastExpr &cast) {
@@ -3121,14 +3187,15 @@ Type TypeChecker::check_cast(const ast::CastExpr &cast) {
   Type src = check_expr(*cast.value);
   const std::string &target = cast.target_type.name;
   TypeKind src_k = src.kind;
-  auto src_is = [&](TypeKind k) { return src_k == k; };
+  auto src_is = [&](TypeKind k) {
+    return src_k == k;
+  };
   const bool string_source = src_is(TypeKind::String);
 
   auto reject_unhandled_fallible = [&]() {
     if (string_source && allow_fallible_cast_depth_ == 0) {
-      error_at(cast.location,
-               "Fallible cast from string to " + target +
-                   " must be handled with '?:' or postfix '?'.");
+      error_at(cast.location, "Fallible cast from string to " + target +
+                                  " must be handled with '?:' or postfix '?'.");
     }
   };
 
@@ -3159,29 +3226,26 @@ Type TypeChecker::check_cast(const ast::CastExpr &cast) {
              "Cast target '" + target + "' is not supported. Use int, float, or string.");
     return null_type();
   }
-  error_at(cast.location,
-           "Cannot cast " + type_to_string(src) + " to " + target + ".");
+  error_at(cast.location, "Cannot cast " + type_to_string(src) + " to " + target + ".");
   return null_type();
-
 }
 
 Type TypeChecker::check_ternary(const ast::TernaryExpr &ternary) {
 
   Type cond_type = check_expr(*ternary.condition);
   if (cond_type.kind != TypeKind::Bool && cond_type.kind != TypeKind::Int) {
-  error_at(ternary.location,
-           "Ternary condition must be bool or int, got " + type_to_string(cond_type) + ".");
+    error_at(ternary.location,
+             "Ternary condition must be bool or int, got " + type_to_string(cond_type) + ".");
   }
   Type then_type = check_expr(*ternary.then_expr);
   Type else_type = check_expr(*ternary.else_expr);
   if (!types_assignable(then_type, else_type) && !types_assignable(else_type, then_type) &&
-    !then_type.is_compatible_with(else_type)) {
-  error_at(ternary.location,
-           "Ternary branches have incompatible types: " + type_to_string(then_type) +
-               " vs " + type_to_string(else_type) + ".");
+      !then_type.is_compatible_with(else_type)) {
+    error_at(ternary.location,
+             "Ternary branches have incompatible types: " + type_to_string(then_type) + " vs " +
+                 type_to_string(else_type) + ".");
   }
   return then_type;
-
 }
 
 Type TypeChecker::check_null_coalesce(const ast::NullCoalesceExpr &null_coalesce) {
@@ -3203,33 +3267,32 @@ Type TypeChecker::check_null_coalesce(const ast::NullCoalesceExpr &null_coalesce
 
   const bool has_binding = !null_coalesce.err_binding.empty();
   if (has_binding) {
-  if (cast_lhs == nullptr) {
-    error_at(null_coalesce.location,
-             "?: let-binding requires a fallible cast on the left-hand side.");
-  } else {
-    push_scope();
-    auto err_it = type_registry_.find("CastError");
-    Type err_ty = (err_it != type_registry_.end()) ? err_it->second : null_type();
-    declare_var(null_coalesce.err_binding, err_ty, false, null_coalesce.location);
-    Type right_type = check_expr(*null_coalesce.right);
-    pop_scope();
-    if (!types_assignable(right_type, result_type) &&
-        !right_type.is_compatible_with(result_type)) {
-      error_at(null_coalesce.right->location,
-               "?: fallback type " + type_to_string(right_type) +
-                   " does not match left-hand type " + type_to_string(result_type) + ".");
+    if (cast_lhs == nullptr) {
+      error_at(null_coalesce.location,
+               "?: let-binding requires a fallible cast on the left-hand side.");
+    } else {
+      push_scope();
+      auto err_it = type_registry_.find("CastError");
+      Type err_ty = (err_it != type_registry_.end()) ? err_it->second : null_type();
+      declare_var(null_coalesce.err_binding, err_ty, false, null_coalesce.location);
+      Type right_type = check_expr(*null_coalesce.right);
+      pop_scope();
+      if (!types_assignable(right_type, result_type) &&
+          !right_type.is_compatible_with(result_type)) {
+        error_at(null_coalesce.right->location, "?: fallback type " + type_to_string(right_type) +
+                                                    " does not match left-hand type " +
+                                                    type_to_string(result_type) + ".");
+      }
+      return result_type;
     }
-    return result_type;
-  }
   }
   Type right_type = check_expr(*null_coalesce.right);
   if (!types_assignable(right_type, result_type) && !right_type.is_compatible_with(result_type)) {
-  error_at(null_coalesce.right->location,
-           "?: fallback type " + type_to_string(right_type) +
-               " does not match left-hand type " + type_to_string(result_type) + ".");
+    error_at(null_coalesce.right->location, "?: fallback type " + type_to_string(right_type) +
+                                                " does not match left-hand type " +
+                                                type_to_string(result_type) + ".");
   }
   return result_type;
-
 }
 
 Type TypeChecker::check_propagate(const ast::PropagateExpr &prop) {
@@ -3238,7 +3301,6 @@ Type TypeChecker::check_propagate(const ast::PropagateExpr &prop) {
   Type inner = check_expr(*prop.value);
   --allow_fallible_cast_depth_;
   return inner;
-
 }
 
 Type TypeChecker::check_index_assign(const ast::IndexAssignExpr &index_assign) {
@@ -3248,64 +3310,119 @@ Type TypeChecker::check_index_assign(const ast::IndexAssignExpr &index_assign) {
   Type value_type = check_expr(*index_assign.value);
   // Map insert/update: key must match key type, value must match value type.
   if (object_type.kind == TypeKind::Map) {
-  if (object_type.key_type && !types_assignable(index_type, *object_type.key_type)) {
-    error_at(index_assign.index->location,
-             "Map key must be " + type_to_string(*object_type.key_type) + ", got " +
-                 type_to_string(index_type) + ".");
-  }
-  if (object_type.element_type && !types_assignable(value_type, *object_type.element_type)) {
-    error_at(index_assign.value->location,
-             "Cannot assign " + type_to_string(value_type) + " to map value of type " +
-                 type_to_string(*object_type.element_type) + ".");
-  }
-  return object_type.element_type ? *object_type.element_type : value_type;
+    if (object_type.key_type && !types_assignable(index_type, *object_type.key_type)) {
+      error_at(index_assign.index->location, "Map key must be " +
+                                                 type_to_string(*object_type.key_type) + ", got " +
+                                                 type_to_string(index_type) + ".");
+    }
+    if (object_type.element_type && !types_assignable(value_type, *object_type.element_type)) {
+      error_at(index_assign.value->location, "Cannot assign " + type_to_string(value_type) +
+                                                 " to map value of type " +
+                                                 type_to_string(*object_type.element_type) + ".");
+    }
+    return object_type.element_type ? *object_type.element_type : value_type;
   }
   if (index_type.kind != TypeKind::Int) {
-  error_at(index_assign.index->location, "Array index must be an Int.");
+    error_at(index_assign.index->location, "Array index must be an Int.");
   }
   if (object_type.kind != TypeKind::Array || !object_type.element_type) {
-  error_at(index_assign.location, "Cannot assign indexed value on non-array type.");
-  return value_type;
+    error_at(index_assign.location, "Cannot assign indexed value on non-array type.");
+    return value_type;
   }
   if (!types_assignable(value_type, *object_type.element_type)) {
-  error_at(index_assign.value->location,
-           "Cannot assign " + type_to_string(value_type) + " to array element of type " +
-               type_to_string(*object_type.element_type) + ".");
+    error_at(index_assign.value->location, "Cannot assign " + type_to_string(value_type) +
+                                               " to array element of type " +
+                                               type_to_string(*object_type.element_type) + ".");
   }
   return *object_type.element_type;
-
 }
-void TypeChecker::visit(const ast::IntLiteralExpr &x) { expr_result_ = check_int_literal(x); }
-void TypeChecker::visit(const ast::CharLiteralExpr &x) { expr_result_ = check_char_literal(x); }
-void TypeChecker::visit(const ast::FloatLiteralExpr &x) { expr_result_ = check_float_literal(x); }
-void TypeChecker::visit(const ast::StringLiteralExpr &x) { expr_result_ = check_string_literal(x); }
-void TypeChecker::visit(const ast::BoolLiteralExpr &x) { expr_result_ = check_bool_literal(x); }
-void TypeChecker::visit(const ast::NullLiteralExpr &x) { expr_result_ = check_null_literal(x); }
-void TypeChecker::visit(const ast::ArrayLiteralExpr &x) { expr_result_ = check_array_literal(x); }
-void TypeChecker::visit(const ast::MapLiteralExpr &x) { expr_result_ = check_map_literal(x); }
-void TypeChecker::visit(const ast::IdentifierExpr &x) { expr_result_ = check_identifier(x); }
-void TypeChecker::visit(const ast::UnaryExpr &x) { expr_result_ = check_unary(x); }
-void TypeChecker::visit(const ast::BinaryExpr &x) { expr_result_ = check_binary(x); }
-void TypeChecker::visit(const ast::AssignExpr &x) { expr_result_ = check_assign(x); }
-void TypeChecker::visit(const ast::CallExpr &x) { expr_result_ = check_call(x); }
-void TypeChecker::visit(const ast::CastExpr &x) { expr_result_ = check_cast(x); }
-void TypeChecker::visit(const ast::TernaryExpr &x) { expr_result_ = check_ternary(x); }
-void TypeChecker::visit(const ast::NullCoalesceExpr &x) { expr_result_ = check_null_coalesce(x); }
-void TypeChecker::visit(const ast::PropagateExpr &x) { expr_result_ = check_propagate(x); }
-void TypeChecker::visit(const ast::BindingPattern &x) { expr_result_ = check_binding_pattern(x); }
-void TypeChecker::visit(const ast::ArrayPattern &x) { expr_result_ = check_array_pattern(x); }
-void TypeChecker::visit(const ast::StructPattern &x) { expr_result_ = check_struct_pattern(x); }
-void TypeChecker::visit(const ast::MatchExpr &x) { expr_result_ = check_match(x); }
-void TypeChecker::visit(const ast::NamespaceAccessExpr &x) { expr_result_ = check_namespace_access(x); }
-void TypeChecker::visit(const ast::FieldAccessExpr &x) { expr_result_ = check_field_access(x); }
-void TypeChecker::visit(const ast::FieldAssignExpr &x) { expr_result_ = check_field_assign(x); }
-void TypeChecker::visit(const ast::IndexExpr &x) { expr_result_ = check_index(x); }
-void TypeChecker::visit(const ast::IndexAssignExpr &x) { expr_result_ = check_index_assign(x); }
-void TypeChecker::visit(const ast::StructLiteralExpr &x) { expr_result_ = check_struct_literal(x); }
-void TypeChecker::visit(const ast::PipeExpr &) { expr_result_ = int_type(); }
-void TypeChecker::visit(const ast::EnumPattern &) { expr_result_ = int_type(); }
-
-
+void TypeChecker::visit(const ast::IntLiteralExpr &x) {
+  expr_result_ = check_int_literal(x);
+}
+void TypeChecker::visit(const ast::CharLiteralExpr &x) {
+  expr_result_ = check_char_literal(x);
+}
+void TypeChecker::visit(const ast::FloatLiteralExpr &x) {
+  expr_result_ = check_float_literal(x);
+}
+void TypeChecker::visit(const ast::StringLiteralExpr &x) {
+  expr_result_ = check_string_literal(x);
+}
+void TypeChecker::visit(const ast::BoolLiteralExpr &x) {
+  expr_result_ = check_bool_literal(x);
+}
+void TypeChecker::visit(const ast::NullLiteralExpr &x) {
+  expr_result_ = check_null_literal(x);
+}
+void TypeChecker::visit(const ast::ArrayLiteralExpr &x) {
+  expr_result_ = check_array_literal(x);
+}
+void TypeChecker::visit(const ast::MapLiteralExpr &x) {
+  expr_result_ = check_map_literal(x);
+}
+void TypeChecker::visit(const ast::IdentifierExpr &x) {
+  expr_result_ = check_identifier(x);
+}
+void TypeChecker::visit(const ast::UnaryExpr &x) {
+  expr_result_ = check_unary(x);
+}
+void TypeChecker::visit(const ast::BinaryExpr &x) {
+  expr_result_ = check_binary(x);
+}
+void TypeChecker::visit(const ast::AssignExpr &x) {
+  expr_result_ = check_assign(x);
+}
+void TypeChecker::visit(const ast::CallExpr &x) {
+  expr_result_ = check_call(x);
+}
+void TypeChecker::visit(const ast::CastExpr &x) {
+  expr_result_ = check_cast(x);
+}
+void TypeChecker::visit(const ast::TernaryExpr &x) {
+  expr_result_ = check_ternary(x);
+}
+void TypeChecker::visit(const ast::NullCoalesceExpr &x) {
+  expr_result_ = check_null_coalesce(x);
+}
+void TypeChecker::visit(const ast::PropagateExpr &x) {
+  expr_result_ = check_propagate(x);
+}
+void TypeChecker::visit(const ast::BindingPattern &x) {
+  expr_result_ = check_binding_pattern(x);
+}
+void TypeChecker::visit(const ast::ArrayPattern &x) {
+  expr_result_ = check_array_pattern(x);
+}
+void TypeChecker::visit(const ast::StructPattern &x) {
+  expr_result_ = check_struct_pattern(x);
+}
+void TypeChecker::visit(const ast::MatchExpr &x) {
+  expr_result_ = check_match(x);
+}
+void TypeChecker::visit(const ast::NamespaceAccessExpr &x) {
+  expr_result_ = check_namespace_access(x);
+}
+void TypeChecker::visit(const ast::FieldAccessExpr &x) {
+  expr_result_ = check_field_access(x);
+}
+void TypeChecker::visit(const ast::FieldAssignExpr &x) {
+  expr_result_ = check_field_assign(x);
+}
+void TypeChecker::visit(const ast::IndexExpr &x) {
+  expr_result_ = check_index(x);
+}
+void TypeChecker::visit(const ast::IndexAssignExpr &x) {
+  expr_result_ = check_index_assign(x);
+}
+void TypeChecker::visit(const ast::StructLiteralExpr &x) {
+  expr_result_ = check_struct_literal(x);
+}
+void TypeChecker::visit(const ast::PipeExpr &) {
+  expr_result_ = int_type();
+}
+void TypeChecker::visit(const ast::EnumPattern &) {
+  expr_result_ = int_type();
+}
 
 Type TypeChecker::check_expr(const ast::Expr &expr) {
   expr.accept(*this);
@@ -3324,8 +3441,7 @@ std::optional<std::string> TypeChecker::referent_name_from_lvalue(const ast::Exp
   return std::nullopt;
 }
 
-void TypeChecker::register_borrow(const std::string &referent, bool mut,
-                                  ast::SourceLocation loc) {
+void TypeChecker::register_borrow(const std::string &referent, bool mut, ast::SourceLocation loc) {
   for (const ActiveBorrow &borrow : active_borrows_) {
     if (borrow.referent != referent) {
       continue;
@@ -3413,12 +3529,11 @@ void TypeChecker::push_scope() {
 void TypeChecker::pop_scope() {
   if (!scopes_.empty()) {
     const std::size_t closing_depth = scopes_.size();
-    active_borrows_.erase(
-        std::remove_if(active_borrows_.begin(), active_borrows_.end(),
-                       [closing_depth](const ActiveBorrow &b) {
-                         return b.scope_depth == closing_depth;
-                       }),
-        active_borrows_.end());
+    active_borrows_.erase(std::remove_if(active_borrows_.begin(), active_borrows_.end(),
+                                         [closing_depth](const ActiveBorrow &b) {
+                                           return b.scope_depth == closing_depth;
+                                         }),
+                          active_borrows_.end());
     for (const auto &[name, info] : scopes_.back()) {
       if (!info.used && name != "_" && info.location.line > 0) {
         warn_at(info.location, "Unused variable '" + name + "'.");
@@ -3428,7 +3543,8 @@ void TypeChecker::pop_scope() {
   }
 }
 
-void TypeChecker::declare_var(const std::string &name, const Type &type, bool is_mutable, ast::SourceLocation loc) {
+void TypeChecker::declare_var(const std::string &name, const Type &type, bool is_mutable,
+                              ast::SourceLocation loc) {
   if (scopes_.empty()) {
     return;
   }
@@ -3437,7 +3553,8 @@ void TypeChecker::declare_var(const std::string &name, const Type &type, bool is
     error_at(loc, "Variable '" + name + "' already declared.");
     return;
   }
-  scope.insert_or_assign(name, VarInfo{.type = type, .is_mutable = is_mutable, .used = false, .location = loc});
+  scope.insert_or_assign(
+      name, VarInfo{.type = type, .is_mutable = is_mutable, .used = false, .location = loc});
 }
 
 std::optional<Type> TypeChecker::lookup_var(const std::string &name) {
@@ -3460,11 +3577,13 @@ std::optional<Type> TypeChecker::lookup_type(const std::string &name) const {
 }
 
 void TypeChecker::error_at(ast::SourceLocation location, std::string message) {
-  errors_.push_back(TypeError{.location = location, .message = std::move(message), .severity = DiagnosticSeverity::Error});
+  errors_.push_back(TypeError{
+      .location = location, .message = std::move(message), .severity = DiagnosticSeverity::Error});
 }
 
 void TypeChecker::warn_at(ast::SourceLocation location, std::string message) {
-  errors_.push_back(TypeError{.location = location, .message = std::move(message), .severity = DiagnosticSeverity::Warning});
+  errors_.push_back(TypeError{
+      .location = location, .message = std::move(message), .severity = DiagnosticSeverity::Warning});
 }
 
 void TypeChecker::populate_kir_types(KirModule *module) const {
@@ -3536,10 +3655,13 @@ void TypeChecker::populate_kir_types(KirModule *module) const {
   }
 }
 
-void TypeChecker::check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::SourceLocation location) {
-  if (args.empty()) return;
+void TypeChecker::check_fmt_args(const std::vector<ast::ExprPtr> &args,
+                                 ast::SourceLocation location) {
+  if (args.empty())
+    return;
   const auto *str_lit = dynamic_cast<const ast::StringLiteralExpr *>(args[0].get());
-  if (!str_lit) return;
+  if (!str_lit)
+    return;
   const std::string &fmt = str_lit->value;
   std::size_t placeholder_count = 0;
   for (std::size_t i = 0; i + 1 < fmt.size(); ++i) {
@@ -3548,7 +3670,8 @@ void TypeChecker::check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::Sou
       ++i;
     }
   }
-  if (placeholder_count == 0) return;
+  if (placeholder_count == 0)
+    return;
   std::size_t value_count = args.size() - 1;
   if (value_count < placeholder_count) {
     warn_at(location, "Format string has " + std::to_string(placeholder_count) +
@@ -3595,7 +3718,7 @@ std::string TypeChecker::type_match_key(const Type &type) const {
 }
 
 const ast::FunctionDecl *TypeChecker::find_free_function_for_type(const std::string &name,
-                                                                   const std::string &key) const {
+                                                                  const std::string &key) const {
   for (const ast::FunctionDecl *fn : free_functions_) {
     if (fn->name != name || fn->params.empty()) {
       continue;
@@ -3644,9 +3767,9 @@ bool TypeChecker::type_satisfies_concept(const ast::ConceptDecl *concept_decl, c
       Type expected_param = resolve_type_expr(substitute_type_params(method.params[i].type, subst));
       Type actual_param = resolve_type_expr(impl->params[i].type);
       if (!types_assignable(actual_param, expected_param)) {
-        error_at(loc, "Implementation of '" + method.name + "' for type '" + type_to_string(concrete) +
-                          "' has incompatible parameter types for concept '" + concept_decl->name +
-                          "'.");
+        error_at(loc,
+                 "Implementation of '" + method.name + "' for type '" + type_to_string(concrete) +
+                     "' has incompatible parameter types for concept '" + concept_decl->name + "'.");
         return false;
       }
     }
@@ -3656,8 +3779,7 @@ bool TypeChecker::type_satisfies_concept(const ast::ConceptDecl *concept_decl, c
 
 std::optional<Type> TypeChecker::lookup_concept_method(const std::string &concept_name,
                                                        const std::string &method_name,
-                                                       const Type &arg_ty,
-                                                       ast::SourceLocation loc) {
+                                                       const Type &arg_ty, ast::SourceLocation loc) {
   auto concept_it = sema_.concept_registry_.find(concept_name);
   if (concept_it == sema_.concept_registry_.end()) {
     error_at(loc, "Unknown concept '" + concept_name + "'.");

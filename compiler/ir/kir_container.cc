@@ -37,7 +37,9 @@ KirContainerType kir_container_peel_element(const KirContainerType &container) {
   return out;
 }
 
-KirContainerType kir_container_clone(const KirContainerType &container) { return container; }
+KirContainerType kir_container_clone(const KirContainerType &container) {
+  return container;
+}
 
 KirContainerType kir_container_from_surface_type(const Type &type) {
   KirContainerType out;

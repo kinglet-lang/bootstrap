@@ -43,8 +43,7 @@ int first_instr_line(const KirFunction &fn) {
 std::string temp_object_path(const std::string &tag, const std::string &out_path) {
   const unsigned long tag_hash =
       static_cast<unsigned long>(std::hash<std::string>{}(out_path + tag));
-  return (std::filesystem::temp_directory_path() /
-          ("kinglet-" + std::to_string(tag_hash) + ".o"))
+  return (std::filesystem::temp_directory_path() / ("kinglet-" + std::to_string(tag_hash) + ".o"))
       .string();
 }
 
@@ -122,10 +121,9 @@ std::string shard_stamp(const KirModule &shard, const KirModule &full,
                      /*LowerCase=*/true);
 #else
   const llvm::StringRef digest = hasher.final();
-  return llvm::toHex(llvm::ArrayRef<uint8_t>(
-                         reinterpret_cast<const uint8_t *>(digest.data()),
-                         digest.size()),
-                     /*LowerCase=*/true);
+  return llvm::toHex(
+      llvm::ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(digest.data()), digest.size()),
+      /*LowerCase=*/true);
 #endif
 }
 

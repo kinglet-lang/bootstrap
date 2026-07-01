@@ -17,13 +17,13 @@ std::string Parser::parse_module_id(const char *context) {
   const Token &first = consume(TokenType::IDENTIFIER, std::string("Expected ") + context + ".");
   std::string module_id(token_text(first));
   while (match(TokenType::DOT)) {
-    const Token &part = consume(TokenType::IDENTIFIER, "Expected identifier after '.' in module name.");
+    const Token &part =
+        consume(TokenType::IDENTIFIER, "Expected identifier after '.' in module name.");
     module_id.push_back('.');
     module_id += token_text(part);
   }
   return module_id;
 }
-
 
 ast::ExprPtr Parser::parse_namespace_access(const Token &first, std::vector<std::string> segments) {
   if (segments.size() < 2) {
@@ -39,7 +39,6 @@ ast::ExprPtr Parser::parse_namespace_access(const Token &first, std::vector<std:
   return std::make_unique<ast::NamespaceAccessExpr>(location_of(first), qualifier, segments.back());
 }
 
-
 std::vector<ast::Parameter> Parser::parameters() {
   std::vector<ast::Parameter> params;
   if (check(TokenType::RIGHT_PAREN)) {
@@ -48,8 +47,8 @@ std::vector<ast::Parameter> Parser::parameters() {
 
   do {
     if (at_completion()) {
-      set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {},
-                      active_type_params_});
+      set_completion(
+          {lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {}, active_type_params_});
       return params;
     }
     ast::TypeExpr type = parse_type_expr();
@@ -60,7 +59,6 @@ std::vector<ast::Parameter> Parser::parameters() {
   return params;
 }
 
-
 ast::StmtPtr Parser::function_body() {
   if (match(TokenType::LEFT_BRACE)) {
     return block_statement();
@@ -70,7 +68,8 @@ ast::StmtPtr Parser::function_body() {
       return block_statement();
     }
     ast::ExprPtr value = expression();
-    if (has_completion()) return nullptr;
+    if (has_completion())
+      return nullptr;
     consume(TokenType::SEMICOLON, "Expected ';' after expression body.");
     const ast::SourceLocation location = value->location;
     return std::make_unique<ast::ReturnStmt>(location, std::move(value));
@@ -80,11 +79,9 @@ ast::StmtPtr Parser::function_body() {
   return std::make_unique<ast::BlockStmt>(location_of(peek()), std::vector<ast::StmtPtr>{});
 }
 
-
 ast::TypeExpr Parser::parse_type_expr() {
   if (at_completion()) {
-    set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {},
-                    active_type_params_});
+    set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}, active_type_params_});
     return ast::TypeExpr{"<error>", {}};
   }
   if (match(TokenType::AMP)) {
@@ -162,6 +159,5 @@ ast::TypeExpr Parser::parse_type_expr() {
   }
   return result;
 }
-
 
 } // namespace kinglet

@@ -10,19 +10,25 @@ namespace kinglet::preen {
 
 namespace {
 
-bool is_digit(char c) { return c >= '0' && c <= '9'; }
+bool is_digit(char c) {
+  return c >= '0' && c <= '9';
+}
 
 bool is_hex_digit(char c) {
   return is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-bool is_binary_digit(char c) { return c == '0' || c == '1'; }
+bool is_binary_digit(char c) {
+  return c == '0' || c == '1';
+}
 
 bool is_alpha(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
-bool is_alpha_numeric(char c) { return is_alpha(c) || is_digit(c); }
+bool is_alpha_numeric(char c) {
+  return is_alpha(c) || is_digit(c);
+}
 
 int escaped_char_value(char c) {
   switch (c) {
@@ -50,10 +56,12 @@ bool is_int_suffix(std::string_view s) {
          s == "u32" || s == "u64";
 }
 
-bool is_float_suffix(std::string_view s) { return s == "f32" || s == "f64"; }
+bool is_float_suffix(std::string_view s) {
+  return s == "f32" || s == "f64";
+}
 
-FmtToken make_trivia(FmtTokenKind kind, std::string_view source, std::size_t start,
-                     std::size_t end, int line, int column) {
+FmtToken make_trivia(FmtTokenKind kind, std::string_view source, std::size_t start, std::size_t end,
+                     int line, int column) {
   FmtToken out;
   out.kind = kind;
   out.text = std::string(source.substr(start, end - start));
@@ -163,7 +171,9 @@ void FmtLexer::scan_trivia(std::vector<FmtToken> &out) {
   }
 }
 
-bool FmtLexer::is_at_end() const { return current_ >= source_.size(); }
+bool FmtLexer::is_at_end() const {
+  return current_ >= source_.size();
+}
 
 Token FmtLexer::scan_token() {
   if (is_at_end()) {
@@ -210,9 +220,9 @@ Token FmtLexer::scan_token() {
   case '+':
     return make_token(match('=') ? TokenType::PLUS_EQUAL : TokenType::PLUS);
   case '-':
-    return make_token(match('>') ? TokenType::ARROW
-                                 : match('=') ? TokenType::MINUS_EQUAL
-                                              : TokenType::MINUS);
+    return make_token(match('>')   ? TokenType::ARROW
+                      : match('=') ? TokenType::MINUS_EQUAL
+                                   : TokenType::MINUS);
   case '*':
     return make_token(match('=') ? TokenType::STAR_EQUAL : TokenType::STAR);
   case '/':
@@ -220,19 +230,19 @@ Token FmtLexer::scan_token() {
   case '%':
     return make_token(TokenType::PERCENT);
   case '=':
-    return make_token(match('=') ? TokenType::EQUAL_EQUAL
-                                 : match('>') ? TokenType::FAT_ARROW
-                                              : TokenType::EQUAL);
+    return make_token(match('=')   ? TokenType::EQUAL_EQUAL
+                      : match('>') ? TokenType::FAT_ARROW
+                                   : TokenType::EQUAL);
   case '!':
     return make_token(match('=') ? TokenType::BANG_EQUAL : TokenType::BANG);
   case '<':
-    return make_token(match('=') ? TokenType::LESS_EQUAL
-                                 : match('<') ? TokenType::LESS_LESS
-                                              : TokenType::LESS);
+    return make_token(match('=')   ? TokenType::LESS_EQUAL
+                      : match('<') ? TokenType::LESS_LESS
+                                   : TokenType::LESS);
   case '>':
-    return make_token(match('=') ? TokenType::GREATER_EQUAL
-                                 : match('>') ? TokenType::GREATER_GREATER
-                                              : TokenType::GREATER);
+    return make_token(match('=')   ? TokenType::GREATER_EQUAL
+                      : match('>') ? TokenType::GREATER_GREATER
+                                   : TokenType::GREATER);
   case '&':
     return make_token(match('&') ? TokenType::AMP_AMP : TokenType::AMP);
   case '|':
@@ -447,29 +457,29 @@ Token FmtLexer::char_literal() {
 
 TokenType FmtLexer::identifier_type() const {
   static const std::unordered_map<std::string_view, TokenType> keywords = {
-      {"auto", TokenType::AUTO},       {"int", TokenType::INT},
-      {"int8", TokenType::INT8},       {"int16", TokenType::INT16},
-      {"int32", TokenType::INT32},     {"int64", TokenType::INT64},
-      {"uint8", TokenType::UINT8},     {"uint16", TokenType::UINT16},
-      {"uint32", TokenType::UINT32},   {"uint64", TokenType::UINT64},
-      {"float", TokenType::FLOAT},     {"float32", TokenType::FLOAT32},
-      {"float64", TokenType::FLOAT64}, {"double", TokenType::DOUBLE},
-      {"bool", TokenType::BOOL},       {"string", TokenType::STRING},
-      {"void", TokenType::VOID},       {"byte", TokenType::BYTE},
-      {"char", TokenType::CHAR},       {"const", TokenType::CONST},
-      {"return", TokenType::RETURN},   {"if", TokenType::IF},
-      {"else", TokenType::ELSE},       {"for", TokenType::FOR},
-      {"while", TokenType::WHILE},     {"break", TokenType::BREAK},
-      {"continue", TokenType::CONTINUE}, {"guard", TokenType::GUARD},
-      {"match", TokenType::MATCH},     {"let", TokenType::LET},
-      {"when", TokenType::WHEN},       {"try", TokenType::TRY},
-      {"catch", TokenType::CATCH},     {"export", TokenType::EXPORT},
-      {"import", TokenType::IMPORT},   {"pub", TokenType::PUB},
+      {"auto", TokenType::AUTO},           {"int", TokenType::INT},
+      {"int8", TokenType::INT8},           {"int16", TokenType::INT16},
+      {"int32", TokenType::INT32},         {"int64", TokenType::INT64},
+      {"uint8", TokenType::UINT8},         {"uint16", TokenType::UINT16},
+      {"uint32", TokenType::UINT32},       {"uint64", TokenType::UINT64},
+      {"float", TokenType::FLOAT},         {"float32", TokenType::FLOAT32},
+      {"float64", TokenType::FLOAT64},     {"double", TokenType::DOUBLE},
+      {"bool", TokenType::BOOL},           {"string", TokenType::STRING},
+      {"void", TokenType::VOID},           {"byte", TokenType::BYTE},
+      {"char", TokenType::CHAR},           {"const", TokenType::CONST},
+      {"return", TokenType::RETURN},       {"if", TokenType::IF},
+      {"else", TokenType::ELSE},           {"for", TokenType::FOR},
+      {"while", TokenType::WHILE},         {"break", TokenType::BREAK},
+      {"continue", TokenType::CONTINUE},   {"guard", TokenType::GUARD},
+      {"match", TokenType::MATCH},         {"let", TokenType::LET},
+      {"when", TokenType::WHEN},           {"try", TokenType::TRY},
+      {"catch", TokenType::CATCH},         {"export", TokenType::EXPORT},
+      {"import", TokenType::IMPORT},       {"pub", TokenType::PUB},
       {"namespace", TokenType::NAMESPACE}, {"using", TokenType::USING},
-      {"struct", TokenType::STRUCT},   {"enum", TokenType::ENUM},
-      {"concept", TokenType::CONCEPT}, {"spawn", TokenType::SPAWN},
-      {"select", TokenType::SELECT},   {"true", TokenType::TRUE},
-      {"false", TokenType::FALSE},     {"null", TokenType::NULL_},
+      {"struct", TokenType::STRUCT},       {"enum", TokenType::ENUM},
+      {"concept", TokenType::CONCEPT},     {"spawn", TokenType::SPAWN},
+      {"select", TokenType::SELECT},       {"true", TokenType::TRUE},
+      {"false", TokenType::FALSE},         {"null", TokenType::NULL_},
   };
 
   const std::string_view text = std::string_view(source_).substr(start_, current_ - start_);

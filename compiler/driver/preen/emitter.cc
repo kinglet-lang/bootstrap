@@ -93,16 +93,23 @@ TokenType token_for_binary_op(ast::BinaryOp op) {
 Emitter::Emitter(const FmtConfig &config, const TriviaMap *decl_trivia,
                  const TokenTriviaIndex *token_trivia, const SpanMap *spans,
                  const std::vector<Token> *tokens)
-    : config_(config), decl_trivia_(decl_trivia), token_trivia_(token_trivia), spans_(spans),
+    : config_(config),
+      decl_trivia_(decl_trivia),
+      token_trivia_(token_trivia),
+      spans_(spans),
       tokens_(tokens) {}
 
 std::string Emitter::indent_str(int extra) const {
   return std::string(static_cast<std::size_t>((indent_level_ + extra) * config_.indent), ' ');
 }
 
-void Emitter::append(const std::string &text) { out_ += text; }
+void Emitter::append(const std::string &text) {
+  out_ += text;
+}
 
-void Emitter::newline() { out_ += config_.newline_string(); }
+void Emitter::newline() {
+  out_ += config_.newline_string();
+}
 
 void Emitter::append_line(const std::string &text) {
   append(indent_str());
@@ -373,8 +380,8 @@ std::string Emitter::emit_expr(const ast::Expr &expr) {
       const TokenSpan left_span = spans_->span(*binary->left);
       const TokenSpan right_span = spans_->span(*binary->right);
       if (left_span.end > 0 && right_span.start > left_span.end) {
-        const std::size_t op_idx = find_token_between(left_span.end, right_span.start,
-                                                      token_for_binary_op(binary->op));
+        const std::size_t op_idx =
+            find_token_between(left_span.end, right_span.start, token_for_binary_op(binary->op));
         if (op_idx < right_span.start) {
           std::string prefix = gap_between(left_span.end - 1, op_idx, " ");
           std::string suffix = gap_between(op_idx, right_span.start, " ");
@@ -433,8 +440,8 @@ std::string Emitter::emit_expr(const ast::Expr &expr) {
     return emit_expr(*index->object) + "[" + emit_expr(*index->index) + "]";
   }
   if (const auto *index_assign = dynamic_cast<const ast::IndexAssignExpr *>(&expr)) {
-    return emit_expr(*index_assign->object) + "[" + emit_expr(*index_assign->index) + "] = " +
-           emit_expr(*index_assign->value);
+    return emit_expr(*index_assign->object) + "[" + emit_expr(*index_assign->index) +
+           "] = " + emit_expr(*index_assign->value);
   }
   if (const auto *array = dynamic_cast<const ast::ArrayLiteralExpr *>(&expr)) {
     std::vector<std::string> elems;
@@ -589,12 +596,10 @@ std::string Emitter::emit_stmt(const ast::Stmt &stmt, bool block_child) {
     return out;
   }
   if (const auto *guard = dynamic_cast<const ast::GuardStmt *>(&stmt)) {
-    return "guard " + emit_expr(*guard->condition) + " else " +
-           emit_stmt(*guard->else_body, true);
+    return "guard " + emit_expr(*guard->condition) + " else " + emit_stmt(*guard->else_body, true);
   }
   if (const auto *while_stmt = dynamic_cast<const ast::WhileStmt *>(&stmt)) {
-    return "while " + emit_expr(*while_stmt->condition) + " " +
-           emit_stmt(*while_stmt->body, true);
+    return "while " + emit_expr(*while_stmt->condition) + " " + emit_stmt(*while_stmt->body, true);
   }
   if (const auto *for_stmt = dynamic_cast<const ast::ForStmt *>(&stmt)) {
     std::string out = "for (";
@@ -684,8 +689,8 @@ std::string Emitter::emit_decl(const ast::Decl &decl, bool top_level) {
     if (fn->is_public) {
       out << "pub ";
     }
-    out << emit_type(fn->return_type) << " " << fn->name << emit_type_params(fn->type_params)
-        << "(" << emit_parameters(fn->params) << ") ";
+    out << emit_type(fn->return_type) << " " << fn->name << emit_type_params(fn->type_params) << "("
+        << emit_parameters(fn->params) << ") ";
     if (const auto *block = dynamic_cast<const ast::BlockStmt *>(fn->body.get());
         block != nullptr && is_single_line_block(*block, fn->location.line)) {
       std::vector<std::string> parts;

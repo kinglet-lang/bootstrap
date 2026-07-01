@@ -211,10 +211,11 @@ kl_h kl_native_fs_listdir(kl_h path) {
     const char *name = entry->d_name;
     // Skip the synthetic "." and ".." entries; everything else (files,
     // subdirectories, dotfiles) is returned so the caller owns the policy.
-    if (name[0] == '.' && name[1] == '\0') continue;
-    if (name[0] == '.' && name[1] == '.' && name[2] == '\0') continue;
-    entries.push_back(
-        kl_string_new(name, static_cast<int32_t>(std::strlen(name))));
+    if (name[0] == '.' && name[1] == '\0')
+      continue;
+    if (name[0] == '.' && name[1] == '.' && name[2] == '\0')
+      continue;
+    entries.push_back(kl_string_new(name, static_cast<int32_t>(std::strlen(name))));
   }
   closedir(handle);
 #endif

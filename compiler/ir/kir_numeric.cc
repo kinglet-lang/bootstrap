@@ -10,20 +10,30 @@ namespace kinglet {
 namespace {
 
 KirType kir_from_canonical_int(std::string_view name) {
-  if (name == "int8") return KirType::Int8;
-  if (name == "int16") return KirType::Int16;
-  if (name == "int32") return KirType::Int32;
-  if (name == "int64") return KirType::Int64;
-  if (name == "uint8") return KirType::UInt8;
-  if (name == "uint16") return KirType::UInt16;
-  if (name == "uint32") return KirType::UInt32;
-  if (name == "uint64") return KirType::UInt64;
+  if (name == "int8")
+    return KirType::Int8;
+  if (name == "int16")
+    return KirType::Int16;
+  if (name == "int32")
+    return KirType::Int32;
+  if (name == "int64")
+    return KirType::Int64;
+  if (name == "uint8")
+    return KirType::UInt8;
+  if (name == "uint16")
+    return KirType::UInt16;
+  if (name == "uint32")
+    return KirType::UInt32;
+  if (name == "uint64")
+    return KirType::UInt64;
   return KirType::Int64;
 }
 
 KirType kir_from_canonical_float(std::string_view name) {
-  if (name == "float32") return KirType::Float32;
-  if (name == "float64") return KirType::Float64;
+  if (name == "float32")
+    return KirType::Float32;
+  if (name == "float64")
+    return KirType::Float64;
   return KirType::Float32;
 }
 

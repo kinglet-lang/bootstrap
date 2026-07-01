@@ -14,9 +14,13 @@ namespace {
   std::exit(70);
 }
 
-bool is_float(kl_h value) { return kl_is_kind(value, KlKind::Float); }
+bool is_float(kl_h value) {
+  return kl_is_kind(value, KlKind::Float);
+}
 
-bool is_string(kl_h value) { return kl_is_kind(value, KlKind::String); }
+bool is_string(kl_h value) {
+  return kl_is_kind(value, KlKind::String);
+}
 
 std::string float_text(double value) {
   // Match the VM's default ostream formatting for doubles.
@@ -84,7 +88,9 @@ kl_h kl_float_new(double value) {
   return kl_box_ptr(obj);
 }
 
-double kl_float_get(kl_h value) { return kl_as_double(value); }
+double kl_float_get(kl_h value) {
+  return kl_as_double(value);
+}
 
 kl_h kl_bool_to_string(kl_h value) {
   const std::string text = kl_to_int(value) != 0 ? "true" : "false";

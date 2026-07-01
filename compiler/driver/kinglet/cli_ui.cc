@@ -87,12 +87,24 @@ std::string Painter::wrap(const char *code, std::string_view text) const {
   return r;
 }
 
-std::string Painter::bold(std::string_view t) const { return wrap(kBold, t); }
-std::string Painter::dim(std::string_view t) const { return wrap(kDim, t); }
-std::string Painter::red(std::string_view t) const { return wrap(kRed, t); }
-std::string Painter::green(std::string_view t) const { return wrap(kGreen, t); }
-std::string Painter::yellow(std::string_view t) const { return wrap(kYellow, t); }
-std::string Painter::cyan(std::string_view t) const { return wrap(kCyan, t); }
+std::string Painter::bold(std::string_view t) const {
+  return wrap(kBold, t);
+}
+std::string Painter::dim(std::string_view t) const {
+  return wrap(kDim, t);
+}
+std::string Painter::red(std::string_view t) const {
+  return wrap(kRed, t);
+}
+std::string Painter::green(std::string_view t) const {
+  return wrap(kGreen, t);
+}
+std::string Painter::yellow(std::string_view t) const {
+  return wrap(kYellow, t);
+}
+std::string Painter::cyan(std::string_view t) const {
+  return wrap(kCyan, t);
+}
 
 Painter g_out;
 Painter g_err;
@@ -124,8 +136,7 @@ std::string display_path(const fs::path &p) {
 }
 
 void print_error(std::string_view subcommand, std::string_view message) {
-  const std::string label =
-      subcommand.empty() ? g_prog : (g_prog + " " + std::string(subcommand));
+  const std::string label = subcommand.empty() ? g_prog : (g_prog + " " + std::string(subcommand));
   std::cerr << ui::g_err.red("✗") << " " << ui::g_err.bold(label) << ": " << message << '\n';
 }
 

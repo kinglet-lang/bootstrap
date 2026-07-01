@@ -53,29 +53,32 @@ struct RcPtr {
 
   RcPtr() = default;
   explicit RcPtr(T *p) : ptr(p) {
-    if (ptr) ++ptr->refcount;
+    if (ptr)
+      ++ptr->refcount;
   }
 
   RcPtr(const RcPtr &other) : ptr(other.ptr) {
-    if (ptr) ++ptr->refcount;
+    if (ptr)
+      ++ptr->refcount;
   }
 
-  RcPtr(RcPtr &&other) noexcept : ptr(other.ptr) {
-    other.ptr = nullptr;
-  }
+  RcPtr(RcPtr &&other) noexcept : ptr(other.ptr) { other.ptr = nullptr; }
 
   RcPtr &operator=(const RcPtr &other) {
     if (this != &other) {
-      if (ptr && --ptr->refcount == 0) delete ptr;
+      if (ptr && --ptr->refcount == 0)
+        delete ptr;
       ptr = other.ptr;
-      if (ptr) ++ptr->refcount;
+      if (ptr)
+        ++ptr->refcount;
     }
     return *this;
   }
 
   RcPtr &operator=(RcPtr &&other) noexcept {
     if (this != &other) {
-      if (ptr && --ptr->refcount == 0) delete ptr;
+      if (ptr && --ptr->refcount == 0)
+        delete ptr;
       ptr = other.ptr;
       other.ptr = nullptr;
     }
@@ -83,7 +86,8 @@ struct RcPtr {
   }
 
   ~RcPtr() {
-    if (ptr && --ptr->refcount == 0) delete ptr;
+    if (ptr && --ptr->refcount == 0)
+      delete ptr;
   }
 
   T *operator->() const { return ptr; }
@@ -109,7 +113,7 @@ struct Value {
   static Value struct_value(int type_index, std::vector<Value> fields);
   static Value enum_value(int type_index, int variant_index);
   static Value enum_value_with_payload(int type_index, int variant_index,
-                                        std::vector<Value> payload);
+                                       std::vector<Value> payload);
   static Value array_value(std::vector<Value> elements);
   static Value dense_array_value(std::vector<Value> flat, std::vector<int32_t> dims);
   static Value map_value();
@@ -124,30 +128,27 @@ struct Value {
   // ── Fields ────────────────────────────────────────────────────────────
 
   ValueType type = ValueType::Null;
-  int64_t as_int = 0;                  // Int, Char
-  double as_double_storage = 0.0;      // Double
-  bool as_bool = false;                // Bool
-  int function_idx = -1;               // Function
+  int64_t as_int = 0;                   // Int, Char
+  double as_double_storage = 0.0;       // Double
+  bool as_bool = false;                 // Bool
+  int function_idx = -1;                // Function
   NativeFn native_fn = NativeFn::IoOut; // NativeFunction
-  int enum_type_idx = -1;              // Enum (no-payload variant, inline)
-  int enum_variant_idx = -1;           // Enum (no-payload variant, inline)
-  RcPtr<HeapObj> heap;                 // String, Struct, Array, Enum(payload), Map
+  int enum_type_idx = -1;               // Enum (no-payload variant, inline)
+  int enum_variant_idx = -1;            // Enum (no-payload variant, inline)
+  RcPtr<HeapObj> heap;                  // String, Struct, Array, Enum(payload), Map
 };
 
 // ── Heap-allocated value types (defined after Value so they see it complete) ─
 
 struct HeapString final : HeapObj {
   std::string value;
-  explicit HeapString(std::string s) : value(std::move(s)) {
-    tag = ValueType::String;
-  }
+  explicit HeapString(std::string s) : value(std::move(s)) { tag = ValueType::String; }
 };
 
 struct HeapStruct final : HeapObj {
   int type_index;
   std::vector<Value> fields;
-  HeapStruct(int ti, std::vector<Value> f)
-      : type_index(ti), fields(std::move(f)) {
+  HeapStruct(int ti, std::vector<Value> f) : type_index(ti), fields(std::move(f)) {
     tag = ValueType::Struct;
   }
 };
@@ -155,9 +156,7 @@ struct HeapStruct final : HeapObj {
 struct HeapArray final : HeapObj {
   std::vector<Value> elements;
   std::vector<int32_t> dense_dims;
-  explicit HeapArray(std::vector<Value> e) : elements(std::move(e)) {
-    tag = ValueType::Array;
-  }
+  explicit HeapArray(std::vector<Value> e) : elements(std::move(e)) { tag = ValueType::Array; }
 };
 
 struct MapEntry {

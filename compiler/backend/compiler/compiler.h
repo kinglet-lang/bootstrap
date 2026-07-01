@@ -121,8 +121,7 @@ private:
 
   void emit(OpCode op, ast::SourceLocation location);
   void emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location);
-  void emit_constant(Value value, ast::SourceLocation location,
-                     KirType numeric_type = KirType::Any);
+  void emit_constant(Value value, ast::SourceLocation location, KirType numeric_type = KirType::Any);
   std::size_t emit_jump(OpCode op, ast::SourceLocation location);
   void patch_jump(std::size_t offset);
   void patch_jump_to(std::size_t offset, std::size_t target);
@@ -136,7 +135,8 @@ private:
   void warning_at(ast::SourceLocation location, std::string message);
 
   void process_import(const ast::ImportDecl &import_decl);
-  void process_import_from(const ast::ImportDecl &import_decl, const std::string &importing_file_dir);
+  void process_import_from(const ast::ImportDecl &import_decl,
+                           const std::string &importing_file_dir);
   void process_logical_import(const ast::LogicalImportDecl &import_decl);
   // Registers a single imported module's namespace, transitive imports,
   // functions, structs, and enums into the compiler's symbol tables. Shared by

@@ -10,16 +10,25 @@ namespace kinglet {
 // Forward declaration — defined in the anonymous namespace below.
 namespace {
 bool values_equal(const Value &a, const Value &b) {
-  if (a.type != b.type) return false;
+  if (a.type != b.type)
+    return false;
   switch (a.type) {
-  case ValueType::Int:    return a.as_int == b.as_int;
-  case ValueType::Double: return a.as_double_storage == b.as_double_storage;
-  case ValueType::Bool:   return a.as_bool == b.as_bool;
-  case ValueType::Char:   return a.as_int == b.as_int;
-  case ValueType::Null:   return true;
-  case ValueType::String: return a.string_val() == b.string_val();
-  case ValueType::Function: return a.function_idx == b.function_idx;
-  default:                return false;
+  case ValueType::Int:
+    return a.as_int == b.as_int;
+  case ValueType::Double:
+    return a.as_double_storage == b.as_double_storage;
+  case ValueType::Bool:
+    return a.as_bool == b.as_bool;
+  case ValueType::Char:
+    return a.as_int == b.as_int;
+  case ValueType::Null:
+    return true;
+  case ValueType::String:
+    return a.string_val() == b.string_val();
+  case ValueType::Function:
+    return a.function_idx == b.function_idx;
+  default:
+    return false;
   }
 }
 } // namespace
@@ -28,42 +37,56 @@ uint32_t Chunk::add_constant(Value value) {
   // Deduplication: if an identical constant already exists, reuse its index.
   for (uint32_t i = 0; i < static_cast<uint32_t>(constants_.size()); ++i) {
     const auto &existing = constants_[i];
-    if (existing.type != value.type) continue;
+    if (existing.type != value.type)
+      continue;
     switch (value.type) {
     case ValueType::Int:
-      if (existing.as_int == value.as_int) return i;
+      if (existing.as_int == value.as_int)
+        return i;
       break;
     case ValueType::Double:
-      if (existing.as_double_storage == value.as_double_storage) return i;
+      if (existing.as_double_storage == value.as_double_storage)
+        return i;
       break;
     case ValueType::Bool:
-      if (existing.as_bool == value.as_bool) return i;
+      if (existing.as_bool == value.as_bool)
+        return i;
       break;
     case ValueType::Char:
-      if (existing.as_int == value.as_int) return i;
+      if (existing.as_int == value.as_int)
+        return i;
       break;
     case ValueType::Null:
       return i;
     case ValueType::String:
-      if (existing.string_val() == value.string_val()) return i;
+      if (existing.string_val() == value.string_val())
+        return i;
       break;
     case ValueType::Function:
-      if (existing.function_idx == value.function_idx) return i;
+      if (existing.function_idx == value.function_idx)
+        return i;
       break;
     case ValueType::Enum: {
       if (existing.enum_type_idx != value.enum_type_idx ||
           existing.enum_variant_idx != value.enum_variant_idx)
         break;
-      if (!existing.heap && !value.heap) return i;
-      if (!existing.heap || !value.heap) break;
+      if (!existing.heap && !value.heap)
+        return i;
+      if (!existing.heap || !value.heap)
+        break;
       auto *ep = static_cast<HeapEnum *>(existing.heap.ptr);
       auto *vp = static_cast<HeapEnum *>(value.heap.ptr);
-      if (ep->payload.size() != vp->payload.size()) break;
+      if (ep->payload.size() != vp->payload.size())
+        break;
       bool match = true;
       for (std::size_t k = 0; k < ep->payload.size(); ++k) {
-        if (!values_equal(ep->payload[k], vp->payload[k])) { match = false; break; }
+        if (!values_equal(ep->payload[k], vp->payload[k])) {
+          match = false;
+          break;
+        }
       }
-      if (match) return i;
+      if (match)
+        return i;
       break;
     }
     default:
@@ -148,13 +171,11 @@ void Chunk::disassemble(std::ostream &out) const {
     if (instruction.op == OpCode::Constant) {
       out << " #" << instruction.operand << " ("
           << constants_[static_cast<std::size_t>(instruction.operand)] << ")";
-    } else if (instruction.op == OpCode::LoadLocal ||
-               instruction.op == OpCode::StoreLocal) {
+    } else if (instruction.op == OpCode::LoadLocal || instruction.op == OpCode::StoreLocal) {
       out << " slot " << instruction.operand;
     } else if (instruction.op == OpCode::Call) {
       out << " args=" << instruction.operand;
-    } else if (instruction.op == OpCode::Jmp ||
-               instruction.op == OpCode::JmpFalse) {
+    } else if (instruction.op == OpCode::Jmp || instruction.op == OpCode::JmpFalse) {
       out << " +" << instruction.operand;
     } else if (instruction.op == OpCode::JmpIfErr) {
       out << " +" << instruction.operand;
@@ -397,6 +418,5 @@ const char *opcode_name(OpCode op) {
   }
   return "Unknown";
 }
-
 
 } // namespace kinglet

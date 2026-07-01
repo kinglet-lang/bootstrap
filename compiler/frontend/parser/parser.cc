@@ -112,7 +112,8 @@ bool Parser::at_completion() const {
 }
 
 bool Parser::completion_after_dangling_access() const {
-  if (current_ == 0) return false;
+  if (current_ == 0)
+    return false;
   switch (previous().type) {
   case TokenType::DOT:
   case TokenType::COLON_COLON:
@@ -128,7 +129,8 @@ void Parser::set_completion(lsp::CompletionInfo info) {
   // primary()) set a more specific context than the fallbacks in
   // expression_statement / block_statement.  Once set, keep the
   // first (most specific) context and ignore later generic ones.
-  if (completion_result_.has_value()) return;
+  if (completion_result_.has_value())
+    return;
   completion_result_ = std::move(info);
 }
 
@@ -139,8 +141,7 @@ std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
   // io::out / io::err / io::in are built-in stream objects; expose them under a
   // synthetic type name the resolver recognises for member completion.
   if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(expr)) {
-    if (ns->namespace_name == "io" &&
-        (ns->member_name == "out" || ns->member_name == "err"))
+    if (ns->namespace_name == "io" && (ns->member_name == "out" || ns->member_name == "err"))
       return "$io_ostream";
     if (ns->namespace_name == "io" && ns->member_name == "in")
       return "$io_istream";
@@ -150,14 +151,15 @@ std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
   // segment is suffixed with "()". E.g. `r.scale(2).` -> "r\x1fscale()".
   if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(expr)) {
     std::string base = infer_receiver_type(field->object.get());
-    if (base.empty()) return {};
+    if (base.empty())
+      return {};
     return base + "\x1f" + field->field_name;
   }
   if (const auto *call = dynamic_cast<const ast::CallExpr *>(expr)) {
-    if (const auto *callee =
-            dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
+    if (const auto *callee = dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
       std::string base = infer_receiver_type(callee->object.get());
-      if (base.empty()) return {};
+      if (base.empty())
+        return {};
       return base + "\x1f" + callee->field_name + "()";
     }
   }
@@ -187,13 +189,15 @@ bool Parser::is_at_end() const {
 }
 
 bool Parser::check(TokenType type) const {
-  if (type == TokenType::GREATER && pending_greater_) return true;
+  if (type == TokenType::GREATER && pending_greater_)
+    return true;
   return !is_at_end() && peek().type == type;
 }
 
 bool Parser::check_next(TokenType type) const {
   if (pending_greater_) {
-    if (type == TokenType::GREATER) return true;
+    if (type == TokenType::GREATER)
+      return true;
     return current_ < tokens_.size() && tokens_[current_].type == type;
   }
   return current_ + 1 < tokens_.size() && tokens_[current_ + 1].type == type;
@@ -294,7 +298,8 @@ bool Parser::is_declaration_start() const {
   if (check(TokenType::CONST)) {
     return true;
   }
-  if (!is_type_start(peek().type)) return false;
+  if (!is_type_start(peek().type))
+    return false;
   size_t pos = current_ + 1;
   if (pos < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
       peek().type == TokenType::AUTO) {
@@ -305,9 +310,12 @@ bool Parser::is_declaration_start() const {
     int depth = 1;
     ++pos;
     while (pos < tokens_.size() && depth > 0) {
-      if (tokens_[pos].type == TokenType::LESS) ++depth;
-      else if (tokens_[pos].type == TokenType::GREATER) --depth;
-      else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
+      if (tokens_[pos].type == TokenType::LESS)
+        ++depth;
+      else if (tokens_[pos].type == TokenType::GREATER)
+        --depth;
+      else if (tokens_[pos].type == TokenType::GREATER_GREATER)
+        depth -= 2;
       ++pos;
     }
   }
@@ -319,7 +327,8 @@ bool Parser::looks_like_map_var_decl() const {
   // Expect current token to be '{'. Scan to the matching '}', requiring a
   // depth-1 ':' (the K:V separator), then an identifier (the variable name)
   // immediately after. A block body never has that shape.
-  if (!check(TokenType::LEFT_BRACE)) return false;
+  if (!check(TokenType::LEFT_BRACE))
+    return false;
   size_t pos = current_ + 1;
   int depth = 1;
   bool saw_top_level_colon = false;
@@ -339,36 +348,45 @@ bool Parser::looks_like_map_var_decl() const {
     }
     ++pos;
   }
-  if (!saw_top_level_colon) return false;
+  if (!saw_top_level_colon)
+    return false;
   skip_array_and_nullable_suffix(tokens_, pos);
   return pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
 }
 
 bool Parser::is_function_declaration_start() const {
-  if (!is_type_start(peek().type)) return false;
+  if (!is_type_start(peek().type))
+    return false;
   // Skip balanced <...> after the type name to find IDENTIFIER then '(' or '<'
   size_t pos = current_ + 1;
   if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
     int depth = 1;
     ++pos;
     while (pos < tokens_.size() && depth > 0) {
-      if (tokens_[pos].type == TokenType::LESS) ++depth;
-      else if (tokens_[pos].type == TokenType::GREATER) --depth;
-      else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
+      if (tokens_[pos].type == TokenType::LESS)
+        ++depth;
+      else if (tokens_[pos].type == TokenType::GREATER)
+        --depth;
+      else if (tokens_[pos].type == TokenType::GREATER_GREATER)
+        depth -= 2;
       ++pos;
     }
   }
   skip_array_and_nullable_suffix(tokens_, pos);
-  if (pos >= tokens_.size() || tokens_[pos].type != TokenType::IDENTIFIER) return false;
+  if (pos >= tokens_.size() || tokens_[pos].type != TokenType::IDENTIFIER)
+    return false;
   ++pos; // skip function name
   // Function may have type params: name<T>(...)
   if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
     int depth = 1;
     ++pos;
     while (pos < tokens_.size() && depth > 0) {
-      if (tokens_[pos].type == TokenType::LESS) ++depth;
-      else if (tokens_[pos].type == TokenType::GREATER) --depth;
-      else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
+      if (tokens_[pos].type == TokenType::LESS)
+        ++depth;
+      else if (tokens_[pos].type == TokenType::GREATER)
+        --depth;
+      else if (tokens_[pos].type == TokenType::GREATER_GREATER)
+        depth -= 2;
       ++pos;
     }
   }

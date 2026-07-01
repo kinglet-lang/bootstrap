@@ -381,33 +381,28 @@ std::string dump_kir_function(const KirFunction &function) {
     out << "  " << bb.label << ":\n";
     int temp = 0;
     for (const KirInstr &instr : bb.instrs) {
-      const bool has_result = instr.op == KirOpcode::ConstInt ||
-                              instr.op == KirOpcode::ConstI32 ||
-                              instr.op == KirOpcode::ConstI64 ||
-                              instr.op == KirOpcode::ConstU8 ||
-                              instr.op == KirOpcode::ConstF32 ||
-                              instr.op == KirOpcode::ConstF64 ||
-                              instr.op == KirOpcode::ConstFloat ||
-                              instr.op == KirOpcode::ConstBool ||
-                              instr.op == KirOpcode::ConstNull ||
-                              instr.op == KirOpcode::ConstString ||
-                              instr.op == KirOpcode::LoadLocal ||
-                              instr.op == KirOpcode::IAdd || instr.op == KirOpcode::ISub ||
-                              instr.op == KirOpcode::IMul || instr.op == KirOpcode::IDiv ||
-                              instr.op == KirOpcode::IMod || instr.op == KirOpcode::IAdd32 ||
-                              instr.op == KirOpcode::IAdd64 || instr.op == KirOpcode::ISub32 ||
-                              instr.op == KirOpcode::ISub64 || instr.op == KirOpcode::IMul32 ||
-                              instr.op == KirOpcode::IMul64 || instr.op == KirOpcode::IDiv32 ||
-                              instr.op == KirOpcode::IDiv64 || instr.op == KirOpcode::IMod32 ||
-                              instr.op == KirOpcode::IMod64 || instr.op == KirOpcode::FAdd32 ||
-                              instr.op == KirOpcode::FAdd64 || instr.op == KirOpcode::FSub32 ||
-                              instr.op == KirOpcode::FSub64 || instr.op == KirOpcode::FMul32 ||
-                              instr.op == KirOpcode::FMul64 || instr.op == KirOpcode::FDiv32 ||
-                              instr.op == KirOpcode::FDiv64 || instr.op == KirOpcode::ICmpEq ||
-                              instr.op == KirOpcode::ICmpNeq || instr.op == KirOpcode::ICmpLt ||
-                              instr.op == KirOpcode::ICmpGt || instr.op == KirOpcode::ICmpLe ||
-                              instr.op == KirOpcode::ICmpGe || instr.op == KirOpcode::ConstFn ||
-                              instr.op == KirOpcode::Call;
+      const bool has_result =
+          instr.op == KirOpcode::ConstInt || instr.op == KirOpcode::ConstI32 ||
+          instr.op == KirOpcode::ConstI64 || instr.op == KirOpcode::ConstU8 ||
+          instr.op == KirOpcode::ConstF32 || instr.op == KirOpcode::ConstF64 ||
+          instr.op == KirOpcode::ConstFloat || instr.op == KirOpcode::ConstBool ||
+          instr.op == KirOpcode::ConstNull || instr.op == KirOpcode::ConstString ||
+          instr.op == KirOpcode::LoadLocal || instr.op == KirOpcode::IAdd ||
+          instr.op == KirOpcode::ISub || instr.op == KirOpcode::IMul ||
+          instr.op == KirOpcode::IDiv || instr.op == KirOpcode::IMod ||
+          instr.op == KirOpcode::IAdd32 || instr.op == KirOpcode::IAdd64 ||
+          instr.op == KirOpcode::ISub32 || instr.op == KirOpcode::ISub64 ||
+          instr.op == KirOpcode::IMul32 || instr.op == KirOpcode::IMul64 ||
+          instr.op == KirOpcode::IDiv32 || instr.op == KirOpcode::IDiv64 ||
+          instr.op == KirOpcode::IMod32 || instr.op == KirOpcode::IMod64 ||
+          instr.op == KirOpcode::FAdd32 || instr.op == KirOpcode::FAdd64 ||
+          instr.op == KirOpcode::FSub32 || instr.op == KirOpcode::FSub64 ||
+          instr.op == KirOpcode::FMul32 || instr.op == KirOpcode::FMul64 ||
+          instr.op == KirOpcode::FDiv32 || instr.op == KirOpcode::FDiv64 ||
+          instr.op == KirOpcode::ICmpEq || instr.op == KirOpcode::ICmpNeq ||
+          instr.op == KirOpcode::ICmpLt || instr.op == KirOpcode::ICmpGt ||
+          instr.op == KirOpcode::ICmpLe || instr.op == KirOpcode::ICmpGe ||
+          instr.op == KirOpcode::ConstFn || instr.op == KirOpcode::Call;
       if (has_result) {
         out << "    %" << temp++ << " = ";
       } else {

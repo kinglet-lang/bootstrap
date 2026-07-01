@@ -54,8 +54,8 @@ kl_h kl_dense_array_new(int32_t rows, int32_t cols, const kl_h *elements) {
   auto *obj = new KlArray();
   if (rows > 0 && cols > 0 && elements != nullptr) {
     obj->dense_dims = {rows, cols};
-    obj->elements.assign(elements,
-                         elements + static_cast<std::size_t>(rows) * static_cast<std::size_t>(cols));
+    obj->elements.assign(elements, elements + static_cast<std::size_t>(rows) *
+                                                  static_cast<std::size_t>(cols));
   }
   return kl_box_ptr(obj);
 }
@@ -73,8 +73,8 @@ kl_h kl_dense2d_get(kl_h grid, int32_t row, int32_t col) {
   if (row >= rows || col >= cols) {
     return kl_from_int(0);
   }
-  const std::size_t idx =
-      static_cast<std::size_t>(row) * static_cast<std::size_t>(cols) + static_cast<std::size_t>(col);
+  const std::size_t idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(cols) +
+                          static_cast<std::size_t>(col);
   return obj->elements[idx];
 }
 
@@ -90,8 +90,8 @@ kl_h kl_array_get(kl_h array, int32_t index) {
     if (static_cast<std::size_t>(index) >= bytes.size()) {
       return kl_from_int(0);
     }
-    return kl_from_int(static_cast<int8_t>(
-        static_cast<unsigned char>(bytes[static_cast<std::size_t>(index)])));
+    return kl_from_int(
+        static_cast<int8_t>(static_cast<unsigned char>(bytes[static_cast<std::size_t>(index)])));
   }
   if (hdr->kind != KlKind::Array) {
     return kl_from_int(0);
@@ -104,8 +104,7 @@ kl_h kl_array_get(kl_h array, int32_t index) {
       if (index >= rows) {
         runtime_abort("Array index out of bounds.");
       }
-      const std::size_t base =
-          static_cast<std::size_t>(index) * static_cast<std::size_t>(cols);
+      const std::size_t base = static_cast<std::size_t>(index) * static_cast<std::size_t>(cols);
       return kl_array_new(cols, obj->elements.data() + static_cast<std::ptrdiff_t>(base));
     }
     return kl_from_int(0);
@@ -208,8 +207,7 @@ kl_h kl_array_insert(kl_h array, kl_h index, kl_h value) {
   // Inserting an array splices its elements, mirroring the VM.
   if (kl_is_kind(value, KlKind::Array)) {
     auto *src = static_cast<KlArray *>(kl_unbox_ptr(value));
-    arr->elements.insert(arr->elements.begin() + idx, src->elements.begin(),
-                         src->elements.end());
+    arr->elements.insert(arr->elements.begin() + idx, src->elements.begin(), src->elements.end());
   } else {
     arr->elements.insert(arr->elements.begin() + idx, value);
   }
