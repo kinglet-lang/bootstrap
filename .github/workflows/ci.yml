@@ -73,7 +73,7 @@ jobs:
       - name: Generate build files
         shell: bash
         run: |
-          gn gen out/Sanitizers --args='is_debug=false enable_llvm=true sanitizer="address,undefined" llvm_config=\"'"$LLVM_CONFIG"'\"'
+          gn gen out/Sanitizers --args="is_debug=false enable_llvm=true sanitizer=\"address,undefined\" llvm_config=\"$LLVM_CONFIG\""
 
       - name: Build
         shell: bash
