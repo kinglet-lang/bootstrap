@@ -8,10 +8,13 @@ Install once per clone:
 
 This sets `core.hooksPath` to `scripts/hooks/` in the current repository.
 
-## Pre-commit: core source comments
+## Pre-commit: formatting and comments
 
-Applies to staged `.cc`, `.h`, `.c`, and `.kl` files under the compiler
-toolchain (parser, checker, compiler, module loader, IR, etc.).
+### clang-format
+
+Staged `.cc` and `.h` files are auto-formatted with `clang-format -i -style=file`
+before the comment check runs. If `clang-format` is not installed the step is
+silently skipped.
 
 ### Required file header
 
