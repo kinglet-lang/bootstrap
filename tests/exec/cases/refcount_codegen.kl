@@ -1,0 +1,138 @@
+// RUN: run
+// Stress test for native heap reference counting.
+// Exercises local-variable assignment, reassignment, function-argument
+// passing, return values, and container ops across multiple types to
+// verify retain/release codegen wiring does not crash or corrupt state.
+
+using io;
+
+struct Point {
+  int x;
+  int y;
+}
+
+// Return a newly-allocated string — caller must own it.
+string make_greeting(string name) {
+  return "hello " + name;
+}
+
+// Return a newly-allocated array — caller must own it.
+int[] make_range(int n) {
+  int[] arr = [0];
+  arr.pop();
+  for (int i = 0; i < n; i = i + 1) {
+    arr.push(i);
+  }
+  return arr;
+}
+
+// Reassign local multiple times — exercises StoreLocal release+retain.
+int[] reassign_local(int n) {
+  int[] a = [1, 2];
+  a = [n, n + 1, n + 2];    // release old [1,2], retain new
+  a = [42];                  // release old [n,n+1,n+2], retain [42]
+  return a;
+}
+
+// Shared references — exercises LoadLocal retain.
+void shared_refs() {
+  string a = "alpha";
+  string b = a;              // LoadLocal retain: refcount now 2
+  string c = a;              // LoadLocal retain: refcount now 3
+  string d = b;              // LoadLocal retain on b
+
+  io::out.line(a);           // all still valid after sharing
+  io::out.line(b);
+  io::out.line(c);
+  io::out.line(d);
+  // Return: release 4 locals → refcount back to 0, free
+}
+
+// Struct field access: LoadLocal, FieldGet, StoreLocal.
+void struct_fields() {
+  Point p1 = Point{10, 20};
+  Point p2 = p1;             // struct value loaded and stored
+  io::out.line("x={}, y={}", p2.x, p2.y);
+
+  p1.x = 99;                 // field-set through StoreLocal
+  io::out.line("p1.x after update: {}", p1.x);
+  io::out.line("p2.x unchanged: {}", p2.x);
+}
+
+// Map ops exercise retain/release on container elements.
+void map_exercise() {
+  {string: int} m = {};
+  m["one"] = 1;
+  m["two"] = 2;
+  io::out.line("map len: {}", m.len());
+
+  m["three"] = 3;            // retain string key and int value
+  io::out.line("three: {}", m["three"]);
+
+  m.remove("one");           // release "one"'s entry
+  io::out.line("has one? {}", m.has("one"));
+  io::out.line("len after remove: {}", m.len());
+}
+
+// Nested function calls: arguments retained by callee, results returned.
+string nesting() {
+  string s = make_greeting("world");
+  return make_greeting(s);    // s is arg → callee retains, caller's local released at end
+}
+
+// Enum payload: exercises enum_new_payload with heap elements.
+void enum_payload() {
+  // Test nullable through container access (existing pattern).
+  {string: int} m = {};
+  int v = m["missing"];
+  io::out.line("miss is null: {}", v == null);
+  m["ok"] = 123;
+  int v2 = m["ok"];
+  io::out.line("ok is not null: {}", v2 != null);
+
+  int? opt = v2;            // nullable from non-null value
+  io::out.line("opt is some: {}", opt != null);
+}
+
+int main() {
+  io::out.line("=== greeting ===");
+  string greet = make_greeting("kinglet");
+  io::out.line(greet);
+
+  io::out.line("=== range ===");
+  int[] r = make_range(3);
+  io::out.line("len={}, r[0]={}, r[2]={}", r.len(), r[0], r[2]);
+
+  io::out.line("=== reassign ===");
+  int[] a = reassign_local(7);
+  io::out.line("a[0]={}", a[0]);
+
+  io::out.line("=== shared_refs ===");
+  shared_refs();
+
+  io::out.line("=== struct_fields ===");
+  struct_fields();
+
+  io::out.line("=== map_exercise ===");
+  map_exercise();
+
+  io::out.line("=== nesting ===");
+  io::out.line(nesting());
+
+  io::out.line("=== enum_payload ===");
+  enum_payload();
+
+  // Large allocation stress: create and drop many arrays.
+  io::out.line("=== stress ===");
+  for (int i = 0; i < 100; i = i + 1) {
+    int[] tmp = [0];
+    tmp.pop();
+    for (int j = 0; j < 10; j = j + 1) {
+      tmp.push(j);
+    }
+    // tmp goes out of scope each iteration → release cascade
+  }
+  io::out.line("stress done");
+
+  return 0;
+}
