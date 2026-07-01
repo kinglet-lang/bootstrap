@@ -72,7 +72,8 @@ CompileResult Compiler::compile(const ast::Program &program) {
     if (const auto *import_decl = dynamic_cast<const ast::ImportDecl *>(declaration.get())) {
       process_import(*import_decl);
     }
-    if (const auto *logical_import = dynamic_cast<const ast::LogicalImportDecl *>(declaration.get())) {
+    if (const auto *logical_import =
+            dynamic_cast<const ast::LogicalImportDecl *>(declaration.get())) {
       process_logical_import(*logical_import);
     }
     if (const auto *import_block = dynamic_cast<const ast::ImportBlockDecl *>(declaration.get())) {
@@ -192,7 +193,8 @@ CompileResult Compiler::compile(const ast::Program &program) {
   // Pass 2: compile each function body
   for (const auto *function : functions) {
     compile_function(*function);
-    if (!errors_.empty()) break;
+    if (!errors_.empty())
+      break;
   }
 
   // Pass 2b: compile imported function bodies (deterministic namespace order).
@@ -207,9 +209,11 @@ CompileResult Compiler::compile(const ast::Program &program) {
     for (const auto *function : func_list) {
       std::string qualified = module_id_to_qualifier(ns) + "::" + function->name;
       compile_function(*function, qualified);
-      if (!errors_.empty()) break;
+      if (!errors_.empty())
+        break;
     }
-    if (!errors_.empty()) break;
+    if (!errors_.empty())
+      break;
   }
 
   // Pass 3: compile deferred generic function instantiations
@@ -218,7 +222,8 @@ CompileResult Compiler::compile(const ast::Program &program) {
     pending_generic_funcs_.clear();
     for (const auto &[name, decl] : pending) {
       compile_function(*decl, name);
-      if (!errors_.empty()) break;
+      if (!errors_.empty())
+        break;
     }
   }
 
@@ -330,7 +335,8 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
 
   for (const auto *function : functions) {
     compile_function(*function);
-    if (!errors_.empty()) break;
+    if (!errors_.empty())
+      break;
   }
 
   attach_kir_metadata();
@@ -396,7 +402,8 @@ void Compiler::push_scope() {
 }
 
 void Compiler::pop_scope() {
-  if (scope_stack_.empty()) return;
+  if (scope_stack_.empty())
+    return;
   const std::size_t target = scope_stack_.back();
   scope_stack_.pop_back();
   while (locals_.size() > target) {
@@ -407,14 +414,17 @@ void Compiler::pop_scope() {
 std::string Compiler::infer_struct_type(const ast::Expr &expr) const {
   if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
     auto it = local_types_.find(id->name);
-    if (it != local_types_.end()) return it->second;
+    if (it != local_types_.end())
+      return it->second;
     return "";
   }
   if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
     std::string parent_type = infer_struct_type(*field->object);
-    if (parent_type.empty()) return "";
+    if (parent_type.empty())
+      return "";
     auto si = struct_indices_.find(parent_type);
-    if (si == struct_indices_.end()) return "";
+    if (si == struct_indices_.end())
+      return "";
     const auto &meta = struct_metas_[static_cast<std::size_t>(si->second)];
     for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
       if (meta.field_names[i] == field->field_name) {
@@ -423,12 +433,14 @@ std::string Compiler::infer_struct_type(const ast::Expr &expr) const {
     }
     std::string method_key = parent_type + "::" + field->field_name;
     auto fi = function_indices_.find(method_key);
-    if (fi != function_indices_.end()) return parent_type;
+    if (fi != function_indices_.end())
+      return parent_type;
     return "";
   }
   if (const auto *call = dynamic_cast<const ast::CallExpr *>(&expr)) {
     if (const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call->callee.get())) {
-      if (struct_indices_.count(callee_id->name)) return callee_id->name;
+      if (struct_indices_.count(callee_id->name))
+        return callee_id->name;
       auto ret_it = method_return_types_.find(callee_id->name);
       if (ret_it != method_return_types_.end() && struct_indices_.count(ret_it->second))
         return ret_it->second;
@@ -464,14 +476,20 @@ int Compiler::resolve_free_function_for_type(const std::string &name,
 }
 
 std::string Compiler::infer_arg_type_name(const ast::Expr &expr) const {
-  if (dynamic_cast<const ast::IntLiteralExpr *>(&expr)) return "int";
-  if (dynamic_cast<const ast::FloatLiteralExpr *>(&expr)) return "float";
-  if (dynamic_cast<const ast::BoolLiteralExpr *>(&expr)) return "bool";
-  if (dynamic_cast<const ast::CharLiteralExpr *>(&expr)) return "char";
-  if (dynamic_cast<const ast::StringLiteralExpr *>(&expr)) return "string";
+  if (dynamic_cast<const ast::IntLiteralExpr *>(&expr))
+    return "int";
+  if (dynamic_cast<const ast::FloatLiteralExpr *>(&expr))
+    return "float";
+  if (dynamic_cast<const ast::BoolLiteralExpr *>(&expr))
+    return "bool";
+  if (dynamic_cast<const ast::CharLiteralExpr *>(&expr))
+    return "char";
+  if (dynamic_cast<const ast::StringLiteralExpr *>(&expr))
+    return "string";
   if (const auto *id = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
     auto it = local_types_.find(id->name);
-    if (it != local_types_.end()) return it->second;
+    if (it != local_types_.end())
+      return it->second;
     return "";
   }
   // Struct value or method return — reuse the struct-type inferencer.
@@ -527,8 +545,7 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
   }
   // The call side mangles symbols from function_source_paths_; keep the
   // definition side identical so cross-module links resolve.
-  if (func_idx >= 0 &&
-      static_cast<std::size_t>(func_idx) < function_source_paths_.size() &&
+  if (func_idx >= 0 && static_cast<std::size_t>(func_idx) < function_source_paths_.size() &&
       !function_source_paths_[static_cast<std::size_t>(func_idx)].empty()) {
     fn_source = function_source_paths_[static_cast<std::size_t>(func_idx)];
   }
@@ -559,8 +576,7 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
   kir_recorder_.begin_function(name, static_cast<int>(function.params.size()), fn_source);
   bool body_returned = false;
   if (body && !body->statements.empty()) {
-    body_returned =
-        dynamic_cast<const ast::ReturnStmt *>(body->statements.back().get()) != nullptr;
+    body_returned = dynamic_cast<const ast::ReturnStmt *>(body->statements.back().get()) != nullptr;
   }
   compile_stmt(*function.body);
   implicit_return_stmt_ = nullptr;
@@ -579,7 +595,8 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     push_scope();
     bool returned = false;
     for (const ast::StmtPtr &statement : block->statements) {
-      if (returned) break;
+      if (returned)
+        break;
       compile_stmt(*statement);
       if (!errors_.empty()) {
         return;
@@ -611,10 +628,12 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       // Record the monomorphized name for a generic type (Box<int> -> Box__int)
       // so member access on this local resolves to the instantiated struct.
       std::string ty = var_decl->type.name;
-      for (const auto &a : var_decl->type.type_args) ty += "__" + a.to_string();
+      for (const auto &a : var_decl->type.type_args)
+        ty += "__" + a.to_string();
       local_types_[var_decl->name] = ty;
     } else if (var_decl->init) {
-      if (const auto *struct_lit = dynamic_cast<const ast::StructLiteralExpr *>(var_decl->init.get())) {
+      if (const auto *struct_lit =
+              dynamic_cast<const ast::StructLiteralExpr *>(var_decl->init.get())) {
         local_types_[var_decl->name] = struct_lit->struct_type.name;
       }
     }
@@ -832,18 +851,15 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
 
 void Compiler::compile_int_literal(const ast::IntLiteralExpr &int_lit) {
 
-  const KirType width =
-      kir_type_from_int_literal_suffix(int_lit.width_suffix, int_lit.value);
+  const KirType width = kir_type_from_int_literal_suffix(int_lit.width_suffix, int_lit.value);
   emit_constant(Value::int_value(int_lit.value), int_lit.location, width);
   return;
-
 }
 
 void Compiler::compile_char_literal(const ast::CharLiteralExpr &char_lit) {
 
   emit_constant(Value::char_value(char_lit.value), char_lit.location, KirType::Int8);
   return;
-
 }
 
 void Compiler::compile_float_literal(const ast::FloatLiteralExpr &float_lit) {
@@ -851,7 +867,6 @@ void Compiler::compile_float_literal(const ast::FloatLiteralExpr &float_lit) {
   const KirType width = kir_type_from_float_literal_suffix(float_lit.width_suffix);
   emit_constant(Value::double_value(float_lit.value), float_lit.location, width);
   return;
-
 }
 
 void Compiler::compile_string_literal(const ast::StringLiteralExpr &string_lit) {
@@ -892,14 +907,12 @@ void Compiler::compile_string_literal(const ast::StringLiteralExpr &string_lit) 
   }
   emit_constant(Value::string_value(unescaped), string_lit.location);
   return;
-
 }
 
 void Compiler::compile_bool_literal(const ast::BoolLiteralExpr &bool_lit) {
 
   emit(bool_lit.value ? OpCode::True : OpCode::False, bool_lit.location);
   return;
-
 }
 void Compiler::compile_null_literal(const ast::NullLiteralExpr &null_lit) {
   emit(OpCode::Null, null_lit.location);
@@ -927,7 +940,6 @@ void Compiler::compile_unary(const ast::UnaryExpr &unary) {
     break;
   }
   return;
-
 }
 
 void Compiler::compile_identifier(const ast::IdentifierExpr &identifier) {
@@ -947,14 +959,12 @@ void Compiler::compile_identifier(const ast::IdentifierExpr &identifier) {
     emit(OpCode::DerefLoad, identifier.location);
   }
   return;
-
 }
 
 void Compiler::compile_assign_expr(const ast::AssignExpr &assign) {
 
   compile_assignment(assign);
   return;
-
 }
 
 void Compiler::compile_binary(const ast::BinaryExpr &binary) {
@@ -1028,7 +1038,6 @@ void Compiler::compile_binary(const ast::BinaryExpr &binary) {
     break;
   }
   return;
-
 }
 
 void Compiler::compile_call(const ast::CallExpr &call_expr) {
@@ -1062,16 +1071,14 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     }
   }
 
-  const auto *ns_callee =
-      dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
+  const auto *ns_callee = dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
   // Type-qualified methods: int::bits(float) -> uint64; float::from_bits(uint64) -> float
   if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
     compile_expr(*call_expr.args[0]);
     emit(OpCode::FloatToBits, call_expr.location);
     return;
   }
-  if (ns_callee && ns_callee->namespace_name == "float" &&
-      ns_callee->member_name == "from_bits") {
+  if (ns_callee && ns_callee->namespace_name == "float" && ns_callee->member_name == "from_bits") {
     if (call_expr.args.size() != 1) {
       error_at(call_expr.location, "float::from_bits() expects exactly 1 argument.");
       return;
@@ -1120,10 +1127,12 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       compile_expr(*call_expr.args[0]);
       const auto *idx_lit = dynamic_cast<const ast::IntLiteralExpr *>(call_expr.args[1].get());
       if (!idx_lit || idx_lit->value < 0) {
-        error_at(call_expr.location, "rt::enum_payload_at index must be a non-negative int literal.");
+        error_at(call_expr.location,
+                 "rt::enum_payload_at index must be a non-negative int literal.");
         return;
       }
-      emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(idx_lit->value), call_expr.location);
+      emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(idx_lit->value),
+                   call_expr.location);
       return;
     }
   }
@@ -1188,8 +1197,8 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) |
-                         static_cast<uint32_t>(variant_idx);
+      uint32_t operand =
+          (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
       emit_operand(OpCode::EnumVariantPayload, operand, call_expr.location);
       return;
     }
@@ -1198,15 +1207,14 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   if (ns_callee && sema_.concept_registry_.count(ns_callee->namespace_name)) {
     if (call_expr.args.empty()) {
       error_at(call_expr.location, "Concept method '" + ns_callee->namespace_name + "::" +
-                                      ns_callee->member_name + "' expects at least one argument.");
+                                       ns_callee->member_name + "' expects at least one argument.");
       return;
     }
     const std::string arg_ty = infer_arg_type_name(*call_expr.args[0]);
-    const int func_idx =
-        resolve_free_function_for_type(ns_callee->member_name, arg_ty);
+    const int func_idx = resolve_free_function_for_type(ns_callee->member_name, arg_ty);
     if (func_idx < 0) {
       error_at(call_expr.location, "No implementation of '" + ns_callee->namespace_name + "::" +
-                                      ns_callee->member_name + "' for type '" + arg_ty + "'.");
+                                       ns_callee->member_name + "' for type '" + arg_ty + "'.");
       return;
     }
     for (const ast::ExprPtr &arg : call_expr.args) {
@@ -1218,11 +1226,9 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   }
 
   // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
-  const auto *field_callee =
-      dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get());
+  const auto *field_callee = dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get());
   if (field_callee) {
-    const auto *ns_obj =
-        dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
+    const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
     if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
       if (ns_obj->member_name == "out" && field_callee->field_name == "line") {
         for (const ast::ExprPtr &arg : call_expr.args) {
@@ -1253,8 +1259,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
 
   // Handle `using namespace io;` bare out.line / err.line / in.secret.
   if (field_callee) {
-    const auto *id_obj =
-        dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
+    const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
     if (id_obj && sema_.opened_.count("io") != 0) {
       if (id_obj->name == "out" && field_callee->field_name == "line") {
         for (const ast::ExprPtr &arg : call_expr.args) {
@@ -1286,13 +1291,12 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   // Handle array/string method calls
   if (field_callee) {
     const std::string &method = field_callee->field_name;
-    if (method == "len" || method == "push" || method == "pop" ||
-        method == "remove" || method == "contains" || method == "clear" ||
-        method == "insert" || method == "index_of" || method == "slice" ||
-        method == "reverse" || method == "resize" || method == "has" ||
-        method == "keys" || method == "starts_with" ||
-        method == "ends_with" || method == "replace" || method == "split" ||
-        method == "trim" || method == "to_upper" || method == "to_lower") {
+    if (method == "len" || method == "push" || method == "pop" || method == "remove" ||
+        method == "contains" || method == "clear" || method == "insert" || method == "index_of" ||
+        method == "slice" || method == "reverse" || method == "resize" || method == "has" ||
+        method == "keys" || method == "starts_with" || method == "ends_with" ||
+        method == "replace" || method == "split" || method == "trim" || method == "to_upper" ||
+        method == "to_lower") {
       compile_expr(*field_callee->object);
       if (method == "len") {
         emit(OpCode::ArrayLen, call_expr.location);
@@ -1404,9 +1408,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_constant(Value::function_value(
-            func_it->second),
-            call_expr.location);
+        emit_constant(Value::function_value(func_it->second), call_expr.location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
                      call_expr.location);
         return;
@@ -1420,9 +1422,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_constant(Value::function_value(
-            free_idx),
-            call_expr.location);
+        emit_constant(Value::function_value(free_idx), call_expr.location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
                      call_expr.location);
         return;
@@ -1443,10 +1443,14 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       std::unordered_map<std::string, std::string> inferred;
       for (size_t i = 0; i < decl->params.size() && i < call_expr.args.size(); ++i) {
         const ast::TypeExpr &pt = decl->params[i].type;
-        if (!pt.type_args.empty() || inferred.count(pt.name)) continue;
+        if (!pt.type_args.empty() || inferred.count(pt.name))
+          continue;
         bool is_type_param = false;
         for (const std::string &tp : decl->type_params) {
-          if (tp == pt.name) { is_type_param = true; break; }
+          if (tp == pt.name) {
+            is_type_param = true;
+            break;
+          }
         }
         if (is_type_param) {
           inferred[pt.name] = infer_arg_type_name(*call_expr.args[i]);
@@ -1481,9 +1485,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_constant(Value::function_value(
-            func_it->second),
-            call_expr.location);
+        emit_constant(Value::function_value(func_it->second), call_expr.location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
         return;
       }
@@ -1523,9 +1525,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_constant(Value::function_value(
-            func_it->second),
-            call_expr.location);
+        emit_constant(Value::function_value(func_it->second), call_expr.location);
         emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
         return;
       }
@@ -1534,8 +1534,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
 
   // User-defined function call
   if (callee_id) {
-    std::unordered_map<std::string, int>::const_iterator func_it =
-        function_indices_.end();
+    std::unordered_map<std::string, int>::const_iterator func_it = function_indices_.end();
     if (!compiling_namespace_.empty()) {
       func_it = function_indices_.find(compiling_namespace_ + "::" + callee_id->name);
     }
@@ -1558,9 +1557,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_constant(Value::function_value(
-          func_it->second),
-          call_expr.location);
+      emit_constant(Value::function_value(func_it->second), call_expr.location);
       emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
       return;
     }
@@ -1572,7 +1569,6 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   compile_expr(*call_expr.callee);
   emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
   return;
-
 }
 
 void Compiler::compile_match(const ast::MatchExpr &match_expr) {
@@ -1683,7 +1679,8 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
       // Check if value matches this enum type and variant
       // Stack: [initial_val]
       emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
-      uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
+      uint32_t operand =
+          (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
       emit_operand(OpCode::EnumVariant, operand, enum_pat->location);
       emit(OpCode::Eq, enum_pat->location);
       fail_jumps.push_back(emit_jump(OpCode::JmpFalse, enum_pat->location));
@@ -1691,7 +1688,8 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
 
       // Extract payload bindings — these push/pop around initial_val.
       for (std::size_t i = 0; i < enum_pat->fields.size(); ++i) {
-        const auto *field_binding = dynamic_cast<const ast::BindingPattern *>(enum_pat->fields[i].get());
+        const auto *field_binding =
+            dynamic_cast<const ast::BindingPattern *>(enum_pat->fields[i].get());
         if (field_binding) {
           const uint32_t slot = static_cast<uint32_t>(locals_.size());
           locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
@@ -1722,7 +1720,8 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
       for (std::size_t j = 0; j < bind_slots.size(); ++j) {
         locals_.pop_back();
       }
-    } else if (const auto *struct_pat = dynamic_cast<const ast::StructPattern *>(arm.pattern.get())) {
+    } else if (const auto *struct_pat =
+                   dynamic_cast<const ast::StructPattern *>(arm.pattern.get())) {
       auto struct_it = struct_indices_.find(struct_pat->struct_name);
       if (struct_it == struct_indices_.end()) {
         error_at(struct_pat->location, "Unknown struct type '" + struct_pat->struct_name + "'.");
@@ -1809,7 +1808,6 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
 
   locals_.pop_back();
   return;
-
 }
 
 void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_access) {
@@ -1832,11 +1830,10 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
     int param_count = meta.variant_param_counts[static_cast<std::size_t>(variant_idx)];
     if (param_count > 0) {
       error_at(ns_access.location, "Enum variant '" + ns_access.member_name + "' requires " +
-               std::to_string(param_count) + " argument(s).");
+                                       std::to_string(param_count) + " argument(s).");
       return;
     }
-    uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) |
-                       static_cast<uint32_t>(variant_idx);
+    uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
     emit_operand(OpCode::EnumVariant, operand, ns_access.location);
     return;
   }
@@ -1894,13 +1891,11 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
     if (sema_.imported_qualifiers_.count(prefix)) {
       auto it = function_indices_.find(qualified);
       if (it != function_indices_.end()) {
-        emit_constant(Value::function_value(
-                          it->second),
-                      ns_access.location);
+        emit_constant(Value::function_value(it->second), ns_access.location);
         return;
       }
-      error_at(ns_access.location, "'" + ns_access.member_name + "' is not exported from '" +
-                                      prefix + "'.");
+      error_at(ns_access.location,
+               "'" + ns_access.member_name + "' is not exported from '" + prefix + "'.");
       return;
     }
   }
@@ -1914,7 +1909,6 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
     error_at(ns_access.location, "Unknown namespace '" + ns_access.namespace_name + "'.");
   }
   return;
-
 }
 
 void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) {
@@ -1927,10 +1921,14 @@ void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) 
     std::unordered_map<std::string, std::string> inferred;
     for (size_t i = 0; i < decl->fields.size() && i < struct_lit.fields.size(); ++i) {
       const ast::TypeExpr &ft = decl->fields[i].type;
-      if (!ft.type_args.empty() || inferred.count(ft.name)) continue;
+      if (!ft.type_args.empty() || inferred.count(ft.name))
+        continue;
       bool is_type_param = false;
       for (const std::string &tp : decl->type_params) {
-        if (tp == ft.name) { is_type_param = true; break; }
+        if (tp == ft.name) {
+          is_type_param = true;
+          break;
+        }
       }
       if (is_type_param) {
         inferred[ft.name] = infer_arg_type_name(*struct_lit.fields[i].value);
@@ -1939,7 +1937,8 @@ void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) 
     std::vector<std::string> targs;
     for (const std::string &tp : decl->type_params) {
       auto it = inferred.find(tp);
-      if (it != inferred.end() && !it->second.empty()) targs.push_back(it->second);
+      if (it != inferred.end() && !it->second.empty())
+        targs.push_back(it->second);
     }
     if (targs.size() == decl->type_params.size()) {
       for (const std::string &n : targs) {
@@ -1964,10 +1963,10 @@ void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) 
       emit(OpCode::Null, struct_lit.location);
     }
   }
-  emit_operand(OpCode::StructNew, static_cast<uint32_t>((type_idx << 16) |
-               static_cast<int>(meta.field_names.size())), struct_lit.location);
+  emit_operand(OpCode::StructNew,
+               static_cast<uint32_t>((type_idx << 16) | static_cast<int>(meta.field_names.size())),
+               struct_lit.location);
   return;
-
 }
 
 void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
@@ -1986,7 +1985,8 @@ void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
     } else if (ns_obj->member_name == "in" && field_access.field_name == "secret") {
       fn = NativeFn::IoInSecret;
     } else {
-      error_at(field_access.location, "Unknown io method '" + ns_obj->member_name + "." + field_access.field_name + "'.");
+      error_at(field_access.location,
+               "Unknown io method '" + ns_obj->member_name + "." + field_access.field_name + "'.");
       return;
     }
     emit_constant(Value::native_function_value(fn), field_access.location);
@@ -1996,7 +1996,6 @@ void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
   uint32_t field_const = add_constant_(Value::string_value(field_access.field_name));
   emit_operand(OpCode::FieldGet, field_const, field_access.location);
   return;
-
 }
 
 void Compiler::compile_field_assign(const ast::FieldAssignExpr &field_assign) {
@@ -2006,7 +2005,6 @@ void Compiler::compile_field_assign(const ast::FieldAssignExpr &field_assign) {
   uint32_t field_const = add_constant_(Value::string_value(field_assign.field_name));
   emit_operand(OpCode::FieldSet, field_const, field_assign.location);
   return;
-
 }
 
 void Compiler::compile_array_literal(const ast::ArrayLiteralExpr &array_lit) {
@@ -2019,8 +2017,7 @@ void Compiler::compile_array_literal(const ast::ArrayLiteralExpr &array_lit) {
         compile_expr(*cell);
       }
     }
-    emit_operand(OpCode::DenseArrayNew,
-                 pack_dense2d_shape(dense_shape.rows, dense_shape.cols),
+    emit_operand(OpCode::DenseArrayNew, pack_dense2d_shape(dense_shape.rows, dense_shape.cols),
                  array_lit.location);
     return;
   }
@@ -2030,7 +2027,6 @@ void Compiler::compile_array_literal(const ast::ArrayLiteralExpr &array_lit) {
   emit_operand(OpCode::ArrayNew, static_cast<uint32_t>(array_lit.elements.size()),
                array_lit.location);
   return;
-
 }
 
 void Compiler::compile_map_literal(const ast::MapLiteralExpr &map_lit) {
@@ -2039,10 +2035,8 @@ void Compiler::compile_map_literal(const ast::MapLiteralExpr &map_lit) {
     compile_expr(*map_lit.keys[i]);
     compile_expr(*map_lit.values[i]);
   }
-  emit_operand(OpCode::MapNew, static_cast<uint32_t>(map_lit.keys.size()),
-               map_lit.location);
+  emit_operand(OpCode::MapNew, static_cast<uint32_t>(map_lit.keys.size()), map_lit.location);
   return;
-
 }
 
 void Compiler::compile_index(const ast::IndexExpr &index_expr) {
@@ -2051,7 +2045,6 @@ void Compiler::compile_index(const ast::IndexExpr &index_expr) {
   compile_expr(*index_expr.index);
   emit(OpCode::IndexGet, index_expr.location);
   return;
-
 }
 
 void Compiler::compile_index_assign(const ast::IndexAssignExpr &index_assign) {
@@ -2061,7 +2054,6 @@ void Compiler::compile_index_assign(const ast::IndexAssignExpr &index_assign) {
   compile_expr(*index_assign.value);
   emit(OpCode::IndexSet, index_assign.location);
   return;
-
 }
 
 void Compiler::compile_cast(const ast::CastExpr &cast) {
@@ -2069,17 +2061,20 @@ void Compiler::compile_cast(const ast::CastExpr &cast) {
   compile_expr(*cast.value);
   int target_kind = -1;
   const std::string &t = cast.target_type.name;
-  if (t == "int") target_kind = 0;
-  else if (t == "float") target_kind = 1;
-  else if (t == "string") target_kind = 2;
-  else if (t == "char" || t == "byte") target_kind = 3;
+  if (t == "int")
+    target_kind = 0;
+  else if (t == "float")
+    target_kind = 1;
+  else if (t == "string")
+    target_kind = 2;
+  else if (t == "char" || t == "byte")
+    target_kind = 3;
   if (target_kind < 0) {
     error_at(cast.location, "Cast target '" + t + "' is not supported in VM compiler.");
     return;
   }
   emit_operand(OpCode::CastTo, static_cast<uint32_t>(target_kind), cast.location);
   return;
-
 }
 
 void Compiler::compile_ternary(const ast::TernaryExpr &ternary) {
@@ -2092,7 +2087,6 @@ void Compiler::compile_ternary(const ast::TernaryExpr &ternary) {
   compile_expr(*ternary.else_expr);
   patch_jump(end_jump);
   return;
-
 }
 
 void Compiler::compile_null_coalesce(const ast::NullCoalesceExpr &null_coalesce) {
@@ -2115,7 +2109,6 @@ void Compiler::compile_null_coalesce(const ast::NullCoalesceExpr &null_coalesce)
   }
   patch_jump(end_jump);
   return;
-
 }
 
 void Compiler::compile_propagate(const ast::PropagateExpr &prop) {
@@ -2136,7 +2129,6 @@ void Compiler::compile_propagate(const ast::PropagateExpr &prop) {
     patch_jump(end_jump);
   }
   return;
-
 }
 
 void Compiler::compile_expr(const ast::Expr &expr) {
@@ -2160,7 +2152,8 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
       return;
     }
     if (assign.op != ast::AssignOp::Assign) {
-      error_at(assign.location, "Compound assignment through a mutable reference is not supported.");
+      error_at(assign.location,
+               "Compound assignment through a mutable reference is not supported.");
       return;
     }
     compile_expr(*assign.value);
@@ -2216,14 +2209,12 @@ std::size_t Compiler::emit_jump(OpCode op, ast::SourceLocation location) {
 
 void Compiler::patch_jump(std::size_t kir_jump_idx) {
   const std::size_t kir_target = kir_recorder_.instr_count();
-  const int32_t kir_rel =
-      static_cast<int32_t>(kir_target) - static_cast<int32_t>(kir_jump_idx) - 1;
+  const int32_t kir_rel = static_cast<int32_t>(kir_target) - static_cast<int32_t>(kir_jump_idx) - 1;
   kir_recorder_.patch_jump(kir_jump_idx, kir_rel);
 }
 
 void Compiler::patch_jump_to(std::size_t kir_jump_idx, std::size_t kir_target) {
-  const int32_t kir_rel =
-      static_cast<int32_t>(kir_target) - static_cast<int32_t>(kir_jump_idx) - 1;
+  const int32_t kir_rel = static_cast<int32_t>(kir_target) - static_cast<int32_t>(kir_jump_idx) - 1;
   kir_recorder_.patch_jump(kir_jump_idx, kir_rel);
 }
 
@@ -2273,8 +2264,7 @@ void Compiler::compile_lvalue_addr(const ast::Expr &expr) {
   }
   if (const auto *field_access = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
     compile_expr(*field_access->object);
-    uint32_t field_const =
-        add_constant_(Value::string_value(field_access->field_name));
+    uint32_t field_const = add_constant_(Value::string_value(field_access->field_name));
     emit_operand(OpCode::BorrowFieldMut, field_const, field_access->location);
     return;
   }
@@ -2298,7 +2288,8 @@ bool Compiler::declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot) {
 int Compiler::resolve_struct(const ast::TypeExpr &type) {
   if (type.type_args.empty()) {
     auto it = struct_indices_.find(type.name);
-    if (it != struct_indices_.end()) return it->second;
+    if (it != struct_indices_.end())
+      return it->second;
     return -1;
   }
   std::string mangled = type.name;
@@ -2306,9 +2297,11 @@ int Compiler::resolve_struct(const ast::TypeExpr &type) {
     mangled += "__" + arg.to_string();
   }
   auto it = struct_indices_.find(mangled);
-  if (it != struct_indices_.end()) return it->second;
+  if (it != struct_indices_.end())
+    return it->second;
   auto gen_it = sema_.generic_structs_.find(type.name);
-  if (gen_it == sema_.generic_structs_.end()) return -1;
+  if (gen_it == sema_.generic_structs_.end())
+    return -1;
   const ast::StructDecl *decl = gen_it->second;
   StructMeta meta;
   meta.name = mangled;
@@ -2344,15 +2337,16 @@ void Compiler::process_import(const ast::ImportDecl &import_decl) {
   process_import_from(import_decl, /*importing_file_dir=*/"");
 }
 
-void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std::string &importing_file_dir) {
+void Compiler::process_import_from(const ast::ImportDecl &import_decl,
+                                   const std::string &importing_file_dir) {
   if (!module_loader_) {
     error_at(import_decl.location, "Import not supported (no module loader configured).");
     return;
   }
 
   auto result = importing_file_dir.empty()
-      ? module_loader_->load(import_decl.path)
-      : module_loader_->load_from(import_decl.path, importing_file_dir);
+                    ? module_loader_->load(import_decl.path)
+                    : module_loader_->load_from(import_decl.path, importing_file_dir);
   if (!result.module) {
     error_at(import_decl.location, result.error);
     return;
@@ -2401,9 +2395,13 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     if (!import_decl.selected_symbols.empty()) {
       bool found = false;
       for (const auto &s : import_decl.selected_symbols) {
-        if (s == func->name) { found = true; break; }
+        if (s == func->name) {
+          found = true;
+          break;
+        }
       }
-      if (!found) continue;
+      if (!found)
+        continue;
     }
 
     int idx = static_cast<int>(function_infos_.size());
@@ -2426,7 +2424,8 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
 
   // Also register private functions so pub functions can call them.
   for (const auto *func : mod.private_functions) {
-    if (function_indices_.count(ns + "::" + func->name)) continue;
+    if (function_indices_.count(ns + "::" + func->name))
+      continue;
     int idx = static_cast<int>(function_infos_.size());
     function_infos_.push_back(FunctionInfo{
         .name = func->name,
@@ -2443,9 +2442,13 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     if (!import_decl.selected_symbols.empty()) {
       bool found = false;
       for (const auto &s : import_decl.selected_symbols) {
-        if (s == sd->name) { found = true; break; }
+        if (s == sd->name) {
+          found = true;
+          break;
+        }
       }
-      if (!found) continue;
+      if (!found)
+        continue;
     }
     if (sd->type_params.empty()) {
       StructMeta meta;
@@ -2464,9 +2467,13 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     if (!import_decl.selected_symbols.empty()) {
       bool found = false;
       for (const auto &s : import_decl.selected_symbols) {
-        if (s == ed->name) { found = true; break; }
+        if (s == ed->name) {
+          found = true;
+          break;
+        }
       }
-      if (!found) continue;
+      if (!found)
+        continue;
     }
     EnumMeta meta;
     meta.name = ed->name;
@@ -2481,18 +2488,21 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
 
   // Register private structs/enums (needed by private helper functions).
   for (const auto *sd : mod.private_structs) {
-    if (struct_indices_.count(sd->name)) continue;
+    if (struct_indices_.count(sd->name))
+      continue;
     if (sd->type_params.empty()) {
       StructMeta meta;
       meta.name = sd->name;
-      for (const auto &field : sd->fields) meta.field_names.push_back(field.name);
+      for (const auto &field : sd->fields)
+        meta.field_names.push_back(field.name);
       int idx = static_cast<int>(struct_metas_.size());
       struct_metas_.push_back(std::move(meta));
       struct_indices_[sd->name] = idx;
     }
   }
   for (const auto *ed : mod.private_enums) {
-    if (enum_indices_.count(ed->name)) continue;
+    if (enum_indices_.count(ed->name))
+      continue;
     EnumMeta meta;
     meta.name = ed->name;
     for (const auto &v : ed->variants) {
@@ -2503,7 +2513,6 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl, const std
     enum_metas_.push_back(std::move(meta));
     enum_indices_[ed->name] = idx;
   }
-
 }
 
 void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl) {
@@ -2518,9 +2527,9 @@ void Compiler::process_logical_import(const ast::LogicalImportDecl &import_decl)
     register_imported_module(*mod);
   }
   if (result.modules.empty()) {
-    error_at(import_decl.location,
-             result.error.empty() ? ("Unknown module '" + import_decl.module_id + "'")
-                                  : result.error);
+    error_at(import_decl.location, result.error.empty()
+                                       ? ("Unknown module '" + import_decl.module_id + "'")
+                                       : result.error);
   } else if (!result.error.empty()) {
     error_at(import_decl.location, result.error);
   }
@@ -2570,7 +2579,8 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
   }
 
   for (const auto *func : mod.private_functions) {
-    if (function_indices_.count(qual + "::" + func->name)) continue;
+    if (function_indices_.count(qual + "::" + func->name))
+      continue;
     int idx = static_cast<int>(function_infos_.size());
     function_infos_.push_back(FunctionInfo{
         .name = func->name,
@@ -2586,7 +2596,8 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
     if (sd->type_params.empty()) {
       StructMeta meta;
       meta.name = sd->name;
-      for (const auto &field : sd->fields) meta.field_names.push_back(field.name);
+      for (const auto &field : sd->fields)
+        meta.field_names.push_back(field.name);
       int idx = static_cast<int>(struct_metas_.size());
       struct_metas_.push_back(std::move(meta));
       struct_indices_[sd->name] = idx;
@@ -2606,18 +2617,21 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
   }
 
   for (const auto *sd : mod.private_structs) {
-    if (struct_indices_.count(sd->name)) continue;
+    if (struct_indices_.count(sd->name))
+      continue;
     if (sd->type_params.empty()) {
       StructMeta meta;
       meta.name = sd->name;
-      for (const auto &field : sd->fields) meta.field_names.push_back(field.name);
+      for (const auto &field : sd->fields)
+        meta.field_names.push_back(field.name);
       int idx = static_cast<int>(struct_metas_.size());
       struct_metas_.push_back(std::move(meta));
       struct_indices_[sd->name] = idx;
     }
   }
   for (const auto *ed : mod.private_enums) {
-    if (enum_indices_.count(ed->name)) continue;
+    if (enum_indices_.count(ed->name))
+      continue;
     EnumMeta meta;
     meta.name = ed->name;
     for (const auto &v : ed->variants) {
@@ -2663,28 +2677,76 @@ bool Compiler::function_uses_concept_params(const ast::FunctionDecl &function) c
   return sema_.function_uses_concept_params(function);
 }
 
-void Compiler::visit(const ast::IntLiteralExpr &x) { compile_int_literal(x); }
-void Compiler::visit(const ast::CharLiteralExpr &x) { compile_char_literal(x); }
-void Compiler::visit(const ast::FloatLiteralExpr &x) { compile_float_literal(x); }
-void Compiler::visit(const ast::StringLiteralExpr &x) { compile_string_literal(x); }
-void Compiler::visit(const ast::BoolLiteralExpr &x) { compile_bool_literal(x); }
-void Compiler::visit(const ast::NullLiteralExpr &x) { compile_null_literal(x); }
-void Compiler::visit(const ast::UnaryExpr &x) { compile_unary(x); }
-void Compiler::visit(const ast::IdentifierExpr &x) { compile_identifier(x); }
-void Compiler::visit(const ast::AssignExpr &x) { compile_assign_expr(x); }
-void Compiler::visit(const ast::BinaryExpr &x) { compile_binary(x); }
-void Compiler::visit(const ast::CallExpr &x) { compile_call(x); }
-void Compiler::visit(const ast::MatchExpr &x) { compile_match(x); }
-void Compiler::visit(const ast::NamespaceAccessExpr &x) { compile_namespace_access(x); }
-void Compiler::visit(const ast::StructLiteralExpr &x) { compile_struct_literal(x); }
-void Compiler::visit(const ast::FieldAccessExpr &x) { compile_field_access(x); }
-void Compiler::visit(const ast::FieldAssignExpr &x) { compile_field_assign(x); }
-void Compiler::visit(const ast::ArrayLiteralExpr &x) { compile_array_literal(x); }
-void Compiler::visit(const ast::MapLiteralExpr &x) { compile_map_literal(x); }
-void Compiler::visit(const ast::IndexExpr &x) { compile_index(x); }
-void Compiler::visit(const ast::IndexAssignExpr &x) { compile_index_assign(x); }
-void Compiler::visit(const ast::CastExpr &x) { compile_cast(x); }
-void Compiler::visit(const ast::TernaryExpr &x) { compile_ternary(x); }
-void Compiler::visit(const ast::NullCoalesceExpr &x) { compile_null_coalesce(x); }
-void Compiler::visit(const ast::PropagateExpr &x) { compile_propagate(x); }
+void Compiler::visit(const ast::IntLiteralExpr &x) {
+  compile_int_literal(x);
+}
+void Compiler::visit(const ast::CharLiteralExpr &x) {
+  compile_char_literal(x);
+}
+void Compiler::visit(const ast::FloatLiteralExpr &x) {
+  compile_float_literal(x);
+}
+void Compiler::visit(const ast::StringLiteralExpr &x) {
+  compile_string_literal(x);
+}
+void Compiler::visit(const ast::BoolLiteralExpr &x) {
+  compile_bool_literal(x);
+}
+void Compiler::visit(const ast::NullLiteralExpr &x) {
+  compile_null_literal(x);
+}
+void Compiler::visit(const ast::UnaryExpr &x) {
+  compile_unary(x);
+}
+void Compiler::visit(const ast::IdentifierExpr &x) {
+  compile_identifier(x);
+}
+void Compiler::visit(const ast::AssignExpr &x) {
+  compile_assign_expr(x);
+}
+void Compiler::visit(const ast::BinaryExpr &x) {
+  compile_binary(x);
+}
+void Compiler::visit(const ast::CallExpr &x) {
+  compile_call(x);
+}
+void Compiler::visit(const ast::MatchExpr &x) {
+  compile_match(x);
+}
+void Compiler::visit(const ast::NamespaceAccessExpr &x) {
+  compile_namespace_access(x);
+}
+void Compiler::visit(const ast::StructLiteralExpr &x) {
+  compile_struct_literal(x);
+}
+void Compiler::visit(const ast::FieldAccessExpr &x) {
+  compile_field_access(x);
+}
+void Compiler::visit(const ast::FieldAssignExpr &x) {
+  compile_field_assign(x);
+}
+void Compiler::visit(const ast::ArrayLiteralExpr &x) {
+  compile_array_literal(x);
+}
+void Compiler::visit(const ast::MapLiteralExpr &x) {
+  compile_map_literal(x);
+}
+void Compiler::visit(const ast::IndexExpr &x) {
+  compile_index(x);
+}
+void Compiler::visit(const ast::IndexAssignExpr &x) {
+  compile_index_assign(x);
+}
+void Compiler::visit(const ast::CastExpr &x) {
+  compile_cast(x);
+}
+void Compiler::visit(const ast::TernaryExpr &x) {
+  compile_ternary(x);
+}
+void Compiler::visit(const ast::NullCoalesceExpr &x) {
+  compile_null_coalesce(x);
+}
+void Compiler::visit(const ast::PropagateExpr &x) {
+  compile_propagate(x);
+}
 } // namespace kinglet

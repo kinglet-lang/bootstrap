@@ -70,7 +70,6 @@ ast::StmtPtr Parser::statement() {
   return expression_statement();
 }
 
-
 ast::StmtPtr Parser::block_statement() {
   const Token &left_brace = previous();
   std::vector<ast::StmtPtr> statements;
@@ -83,11 +82,11 @@ ast::StmtPtr Parser::block_statement() {
     set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}});
     return nullptr;
   }
-  if (has_completion()) return nullptr;
+  if (has_completion())
+    return nullptr;
   consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
   return std::make_unique<ast::BlockStmt>(location_of(left_brace), std::move(statements));
 }
-
 
 ast::StmtPtr Parser::return_statement() {
   const Token &return_token = previous();
@@ -99,7 +98,6 @@ ast::StmtPtr Parser::return_statement() {
   return std::make_unique<ast::ReturnStmt>(location_of(return_token), std::move(value));
 }
 
-
 ast::StmtPtr Parser::if_statement() {
   const Token &if_token = previous();
   ast::ExprPtr condition = condition_expression();
@@ -108,10 +106,9 @@ ast::StmtPtr Parser::if_statement() {
   if (match(TokenType::ELSE)) {
     else_branch = statement();
   }
-  return std::make_unique<ast::IfStmt>(location_of(if_token), std::move(condition), std::move(then_branch),
-                                       std::move(else_branch));
+  return std::make_unique<ast::IfStmt>(location_of(if_token), std::move(condition),
+                                       std::move(then_branch), std::move(else_branch));
 }
-
 
 ast::StmtPtr Parser::while_statement() {
   const Token &while_token = previous();
@@ -120,7 +117,6 @@ ast::StmtPtr Parser::while_statement() {
   return std::make_unique<ast::WhileStmt>(location_of(while_token), std::move(condition),
                                           std::move(body));
 }
-
 
 ast::StmtPtr Parser::guard_statement() {
   const Token &guard_token = previous();
@@ -131,7 +127,6 @@ ast::StmtPtr Parser::guard_statement() {
   return std::make_unique<ast::GuardStmt>(location_of(guard_token), std::move(condition),
                                           std::move(else_body));
 }
-
 
 ast::StmtPtr Parser::for_statement() {
   const Token &for_token = previous();
@@ -170,7 +165,6 @@ ast::StmtPtr Parser::for_statement() {
                                         std::move(condition), std::move(step), std::move(body));
 }
 
-
 ast::StmtPtr Parser::try_catch_statement() {
   const Token &try_token = previous();
   consume(TokenType::LEFT_BRACE, "Expected '{' after 'try'.");
@@ -199,20 +193,17 @@ ast::StmtPtr Parser::try_catch_statement() {
                                              std::move(catches));
 }
 
-
 ast::StmtPtr Parser::break_statement() {
   const Token &break_token = previous();
   consume(TokenType::SEMICOLON, "Expected ';' after 'break'.");
   return std::make_unique<ast::BreakStmt>(location_of(break_token));
 }
 
-
 ast::StmtPtr Parser::continue_statement() {
   const Token &continue_token = previous();
   consume(TokenType::SEMICOLON, "Expected ';' after 'continue'.");
   return std::make_unique<ast::ContinueStmt>(location_of(continue_token));
 }
-
 
 ast::StmtPtr Parser::var_declaration() {
   const Token &start_token = peek();
@@ -259,8 +250,10 @@ ast::StmtPtr Parser::var_declaration() {
       // Map type {K: V}: scan to the matching '}', then expect an identifier.
       int depth = 1;
       while (pos < tokens_.size() && depth > 0) {
-        if (tokens_[pos].type == TokenType::LEFT_BRACE) ++depth;
-        else if (tokens_[pos].type == TokenType::RIGHT_BRACE) --depth;
+        if (tokens_[pos].type == TokenType::LEFT_BRACE)
+          ++depth;
+        else if (tokens_[pos].type == TokenType::RIGHT_BRACE)
+          --depth;
         ++pos;
       }
       skip_array_and_nullable_suffix(tokens_, pos);
@@ -269,9 +262,12 @@ ast::StmtPtr Parser::var_declaration() {
       int depth = 1;
       ++pos;
       while (pos < tokens_.size() && depth > 0) {
-        if (tokens_[pos].type == TokenType::LESS) ++depth;
-        else if (tokens_[pos].type == TokenType::GREATER) --depth;
-        else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
+        if (tokens_[pos].type == TokenType::LESS)
+          ++depth;
+        else if (tokens_[pos].type == TokenType::GREATER)
+          --depth;
+        else if (tokens_[pos].type == TokenType::GREATER_GREATER)
+          depth -= 2;
         ++pos;
       }
       skip_array_and_nullable_suffix(tokens_, pos);
@@ -283,7 +279,8 @@ ast::StmtPtr Parser::var_declaration() {
   }
   if (has_type) {
     type = parse_type_expr();
-    if (pending_greater_) pending_greater_ = false;
+    if (pending_greater_)
+      pending_greater_ = false;
     name = consume(TokenType::IDENTIFIER, "Expected variable name.");
   } else {
     name = consume(TokenType::IDENTIFIER, "Expected variable name.");
@@ -302,21 +299,21 @@ ast::StmtPtr Parser::var_declaration() {
         return nullptr;
       }
       ast::ExprPtr value = expression();
-      if (has_completion()) return nullptr;
+      if (has_completion())
+        return nullptr;
       fields.push_back(ast::StructLiteralExpr::FieldInit{"", std::move(value)});
       if (!check(TokenType::RIGHT_BRACE)) {
         consume(TokenType::COMMA, "Expected ',' between struct fields.");
       }
     }
     consume(TokenType::RIGHT_BRACE, "Expected '}' after struct literal.");
-    init = std::make_unique<ast::StructLiteralExpr>(
-        location_of(start_token), type, std::move(fields));
+    init =
+        std::make_unique<ast::StructLiteralExpr>(location_of(start_token), type, std::move(fields));
   }
   consume(TokenType::SEMICOLON, "Expected ';' after variable declaration.");
-  return std::make_unique<ast::VarDeclStmt>(location_of(start_token), std::move(storage), std::move(type),
-                                            token_text(name), std::move(init));
+  return std::make_unique<ast::VarDeclStmt>(location_of(start_token), std::move(storage),
+                                            std::move(type), token_text(name), std::move(init));
 }
-
 
 ast::StmtPtr Parser::expression_statement() {
   ast::ExprPtr expr = expression();
@@ -324,11 +321,11 @@ ast::StmtPtr Parser::expression_statement() {
     set_completion({lsp::CompletionPosition::ExpressionStart, {}, {}, {}, {}, {}});
     return nullptr;
   }
-  if (has_completion()) return nullptr;
+  if (has_completion())
+    return nullptr;
   const ast::SourceLocation location = expr->location;
   consume(TokenType::SEMICOLON, "Expected ';' after expression.");
   return std::make_unique<ast::ExprStmt>(location, std::move(expr));
 }
-
 
 } // namespace kinglet

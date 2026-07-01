@@ -53,7 +53,6 @@
 #include "backend/codegen/llvm/llvm_function_lowerer.h"
 namespace kinglet {
 
-
 NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
                                                   const std::string &out_path,
                                                   const std::string &rt_lib_path,
@@ -79,8 +78,8 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     std::filesystem::create_directories(options.object_cache_dir, cache_ec);
     if (cache_ec) {
       return {.ok = false,
-              .error = "cannot create object cache dir " + options.object_cache_dir +
-                       ": " + cache_ec.message()};
+              .error = "cannot create object cache dir " + options.object_cache_dir + ": " +
+                       cache_ec.message()};
     }
   }
 
@@ -123,8 +122,7 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
       std::error_code rename_ec;
       std::filesystem::rename(tmp_path, obj_path, rename_ec);
       if (rename_ec) {
-        return {.ok = false,
-                .error = "cannot move object into cache: " + rename_ec.message()};
+        return {.ok = false, .error = "cannot move object into cache: " + rename_ec.message()};
       }
     } else if (!emit_object(llvm_module, obj_path, &error)) {
       return {.ok = false, .error = error};

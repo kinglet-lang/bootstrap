@@ -45,7 +45,9 @@ Value Value::char_value(int8_t value) {
   return result;
 }
 
-Value Value::null_value() { return Value{}; }
+Value Value::null_value() {
+  return Value{};
+}
 
 Value Value::string_value(std::string value) {
   Value result;
@@ -83,14 +85,12 @@ Value Value::enum_value(int type_index, int variant_index) {
   return result;
 }
 
-Value Value::enum_value_with_payload(int type_index, int variant_index,
-                                      std::vector<Value> payload) {
+Value Value::enum_value_with_payload(int type_index, int variant_index, std::vector<Value> payload) {
   Value result;
   result.type = ValueType::Enum;
   result.enum_type_idx = type_index;
   result.enum_variant_idx = variant_index;
-  result.heap =
-      RcPtr<HeapObj>{new HeapEnum(type_index, variant_index, std::move(payload))};
+  result.heap = RcPtr<HeapObj>{new HeapEnum(type_index, variant_index, std::move(payload))};
   return result;
 }
 
@@ -122,23 +122,28 @@ bool Value::is_number() const {
 }
 
 double Value::as_double() const {
-  if (type == ValueType::Int) return static_cast<double>(as_int);
+  if (type == ValueType::Int)
+    return static_cast<double>(as_int);
   return as_double_storage;
 }
 
 int exit_code_from_value(const Value &value) {
   switch (value.type) {
   case ValueType::Int: {
-    if (value.as_int < 0) return 255;
-    if (value.as_int > 255) return 255;
+    if (value.as_int < 0)
+      return 255;
+    if (value.as_int > 255)
+      return 255;
     return static_cast<int>(value.as_int);
   }
   case ValueType::Bool:
     return value.as_bool ? 1 : 0;
   case ValueType::Double: {
     auto n = static_cast<int64_t>(value.as_double_storage);
-    if (n < 0) return 255;
-    if (n > 255) return 255;
+    if (n < 0)
+      return 255;
+    if (n > 255)
+      return 255;
     return static_cast<int>(n);
   }
   default:
@@ -181,8 +186,7 @@ std::ostream &operator<<(std::ostream &out, const Value &value) {
       auto &e = *static_cast<HeapEnum *>(value.heap.ptr);
       out << "<enum:" << e.type_index << ":" << e.variant_index << ">";
     } else {
-      out << "<enum:" << value.enum_type_idx << ":" << value.enum_variant_idx
-          << ">";
+      out << "<enum:" << value.enum_type_idx << ":" << value.enum_variant_idx << ">";
     }
     break;
   }
@@ -191,7 +195,8 @@ std::ostream &operator<<(std::ostream &out, const Value &value) {
     if (value.heap) {
       auto &a = *static_cast<HeapArray *>(value.heap.ptr);
       for (std::size_t i = 0; i < a.elements.size(); ++i) {
-        if (i > 0) out << ", ";
+        if (i > 0)
+          out << ", ";
         out << a.elements[i];
       }
     }
@@ -203,9 +208,9 @@ std::ostream &operator<<(std::ostream &out, const Value &value) {
     if (value.heap) {
       auto &m = *static_cast<HeapMap *>(value.heap.ptr);
       for (std::size_t i = 0; i < m.order.size(); ++i) {
-        if (i > 0) out << ", ";
-        out << m.entries.at(m.order[i]).key << ": "
-            << m.entries.at(m.order[i]).value;
+        if (i > 0)
+          out << ", ";
+        out << m.entries.at(m.order[i]).key << ": " << m.entries.at(m.order[i]).value;
       }
     }
     out << "}";

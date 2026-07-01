@@ -49,9 +49,9 @@ public:
   // and load every `<dir>/*.kl` as a submodule `<module_id>.<stem>`. This is
   // the auto-import path that removes the need for a `_dir.kl` manifest.
   struct DirectoryImportResult {
-    bool is_directory = false;             // did <root>/<module_id>/ exist?
-    std::vector<const ParsedModule *> modules;  // successfully loaded submodules
-    std::string error;                     // first error encountered, if any
+    bool is_directory = false;                 // did <root>/<module_id>/ exist?
+    std::vector<const ParsedModule *> modules; // successfully loaded submodules
+    std::string error;                         // first error encountered, if any
   };
   DirectoryImportResult load_directory_import(const std::string &module_id);
 

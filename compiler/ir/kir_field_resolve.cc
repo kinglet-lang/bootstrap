@@ -27,8 +27,7 @@ bool is_identifier_like(const std::string &s) {
 }
 
 bool operand_is_field_name_pool_index(const KirModule &module, int operand) {
-  if (operand < 0 ||
-      static_cast<std::size_t>(operand) >= module.constant_strings.size()) {
+  if (operand < 0 || static_cast<std::size_t>(operand) >= module.constant_strings.size()) {
     return false;
   }
   const std::string &s = module.constant_strings[static_cast<std::size_t>(operand)];
@@ -81,8 +80,7 @@ void resolve_kir_field_operands(KirModule &module) {
         if (!operand_is_field_name_pool_index(module, operand)) {
           continue;
         }
-        const std::string &field_name =
-            module.constant_strings[static_cast<std::size_t>(operand)];
+        const std::string &field_name = module.constant_strings[static_cast<std::size_t>(operand)];
         const int fi = unique_field_index_for_name(module, field_name);
         if (fi >= 0) {
           instr.operands[0] = fi;

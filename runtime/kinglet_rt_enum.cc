@@ -190,8 +190,7 @@ kl_h kl_cast_to_char(kl_h value) {
       if (s.empty()) {
         return cast_error(0, 0);
       }
-      return kl_from_int(static_cast<int8_t>(
-          static_cast<unsigned char>(s[0])));
+      return kl_from_int(static_cast<int8_t>(static_cast<unsigned char>(s[0])));
     }
     return kl_from_int(0);
   }

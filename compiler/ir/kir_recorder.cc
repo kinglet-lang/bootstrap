@@ -22,8 +22,7 @@ KirInstr rec(KirOpcode op, std::vector<int32_t> operands, ast::SourceLocation lo
 }
 
 std::vector<int32_t> encode_i64_operands(int64_t value) {
-  return {static_cast<int32_t>(value),
-          static_cast<int32_t>(static_cast<uint64_t>(value) >> 32)};
+  return {static_cast<int32_t>(value), static_cast<int32_t>(static_cast<uint64_t>(value) >> 32)};
 }
 
 std::vector<int32_t> encode_f32_operands(float value) {
@@ -96,8 +95,8 @@ void KirRecorder::patch_operand(std::size_t instr_index, int32_t operand) {
   }
 }
 
-void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
-                              ast::SourceLocation location, KirType numeric_type) {
+void KirRecorder::on_constant(const Value &value, uint32_t pool_index, ast::SourceLocation location,
+                              KirType numeric_type) {
   if (!active_) {
     return;
   }
@@ -110,13 +109,11 @@ void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
     switch (kir_type_normalize(width)) {
     case KirType::Int8:
     case KirType::UInt8:
-      bb_.instrs.push_back(
-          rec(KirOpcode::ConstU8, {static_cast<int32_t>(v & 0xff)}, location));
+      bb_.instrs.push_back(rec(KirOpcode::ConstU8, {static_cast<int32_t>(v & 0xff)}, location));
       break;
     case KirType::Int32:
     case KirType::UInt32:
-      bb_.instrs.push_back(
-          rec(KirOpcode::ConstI32, {static_cast<int32_t>(v)}, location));
+      bb_.instrs.push_back(rec(KirOpcode::ConstI32, {static_cast<int32_t>(v)}, location));
       break;
     case KirType::Int64:
     case KirType::UInt64:
@@ -137,15 +134,14 @@ void KirRecorder::on_constant(const Value &value, uint32_t pool_index,
       bb_.instrs.push_back(
           rec(KirOpcode::ConstF64, encode_f64_operands(value.as_double_storage), location));
     } else {
-      bb_.instrs.push_back(rec(
-          KirOpcode::ConstF32,
-          encode_f32_operands(static_cast<float>(value.as_double_storage)), location));
+      bb_.instrs.push_back(rec(KirOpcode::ConstF32,
+                               encode_f32_operands(static_cast<float>(value.as_double_storage)),
+                               location));
     }
   } else if (value.type == ValueType::Null) {
     bb_.instrs.push_back(rec(KirOpcode::ConstNull, {}, location));
   } else if (value.type == ValueType::String) {
-    bb_.instrs.push_back(
-        rec(KirOpcode::ConstString, {static_cast<int32_t>(pool_index)}, location));
+    bb_.instrs.push_back(rec(KirOpcode::ConstString, {static_cast<int32_t>(pool_index)}, location));
   } else if (value.type == ValueType::Function) {
     bb_.instrs.push_back(
         rec(KirOpcode::ConstFn, {static_cast<int32_t>(value.function_idx)}, location));
@@ -272,31 +268,25 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     bb_.instrs.push_back(rec(KirOpcode::PropagateErr, {}, location));
     break;
   case OpCode::StructNew:
-    bb_.instrs.push_back(
-        rec(KirOpcode::StructNew, {static_cast<int32_t>(operand)}, location));
+    bb_.instrs.push_back(rec(KirOpcode::StructNew, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::BorrowFieldMut:
-    bb_.instrs.push_back(
-        rec(KirOpcode::BorrowFieldMut, {static_cast<int32_t>(operand)}, location));
+    bb_.instrs.push_back(rec(KirOpcode::BorrowFieldMut, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::FieldGet:
-    bb_.instrs.push_back(
-        rec(KirOpcode::FieldGet, {static_cast<int32_t>(operand)}, location));
+    bb_.instrs.push_back(rec(KirOpcode::FieldGet, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::FieldSet:
-    bb_.instrs.push_back(
-        rec(KirOpcode::FieldSet, {static_cast<int32_t>(operand)}, location));
+    bb_.instrs.push_back(rec(KirOpcode::FieldSet, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::ArrayNew:
-    bb_.instrs.push_back(
-        rec(KirOpcode::ArrayNew, {static_cast<int32_t>(operand)}, location));
+    bb_.instrs.push_back(rec(KirOpcode::ArrayNew, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::DenseArrayNew: {
     int rows = 0;
     int cols = 0;
     unpack_dense2d_shape(static_cast<uint32_t>(operand), &rows, &cols);
-    bb_.instrs.push_back(
-        rec(KirOpcode::DenseArrayNew, {rows, cols}, location));
+    bb_.instrs.push_back(rec(KirOpcode::DenseArrayNew, {rows, cols}, location));
     break;
   }
   case OpCode::IndexGet:
@@ -369,16 +359,14 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
     bb_.instrs.push_back(rec(KirOpcode::MapKeys, {}, location));
     break;
   case OpCode::EnumVariant:
-    bb_.instrs.push_back(
-        rec(KirOpcode::EnumVariant, {static_cast<int32_t>(operand)}, location));
+    bb_.instrs.push_back(rec(KirOpcode::EnumVariant, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::EnumVariantPayload:
     bb_.instrs.push_back(
         rec(KirOpcode::EnumVariantPayload, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::EnumPayloadGet:
-    bb_.instrs.push_back(
-        rec(KirOpcode::EnumPayloadGet, {static_cast<int32_t>(operand)}, location));
+    bb_.instrs.push_back(rec(KirOpcode::EnumPayloadGet, {static_cast<int32_t>(operand)}, location));
     break;
   case OpCode::CastTo:
     bb_.instrs.push_back(rec(KirOpcode::CastTo, {static_cast<int32_t>(operand)}, location));

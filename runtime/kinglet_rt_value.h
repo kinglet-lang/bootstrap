@@ -20,9 +20,8 @@ static inline int kl_is_inline_enum(kl_h value) {
 }
 
 static inline kl_h kl_enum_inline(int32_t type_index, int32_t variant_index) {
-  return static_cast<kl_h>(KL_INLINE_ENUM_MARK |
-                         (static_cast<uint64_t>(type_index & 0xFFFF) << 16) |
-                         static_cast<uint64_t>(variant_index & 0xFFFF));
+  return static_cast<kl_h>(KL_INLINE_ENUM_MARK | (static_cast<uint64_t>(type_index & 0xFFFF) << 16) |
+                           static_cast<uint64_t>(variant_index & 0xFFFF));
 }
 
 static inline kl_h kl_from_int(int64_t value) {
@@ -34,18 +33,17 @@ static inline int64_t kl_to_int(kl_h value) {
 }
 
 static inline int kl_is_heap(kl_h value) {
-  return (static_cast<uint64_t>(value) & (0xFFFFULL << 48)) ==
-         static_cast<uint64_t>(KL_HEAP_MARK);
+  return (static_cast<uint64_t>(value) & (0xFFFFULL << 48)) == static_cast<uint64_t>(KL_HEAP_MARK);
 }
 
 static inline void *kl_unbox_ptr(kl_h value) {
-  return reinterpret_cast<void *>(static_cast<intptr_t>(
-      static_cast<uint64_t>(value) & ~static_cast<uint64_t>(KL_HEAP_MARK)));
+  return reinterpret_cast<void *>(
+      static_cast<intptr_t>(static_cast<uint64_t>(value) & ~static_cast<uint64_t>(KL_HEAP_MARK)));
 }
 
 static inline kl_h kl_box_ptr(void *ptr) {
   return static_cast<kl_h>(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(ptr)) |
-                             static_cast<uint64_t>(KL_HEAP_MARK));
+                           static_cast<uint64_t>(KL_HEAP_MARK));
 }
 
 kl_h kl_string_new(const char *data, int32_t len);

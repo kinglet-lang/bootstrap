@@ -51,14 +51,13 @@ int run_embedded_compiler(int argc, char **argv) {
   return 78;
 #else
   namespace fs = std::filesystem;
-  const fs::path cache_path =
-      fs::temp_directory_path() /
-      (std::string("kinglet-selfhost-") + kinglet::kEmbeddedCompilerHash);
+  const fs::path cache_path = fs::temp_directory_path() /
+                              (std::string("kinglet-selfhost-") + kinglet::kEmbeddedCompilerHash);
   const std::string cache = cache_path.string();
 
   std::error_code ec;
-  const bool fresh = fs::exists(cache_path, ec) &&
-                     fs::file_size(cache_path, ec) == kinglet::kEmbeddedCompilerSize;
+  const bool fresh =
+      fs::exists(cache_path, ec) && fs::file_size(cache_path, ec) == kinglet::kEmbeddedCompilerSize;
   if (!fresh) {
     const fs::path tmp_path = cache + ".tmp." + std::to_string(::getpid());
     {
@@ -108,8 +107,8 @@ enum class Mode {
 #ifdef KINGLET_HAVE_LLVM
 std::string resolve_rt_lib(const char *argv0);
 
-int run_native_executable(const kinglet::KirModule &kir, const std::vector<std::string> &program_args,
-                          const char *argv0) {
+int run_native_executable(const kinglet::KirModule &kir,
+                          const std::vector<std::string> &program_args, const char *argv0) {
   const std::filesystem::path tmp_dir = std::filesystem::temp_directory_path();
   std::string exe_template = (tmp_dir / "kinglet-run-XXXXXX").string();
   std::vector<char> tpl(exe_template.begin(), exe_template.end());
@@ -131,8 +130,8 @@ int run_native_executable(const kinglet::KirModule &kir, const std::vector<std::
   std::filesystem::remove(exe_path);
 
   kinglet::NativeCompileOptions native_options;
-  const kinglet::NativeCompileResult native = kinglet::KirToLlvm::compile_executable(
-      kir, exe_path, resolve_rt_lib(argv0), native_options);
+  const kinglet::NativeCompileResult native =
+      kinglet::KirToLlvm::compile_executable(kir, exe_path, resolve_rt_lib(argv0), native_options);
   if (!native.ok) {
     std::cerr << "kinglet: native compile failed: " << native.error << '\n';
     return 78;
@@ -172,8 +171,8 @@ int run_native_executable(const kinglet::KirModule &kir, const std::vector<std::
 #ifdef KINGLET_HAVE_LLVM
 std::string resolve_rt_lib(const char *argv0) {
   const std::filesystem::path dir = std::filesystem::absolute(argv0).parent_path();
-  for (const char *rel : { "libkinglet_rt.a", "obj/runtime/libkinglet_rt.a",
-                           "kinglet_rt.lib", "obj/runtime/kinglet_rt.lib" }) {
+  for (const char *rel : {"libkinglet_rt.a", "obj/runtime/libkinglet_rt.a", "kinglet_rt.lib",
+                          "obj/runtime/kinglet_rt.lib"}) {
     const std::filesystem::path candidate = dir / rel;
     if (std::filesystem::exists(candidate)) {
       return candidate.string();
@@ -202,7 +201,8 @@ std::string compiler_identity(const char *argv0) {
 #endif
 
 void print_usage(std::ostream &out) {
-  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache <dir>] | -o <out>] [file.kl] [args...]\n"
+  out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache "
+         "<dir>] | -o <out>] [file.kl] [args...]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles to a native executable and runs main() (requires LLVM build).\n"
@@ -249,8 +249,7 @@ void print_escaped(std::ostream &out, std::string_view text) {
 }
 
 void print_token(const kinglet::Token &token) {
-  std::cout << token.line << ':' << token.column << ' '
-            << kinglet::token_type_name(token.type);
+  std::cout << token.line << ':' << token.column << ' ' << kinglet::token_type_name(token.type);
 
   if (!token.lexeme.empty()) {
     std::cout << " \"";
@@ -384,8 +383,7 @@ int main(int argc, char **argv) {
   bool had_lexer_error = false;
   for (const kinglet::Token &token : tokens) {
     if (token.type == kinglet::TokenType::ERROR) {
-      std::cerr << token.line << ':' << token.column << ": lexer error: "
-                << token.lexeme << '\n';
+      std::cerr << token.line << ':' << token.column << ": lexer error: " << token.lexeme << '\n';
       had_lexer_error = true;
     }
   }
@@ -404,8 +402,7 @@ int main(int argc, char **argv) {
   kinglet::Parser parser(tokens);
   kinglet::ParseResult result = parser.parse();
   for (const kinglet::ParseError &error : result.errors) {
-    std::cerr << error.line << ':' << error.column << ": parse error: "
-              << error.message << '\n';
+    std::cerr << error.line << ':' << error.column << ": parse error: " << error.message << '\n';
   }
 
   if (!result.errors.empty()) {
@@ -426,7 +423,8 @@ int main(int argc, char **argv) {
       }
     } else {
       base_dir = std::filesystem::absolute(p).parent_path().string();
-      if (base_dir == ".") base_dir = std::filesystem::current_path().string();
+      if (base_dir == ".")
+        base_dir = std::filesystem::current_path().string();
     }
   }
   kinglet::ModuleLoader module_loader(base_dir);
@@ -449,26 +447,31 @@ int main(int argc, char **argv) {
   kinglet::TypeCheckResult type_result = checker.check(*result.program);
   bool has_type_errors = false;
   for (const kinglet::TypeError &error : type_result.errors) {
-    const char *label = error.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
-    std::cerr << error.location.line << ':' << error.location.column
-              << ": " << label << ": " << error.message << '\n';
-    if (error.severity == kinglet::DiagnosticSeverity::Error) has_type_errors = true;
+    const char *label =
+        error.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
+    std::cerr << error.location.line << ':' << error.location.column << ": " << label << ": "
+              << error.message << '\n';
+    if (error.severity == kinglet::DiagnosticSeverity::Error)
+      has_type_errors = true;
   }
 
   if (has_type_errors) {
-    if (mode == Mode::Check) { return 65; }
+    if (mode == Mode::Check) {
+      return 65;
+    }
     return 65;
   }
 
-  if (mode == Mode::Check) { return 0; }
+  if (mode == Mode::Check) {
+    return 0;
+  }
 
   kinglet::Compiler compiler;
   compiler.set_module_loader(&module_loader);
   if (!input_path.empty()) {
-    const std::filesystem::path entry_path =
-        std::filesystem::path(input_path).is_absolute()
-            ? std::filesystem::path(input_path)
-            : std::filesystem::current_path() / input_path;
+    const std::filesystem::path entry_path = std::filesystem::path(input_path).is_absolute()
+                                                 ? std::filesystem::path(input_path)
+                                                 : std::filesystem::current_path() / input_path;
     compiler.set_entry_source_path(entry_path.string());
   }
   kinglet::CompileResult compile_result = compiler.compile(*result.program);

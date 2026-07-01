@@ -15,8 +15,7 @@ namespace kinglet {
 // KirRecorder accumulates KirInstr nodes and finalises a KirFunction on end_function().
 class KirRecorder {
 public:
-  void begin_function(const std::string &name, int param_count,
-                      const std::string &source_path = "");
+  void begin_function(const std::string &name, int param_count, const std::string &source_path = "");
   void end_function(KirModule *module);
 
   void on_emit(OpCode op, uint32_t operand, ast::SourceLocation location);

@@ -17,7 +17,6 @@ ast::ExprPtr Parser::expression() {
   return assignment();
 }
 
-
 ast::ExprPtr Parser::ternary() {
   ast::ExprPtr expr = coalesce();
   if (match(TokenType::QUESTION)) {
@@ -31,10 +30,10 @@ ast::ExprPtr Parser::ternary() {
   return expr;
 }
 
-
 ast::ExprPtr Parser::assignment() {
   ast::ExprPtr expr = ternary();
-  if (has_completion()) return expr;
+  if (has_completion())
+    return expr;
   if (is_assignment_operator(peek().type)) {
     const Token &op = advance();
     ast::ExprPtr value = assignment();
@@ -52,8 +51,7 @@ ast::ExprPtr Parser::assignment() {
       }
       const ast::SourceLocation location = expr->location;
       return std::make_unique<ast::IndexAssignExpr>(location, std::move(index_expr->object),
-                                                    std::move(index_expr->index),
-                                                    std::move(value));
+                                                    std::move(index_expr->index), std::move(value));
     }
     auto *field_access = dynamic_cast<ast::FieldAccessExpr *>(expr.get());
     if (field_access != nullptr) {
@@ -67,16 +65,15 @@ ast::ExprPtr Parser::assignment() {
   return expr;
 }
 
-
 ast::ExprPtr Parser::pipeline() {
   ast::ExprPtr expr = logical_or();
   while (match(TokenType::PIPE_GREATER)) {
     ast::ExprPtr func = logical_or();
-    expr = std::make_unique<ast::PipeExpr>(location_of(previous()), std::move(expr), std::move(func));
+    expr =
+        std::make_unique<ast::PipeExpr>(location_of(previous()), std::move(expr), std::move(func));
   }
   return expr;
 }
-
 
 ast::ExprPtr Parser::coalesce() {
   ast::ExprPtr expr = pipeline();
@@ -84,8 +81,7 @@ ast::ExprPtr Parser::coalesce() {
     auto loc = location_of(previous());
     std::string err_binding;
     if (check(TokenType::LET) && current_ + 1 < tokens_.size() &&
-        tokens_[current_ + 1].type == TokenType::IDENTIFIER &&
-        current_ + 2 < tokens_.size() &&
+        tokens_[current_ + 1].type == TokenType::IDENTIFIER && current_ + 2 < tokens_.size() &&
         tokens_[current_ + 2].type == TokenType::FAT_ARROW) {
       advance(); // consume `let`
       const Token &name_tok = consume(TokenType::IDENTIFIER, "Expected error binding name.");
@@ -99,7 +95,6 @@ ast::ExprPtr Parser::coalesce() {
   return expr;
 }
 
-
 ast::ExprPtr Parser::logical_or() {
   ast::ExprPtr expr = logical_and();
   while (match(TokenType::PIPE_PIPE)) {
@@ -110,7 +105,6 @@ ast::ExprPtr Parser::logical_or() {
   }
   return expr;
 }
-
 
 ast::ExprPtr Parser::logical_and() {
   ast::ExprPtr expr = bit_or();
@@ -123,7 +117,6 @@ ast::ExprPtr Parser::logical_and() {
   return expr;
 }
 
-
 ast::ExprPtr Parser::bit_or() {
   ast::ExprPtr expr = bit_xor();
   while (match(TokenType::PIPE)) {
@@ -134,7 +127,6 @@ ast::ExprPtr Parser::bit_or() {
   }
   return expr;
 }
-
 
 ast::ExprPtr Parser::bit_xor() {
   ast::ExprPtr expr = bit_and();
@@ -147,7 +139,6 @@ ast::ExprPtr Parser::bit_xor() {
   return expr;
 }
 
-
 ast::ExprPtr Parser::bit_and() {
   ast::ExprPtr expr = equality();
   while (match(TokenType::AMP)) {
@@ -158,7 +149,6 @@ ast::ExprPtr Parser::bit_and() {
   }
   return expr;
 }
-
 
 ast::ExprPtr Parser::equality() {
   ast::ExprPtr expr = comparison();
@@ -171,13 +161,12 @@ ast::ExprPtr Parser::equality() {
   return expr;
 }
 
-
 ast::ExprPtr Parser::comparison() {
   ast::ExprPtr expr = shift();
 
   auto is_comparison_op = [this]() {
-    return check(TokenType::LESS) || check(TokenType::LESS_EQUAL) ||
-           check(TokenType::GREATER) || check(TokenType::GREATER_EQUAL);
+    return check(TokenType::LESS) || check(TokenType::LESS_EQUAL) || check(TokenType::GREATER) ||
+           check(TokenType::GREATER_EQUAL);
   };
 
   if (!is_comparison_op()) {
@@ -200,18 +189,20 @@ ast::ExprPtr Parser::comparison() {
   ast::ExprPtr mid_copy = shift();
   current_ = saved;
 
-  ast::ExprPtr left_cmp = std::make_unique<ast::BinaryExpr>(op1_loc, std::move(expr), bin_op1, std::move(mid));
+  ast::ExprPtr left_cmp =
+      std::make_unique<ast::BinaryExpr>(op1_loc, std::move(expr), bin_op1, std::move(mid));
 
   advance();
   auto op2_loc = location_of(previous());
   ast::BinaryOp bin_op2 = token_to_binary_op(previous().type);
   ast::ExprPtr right_term = shift();
 
-  ast::ExprPtr right_cmp = std::make_unique<ast::BinaryExpr>(op2_loc, std::move(mid_copy), bin_op2, std::move(right_term));
+  ast::ExprPtr right_cmp = std::make_unique<ast::BinaryExpr>(op2_loc, std::move(mid_copy), bin_op2,
+                                                             std::move(right_term));
 
-  return std::make_unique<ast::BinaryExpr>(op1_loc, std::move(left_cmp), ast::BinaryOp::And, std::move(right_cmp));
+  return std::make_unique<ast::BinaryExpr>(op1_loc, std::move(left_cmp), ast::BinaryOp::And,
+                                           std::move(right_cmp));
 }
-
 
 ast::ExprPtr Parser::shift() {
   ast::ExprPtr expr = term();
@@ -224,7 +215,6 @@ ast::ExprPtr Parser::shift() {
   return expr;
 }
 
-
 ast::ExprPtr Parser::term() {
   ast::ExprPtr expr = factor();
   while (match_any({TokenType::PLUS, TokenType::MINUS})) {
@@ -236,7 +226,6 @@ ast::ExprPtr Parser::term() {
   return expr;
 }
 
-
 ast::ExprPtr Parser::factor() {
   ast::ExprPtr expr = unary();
   while (match_any({TokenType::STAR, TokenType::SLASH, TokenType::PERCENT})) {
@@ -247,7 +236,6 @@ ast::ExprPtr Parser::factor() {
   }
   return expr;
 }
-
 
 ast::ExprPtr Parser::unary() {
   if (match(TokenType::AMP)) {
@@ -269,10 +257,10 @@ ast::ExprPtr Parser::unary() {
   return call();
 }
 
-
 ast::ExprPtr Parser::call() {
   ast::ExprPtr expr = primary();
-  if (has_completion()) return expr;
+  if (has_completion())
+    return expr;
   while (true) {
     if (check(TokenType::LESS) && dynamic_cast<const ast::IdentifierExpr *>(expr.get())) {
       size_t saved = current_;
@@ -280,10 +268,15 @@ ast::ExprPtr Parser::call() {
       int depth = 1;
       bool valid = false;
       while (pos < tokens_.size() && depth > 0) {
-        if (tokens_[pos].type == TokenType::LESS) ++depth;
-        else if (tokens_[pos].type == TokenType::GREATER) --depth;
-        else if (tokens_[pos].type == TokenType::GREATER_GREATER) depth -= 2;
-        else if (tokens_[pos].type == TokenType::SEMICOLON || tokens_[pos].type == TokenType::END_OF_FILE) break;
+        if (tokens_[pos].type == TokenType::LESS)
+          ++depth;
+        else if (tokens_[pos].type == TokenType::GREATER)
+          --depth;
+        else if (tokens_[pos].type == TokenType::GREATER_GREATER)
+          depth -= 2;
+        else if (tokens_[pos].type == TokenType::SEMICOLON ||
+                 tokens_[pos].type == TokenType::END_OF_FILE)
+          break;
         ++pos;
       }
       if (depth == 0 && pos < tokens_.size() && tokens_[pos].type == TokenType::LEFT_PAREN) {
@@ -306,14 +299,15 @@ ast::ExprPtr Parser::call() {
         }
         consume(TokenType::RIGHT_PAREN, "Expected ')' after arguments.");
         const ast::SourceLocation location = expr->location;
-        expr = std::make_unique<ast::CallExpr>(location, std::move(expr),
-                                               std::move(type_args), std::move(args));
+        expr = std::make_unique<ast::CallExpr>(location, std::move(expr), std::move(type_args),
+                                               std::move(args));
         valid = true;
       }
       if (!valid) {
         current_ = saved;
       }
-      if (valid) continue;
+      if (valid)
+        continue;
     }
     if (match(TokenType::LEFT_PAREN)) {
       std::vector<ast::ExprPtr> args;
@@ -350,15 +344,27 @@ ast::ExprPtr Parser::call() {
       if (current_ + 1 < tokens_.size()) {
         switch (tokens_[current_ + 1].type) {
         case TokenType::IDENTIFIER:
-        case TokenType::INTEGER: case TokenType::FLOAT_LIT:
-        case TokenType::STRING_LIT: case TokenType::CHAR_LIT:
-        case TokenType::TRUE: case TokenType::FALSE: case TokenType::NULL_:
-        case TokenType::LEFT_PAREN: case TokenType::LEFT_BRACKET:
+        case TokenType::INTEGER:
+        case TokenType::FLOAT_LIT:
+        case TokenType::STRING_LIT:
+        case TokenType::CHAR_LIT:
+        case TokenType::TRUE:
+        case TokenType::FALSE:
+        case TokenType::NULL_:
+        case TokenType::LEFT_PAREN:
+        case TokenType::LEFT_BRACKET:
         case TokenType::LEFT_BRACE:
-        case TokenType::MINUS: case TokenType::BANG: case TokenType::TILDE:
-        case TokenType::INT: case TokenType::FLOAT: case TokenType::DOUBLE:
-        case TokenType::BOOL: case TokenType::STRING: case TokenType::VOID:
-        case TokenType::CHAR: case TokenType::BYTE:
+        case TokenType::MINUS:
+        case TokenType::BANG:
+        case TokenType::TILDE:
+        case TokenType::INT:
+        case TokenType::FLOAT:
+        case TokenType::DOUBLE:
+        case TokenType::BOOL:
+        case TokenType::STRING:
+        case TokenType::VOID:
+        case TokenType::CHAR:
+        case TokenType::BYTE:
           break; // ternary — don't consume `?`
         default:
           advance(); // consume `?` as propagate
@@ -374,7 +380,6 @@ ast::ExprPtr Parser::call() {
   }
   return expr;
 }
-
 
 ast::ExprPtr Parser::primary() {
   if (at_completion()) {
@@ -426,8 +431,7 @@ ast::ExprPtr Parser::primary() {
       } while (match(TokenType::COMMA));
     }
     consume(TokenType::RIGHT_BRACKET, "Expected ']' after array literal.");
-    return std::make_unique<ast::ArrayLiteralExpr>(location_of(left_bracket),
-                                                   std::move(elements));
+    return std::make_unique<ast::ArrayLiteralExpr>(location_of(left_bracket), std::move(elements));
   }
   // Map literal in expression position: `{}` or `{k: v, ...}`. Blocks never
   // appear in expression position, so a '{' here is unambiguously a map.
@@ -437,26 +441,26 @@ ast::ExprPtr Parser::primary() {
     std::vector<ast::ExprPtr> values;
     if (!check(TokenType::RIGHT_BRACE)) {
       do {
-        if (check(TokenType::RIGHT_BRACE)) break; // trailing comma
+        if (check(TokenType::RIGHT_BRACE))
+          break; // trailing comma
         keys.push_back(expression());
         consume(TokenType::COLON, "Expected ':' between map key and value.");
         values.push_back(expression());
       } while (match(TokenType::COMMA));
     }
     consume(TokenType::RIGHT_BRACE, "Expected '}' after map literal.");
-    return std::make_unique<ast::MapLiteralExpr>(location_of(left_brace),
-                                                 std::move(keys), std::move(values));
+    return std::make_unique<ast::MapLiteralExpr>(location_of(left_brace), std::move(keys),
+                                                 std::move(values));
   }
   if (check(TokenType::INT) || check(TokenType::FLOAT) || check(TokenType::STRING) ||
       check(TokenType::BOOL) || check(TokenType::BYTE) || check(TokenType::DOUBLE) ||
       check(TokenType::CHAR)) {
     // Type-qualified method call: int::bits(expr)
-    if (current_ + 2 < tokens_.size() &&
-        tokens_[current_ + 1].type == TokenType::COLON_COLON &&
+    if (current_ + 2 < tokens_.size() && tokens_[current_ + 1].type == TokenType::COLON_COLON &&
         tokens_[current_ + 2].type == TokenType::IDENTIFIER) {
       const Token &type_tok = advance(); // consume type keyword
-      advance(); // consume ::
-      const Token &method = advance(); // consume method name
+      advance();                         // consume ::
+      const Token &method = advance();   // consume method name
       if (check(TokenType::LEFT_PAREN)) {
         consume(TokenType::LEFT_PAREN, "Expected '(' after type-qualified method.");
         std::vector<ast::ExprPtr> args;
@@ -472,11 +476,10 @@ ast::ExprPtr Parser::primary() {
                                                std::vector<ast::TypeExpr>{}, std::move(args));
       }
       // Not a call — treat as namespace access (unlikely but safe fallback)
-      return std::make_unique<ast::NamespaceAccessExpr>(
-          location_of(type_tok), token_text(type_tok), token_text(method));
+      return std::make_unique<ast::NamespaceAccessExpr>(location_of(type_tok), token_text(type_tok),
+                                                        token_text(method));
     }
-    if (current_ + 1 < tokens_.size() &&
-        tokens_[current_ + 1].type == TokenType::LEFT_PAREN) {
+    if (current_ + 1 < tokens_.size() && tokens_[current_ + 1].type == TokenType::LEFT_PAREN) {
       const Token &type_tok = advance();
       ast::TypeExpr target{std::string(token_text(type_tok)), {}};
       consume(TokenType::LEFT_PAREN, "Expected '(' after type name.");
@@ -490,29 +493,33 @@ ast::ExprPtr Parser::primary() {
     const Token &identifier = previous();
     if (match(TokenType::COLON_COLON)) {
       if (at_completion()) {
-        set_completion({lsp::CompletionPosition::NamespaceAccess, {}, {}, token_text(identifier), {}, {}});
-        return std::make_unique<ast::IdentifierExpr>(location_of(identifier), token_text(identifier));
+        set_completion(
+            {lsp::CompletionPosition::NamespaceAccess, {}, {}, token_text(identifier), {}, {}});
+        return std::make_unique<ast::IdentifierExpr>(location_of(identifier),
+                                                     token_text(identifier));
       }
       std::vector<std::string> segments;
       segments.push_back(std::string(token_text(identifier)));
-      const Token &first_part =
-          consume(TokenType::IDENTIFIER, "Expected name after '::'.");
+      const Token &first_part = consume(TokenType::IDENTIFIER, "Expected name after '::'.");
       segments.push_back(std::string(token_text(first_part)));
       while (match(TokenType::COLON_COLON)) {
-        const Token &part =
-            consume(TokenType::IDENTIFIER, "Expected name after '::'.");
+        const Token &part = consume(TokenType::IDENTIFIER, "Expected name after '::'.");
         segments.push_back(std::string(token_text(part)));
       }
       return parse_namespace_access(identifier, std::move(segments));
     }
     if (check(TokenType::LEFT_BRACE) && current_ + 1 < tokens_.size() &&
-        tokens_[current_ + 1].type != TokenType::RIGHT_BRACE &&
-        !token_text(identifier).empty() && std::isupper(token_text(identifier)[0])) {
+        tokens_[current_ + 1].type != TokenType::RIGHT_BRACE && !token_text(identifier).empty() &&
+        std::isupper(token_text(identifier)[0])) {
       advance(); // consume '{'
       std::vector<ast::StructLiteralExpr::FieldInit> fields;
       while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
         if (at_completion()) {
-          set_completion({lsp::CompletionPosition::StructLiteral, {}, {}, {}, {},
+          set_completion({lsp::CompletionPosition::StructLiteral,
+                          {},
+                          {},
+                          {},
+                          {},
                           std::string(token_text(identifier))});
           return std::make_unique<ast::IdentifierExpr>(location_of(identifier),
                                                        token_text(identifier));
@@ -527,9 +534,8 @@ ast::ExprPtr Parser::primary() {
         }
       }
       consume(TokenType::RIGHT_BRACE, "Expected '}' after struct literal.");
-      return std::make_unique<ast::StructLiteralExpr>(location_of(identifier),
-                                                      ast::TypeExpr{token_text(identifier), {}},
-                                                      std::move(fields));
+      return std::make_unique<ast::StructLiteralExpr>(
+          location_of(identifier), ast::TypeExpr{token_text(identifier), {}}, std::move(fields));
     }
     return std::make_unique<ast::IdentifierExpr>(location_of(identifier), token_text(identifier));
   }
@@ -544,7 +550,6 @@ ast::ExprPtr Parser::primary() {
   return std::make_unique<ast::NullLiteralExpr>(location_of(error_token));
 }
 
-
 ast::ExprPtr Parser::condition_expression() {
   if (match(TokenType::LEFT_PAREN)) {
     ast::ExprPtr condition = expression();
@@ -554,11 +559,11 @@ ast::ExprPtr Parser::condition_expression() {
   return expression();
 }
 
-
 ast::ExprPtr Parser::parse_match_pattern() {
   if (match(TokenType::LET)) {
     const Token &name_token = consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
-    return std::make_unique<ast::BindingPattern>(location_of(name_token), std::string(name_token.lexeme));
+    return std::make_unique<ast::BindingPattern>(location_of(name_token),
+                                                 std::string(name_token.lexeme));
   }
   if (match(TokenType::LEFT_BRACKET)) {
     return parse_array_pattern();
@@ -568,18 +573,22 @@ ast::ExprPtr Parser::parse_match_pattern() {
     const Token &enum_token = advance();
     std::string enum_name(token_text(enum_token));
     advance(); // consume '::'
-    const Token &variant_token = consume(TokenType::IDENTIFIER, "Expected variant name after '::'.");
+    const Token &variant_token =
+        consume(TokenType::IDENTIFIER, "Expected variant name after '::'.");
     std::string variant_name(token_text(variant_token));
     std::vector<ast::ExprPtr> fields;
     if (match(TokenType::LEFT_PAREN)) {
       while (!check(TokenType::RIGHT_PAREN) && !is_at_end() && !has_completion()) {
         if (match(TokenType::LET)) {
-          const Token &name_tok = consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
-          fields.push_back(std::make_unique<ast::BindingPattern>(location_of(name_tok), std::string(name_tok.lexeme)));
+          const Token &name_tok =
+              consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
+          fields.push_back(std::make_unique<ast::BindingPattern>(location_of(name_tok),
+                                                                 std::string(name_tok.lexeme)));
         } else {
           fields.push_back(parse_match_pattern());
         }
-        if (has_completion()) break;
+        if (has_completion())
+          break;
         if (!check(TokenType::RIGHT_PAREN)) {
           consume(TokenType::COMMA, "Expected ',' between enum pattern fields.");
         }
@@ -588,12 +597,11 @@ ast::ExprPtr Parser::parse_match_pattern() {
         consume(TokenType::RIGHT_PAREN, "Expected ')' after enum pattern fields.");
       }
     }
-    return std::make_unique<ast::EnumPattern>(location_of(enum_token), std::move(enum_name), std::move(variant_name),
-                                              std::move(fields));
+    return std::make_unique<ast::EnumPattern>(location_of(enum_token), std::move(enum_name),
+                                              std::move(variant_name), std::move(fields));
   }
   if (check(TokenType::IDENTIFIER) && current_ + 1 < tokens_.size() &&
-      tokens_[current_ + 1].type == TokenType::LEFT_BRACE &&
-      !token_text(peek()).empty() &&
+      tokens_[current_ + 1].type == TokenType::LEFT_BRACE && !token_text(peek()).empty() &&
       std::isupper(static_cast<unsigned char>(token_text(peek())[0]))) {
     const Token &struct_token = advance();
     return parse_struct_pattern(struct_token);
@@ -601,27 +609,29 @@ ast::ExprPtr Parser::parse_match_pattern() {
   return expression();
 }
 
-
 ast::ExprPtr Parser::parse_array_pattern() {
   const Token &bracket = previous();
   std::vector<ast::ExprPtr> elements;
   while (!check(TokenType::RIGHT_BRACKET) && !is_at_end() && !has_completion()) {
     if (match(TokenType::LET)) {
-      const Token &name_token = consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
-      elements.push_back(std::make_unique<ast::BindingPattern>(location_of(name_token), std::string(name_token.lexeme)));
+      const Token &name_token =
+          consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
+      elements.push_back(std::make_unique<ast::BindingPattern>(location_of(name_token),
+                                                               std::string(name_token.lexeme)));
     } else {
       elements.push_back(parse_match_pattern());
     }
-    if (has_completion()) break;
+    if (has_completion())
+      break;
     if (!check(TokenType::RIGHT_BRACKET)) {
       consume(TokenType::COMMA, "Expected ',' between array pattern elements.");
     }
   }
-  if (has_completion()) return std::make_unique<ast::ArrayPattern>(location_of(bracket), std::move(elements));
+  if (has_completion())
+    return std::make_unique<ast::ArrayPattern>(location_of(bracket), std::move(elements));
   consume(TokenType::RIGHT_BRACKET, "Expected ']' after array pattern.");
   return std::make_unique<ast::ArrayPattern>(location_of(bracket), std::move(elements));
 }
-
 
 ast::ExprPtr Parser::parse_struct_pattern(const Token &struct_token) {
   std::string struct_name(token_text(struct_token));
@@ -631,8 +641,10 @@ ast::ExprPtr Parser::parse_struct_pattern(const Token &struct_token) {
     std::string field_name;
     ast::ExprPtr pattern;
     if (match(TokenType::LET)) {
-      const Token &name_token = consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
-      pattern = std::make_unique<ast::BindingPattern>(location_of(name_token), std::string(name_token.lexeme));
+      const Token &name_token =
+          consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
+      pattern = std::make_unique<ast::BindingPattern>(location_of(name_token),
+                                                      std::string(name_token.lexeme));
     } else if (check(TokenType::IDENTIFIER) && current_ + 1 < tokens_.size() &&
                tokens_[current_ + 1].type == TokenType::COLON) {
       const Token &name_token = advance();
@@ -643,7 +655,8 @@ ast::ExprPtr Parser::parse_struct_pattern(const Token &struct_token) {
       pattern = parse_match_pattern();
     }
     fields.push_back(ast::StructPatternField{std::move(field_name), std::move(pattern)});
-    if (has_completion()) break;
+    if (has_completion())
+      break;
     if (!check(TokenType::RIGHT_BRACE)) {
       consume(TokenType::COMMA, "Expected ',' between struct pattern fields.");
     }
@@ -651,9 +664,9 @@ ast::ExprPtr Parser::parse_struct_pattern(const Token &struct_token) {
   if (!has_completion()) {
     consume(TokenType::RIGHT_BRACE, "Expected '}' after struct pattern.");
   }
-  return std::make_unique<ast::StructPattern>(location_of(struct_token), std::move(struct_name), std::move(fields));
+  return std::make_unique<ast::StructPattern>(location_of(struct_token), std::move(struct_name),
+                                              std::move(fields));
 }
-
 
 ast::ExprPtr Parser::match_expression(ast::ExprPtr value) {
   const Token &match_token = previous();
@@ -662,8 +675,8 @@ ast::ExprPtr Parser::match_expression(ast::ExprPtr value) {
   std::vector<ast::MatchArm> arms;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
     if (at_completion()) {
-      set_completion({lsp::CompletionPosition::MatchArm, {},
-                      infer_receiver_type(value.get()), {}, {}, {}});
+      set_completion(
+          {lsp::CompletionPosition::MatchArm, {}, infer_receiver_type(value.get()), {}, {}, {}});
       return value;
     }
     ast::ExprPtr pattern = parse_match_pattern();
@@ -684,6 +697,5 @@ ast::ExprPtr Parser::match_expression(ast::ExprPtr value) {
   return std::make_unique<ast::MatchExpr>(location_of(match_token), std::move(value),
                                           std::move(arms));
 }
-
 
 } // namespace kinglet

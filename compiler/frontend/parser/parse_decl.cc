@@ -78,7 +78,8 @@ ast::DeclPtr Parser::declaration() {
   }
 
   if (is_public) {
-    error_at(peek(), "'pub' can only be used before function, struct, enum, or concept declarations.");
+    error_at(peek(),
+             "'pub' can only be used before function, struct, enum, or concept declarations.");
   }
 
   ast::StmtPtr stmt = statement();
@@ -89,7 +90,6 @@ ast::DeclPtr Parser::declaration() {
   const ast::SourceLocation location = stmt->location;
   return std::make_unique<ast::TopLevelStmtDecl>(location, std::move(stmt));
 }
-
 
 ast::DeclPtr Parser::using_declaration() {
   const Token &using_token = previous();
@@ -105,33 +105,34 @@ ast::DeclPtr Parser::using_declaration() {
   if (!is_namespace && match(TokenType::EQUAL)) {
     const std::string module_id = parse_module_id("module alias");
     consume(TokenType::SEMICOLON, "Expected ';' after using alias.");
-    return std::make_unique<ast::UsingAliasDecl>(location_of(using_token), std::string(token_text(name)),
-                                                 module_id);
+    return std::make_unique<ast::UsingAliasDecl>(location_of(using_token),
+                                                 std::string(token_text(name)), module_id);
   }
   if (match(TokenType::COLON_COLON)) {
-    error_at(previous(), "Wildcard `using module::*` is not supported; use `using namespace module` instead.");
+    error_at(previous(),
+             "Wildcard `using module::*` is not supported; use `using namespace module` instead.");
     return nullptr;
   }
   std::string module_id = std::string(token_text(name));
   while (match(TokenType::DOT)) {
-    const Token &part = consume(TokenType::IDENTIFIER, "Expected identifier after '.' in module name.");
+    const Token &part =
+        consume(TokenType::IDENTIFIER, "Expected identifier after '.' in module name.");
     module_id.push_back('.');
     module_id += token_text(part);
   }
   if (match(TokenType::LEFT_BRACE)) {
     error_at(previous(), "Selective `using module { sym }` is not supported; use qualified access, "
-                          "`using alias = module`, or `using namespace module`.");
+                         "`using alias = module`, or `using namespace module`.");
     return nullptr;
   }
   consume(TokenType::SEMICOLON, "Expected ';' after using declaration.");
-  return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(module_id), is_namespace);
+  return std::make_unique<ast::UsingDecl>(location_of(using_token), std::move(module_id),
+                                          is_namespace);
 }
-
 
 ast::DeclPtr Parser::export_module_declaration() {
   const Token &export_token = previous();
-  const Token &module_kw =
-      consume(TokenType::IDENTIFIER, "Expected 'module' after 'export'.");
+  const Token &module_kw = consume(TokenType::IDENTIFIER, "Expected 'module' after 'export'.");
   if (token_text(module_kw) != "module") {
     error_at(module_kw, "Expected 'module' after 'export'.");
     return nullptr;
@@ -140,7 +141,6 @@ ast::DeclPtr Parser::export_module_declaration() {
   consume(TokenType::SEMICOLON, "Expected ';' after export module.");
   return std::make_unique<ast::ExportModuleDecl>(location_of(export_token), module_id);
 }
-
 
 ast::DeclPtr Parser::import_declaration() {
   const Token &import_token = previous();
@@ -154,7 +154,7 @@ ast::DeclPtr Parser::import_declaration() {
 
   if (match(TokenType::LEFT_BRACE)) {
     error_at(previous(), "Import block syntax `import { ... }` is removed; use `import module-id;` "
-                          "with kinglet.nest.");
+                         "with kinglet.nest.");
     return nullptr;
   }
   if (check(TokenType::IDENTIFIER)) {
@@ -166,7 +166,6 @@ ast::DeclPtr Parser::import_declaration() {
   error_at(peek(), "Expected module name after 'import'.");
   return nullptr;
 }
-
 
 ast::DeclPtr Parser::struct_declaration() {
   const Token &struct_token = previous();
@@ -191,7 +190,8 @@ ast::DeclPtr Parser::struct_declaration() {
     }
     size_t start_pos = current_;
     ast::TypeExpr type = parse_type_expr();
-    if (has_completion()) return nullptr;
+    if (has_completion())
+      return nullptr;
     const Token &field_name = consume(TokenType::IDENTIFIER, "Expected field name.");
     consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
     fields.push_back(ast::FieldDef{std::move(type), token_text(field_name)});
@@ -204,7 +204,6 @@ ast::DeclPtr Parser::struct_declaration() {
   return std::make_unique<ast::StructDecl>(location_of(struct_token), token_text(name),
                                            std::move(type_params), std::move(fields));
 }
-
 
 ast::DeclPtr Parser::enum_declaration() {
   const Token &enum_token = previous();
@@ -248,7 +247,6 @@ ast::DeclPtr Parser::enum_declaration() {
                                          std::move(variants));
 }
 
-
 ast::DeclPtr Parser::concept_declaration() {
   const Token &concept_token = previous();
   const Token &name = consume(TokenType::IDENTIFIER, "Expected concept name.");
@@ -271,8 +269,8 @@ ast::DeclPtr Parser::concept_declaration() {
   // completion context.  ParameterType filters out 'auto' — concept
   // method signatures require explicit return types, not type deduction.
   if (at_completion()) {
-    set_completion({lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {},
-                    active_type_params_});
+    set_completion(
+        {lsp::CompletionPosition::ParameterType, {}, {}, {}, {}, {}, active_type_params_});
     active_type_params_.clear();
     return nullptr;
   }
@@ -287,12 +285,12 @@ ast::DeclPtr Parser::concept_declaration() {
     methods.push_back(ast::ConceptMethodDecl{ret_type, token_text(method_name), std::move(params)});
   }
   active_type_params_.clear();
-  if (has_completion()) return nullptr;
+  if (has_completion())
+    return nullptr;
   consume(TokenType::RIGHT_BRACE, "Expected '}' after concept body.");
   return std::make_unique<ast::ConceptDecl>(location_of(concept_token), token_text(name),
                                             std::move(type_params), std::move(methods));
 }
-
 
 ast::DeclPtr Parser::function_declaration() {
   const Token &return_type_token = peek();
@@ -316,6 +314,5 @@ ast::DeclPtr Parser::function_declaration() {
                                              token_text(name), std::move(type_params),
                                              std::move(params), std::move(body));
 }
-
 
 } // namespace kinglet

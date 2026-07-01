@@ -43,8 +43,8 @@ void redraw_answer(const std::string &label, const std::string &value, int lines
   for (int i = 0; i < lines; ++i) {
     std::cout << "\033[1A\033[2K";
   }
-  std::cout << '\r' << p.green("✓") << "  " << p.bold(label) << ' ' << p.dim("·") << ' '
-            << value << '\n';
+  std::cout << '\r' << p.green("✓") << "  " << p.bold(label) << ' ' << p.dim("·") << ' ' << value
+            << '\n';
 }
 
 std::string ask_line(const std::string &label, const std::string &def) {

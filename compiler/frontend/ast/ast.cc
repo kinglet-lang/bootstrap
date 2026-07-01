@@ -12,10 +12,12 @@ std::string TypeExpr::to_string() const {
   if (name == "Array" && type_args.size() == 1) {
     return type_args[0].to_string() + "[]";
   }
-  if (type_args.empty()) return name;
+  if (type_args.empty())
+    return name;
   std::string result = name + "<";
   for (size_t i = 0; i < type_args.size(); ++i) {
-    if (i > 0) result += ", ";
+    if (i > 0)
+      result += ", ";
     result += type_args[i].to_string();
   }
   result += ">";
@@ -153,8 +155,7 @@ void BoolLiteralExpr::print(std::ostream &out, int indent) const {
   out << "(bool-literal " << (value ? "true" : "false") << ")";
 }
 
-NullLiteralExpr::NullLiteralExpr(SourceLocation location)
-    : Expr(location) {}
+NullLiteralExpr::NullLiteralExpr(SourceLocation location) : Expr(location) {}
 
 void NullLiteralExpr::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
@@ -230,7 +231,9 @@ void AssignExpr::print(std::ostream &out, int indent) const {
 
 CallExpr::CallExpr(SourceLocation location, ExprPtr callee, std::vector<TypeExpr> type_args,
                    std::vector<ExprPtr> args)
-    : Expr(location), callee(std::move(callee)), type_args(std::move(type_args)),
+    : Expr(location),
+      callee(std::move(callee)),
+      type_args(std::move(type_args)),
       args(std::move(args)) {}
 
 void CallExpr::print(std::ostream &out, int indent) const {
@@ -266,7 +269,9 @@ void CastExpr::print(std::ostream &out, int indent) const {
 
 TernaryExpr::TernaryExpr(SourceLocation location, ExprPtr condition, ExprPtr then_expr,
                          ExprPtr else_expr)
-    : Expr(location), condition(std::move(condition)), then_expr(std::move(then_expr)),
+    : Expr(location),
+      condition(std::move(condition)),
+      then_expr(std::move(then_expr)),
       else_expr(std::move(else_expr)) {}
 
 void TernaryExpr::print(std::ostream &out, int indent) const {
@@ -280,7 +285,9 @@ void TernaryExpr::print(std::ostream &out, int indent) const {
 
 NullCoalesceExpr::NullCoalesceExpr(SourceLocation location, ExprPtr left, std::string err_binding,
                                    ExprPtr right)
-    : Expr(location), left(std::move(left)), err_binding(std::move(err_binding)),
+    : Expr(location),
+      left(std::move(left)),
+      err_binding(std::move(err_binding)),
       right(std::move(right)) {}
 
 void NullCoalesceExpr::print(std::ostream &out, int indent) const {
@@ -319,7 +326,8 @@ void ArrayPattern::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
   out << "[";
   for (std::size_t i = 0; i < elements.size(); ++i) {
-    if (i > 0) out << ", ";
+    if (i > 0)
+      out << ", ";
     elements[i]->print(out, 0);
   }
   out << "]";
@@ -327,7 +335,9 @@ void ArrayPattern::print(std::ostream &out, int indent) const {
 
 EnumPattern::EnumPattern(SourceLocation location, std::string enum_name, std::string variant_name,
                          std::vector<ExprPtr> fields)
-    : Expr(location), enum_name(std::move(enum_name)), variant_name(std::move(variant_name)),
+    : Expr(location),
+      enum_name(std::move(enum_name)),
+      variant_name(std::move(variant_name)),
       fields(std::move(fields)) {}
 
 void EnumPattern::print(std::ostream &out, int indent) const {
@@ -376,8 +386,7 @@ void MatchExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
-ExprStmt::ExprStmt(SourceLocation location, ExprPtr expr)
-    : Stmt(location), expr(std::move(expr)) {}
+ExprStmt::ExprStmt(SourceLocation location, ExprPtr expr) : Stmt(location), expr(std::move(expr)) {}
 
 void ExprStmt::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
@@ -417,8 +426,11 @@ void ReturnStmt::print(std::ostream &out, int indent) const {
 
 VarDeclStmt::VarDeclStmt(SourceLocation location, std::string storage, TypeExpr type,
                          std::string name, ExprPtr init)
-    : Stmt(location), storage(std::move(storage)), type(std::move(type)),
-      name(std::move(name)), init(std::move(init)) {}
+    : Stmt(location),
+      storage(std::move(storage)),
+      type(std::move(type)),
+      name(std::move(name)),
+      init(std::move(init)) {}
 
 void VarDeclStmt::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
@@ -438,18 +450,22 @@ void VarDeclStmt::print(std::ostream &out, int indent) const {
 
 UnpackDeclStmt::UnpackDeclStmt(SourceLocation location, std::vector<std::string> names,
                                std::string rest_name, ExprPtr init)
-    : Stmt(location), names(std::move(names)), rest_name(std::move(rest_name)),
+    : Stmt(location),
+      names(std::move(names)),
+      rest_name(std::move(rest_name)),
       init(std::move(init)) {}
 
 void UnpackDeclStmt::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
   out << "(unpack [";
   for (std::size_t i = 0; i < names.size(); ++i) {
-    if (i > 0) out << ", ";
+    if (i > 0)
+      out << ", ";
     out << names[i];
   }
   if (!rest_name.empty()) {
-    if (!names.empty()) out << ", ";
+    if (!names.empty())
+      out << ", ";
     out << "..." << rest_name;
   }
   out << "]";
@@ -471,9 +487,10 @@ void BlockStmt::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
-IfStmt::IfStmt(SourceLocation location, ExprPtr condition, StmtPtr then_branch,
-               StmtPtr else_branch)
-    : Stmt(location), condition(std::move(condition)), then_branch(std::move(then_branch)),
+IfStmt::IfStmt(SourceLocation location, ExprPtr condition, StmtPtr then_branch, StmtPtr else_branch)
+    : Stmt(location),
+      condition(std::move(condition)),
+      then_branch(std::move(then_branch)),
       else_branch(std::move(else_branch)) {}
 
 void IfStmt::print(std::ostream &out, int indent) const {
@@ -512,8 +529,11 @@ void WhileStmt::print(std::ostream &out, int indent) const {
 
 ForStmt::ForStmt(SourceLocation location, StmtPtr init, ExprPtr condition, StmtPtr step,
                  StmtPtr body)
-    : Stmt(location), init(std::move(init)), condition(std::move(condition)),
-      step(std::move(step)), body(std::move(body)) {}
+    : Stmt(location),
+      init(std::move(init)),
+      condition(std::move(condition)),
+      step(std::move(step)),
+      body(std::move(body)) {}
 
 void ForStmt::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
@@ -557,8 +577,12 @@ void ContinueStmt::print(std::ostream &out, int indent) const {
 FunctionDecl::FunctionDecl(SourceLocation location, TypeExpr return_type, std::string name,
                            std::vector<std::string> type_params, std::vector<Parameter> params,
                            StmtPtr body)
-    : Decl(location), return_type(std::move(return_type)), name(std::move(name)),
-      type_params(std::move(type_params)), params(std::move(params)), body(std::move(body)) {}
+    : Decl(location),
+      return_type(std::move(return_type)),
+      name(std::move(name)),
+      type_params(std::move(type_params)),
+      params(std::move(params)),
+      body(std::move(body)) {}
 
 void FunctionDecl::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
@@ -571,19 +595,23 @@ void FunctionDecl::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
-ImportDecl::ImportDecl(SourceLocation location, std::string path,
-                       std::string alias, std::vector<std::string> selected_symbols)
-    : Decl(location), path(std::move(path)), alias(std::move(alias)),
+ImportDecl::ImportDecl(SourceLocation location, std::string path, std::string alias,
+                       std::vector<std::string> selected_symbols)
+    : Decl(location),
+      path(std::move(path)),
+      alias(std::move(alias)),
       selected_symbols(std::move(selected_symbols)) {}
 
 void ImportDecl::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
   out << "(import \"" << path << "\"";
-  if (!alias.empty()) out << " as " << alias;
+  if (!alias.empty())
+    out << " as " << alias;
   if (!selected_symbols.empty()) {
     out << " {";
     for (std::size_t i = 0; i < selected_symbols.size(); ++i) {
-      if (i > 0) out << ", ";
+      if (i > 0)
+        out << ", ";
       out << selected_symbols[i];
     }
     out << "}";
@@ -642,7 +670,8 @@ void UsingAliasDecl::print(std::ostream &out, int indent) const {
 
 NamespaceAccessExpr::NamespaceAccessExpr(SourceLocation location, std::string namespace_name,
                                          std::string member_name)
-    : Expr(location), namespace_name(std::move(namespace_name)),
+    : Expr(location),
+      namespace_name(std::move(namespace_name)),
       member_name(std::move(member_name)) {}
 
 void NamespaceAccessExpr::print(std::ostream &out, int indent) const {
@@ -662,7 +691,9 @@ void FieldAccessExpr::print(std::ostream &out, int indent) const {
 
 FieldAssignExpr::FieldAssignExpr(SourceLocation location, ExprPtr object, std::string field_name,
                                  ExprPtr value)
-    : Expr(location), object(std::move(object)), field_name(std::move(field_name)),
+    : Expr(location),
+      object(std::move(object)),
+      field_name(std::move(field_name)),
       value(std::move(value)) {}
 
 void FieldAssignExpr::print(std::ostream &out, int indent) const {
@@ -686,8 +717,7 @@ void IndexExpr::print(std::ostream &out, int indent) const {
 
 IndexAssignExpr::IndexAssignExpr(SourceLocation location, ExprPtr object, ExprPtr index,
                                  ExprPtr value)
-    : Expr(location), object(std::move(object)), index(std::move(index)),
-      value(std::move(value)) {}
+    : Expr(location), object(std::move(object)), index(std::move(index)), value(std::move(value)) {}
 
 void IndexAssignExpr::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
@@ -717,7 +747,9 @@ void StructLiteralExpr::print(std::ostream &out, int indent) const {
 
 StructDecl::StructDecl(SourceLocation location, std::string name,
                        std::vector<std::string> type_params, std::vector<FieldDef> fields)
-    : Decl(location), name(std::move(name)), type_params(std::move(type_params)),
+    : Decl(location),
+      name(std::move(name)),
+      type_params(std::move(type_params)),
       fields(std::move(fields)) {}
 
 void StructDecl::print(std::ostream &out, int indent) const {
@@ -744,7 +776,8 @@ void EnumDecl::print(std::ostream &out, int indent) const {
     if (!v.param_types.empty()) {
       out << "(";
       for (std::size_t i = 0; i < v.param_types.size(); ++i) {
-        if (i > 0) out << ", ";
+        if (i > 0)
+          out << ", ";
         out << v.param_types[i].name;
       }
       out << ")";
@@ -756,14 +789,17 @@ void EnumDecl::print(std::ostream &out, int indent) const {
 ConceptDecl::ConceptDecl(SourceLocation location, std::string name,
                          std::vector<std::string> type_params,
                          std::vector<ConceptMethodDecl> methods)
-    : Decl(location), name(std::move(name)), type_params(std::move(type_params)),
+    : Decl(location),
+      name(std::move(name)),
+      type_params(std::move(type_params)),
       methods(std::move(methods)) {}
 
 void ConceptDecl::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
   out << "(concept " << name << "<";
   for (size_t i = 0; i < type_params.size(); ++i) {
-    if (i > 0) out << ", ";
+    if (i > 0)
+      out << ", ";
     out << type_params[i];
   }
   out << ">";

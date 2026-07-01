@@ -10,8 +10,7 @@
 namespace kinglet {
 
 inline uint32_t pack_dense2d_shape(int rows, int cols) {
-  return (static_cast<uint32_t>(rows) << 16) |
-         (static_cast<uint32_t>(cols) & 0xFFFFu);
+  return (static_cast<uint32_t>(rows) << 16) | (static_cast<uint32_t>(cols) & 0xFFFFu);
 }
 
 inline void unpack_dense2d_shape(uint32_t packed, int *rows, int *cols) {
@@ -44,7 +43,9 @@ enum class OpCode : uint8_t {
   StoreLocal,
   Pop,
   Dup,
-  CastTo, FloatToBits, BitsToFloat,
+  CastTo,
+  FloatToBits,
+  BitsToFloat,
   Call,
   Return,
   Jmp,

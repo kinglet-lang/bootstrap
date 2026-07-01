@@ -13,8 +13,7 @@
 
 namespace kinglet {
 
-ModuleLoader::ModuleLoader(std::string base_dir)
-    : base_dir_(std::move(base_dir)) {}
+ModuleLoader::ModuleLoader(std::string base_dir) : base_dir_(std::move(base_dir)) {}
 
 void ModuleLoader::discover_project_root(const std::string &source_file_dir) {
   project_config_ = find_project_config(source_file_dir);
@@ -26,7 +25,8 @@ std::string ModuleLoader::resolve_path(const std::string &relative_path) const {
   return std::filesystem::canonical(resolved).string();
 }
 
-std::string ModuleLoader::resolve_path_from(const std::string &relative_path, const std::string &base) const {
+std::string ModuleLoader::resolve_path_from(const std::string &relative_path,
+                                            const std::string &base) const {
   std::filesystem::path b(base);
   std::filesystem::path resolved = b / relative_path;
   return std::filesystem::canonical(resolved).string();
@@ -62,16 +62,15 @@ void assign_namespace(ParsedModule &mod, const std::string &fallback_path) {
 
 void ModuleLoader::register_source_file(const std::string &path) {
   std::filesystem::path p(path);
-  std::filesystem::path target = p.is_absolute()
-                                     ? p
-                                     : std::filesystem::path(base_dir_) / path;
+  std::filesystem::path target = p.is_absolute() ? p : std::filesystem::path(base_dir_) / path;
   std::error_code ec;
   std::filesystem::path canonical = std::filesystem::canonical(target, ec);
   if (ec) {
     // File may not exist on disk yet (e.g. unsaved LSP buffer); fall back to
     // a lexical normalization so registration never throws.
     canonical = std::filesystem::weakly_canonical(target, ec);
-    if (ec) canonical = target.lexically_normal();
+    if (ec)
+      canonical = target.lexically_normal();
   }
   source_files_.insert(canonical.string());
 }
@@ -96,7 +95,8 @@ ModuleLoader::LoadResult ModuleLoader::load(const std::string &path) {
   return load_resolved(resolved, path);
 }
 
-ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const std::string &importing_file_dir) {
+ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path,
+                                                 const std::string &importing_file_dir) {
   std::string resolved;
   try {
     if (path.size() >= 2 && path[0] == '/' && path[1] == '/') {
@@ -117,7 +117,8 @@ ModuleLoader::LoadResult ModuleLoader::load_from(const std::string &path, const 
   return load_resolved(resolved, path);
 }
 
-ModuleLoader::LoadResult ModuleLoader::load_resolved(const std::string &resolved, const std::string &path) {
+ModuleLoader::LoadResult ModuleLoader::load_resolved(const std::string &resolved,
+                                                     const std::string &path) {
   if (source_files_.count(resolved)) {
     return {nullptr, "File cannot import itself: " + path};
   }
@@ -203,7 +204,7 @@ ModuleLoader::LoadResult ModuleLoader::load_by_logical_name(const std::string &m
   }
   if (result.module->namespace_name != module_id) {
     return {nullptr, "export module '" + result.module->namespace_name +
-                          "' does not match manifest key '" + module_id + "'"};
+                         "' does not match manifest key '" + module_id + "'"};
   }
   return result;
 }
@@ -219,11 +220,11 @@ ModuleLoader::load_directory_import(const std::string &module_id) {
   // module_id "a.b" -> directory "a/b" relative to the project root.
   std::string rel_dir = module_id;
   for (char &c : rel_dir) {
-    if (c == '.') c = '/';
+    if (c == '.')
+      c = '/';
   }
   std::error_code ec;
-  std::filesystem::path dir =
-      std::filesystem::path(project_config_->root_dir) / rel_dir;
+  std::filesystem::path dir = std::filesystem::path(project_config_->root_dir) / rel_dir;
   if (!std::filesystem::is_directory(dir, ec)) {
     // Not a directory: caller falls back to reporting the manifest miss.
     return out;
@@ -233,10 +234,13 @@ ModuleLoader::load_directory_import(const std::string &module_id) {
   // Gather `.kl` stems in deterministic (sorted) order for reproducible builds.
   std::vector<std::string> stems;
   for (std::filesystem::directory_iterator it(dir, ec), end; it != end; it.increment(ec)) {
-    if (ec) break;
+    if (ec)
+      break;
     const std::filesystem::path &entry = it->path();
-    if (!std::filesystem::is_regular_file(entry, ec)) continue;
-    if (entry.extension() != ".kl") continue;
+    if (!std::filesystem::is_regular_file(entry, ec))
+      continue;
+    if (entry.extension() != ".kl")
+      continue;
     stems.push_back(entry.stem().string());
   }
   std::sort(stems.begin(), stems.end());
@@ -254,7 +258,8 @@ ModuleLoader::load_directory_import(const std::string &module_id) {
     const std::string rel_path = rel_dir_with_sep + stem + ".kl";
     LoadResult result = load_from(rel_path, project_config_->root_dir);
     if (!result.module) {
-      if (out.error.empty()) out.error = result.error;
+      if (out.error.empty())
+        out.error = result.error;
       continue;
     }
     // Each submodule must declare the matching dotted namespace so that
@@ -262,9 +267,8 @@ ModuleLoader::load_directory_import(const std::string &module_id) {
     const std::string expected_ns = module_id + "." + stem;
     if (result.module->namespace_name != expected_ns) {
       if (out.error.empty()) {
-        out.error = "Module in '" + rel_path + "' declares '" +
-                    result.module->namespace_name + "' but directory import '" +
-                    module_id + "' expects '" + expected_ns +
+        out.error = "Module in '" + rel_path + "' declares '" + result.module->namespace_name +
+                    "' but directory import '" + module_id + "' expects '" + expected_ns +
                     "' (add 'export module " + expected_ns + ";')";
       }
       continue;
@@ -274,11 +278,9 @@ ModuleLoader::load_directory_import(const std::string &module_id) {
   return out;
 }
 
-ModuleLoader::LogicalResolveResult
-ModuleLoader::resolve_logical(const std::string &module_id) {
+ModuleLoader::LogicalResolveResult ModuleLoader::resolve_logical(const std::string &module_id) {
   LogicalResolveResult out;
-  const bool in_manifest =
-      project_config_ && project_config_->modules.count(module_id) > 0;
+  const bool in_manifest = project_config_ && project_config_->modules.count(module_id) > 0;
   LoadResult manifest = load_by_logical_name(module_id);
   if (manifest.module) {
     out.modules.push_back(manifest.module);
@@ -294,14 +296,13 @@ ModuleLoader::resolve_logical(const std::string &module_id) {
   DirectoryImportResult dir = load_directory_import(module_id);
   if (dir.is_directory) {
     out.modules = std::move(dir.modules);
-    out.error = dir.error;  // empty on full success, else a partial-failure msg
+    out.error = dir.error; // empty on full success, else a partial-failure msg
     return out;
   }
   // Neither manifest nor directory: surface the underlying reason.
   out.error = dir.error.empty()
                   ? ("Unknown module '" + module_id +
-                     "': not in project manifest and no directory '" + module_id +
-                     "/' found")
+                     "': not in project manifest and no directory '" + module_id + "/' found")
                   : dir.error;
   return out;
 }

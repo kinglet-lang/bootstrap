@@ -84,10 +84,7 @@ int32_t kl_str_ends_with(kl_h str, kl_h suffix) {
   if (s == nullptr || p == nullptr) {
     return 0;
   }
-  return s->size() >= p->size() &&
-                 s->compare(s->size() - p->size(), p->size(), *p) == 0
-             ? 1
-             : 0;
+  return s->size() >= p->size() && s->compare(s->size() - p->size(), p->size(), *p) == 0 ? 1 : 0;
 }
 
 kl_h kl_str_replace(kl_h str, kl_h old_str, kl_h new_str) {

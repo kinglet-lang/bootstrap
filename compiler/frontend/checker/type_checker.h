@@ -13,7 +13,7 @@
 namespace kinglet {
 class ModuleLoader;
 struct ParsedModule;
-}
+} // namespace kinglet
 
 #include <memory>
 #include <optional>
@@ -127,7 +127,8 @@ private:
 
   void push_scope();
   void pop_scope();
-  void declare_var(const std::string &name, const Type &type, bool is_mutable, ast::SourceLocation loc = {});
+  void declare_var(const std::string &name, const Type &type, bool is_mutable,
+                   ast::SourceLocation loc = {});
   std::optional<Type> lookup_var(const std::string &name);
   std::optional<Type> lookup_type(const std::string &name) const;
   Type resolve_type_name(const std::string &name) const;
@@ -145,7 +146,8 @@ private:
                                               const std::vector<ast::ExprPtr> &args,
                                               ast::SourceLocation loc);
   std::string mangle_name(const std::string &base, const std::vector<ast::TypeExpr> &args) const;
-  void instantiate_generic_struct(const ast::StructDecl *decl, const std::vector<ast::TypeExpr> &args);
+  void instantiate_generic_struct(const ast::StructDecl *decl,
+                                  const std::vector<ast::TypeExpr> &args);
   void error_at(ast::SourceLocation location, std::string message);
   void warn_at(ast::SourceLocation location, std::string message);
   void check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::SourceLocation location);
@@ -190,7 +192,7 @@ private:
 
   std::vector<TypeError> errors_;
   std::unordered_map<std::string, KirFunctionSig> kir_function_sigs_;
-  std::unordered_set<std::string> imported_bare_names_;  // for selective imports
+  std::unordered_set<std::string> imported_bare_names_; // for selective imports
   // Per-namespace exported / private symbol names, populated when an import is
   // processed. Used to give a precise diagnostic for `using mod { sym };` when
   // a symbol is missing from the module or exists but is not pub.

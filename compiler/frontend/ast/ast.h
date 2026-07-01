@@ -280,8 +280,7 @@ struct ArrayLiteralExpr final : Expr {
 
 // A map literal: `{}` (empty) or `{k1: v1, k2: v2}`. Parallel key/value lists.
 struct MapLiteralExpr final : Expr {
-  MapLiteralExpr(SourceLocation location, std::vector<ExprPtr> keys,
-                 std::vector<ExprPtr> values);
+  MapLiteralExpr(SourceLocation location, std::vector<ExprPtr> keys, std::vector<ExprPtr> values);
   void print(std::ostream &out, int indent = 0) const override;
   void accept(ExprVisitor &v) const override { v.visit(*this); }
 
@@ -490,8 +489,8 @@ struct VarDeclStmt final : Stmt {
 };
 
 struct UnpackDeclStmt final : Stmt {
-  UnpackDeclStmt(SourceLocation location, std::vector<std::string> names,
-                 std::string rest_name, ExprPtr init);
+  UnpackDeclStmt(SourceLocation location, std::vector<std::string> names, std::string rest_name,
+                 ExprPtr init);
   void print(std::ostream &out, int indent = 0) const override;
   void accept(StmtVisitor &v) const override { v.visit(*this); }
 
@@ -632,8 +631,7 @@ struct UsingAliasDecl final : Decl {
 };
 
 struct NamespaceAccessExpr final : Expr {
-  NamespaceAccessExpr(SourceLocation location, std::string namespace_name,
-                      std::string member_name);
+  NamespaceAccessExpr(SourceLocation location, std::string namespace_name, std::string member_name);
   void print(std::ostream &out, int indent = 0) const override;
   void accept(ExprVisitor &v) const override { v.visit(*this); }
 
@@ -689,8 +687,7 @@ struct StructLiteralExpr final : Expr {
     std::string name;
     ExprPtr value;
   };
-  StructLiteralExpr(SourceLocation location, TypeExpr struct_type,
-                    std::vector<FieldInit> fields);
+  StructLiteralExpr(SourceLocation location, TypeExpr struct_type, std::vector<FieldInit> fields);
   void print(std::ostream &out, int indent = 0) const override;
   void accept(ExprVisitor &v) const override { v.visit(*this); }
 
@@ -732,8 +729,7 @@ struct ConceptMethodDecl {
 };
 
 struct ConceptDecl final : Decl {
-  ConceptDecl(SourceLocation location, std::string name,
-              std::vector<std::string> type_params,
+  ConceptDecl(SourceLocation location, std::string name, std::vector<std::string> type_params,
               std::vector<ConceptMethodDecl> methods);
   void print(std::ostream &out, int indent = 0) const override;
   void accept(DeclVisitor &v) const override { v.visit(*this); }

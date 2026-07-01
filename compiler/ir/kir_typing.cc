@@ -122,7 +122,8 @@ KirContainerType join_container(KirContainerType a, KirContainerType b) {
       a.nested_shape == b.nested_shape) {
     out.nested_element_type = kir_type_join(a.nested_element_type, b.nested_element_type);
     out.nested_key_type = kir_type_join(a.nested_key_type, b.nested_key_type);
-  } else if (a.nested_shape != KirContainerShape::None || b.nested_shape != KirContainerShape::None) {
+  } else if (a.nested_shape != KirContainerShape::None ||
+             b.nested_shape != KirContainerShape::None) {
     out.nested_shape = KirContainerShape::None;
     out.nested_element_type = KirType::Any;
     out.nested_key_type = KirType::Any;
@@ -463,8 +464,8 @@ void infer_function(KirFunction *fn, const KirModule &module) {
           state.locals[static_cast<std::size_t>(slot)] =
               kir_type_join(state.locals[static_cast<std::size_t>(slot)], value);
         }
-        state.local_containers[static_cast<std::size_t>(slot)] = join_container(
-            state.local_containers[static_cast<std::size_t>(slot)], container);
+        state.local_containers[static_cast<std::size_t>(slot)] =
+            join_container(state.local_containers[static_cast<std::size_t>(slot)], container);
       }
       break;
     }
@@ -555,11 +556,9 @@ void infer_function(KirFunction *fn, const KirModule &module) {
     case KirOpcode::Call: {
       const int argc = instr->operands[0];
       KirType ret = KirType::Any;
-      if (i > 0 && linear[i - 1]->op == KirOpcode::ConstFn &&
-          !linear[i - 1]->operands.empty()) {
+      if (i > 0 && linear[i - 1]->op == KirOpcode::ConstFn && !linear[i - 1]->operands.empty()) {
         const int fn_idx = linear[i - 1]->operands[0];
-        if (fn_idx >= 0 &&
-            static_cast<std::size_t>(fn_idx) < module.function_signatures.size()) {
+        if (fn_idx >= 0 && static_cast<std::size_t>(fn_idx) < module.function_signatures.size()) {
           ret = module.function_signatures[static_cast<std::size_t>(fn_idx)].return_type;
         }
       } else if (i > 0 && linear[i - 1]->op == KirOpcode::ConstNativeFn) {
@@ -748,13 +747,15 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       if (kir_container_is_array(object_container) &&
           object_container.element_type != KirType::Any) {
         result = object_container.element_type;
-        if (kir_type_is_container(result) && object_container.nested_shape != KirContainerShape::None) {
+        if (kir_type_is_container(result) &&
+            object_container.nested_shape != KirContainerShape::None) {
           result_container = kir_container_peel_element(object_container);
         }
       } else if (kir_container_is_map(object_container) &&
                  object_container.element_type != KirType::Any) {
         result = object_container.element_type;
-        if (kir_type_is_container(result) && object_container.nested_shape != KirContainerShape::None) {
+        if (kir_type_is_container(result) &&
+            object_container.nested_shape != KirContainerShape::None) {
           result_container = kir_container_peel_element(object_container);
         }
       } else if (object == KirType::String && kir_type_is_integer(kir_type_normalize(key))) {

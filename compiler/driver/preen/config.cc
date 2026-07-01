@@ -7,7 +7,9 @@
 
 namespace kinglet::preen {
 
-FmtConfig FmtConfig::defaults() { return FmtConfig{}; }
+FmtConfig FmtConfig::defaults() {
+  return FmtConfig{};
+}
 
 FmtConfig FmtConfig::merge(const FmtConfig &base, const FmtConfig &overlay) {
   FmtConfig out = base;
@@ -46,9 +48,8 @@ FmtConfig fmt_config_from_project(const kinglet::ProjectConfig &project) {
   }
   for (const auto &[name, enabled] : project.fmt.extension_entries) {
     if (!enabled) {
-      config.extensions.erase(
-          std::remove(config.extensions.begin(), config.extensions.end(), name),
-          config.extensions.end());
+      config.extensions.erase(std::remove(config.extensions.begin(), config.extensions.end(), name),
+                              config.extensions.end());
       continue;
     }
     if (std::find(config.extensions.begin(), config.extensions.end(), name) ==
