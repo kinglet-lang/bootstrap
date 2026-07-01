@@ -89,6 +89,61 @@ jobs:
           export KINGLET_SKIP_REBUILD=1
           bash tests/cli/run_golden.sh
 
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pinned GN + Ninja
+        shell: bash
+        run: |
+          bash scripts/bootstrap.sh
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install LLVM
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-dev clang
+          echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
+
+      - name: Generate build files
+        shell: bash
+        run: |
+          gn gen out/Coverage --args="is_debug=false enable_llvm=true coverage=true llvm_config=\"$LLVM_CONFIG\""
+
+      - name: Build
+        shell: bash
+        run: ninja -C out/Coverage
+
+      - name: Run golden tests
+        shell: bash
+        env:
+          LLVM_PROFILE_FILE: "${{ github.workspace }}/profraw/%p.profraw"
+        run: |
+          mkdir -p profraw
+          export KINGLET="$PWD/out/Coverage/kinglet"
+          export KINGLET_SKIP_REBUILD=1
+          bash tests/cli/run_golden.sh
+
+      - name: Generate coverage report
+        shell: bash
+        run: |
+          llvm-profdata merge -sparse profraw/*.profraw -o coverage.profdata
+          llvm-cov export \
+            out/Coverage/kinglet \
+            -instr-profile=coverage.profdata \
+            -format=lcov \
+            -ignore-filename-regex='(tests/|out/|/usr/)' \
+            > coverage.lcov
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.lcov
+          fail_ci_if_error: false
+
   # Windows: Git Bash + non-LLVM kinglet is enough for compile-only golden
   # (--check / --ast / --ir / --bytecode). Native `run` is unsupported on
   # _WIN32; MSYS2+LLVM builds were failing the golden harness itself.

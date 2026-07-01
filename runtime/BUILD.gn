@@ -19,7 +19,10 @@ static_library("kinglet_rt") {
   ]
 
   # Runtime library is linked into JIT-compiled user programs at runtime.
-  # It must not carry sanitizer instrumentation, because the JIT linker has
-  # no sanitizer runtime available.
-  configs -= [ "//build/config:sanitizer" ]
+  # It must not carry sanitizer or coverage instrumentation, because the
+  # JIT linker has no sanitizer or profiling runtime available.
+  configs -= [
+    "//build/config:sanitizer",
+    "//build/config:coverage",
+  ]
 }
