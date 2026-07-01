@@ -1,17 +1,24 @@
 name: Auto Merge
+
 on:
-  workflow_run:
-    workflows: [CI]
+  check_suite:
     types: [completed]
   workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: automerge
+  cancel-in-progress: false
+
 jobs:
   automerge:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.check_suite.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@v3
@@ -21,38 +28,40 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-workflows: write
-      - name: Batch enable auto-merge
+
+      - name: Enable auto-merge on ready PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
         run: |
-          # Get all open PRs where all completed checks passed, with mergeable state
-          prs=$(gh pr list -R "$REPO" --state open \
-            --json number,statusCheckRollup,mergeable \
-            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | select(.mergeable == "MERGEABLE") | .number')
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual dispatch: process all open PRs with passing checks.
+            head_filter="true"
+            prs=$(gh pr list -R "$REPO" --state open \
+              --json number,statusCheckRollup \
+              --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | .number')
+          else
+            # Check suite completion: only process PRs that match this suite's commit.
+            head_sha="${{ github.event.check_suite.head_sha }}"
+            head_filter=".headRefOid == \"$head_sha\""
+            prs=$(gh pr list -R "$REPO" --state open \
+              --json number,headRefOid,statusCheckRollup \
+              --jq ".[] | select(.headRefOid == \"$head_sha\") | select(.statusCheckRollup | map(select(.conclusion != \"\" and .conclusion != \"SUCCESS\")) | length == 0) | .number")
+          fi
+
           if [ -z "$prs" ]; then
-            echo "No PRs with all checks passed."
+            echo "No ready PRs found."
             exit 0
           fi
-          echo "PRs ready to auto-merge: $prs"
+
+          echo "PRs ready for auto-merge: $prs"
           for num in $prs; do
-            echo "--- Processing PR #$num ---"
+            echo "Enabling auto-merge for PR #$num..."
 
-            # Rebase if behind
-            state=$(gh api "repos/$REPO/pulls/$num" --jq '.mergeable_state')
-            echo "  mergeable_state: $state"
-            if [ "$state" = "behind" ]; then
-              echo "  Branch is behind canon, updating..."
-              if gh api "repos/$REPO/pulls/$num/update-branch" -X PUT --jq '.message' 2>&1; then
-                echo "  Branch updated. Waiting for mergeability recalculation..."
-                sleep 10
-              else
-                echo "  Failed to update branch (may need rebase after CI re-run in next tick)"
-              fi
-            fi
+            # Strip markdown formatting so the commit message reads as plain text.
+            pr_body=$(gh api "repos/$REPO/pulls/$num" --jq '.body' \
+              | sed 's/\*\*//g; s/`//g')
 
-            # Preserve PR body in squash merge commit
-            pr_body=$(gh api "repos/$REPO/pulls/$num" --jq '.body')
-            echo "  Enabling auto-merge with PR body as commit message..."
             gh pr merge "$num" --auto --squash --body "$pr_body"
+            echo "  Auto-merge enabled."
           done
