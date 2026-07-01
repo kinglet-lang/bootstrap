@@ -4,4 +4,13 @@ set -eu
 ROOT="$(git rev-parse --show-toplevel)"
 HOOK_DIR="$ROOT/scripts/hooks"
 
+# clang-format: auto-fix staged C++ files before the comment check.
+if command -v clang-format >/dev/null 2>&1; then
+  staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cc|h)$' || true)
+  if [ -n "$staged" ]; then
+    echo "$staged" | xargs -r clang-format -i -style=file
+    echo "$staged" | xargs -r git add
+  fi
+fi
+
 exec python3 "$HOOK_DIR/check_comments.py"
