@@ -51,6 +51,9 @@ kl_h kl_enum_new_payload(int32_t type_index, int32_t variant_index, int32_t coun
   obj->variant_index = variant_index;
   if (count > 0 && elements != nullptr) {
     obj->payload.assign(elements, elements + count);
+    for (kl_h p : obj->payload) {
+      kl_retain(p);
+    }
   }
   return kl_box_ptr(obj);
 }
@@ -66,7 +69,9 @@ kl_h kl_enum_payload_at(kl_h value, int32_t index) {
   if (static_cast<std::size_t>(index) >= obj->payload.size()) {
     return kl_from_int(0);
   }
-  return obj->payload[static_cast<std::size_t>(index)];
+  kl_h payload = obj->payload[static_cast<std::size_t>(index)];
+  kl_retain(payload);
+  return payload;
 }
 
 kl_h kl_cast_to_int(kl_h value) {

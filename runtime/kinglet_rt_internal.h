@@ -23,6 +23,9 @@ enum class KlKind : uint8_t {
 
 struct KlHeader {
   KlKind kind;
+  // Reference count: starts at 1 (owning) on allocation; kl_retain increments,
+  // kl_release decrements and frees (cascading into container elements) at zero.
+  uint32_t refcount = 1;
 };
 
 struct KlString {

@@ -11,7 +11,11 @@
 #include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/SHA256.h>
+#if LLVM_VERSION_MAJOR >= 16
 #include <llvm/TargetParser/Host.h>
+#else
+#include <llvm/Support/Host.h>
+#endif
 
 #include <filesystem>
 #include <sstream>

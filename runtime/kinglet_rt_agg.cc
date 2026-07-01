@@ -46,6 +46,9 @@ kl_h kl_array_new(int32_t count, const kl_h *elements) {
   auto *obj = new KlArray();
   if (count > 0 && elements != nullptr) {
     obj->elements.assign(elements, elements + count);
+    for (kl_h e : obj->elements) {
+      kl_retain(e);
+    }
   }
   return kl_box_ptr(obj);
 }
@@ -56,6 +59,9 @@ kl_h kl_dense_array_new(int32_t rows, int32_t cols, const kl_h *elements) {
     obj->dense_dims = {rows, cols};
     obj->elements.assign(elements, elements + static_cast<std::size_t>(rows) *
                                                   static_cast<std::size_t>(cols));
+    for (kl_h e : obj->elements) {
+      kl_retain(e);
+    }
   }
   return kl_box_ptr(obj);
 }
@@ -75,7 +81,9 @@ kl_h kl_dense2d_get(kl_h grid, int32_t row, int32_t col) {
   }
   const std::size_t idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(cols) +
                           static_cast<std::size_t>(col);
-  return obj->elements[idx];
+  kl_h elem = obj->elements[idx];
+  kl_retain(elem);
+  return elem;
 }
 
 kl_h kl_array_get(kl_h array, int32_t index) {
@@ -112,7 +120,9 @@ kl_h kl_array_get(kl_h array, int32_t index) {
   if (static_cast<std::size_t>(index) >= obj->elements.size()) {
     runtime_abort("Array index out of bounds.");
   }
-  return obj->elements[static_cast<std::size_t>(index)];
+  kl_h elem = obj->elements[static_cast<std::size_t>(index)];
+  kl_retain(elem);
+  return elem;
 }
 
 int32_t kl_array_len(kl_h array) {
@@ -131,6 +141,9 @@ kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields) 
   obj->type_index = type_index;
   if (field_count > 0 && fields != nullptr) {
     obj->fields.assign(fields, fields + field_count);
+    for (kl_h f : obj->fields) {
+      kl_retain(f);
+    }
   }
   return kl_box_ptr(obj);
 }
@@ -160,6 +173,7 @@ kl_h kl_array_push(kl_h array, kl_h value) {
       kl_array_ensure_jagged(obj);
     }
     obj->elements.push_back(value);
+    kl_retain(value);
   }
   return 0;
 }
@@ -168,8 +182,20 @@ kl_h kl_array_resize(kl_h array, kl_h count, kl_h default_value) {
   if (kl_is_kind(array, KlKind::Array)) {
     const int64_t n = kl_to_int(count);
     if (n >= 0) {
-      static_cast<KlArray *>(kl_unbox_ptr(array))
-          ->elements.resize(static_cast<std::size_t>(n), default_value);
+      auto *obj = static_cast<KlArray *>(kl_unbox_ptr(array));
+      const std::size_t old_size = obj->elements.size();
+      const std::size_t new_size = static_cast<std::size_t>(n);
+      if (new_size > old_size) {
+        obj->elements.resize(new_size, default_value);
+        for (std::size_t i = old_size; i < new_size; ++i) {
+          kl_retain(obj->elements[i]);
+        }
+      } else if (new_size < old_size) {
+        for (std::size_t i = new_size; i < old_size; ++i) {
+          kl_release(obj->elements[i]);
+        }
+        obj->elements.resize(new_size);
+      }
     }
   }
   return 0;
@@ -190,7 +216,11 @@ kl_h kl_array_pop(kl_h array) {
 
 kl_h kl_array_clear(kl_h array) {
   if (kl_is_kind(array, KlKind::Array)) {
-    static_cast<KlArray *>(kl_unbox_ptr(array))->elements.clear();
+    auto *obj = static_cast<KlArray *>(kl_unbox_ptr(array));
+    for (kl_h e : obj->elements) {
+      kl_release(e);
+    }
+    obj->elements.clear();
   }
   return 0;
 }
@@ -208,8 +238,12 @@ kl_h kl_array_insert(kl_h array, kl_h index, kl_h value) {
   if (kl_is_kind(value, KlKind::Array)) {
     auto *src = static_cast<KlArray *>(kl_unbox_ptr(value));
     arr->elements.insert(arr->elements.begin() + idx, src->elements.begin(), src->elements.end());
+    for (kl_h e : src->elements) {
+      kl_retain(e);
+    }
   } else {
     arr->elements.insert(arr->elements.begin() + idx, value);
+    kl_retain(value);
   }
   return 0;
 }
@@ -293,7 +327,9 @@ kl_h kl_struct_field_at(kl_h object, int32_t field_index) {
   if (static_cast<std::size_t>(field_index) >= obj->fields.size()) {
     return kl_from_int(0);
   }
-  return obj->fields[static_cast<std::size_t>(field_index)];
+  kl_h field = obj->fields[static_cast<std::size_t>(field_index)];
+  kl_retain(field);
+  return field;
 }
 
 kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value) {
@@ -304,7 +340,10 @@ kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value) {
   if (static_cast<std::size_t>(field_index) >= obj->fields.size()) {
     return object;
   }
+  kl_h old = obj->fields[static_cast<std::size_t>(field_index)];
+  kl_retain(value);
   obj->fields[static_cast<std::size_t>(field_index)] = value;
+  kl_release(old);
   return object;
 }
 

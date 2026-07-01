@@ -1,0 +1,28 @@
+=== greeting ===
+hello kinglet
+=== range ===
+len=3, r[0]=0, r[2]=2
+=== reassign ===
+a[0]=42
+=== shared_refs ===
+alpha
+alpha
+alpha
+alpha
+=== struct_fields ===
+x=10, y=20
+p1.x after update: 99
+p2.x unchanged: 99
+=== map_exercise ===
+map len: 2
+three: 3
+has one? false
+len after remove: 2
+=== nesting ===
+hello hello world
+=== enum_payload ===
+miss is null: true
+ok is not null: true
+opt is some: true
+=== stress ===
+stress done
