@@ -9,6 +9,7 @@ if (host_os == "win") {
 default_configs = [
   "//build/config:compiler",
   "//build/config:warnings",
+  "//build/config:sanitizer",
 ]
 
 set_defaults("executable") {
