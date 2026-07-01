@@ -7,7 +7,7 @@ compiler → KIR → LLVM native. Language semantics and
 self-host parity are defined in [kinglet-lang/kinglet](https://github.com/kinglet-lang/kinglet).
 
 This repo is **not** the language spec repo. No editor extensions or LSP server
-here — those belong in a separate `lsp` repo.
+here — those belong in a separate `perch` repo.
 
 ## Build
 
@@ -37,6 +37,10 @@ Run:
 Test suites: `bash tests/run_all.sh` (see [tests/README.md](tests/README.md))
 
 ## Contributing (Fork Workflow)
+
+The full contributor guide — build setup, tests, code style, file-header and
+commit-message rules, and the pull-request checklist — lives in
+[CONTRIBUTING.md](CONTRIBUTING.md). The essentials are repeated below.
 
 External contributions use a fork-based flow. The repo has no `main` branch —
 work lands on `canon` via pull request.
