@@ -1,5 +1,6 @@
 declare_args() {
   is_debug = true
+  sanitizer = ""
 }
 
 config("compiler") {
@@ -27,4 +28,14 @@ config("warnings") {
     "-Wconversion",
     "-Wsign-conversion",
   ]
+}
+
+config("sanitizer") {
+  if (sanitizer != "") {
+    cflags = [
+      "-fsanitize=$sanitizer",
+      "-fno-omit-frame-pointer",
+    ]
+    ldflags = [ "-fsanitize=$sanitizer" ]
+  }
 }

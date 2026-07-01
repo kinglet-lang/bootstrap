@@ -51,6 +51,44 @@ jobs:
           export KINGLET_SKIP_REBUILD=1
           bash tests/cli/run_golden.sh
 
+  sanitizers:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pinned GN + Ninja
+        shell: bash
+        run: |
+          bash scripts/bootstrap.sh
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install LLVM
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-dev clang
+          echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
+
+      - name: Generate build files
+        shell: bash
+        run: |
+          gn gen out/Sanitizers --args='is_debug=false enable_llvm=true sanitizer="address,undefined" llvm_config=\"'"$LLVM_CONFIG"'\"'
+
+      - name: Build
+        shell: bash
+        run: ninja -C out/Sanitizers
+
+      - name: Run golden tests
+        shell: bash
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          export KINGLET="$PWD/out/Sanitizers/kinglet"
+          export KINGLET_SKIP_REBUILD=1
+          bash tests/cli/run_golden.sh
+
   # Windows: Git Bash + non-LLVM kinglet is enough for compile-only golden
   # (--check / --ast / --ir / --bytecode). Native `run` is unsupported on
   # _WIN32; MSYS2+LLVM builds were failing the golden harness itself.
