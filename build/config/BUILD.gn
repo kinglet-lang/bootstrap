@@ -1,6 +1,7 @@
 declare_args() {
   is_debug = true
   sanitizer = ""
+  coverage = false
 }
 
 config("compiler") {
@@ -37,5 +38,15 @@ config("sanitizer") {
       "-fno-omit-frame-pointer",
     ]
     ldflags = [ "-fsanitize=$sanitizer" ]
+  }
+}
+
+config("coverage") {
+  if (coverage) {
+    cflags = [
+      "-fprofile-instr-generate",
+      "-fcoverage-mapping",
+    ]
+    ldflags = [ "-fprofile-instr-generate" ]
   }
 }
