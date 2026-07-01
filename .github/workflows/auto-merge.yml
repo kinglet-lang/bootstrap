@@ -1,7 +1,8 @@
 name: Auto Merge
 
 on:
-  check_suite:
+  workflow_run:
+    workflows: [CI, Lint]
     types: [completed]
   workflow_dispatch:
 
@@ -14,7 +15,7 @@ concurrency:
 
 jobs:
   automerge:
-    if: github.event_name == 'workflow_dispatch' || github.event.check_suite.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,23 +35,12 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Manual dispatch: process all open PRs with passing checks.
-            head_filter="true"
-            prs=$(gh pr list -R "$REPO" --state open \
-              --json number,statusCheckRollup \
-              --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | .number')
-          else
-            # Check suite completion: only process PRs that match this suite's commit.
-            head_sha="${{ github.event.check_suite.head_sha }}"
-            head_filter=".headRefOid == \"$head_sha\""
-            prs=$(gh pr list -R "$REPO" --state open \
-              --json number,headRefOid,statusCheckRollup \
-              --jq ".[] | select(.headRefOid == \"$head_sha\") | select(.statusCheckRollup | map(select(.conclusion != \"\" and .conclusion != \"SUCCESS\")) | length == 0) | .number")
-          fi
+          prs=$(gh pr list -R "$REPO" --state open \
+            --json number,statusCheckRollup,mergeable \
+            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | select(.mergeable == "MERGEABLE") | .number')
 
           if [ -z "$prs" ]; then
-            echo "No ready PRs found."
+            echo "No PRs with all checks passed."
             exit 0
           fi
 
