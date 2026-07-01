@@ -185,6 +185,8 @@ struct RtFns {
   llvm::Function *str_trim = nullptr;
   llvm::Function *str_to_upper = nullptr;
   llvm::Function *str_to_lower = nullptr;
+  llvm::Function *retain = nullptr;
+  llvm::Function *release = nullptr;
 };
 
 RtFns declare_runtime(llvm::Module *module) {
@@ -355,6 +357,12 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.str_trim = fn_1("kl_str_trim");
   rt.str_to_upper = fn_1("kl_str_to_upper");
   rt.str_to_lower = fn_1("kl_str_to_lower");
+  rt.retain =
+      llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_retain", module);
+  rt.release =
+      llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_release", module);
   return rt;
 }
 
@@ -834,8 +842,9 @@ public:
           alloca_builder.CreateAlloca(i64, nullptr, "local" + std::to_string(i));
     }
     for (int i = 0; i < fn.param_count; ++i) {
-      alloca_builder.CreateStore(llvm_fn_->getArg(static_cast<unsigned>(i)),
-                                 local_slots_[static_cast<std::size_t>(i)]);
+      llvm::Value *arg = llvm_fn_->getArg(static_cast<unsigned>(i));
+      alloca_builder.CreateCall(rt_.retain, {arg});
+      alloca_builder.CreateStore(arg, local_slots_[static_cast<std::size_t>(i)]);
     }
     alloca_builder.CreateBr(code_bb);
 
@@ -1198,6 +1207,8 @@ public:
           return false;
         }
         llvm::Value *loaded = builder.CreateLoad(i64, local_slots_[static_cast<std::size_t>(slot)]);
+        // The stack holds a new reference to this value.
+        builder.CreateCall(rt_.retain, {loaded});
         const KirType local_ty = kir_local_type(fn, slot);
         const UnboxedScalar scalar = unbox_wire_scalar(builder, rt_, loaded, local_ty, i64, i32);
         if (scalar.is_double) {
@@ -1255,14 +1266,22 @@ public:
           *error = "store_local slot out of range";
           return false;
         }
+        // Release the old value held by this local slot.
+        llvm::Value *old = builder.CreateLoad(i64, local_slots_[static_cast<std::size_t>(slot)]);
+        builder.CreateCall(rt_.release, {old});
+        // Retain the new value — the local now owns an additional reference.
+        builder.CreateCall(rt_.retain, {value});
         builder.CreateStore(value, local_slots_[static_cast<std::size_t>(slot)]);
         break;
       }
-      case KirOpcode::Pop:
-        if (pop_value(&stack, error, &type_stack) == nullptr) {
+      case KirOpcode::Pop: {
+        llvm::Value *discard = pop_value(&stack, error, &type_stack);
+        if (discard == nullptr) {
           return false;
         }
+        builder.CreateCall(rt_.release, {discard});
         break;
+      }
       case KirOpcode::IAdd:
       case KirOpcode::ISub:
       case KirOpcode::IMul:
@@ -2171,6 +2190,11 @@ public:
         } else if (!stack.empty()) {
           retv = stack.back();
           ret_ty = type_stack.back();
+        }
+        // Release every local that goes out of scope at function exit.
+        for (std::size_t si = 0; si < local_slots_.size(); ++si) {
+          llvm::Value *val = builder.CreateLoad(i64, local_slots_[si]);
+          builder.CreateCall(rt_.release, {val});
         }
         builder.CreateRet(to_wire_i64(builder, rt_, retv, ret_ty));
         exit_stacks[bb] = stack;
