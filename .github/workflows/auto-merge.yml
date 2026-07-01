@@ -37,7 +37,8 @@ jobs:
         run: |
           prs=$(gh pr list -R "$REPO" --state open \
             --json number,statusCheckRollup,mergeable \
-            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | select(.mergeable == "MERGEABLE") | .number')
+            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | select(.mergeable == "MERGEABLE") | .number' \
+            | sort -n)
 
           if [ -z "$prs" ]; then
             echo "No PRs with all checks passed."
@@ -48,9 +49,11 @@ jobs:
           for num in $prs; do
             echo "Enabling auto-merge for PR #$num..."
 
-            # Strip markdown formatting so the commit message reads as plain text.
+            # Extract only the Summary section of the PR body as the commit body.
             pr_body=$(gh api "repos/$REPO/pulls/$num" --jq '.body' \
-              | sed 's/\*\*//g; s/`//g')
+              | sed -n '/^\*\*Summary\*\*$/,/^\*\*[A-Z]/p' \
+              | sed '1d; $d' \
+              | sed '/^[[:space:]]*$/d')
 
             gh pr merge "$num" --auto --squash --body "$pr_body"
             echo "  Auto-merge enabled."
