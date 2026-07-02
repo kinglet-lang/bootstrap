@@ -1082,13 +1082,46 @@ public:
       };
 
       auto pop_icmp = [&](KirOpcode op) -> bool {
+        const KirType rhs_ty =
+            type_stack.size() >= 1 ? type_stack[type_stack.size() - 1] : KirType::Any;
+        const KirType lhs_ty =
+            type_stack.size() >= 2 ? type_stack[type_stack.size() - 2] : KirType::Any;
         llvm::Value *rhs = pop_value(&stack, error, &type_stack);
         llvm::Value *lhs = pop_value(&stack, error, &type_stack);
         if (lhs == nullptr || rhs == nullptr) {
           return false;
         }
+        // Fast path: plain integer comparisons bypass the runtime cmp/eql
+        // call and use LLVM native icmp directly.
+        const bool int_cmp = !kir_type_is_heap(lhs_ty) && !kir_type_is_heap(rhs_ty) &&
+                             lhs_ty != KirType::Any && rhs_ty != KirType::Any;
         llvm::Value *result = nullptr;
-        if (op == KirOpcode::ICmpEq || op == KirOpcode::ICmpNeq) {
+        if (int_cmp && (op == KirOpcode::ICmpEq || op == KirOpcode::ICmpNeq)) {
+          llvm::Value *eq = builder.CreateICmpEQ(lhs, rhs);
+          if (op == KirOpcode::ICmpNeq) {
+            eq = builder.CreateXor(eq, llvm::ConstantInt::get(builder.getInt1Ty(), 1));
+          }
+          result = bool_to_i64(builder, eq);
+        } else if (int_cmp) {
+          llvm::Value *eq = nullptr;
+          switch (op) {
+          case KirOpcode::ICmpLt:
+            eq = builder.CreateICmpSLT(lhs, rhs);
+            break;
+          case KirOpcode::ICmpGt:
+            eq = builder.CreateICmpSGT(lhs, rhs);
+            break;
+          case KirOpcode::ICmpLe:
+            eq = builder.CreateICmpSLE(lhs, rhs);
+            break;
+          case KirOpcode::ICmpGe:
+            eq = builder.CreateICmpSGE(lhs, rhs);
+            break;
+          default:
+            break;
+          }
+          result = bool_to_i64(builder, eq);
+        } else if (op == KirOpcode::ICmpEq || op == KirOpcode::ICmpNeq) {
           llvm::Value *eq = builder.CreateCall(rt_.value_eq, {lhs, rhs});
           if (op == KirOpcode::ICmpNeq) {
             eq = builder.CreateXor(eq, llvm::ConstantInt::get(builder.getInt32Ty(), 1));
@@ -1266,11 +1299,19 @@ public:
           *error = "store_local slot out of range";
           return false;
         }
+        const KirType value_ty = !type_stack.empty() ? type_stack.back() : KirType::Any;
+        const bool is_heap = kir_type_is_heap(value_ty);
         // Retain the new value before releasing the old so that
         // old == value (e.g. in-place string concat) stays alive.
-        builder.CreateCall(rt_.retain, {value});
+        // Skip retain/release for non-heap types (integers, bools, etc.)
+        // — the calls are no-ops but expensive in hot loops.
+        if (is_heap || value_ty == KirType::Any) {
+          builder.CreateCall(rt_.retain, {value});
+        }
         llvm::Value *old = builder.CreateLoad(i64, local_slots_[static_cast<std::size_t>(slot)]);
-        builder.CreateCall(rt_.release, {old});
+        if (is_heap || value_ty == KirType::Any) {
+          builder.CreateCall(rt_.release, {old});
+        }
         builder.CreateStore(value, local_slots_[static_cast<std::size_t>(slot)]);
         break;
       }
@@ -1279,7 +1320,11 @@ public:
         if (discard == nullptr) {
           return false;
         }
-        builder.CreateCall(rt_.release, {discard});
+        // Skip release for non-heap types — the call is a no-op.
+        const KirType discard_ty = !type_stack.empty() ? type_stack.back() : KirType::Any;
+        if (kir_type_is_heap(discard_ty) || discard_ty == KirType::Any) {
+          builder.CreateCall(rt_.release, {discard});
+        }
         break;
       }
       case KirOpcode::IAdd:
