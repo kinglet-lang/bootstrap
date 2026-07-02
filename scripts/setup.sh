@@ -324,6 +324,11 @@ main() {
     info "  gn gen out/Default --args='is_debug=false'"
   fi
   info "  ninja -C out/Default kinglet"
+
+  # When not sourced, emit LLVM_CONFIG on stdout so callers can capture it.
+  if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "${LLVM_CONFIG:-}"
+  fi
 }
 
 # When sourced, run main and export LLVM_CONFIG into the caller's environment.
