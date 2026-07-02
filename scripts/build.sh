@@ -47,7 +47,7 @@ err()   { printf '\033[31m✗\033[0m %s\n' "$*" >&2; }
 
 cd "$ROOT"
 
-# ── prerequisites ────────────────────────────────────────────────────────────
+# ── prerequisites ─────────────────────────────────────────────────────────────
 
 if [[ ! -x "$BIN/gn" || ! -x "$BIN/ninja" ]]; then
   err "GN/Ninja not found in $BIN"
@@ -60,7 +60,7 @@ export PATH="$BIN:$PATH"
 # its install flow.
 SETUP_SH_SKIP_MAIN=1 source "$SCRIPT_DIR/setup.sh"
 
-# ── configure ────────────────────────────────────────────────────────────────
+# ── configure ─────────────────────────────────────────────────────────────────
 
 GN_ARGS="is_debug=$IS_DEBUG"
 
@@ -79,7 +79,7 @@ fi
 info "gn gen $OUT_DIR --args='$GN_ARGS'"
 eval gn gen "$OUT_DIR" --args="'$GN_ARGS'"
 
-# ── build ────────────────────────────────────────────────────────────────────
+# ── build ─────────────────────────────────────────────────────────────────────
 
 NINJA_TARGETS="kinglet"
 if [[ "$GN_ARGS" == *enable_llvm=true* ]]; then
@@ -95,7 +95,7 @@ if [[ ! -x "$BUILT_BIN" ]]; then
   exit 1
 fi
 
-# ── stage kinglet/klet + wire PATH ──────────────────────────────────────────
+# ── stage kinglet/klet + wire PATH ────────────────────────────────────────────
 
 mkdir -p "$BIN"
 cp -f "$BUILT_BIN" "$BIN/kinglet"
