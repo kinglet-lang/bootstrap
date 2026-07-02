@@ -93,7 +93,23 @@ NativeCompileResult KirToLlvm::compile_executable(const KirModule &module,
     std::string obj_path;
     if (use_cache) {
       const std::string stamp = shard_stamp(shard, module_ref, options);
-      obj_path = (std::filesystem::path(options.object_cache_dir) / (stamp + ".o")).string();
+      // Derive a readable sub-path from the source key so cached objects
+      // are organised per source file (e.g. src/main.kl/abc123.o).
+      std::string rel_key = key;
+      if (!options.source_prefix.empty() && key.starts_with(options.source_prefix)) {
+        rel_key = key.substr(options.source_prefix.size());
+        if (!rel_key.empty() && (rel_key[0] == '/' || rel_key[0] == '\\')) {
+          rel_key = rel_key.substr(1);
+        }
+      }
+      const std::filesystem::path cache_subdir(options.object_cache_dir);
+      std::filesystem::path cache_path = cache_subdir;
+      if (!rel_key.empty()) {
+        cache_path /= rel_key;
+        std::error_code dir_ec;
+        std::filesystem::create_directories(cache_path, dir_ec);
+      }
+      obj_path = (cache_path / (stamp + ".o")).string();
       if (std::filesystem::exists(obj_path)) {
         obj_paths.push_back(obj_path);
         ++shard_idx;
