@@ -20,7 +20,7 @@ REPO="${KINGLET_REPO:-kinglet-lang/bootstrap}"
 INSTALL_DIR="${KINGLET_INSTALL_DIR:-$HOME/.kinglet}"
 BIN_DIR="$INSTALL_DIR/bin"
 
-# ---- output helpers ---------------------------------------------------------
+# ── output helpers ────────────────────────────────────────────────────────────
 
 if [ -t 1 ]; then
   C_BOLD="$(printf '\033[1m')"
@@ -41,7 +41,7 @@ err()  { printf '%serror:%s %s\n' "$C_RED" "$C_RST" "$1" >&2; exit 1; }
 
 need() { command -v "$1" >/dev/null 2>&1 || err "required tool not found: $1"; }
 
-# ---- platform detection -----------------------------------------------------
+# ── platform detection ────────────────────────────────────────────────────────
 
 detect_target() {
   uname_s="$(uname -s)"
@@ -68,7 +68,7 @@ detect_target() {
   esac
 }
 
-# ---- download helpers -------------------------------------------------------
+# ── download helpers ──────────────────────────────────────────────────────────
 
 http_get() {
   # http_get <url> <out-file>
@@ -112,7 +112,7 @@ verify_checksum() {
   info "checksum verified"
 }
 
-# ---- PATH wiring ------------------------------------------------------------
+# ── PATH wiring ───────────────────────────────────────────────────────────────
 
 profile_for_shell() {
   case "${SHELL:-}" in
@@ -146,7 +146,7 @@ add_to_path() {
   PROFILE_TOUCHED="$profile"
 }
 
-# ---- main -------------------------------------------------------------------
+# ── main ──────────────────────────────────────────────────────────────────────
 
 main() {
   need uname
