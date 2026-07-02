@@ -1266,11 +1266,11 @@ public:
           *error = "store_local slot out of range";
           return false;
         }
-        // Release the old value held by this local slot.
+        // Retain the new value before releasing the old so that
+        // old == value (e.g. in-place string concat) stays alive.
+        builder.CreateCall(rt_.retain, {value});
         llvm::Value *old = builder.CreateLoad(i64, local_slots_[static_cast<std::size_t>(slot)]);
         builder.CreateCall(rt_.release, {old});
-        // Retain the new value — the local now owns an additional reference.
-        builder.CreateCall(rt_.retain, {value});
         builder.CreateStore(value, local_slots_[static_cast<std::size_t>(slot)]);
         break;
       }

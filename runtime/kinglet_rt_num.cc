@@ -30,6 +30,17 @@ std::string float_text(double value) {
 }
 
 kl_h concat(kl_h left, kl_h right) {
+  // Shortcut: when left is a string that isn't shared elsewhere (refcount ≤ 2
+  // covers "local slot only" or "local + stack slot"), append right's text
+  // in-place instead of allocating a new string.  This turns O(n²) repeated
+  // concatenation into amortized O(n).
+  if (is_string(left)) {
+    auto *str = static_cast<KlString *>(kl_unbox_ptr(left));
+    if (str->hdr.refcount <= 2) {
+      str->bytes += kl_value_text(right);
+      return left;
+    }
+  }
   const std::string text = kl_value_text(left) + kl_value_text(right);
   return kl_string_new(text.data(), static_cast<int32_t>(text.size()));
 }
