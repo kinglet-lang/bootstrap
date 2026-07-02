@@ -181,7 +181,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/),
 enforced both by the local `commit-msg` hook and by CI:
 
 ```
-type(scope): short description
+type(scope): description
 ```
 
 - **Allowed types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`,
@@ -193,6 +193,43 @@ type(scope): short description
 - The description must be at least four characters after the colon.
 - The subject **must not** reference `Phase A/B/…` or `ADR ####`.
 
+### How to write the description
+
+The style follows Google's
+[CL description guidance](https://google.github.io/eng-practices/review/developer/cl-descriptions.html),
+adapted to the conventional-commits prefix. The `commit-msg` hook enforces the
+mechanical rules; the rest is convention that reviewers will hold you to.
+
+- **Write the subject in the imperative mood** — phrase it as an order, the
+  same way Git's own messages read. Say `add fold-expression parsing`, not
+  `added …`, `adding …`, or `adds …`. A good subject completes the sentence
+  "If applied, this commit will _____".
+- **Start the description lowercase and omit the trailing period.** The type
+  prefix opens the line, so `feat(parser): add …` reads as one sentence.
+  Proper nouns and identifiers keep their capitalization (`LLVM`, `KIR`).
+- **Be specific — never vague.** `fix bug`, `update`, `changes`, `wip`, and
+  `cleanup` are rejected: they tell a future reader nothing. Name what
+  actually changed (`fix(checker): reject nullable operands in arithmetic`).
+- **Keep the subject short** — aim for ≤ 50 characters, and keep it under 72
+  where practical so it isn't truncated in `git log --oneline`. This is a
+  warning, not a hard failure (squash-merge appends ` (#NN)`).
+
+### Explain *what* and *why* in the body
+
+For anything beyond a trivial change, add a body after a blank line. The
+subject says *what* at a glance; the body fills in the details a reader needs
+to understand the change holistically:
+
+- **What** changed, if the subject can't carry it all.
+- **Why** the change is being made — the problem being solved and why this is
+  the right approach. This context is rarely recoverable from the diff alone.
+- Any **shortcomings** of the approach, and **background** such as benchmark
+  numbers or issue references (`Fixes #123`).
+
+Wrap body prose at 72 columns; the `commit-msg` hook rewraps paragraphs for
+you, and CI rejects over-long body lines. List items, indented blocks, and
+blockquotes are left untouched.
+
 Examples:
 
 ```
@@ -200,6 +237,17 @@ feat(parser): add pattern matching for fold expressions
 fix(checker): reject nullable operands in binary arithmetic
 docs: expand native backend troubleshooting
 perf(runtime): block-buffer stdout and stderr
+```
+
+A fuller example with a body:
+
+```
+perf(runtime): reuse freed map slots instead of reallocating
+
+Hot loops that insert and delete keys in a tight cycle were thrashing
+the allocator. Keep a small freelist of vacated slots and reuse them
+before asking the allocator for more, which cuts map-heavy benchmark
+time by ~18%. The freelist is bounded so idle maps release memory.
 ```
 
 Squash-merge commits and `fixup!` / `squash!` / `Revert …` subjects are
