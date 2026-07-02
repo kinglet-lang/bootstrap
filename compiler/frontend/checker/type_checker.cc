@@ -911,6 +911,11 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       }
       free_functions_.push_back(func);
       Type return_type = resolve_type_expr(func->return_type);
+      if (func->return_type.name == "auto") {
+        // Infer the real return type up front so every caller sees the correct
+        // signature regardless of the order functions are checked in.
+        return_type = infer_auto_return_type(*func);
+      }
       std::vector<Type> param_types;
       for (const auto &param : func->params) {
         param_types.push_back(resolve_type_expr(param.type));
@@ -1282,6 +1287,46 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     }
   }
 
+  // Fixpoint refinement for `auto` return types. A function whose body calls a
+  // *later*-declared `auto` function sees a stale placeholder on the first
+  // registration pass. Re-infer every auto free function until the results
+  // stop changing, so chains and forward references converge. Bounded by the
+  // number of auto functions to guarantee termination even with cycles.
+  {
+    std::vector<const ast::FunctionDecl *> auto_funcs;
+    for (const ast::FunctionDecl *fn : free_functions_) {
+      if (fn->return_type.name == "auto") {
+        auto_funcs.push_back(fn);
+      }
+    }
+    for (std::size_t iter = 0; iter <= auto_funcs.size() && !auto_funcs.empty(); ++iter) {
+      bool changed = false;
+      for (const ast::FunctionDecl *fn : auto_funcs) {
+        Type inferred = infer_auto_return_type(*fn);
+        auto sig_it = kir_function_sigs_.find(fn->name);
+        KirType new_kir = kir_type_from(inferred);
+        if (sig_it != kir_function_sigs_.end() && sig_it->second.return_type == new_kir) {
+          continue; // already stable
+        }
+        changed = true;
+        if (sig_it != kir_function_sigs_.end()) {
+          sig_it->second.return_type = new_kir;
+        }
+        // Update the caller-visible function type in the global scope.
+        for (auto &scope : scopes_) {
+          auto var_it = scope.find(fn->name);
+          if (var_it != scope.end() && var_it->second.type.kind == TypeKind::Function) {
+            var_it->second.type.return_type = std::make_shared<Type>(inferred);
+            break;
+          }
+        }
+      }
+      if (!changed) {
+        break;
+      }
+    }
+  }
+
   for (const ast::DeclPtr &decl : program.declarations) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
       const bool runtime_ns =
@@ -1345,8 +1390,121 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   return TypeCheckResult{.errors = std::move(errors_)};
 }
 
+void TypeChecker::collect_return_types(const ast::Stmt &stmt, std::vector<Type> &out) {
+  if (const auto *ret = dynamic_cast<const ast::ReturnStmt *>(&stmt)) {
+    if (ret->value) {
+      out.push_back(check_expr(*ret->value));
+    }
+    return;
+  }
+  if (const auto *block = dynamic_cast<const ast::BlockStmt *>(&stmt)) {
+    for (const auto &s : block->statements) {
+      collect_return_types(*s, out);
+    }
+    return;
+  }
+  if (const auto *if_stmt = dynamic_cast<const ast::IfStmt *>(&stmt)) {
+    if (if_stmt->then_branch) {
+      collect_return_types(*if_stmt->then_branch, out);
+    }
+    if (if_stmt->else_branch) {
+      collect_return_types(*if_stmt->else_branch, out);
+    }
+    return;
+  }
+  if (const auto *while_stmt = dynamic_cast<const ast::WhileStmt *>(&stmt)) {
+    if (while_stmt->body) {
+      collect_return_types(*while_stmt->body, out);
+    }
+    return;
+  }
+  if (const auto *for_stmt = dynamic_cast<const ast::ForStmt *>(&stmt)) {
+    if (for_stmt->body) {
+      collect_return_types(*for_stmt->body, out);
+    }
+    return;
+  }
+  if (const auto *guard = dynamic_cast<const ast::GuardStmt *>(&stmt)) {
+    if (guard->else_body) {
+      collect_return_types(*guard->else_body, out);
+    }
+    return;
+  }
+  if (const auto *try_catch = dynamic_cast<const ast::TryCatchStmt *>(&stmt)) {
+    if (try_catch->body) {
+      collect_return_types(*try_catch->body, out);
+    }
+    for (const auto &arm : try_catch->catches) {
+      if (arm.body) {
+        collect_return_types(*arm.body, out);
+      }
+    }
+    return;
+  }
+}
+
+Type TypeChecker::infer_auto_return_type(const ast::FunctionDecl &function) {
+  if (!function.body) {
+    return Type(TypeKind::Void);
+  }
+  // Type-check return expressions in a scratch scope with the parameters
+  // declared, capturing any errors so a failed inference does not leak
+  // spurious diagnostics into the real pass (which runs afterwards).
+  const std::size_t saved_error_count = errors_.size();
+  push_scope();
+  for (const auto &param : function.params) {
+    declare_var(param.name, resolve_type_expr(param.type, function.location), true);
+  }
+  std::vector<Type> return_types;
+  collect_return_types(*function.body, return_types);
+  // A trailing bare expression statement in the function body acts as an
+  // implicit return (matches the mechanism in check_function). Capture its
+  // type too so `auto square(int x) { x * x; }` infers int, not void.
+  if (const auto *block = dynamic_cast<const ast::BlockStmt *>(function.body.get())) {
+    if (!block->statements.empty()) {
+      if (const auto *last_expr =
+              dynamic_cast<const ast::ExprStmt *>(block->statements.back().get())) {
+        Type tail = check_expr(*last_expr->expr);
+        if (tail.kind != TypeKind::Void) {
+          return_types.push_back(tail);
+        }
+      }
+    }
+  }
+  pop_scope();
+  // Discard diagnostics produced during inference; the real pass re-checks the
+  // body and reports genuine errors with correct expected-return context.
+  errors_.resize(saved_error_count);
+
+  if (return_types.empty()) {
+    return Type(TypeKind::Void);
+  }
+  Type inferred = return_types.front();
+  for (std::size_t i = 1; i < return_types.size(); ++i) {
+    if (!types_assignable(return_types[i], inferred) &&
+        !types_assignable(inferred, return_types[i])) {
+      error_at(function.location, "Cannot infer 'auto' return type: conflicting return types " +
+                                      type_to_string(inferred) + " and " +
+                                      type_to_string(return_types[i]) + ".");
+      break;
+    }
+  }
+  return inferred;
+}
+
 void TypeChecker::check_function(const ast::FunctionDecl &function) {
   Type return_type = resolve_type_expr(function.return_type, function.location);
+  if (function.return_type.name == "auto") {
+    // The real return type was inferred and registered during pre-registration
+    // (see the free-function pass). Read it back so `return` statements are
+    // validated against the inferred type rather than the `auto` placeholder.
+    if (auto existing = lookup_var(function.name);
+        existing.has_value() && existing->kind == TypeKind::Function && existing->return_type) {
+      return_type = *existing->return_type;
+    } else {
+      return_type = infer_auto_return_type(function);
+    }
+  }
 
   push_scope();
 

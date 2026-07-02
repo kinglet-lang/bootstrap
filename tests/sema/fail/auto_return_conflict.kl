@@ -1,0 +1,17 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: conflicting return types
+
+// An `auto`-returning function whose branches yield incompatible types cannot
+// have its return type inferred.
+auto pick(bool b) {
+  if (b) {
+    return 1;
+  }
+  return "not an int";
+}
+
+int main() {
+  return 0;
+}
