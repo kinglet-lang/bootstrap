@@ -293,7 +293,7 @@ setup_llvm() {
 
 main() {
   info "Kinglet dev setup"
-  echo ""
+  info ""
 
   local plat
   plat="$(detect_platform)"
@@ -303,7 +303,7 @@ main() {
   install_gn "$plat"
   install_ninja "$plat"
   write_env
-  echo ""
+  info ""
 
   # LLVM (detect, optionally install).
   local llvm_cfg
