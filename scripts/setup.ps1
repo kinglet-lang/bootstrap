@@ -101,3 +101,6 @@ Info "or manually:"
 Info '  gn gen out/Debug --args="is_debug=false"'
 Info "  ninja -C out/Debug kinglet"
 Info ""
+
+# Windows toolchain setup complete.
+
