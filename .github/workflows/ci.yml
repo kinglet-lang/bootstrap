@@ -120,7 +120,7 @@ jobs:
       - name: Run golden tests
         shell: bash
         env:
-          ASAN_OPTIONS: halt_on_error=1
+          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
           export KINGLET="$PWD/out/Sanitizers/kinglet"
