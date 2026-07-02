@@ -134,6 +134,15 @@ private:
   Type resolve_type_name(const std::string &name) const;
   Type resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocation loc = {});
   bool function_uses_concept_params(const ast::FunctionDecl &function) const;
+  // Infer the return type of an `auto`-returning function by walking its body's
+  // return statements and unifying their expression types. Returns Void when the
+  // function has no value-returning `return`. Runs in a scratch scope with the
+  // function's parameters declared, so it must be called with no active scope
+  // state that it should not see. Diagnostics for conflicting return types are
+  // emitted here.
+  Type infer_auto_return_type(const ast::FunctionDecl &function);
+  // Recursively collect the types of every value-bearing `return` in a stmt.
+  void collect_return_types(const ast::Stmt &stmt, std::vector<Type> &out);
   std::string type_match_key(const Type &type) const;
   bool type_satisfies_concept(const ast::ConceptDecl *concept_decl, const Type &concrete,
                               ast::SourceLocation loc);
