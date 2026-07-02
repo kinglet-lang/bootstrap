@@ -1,6 +1,10 @@
 project "abi-cross-module-struct" version "0.1.0"
 
-modules {
-  abi.pair = "pair.kl"
-  abi.main = "main.kl"
+target app {
+  kind    = "binary"
+  sources = ["main.kl", "pair.kl"]
+}
+
+build {
+  default = "app"
 }

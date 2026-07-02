@@ -101,7 +101,11 @@ ninja -C out/Default kinglet kinglet_rt
 ./out/Default/kinglet --check path/to/file.kl                    # type-check only
 ./out/Default/kinglet --ir path/to/file.kl                       # dump KIR
 ./out/Default/kinglet build                                       # project build (needs kinglet.nest)
+./out/Default/kinglet build <target>                              # build a named target
 ```
+
+For the `kinglet.nest` manifest format, targets, and the module system, see
+[docs/MODULES.md](MODULES.md).
 
 ## Tests
 

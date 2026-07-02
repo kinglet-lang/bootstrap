@@ -42,22 +42,12 @@ public:
   void discover_project_root(const std::string &source_file_dir);
   LoadResult load(const std::string &path);
   LoadResult load_from(const std::string &path, const std::string &importing_file_dir);
-  LoadResult load_by_logical_name(const std::string &module_id);
 
-  // Directory-as-module: when `import <module_id>;` is not a manifest entry,
-  // treat <module_id> (dots -> slashes) as a directory under the project root
-  // and load every `<dir>/*.kl` as a submodule `<module_id>.<stem>`. This is
-  // the auto-import path that removes the need for a `_dir.kl` manifest.
-  struct DirectoryImportResult {
-    bool is_directory = false;                 // did <root>/<module_id>/ exist?
-    std::vector<const ParsedModule *> modules; // successfully loaded submodules
-    std::string error;                         // first error encountered, if any
-  };
-  DirectoryImportResult load_directory_import(const std::string &module_id);
-
-  // Unified logical resolution: manifest entry first, then directory-as-module.
-  // Returns the loaded module(s) — one for a manifest hit, N for a directory —
-  // and sets `error` when nothing was found or a submodule failed to load.
+  // Unified logical resolution against the project module index (built from all
+  // targets' sources). `import a.b;` resolves to the single file that declares
+  // `export module a.b;`. A bare `import x;` that is not itself a module name
+  // resolves to every module whose name starts with `x.` (group import).
+  // Returns the loaded module(s), or sets `error` when nothing matched.
   struct LogicalResolveResult {
     std::vector<const ParsedModule *> modules;
     std::string error;
@@ -78,6 +68,14 @@ private:
   std::unordered_map<std::string, ParsedModule> cache_;
   std::unordered_set<std::string> loading_;
   std::unordered_set<std::string> source_files_;
+  // module name (`export module X;`) → resolved source file. Built from every
+  // target's sources when the project root is discovered.
+  std::unordered_map<std::string, std::string> module_index_;
+  bool module_index_built_ = false;
+
+  // Scan all targets' sources for `export module <name>;` and populate
+  // module_index_. Idempotent.
+  void build_module_index();
 };
 
 } // namespace kinglet
