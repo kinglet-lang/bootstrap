@@ -167,6 +167,8 @@ jobs:
       - name: Generate coverage report
         shell: bash
         run: |
+          LLVM_BIN="$(dirname "$LLVM_CONFIG")"
+          export PATH="$LLVM_BIN:$PATH"
           llvm-profdata merge -sparse profraw/*.profraw -o coverage.profdata
           llvm-cov export \
             out/Coverage/kinglet \
