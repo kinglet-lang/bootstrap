@@ -97,7 +97,7 @@ jobs:
           bad_commits=""
           while IFS= read -r commit_msg; do
             if ! echo "$commit_msg" | grep -qE "$pattern"; then
-              bad_commits="$bad_commits\n  $commit_msg"
+              bad_commits="$bad_commits\\n  $commit_msg"
             fi
           done < <(git log --format=%s --no-merges "$base_ref..HEAD")
 
@@ -116,3 +116,32 @@ jobs:
 
           commit_count=$(git log --format=%s --no-merges "$base_ref..HEAD" | wc -l)
           echo "✓ All $commit_count commit messages follow conventional commits format."
+
+      - name: Validate commit body line length
+        run: |
+          base_ref="${{ github.event.pull_request.base.sha }}"
+          max_len=72
+          bad=""
+
+          while IFS= read -r hash; do
+            while IFS=: read -r lineno line; do
+              stripped="${line# }"  # strip leading ' ' that git log indents
+              if [ "${#stripped}" -gt "$max_len" ]; then
+                bad="${bad}\\n  ${hash:0:7} L${lineno}: ${stripped:0:80}..."
+              fi
+            done < <(
+              git log --format=%B --no-merges "$hash" -1 \
+                | awk 'NR>1 && length>'"$max_len"' && !/^[-*]/ && !/^  / {print NR": "$0}'
+            )
+          done < <(git log --format=%H --no-merges "$base_ref..HEAD")
+
+          if [ -n "$bad" ]; then
+            echo "✗ Commit body lines exceed $max_len characters:"
+            echo -e "$bad"
+            echo ""
+            echo "  Prose lines should wrap at $max_len chars."
+            echo "  Run: git commit --amend  (the commit-msg hook rewraps automatically)"
+            exit 1
+          fi
+
+          echo "✓ All commit body lines are ≤ $max_len characters."

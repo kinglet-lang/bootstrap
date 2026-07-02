@@ -1,0 +1,7 @@
+# Kinglet micro-benchmark thresholds (wall seconds, including compile).
+# CI compares against these: a benchmark > baseline * 1.10 triggers failure.
+#
+# To recalibrate after an intentional perf change, edit the numbers here.
+bench_loop    5.0
+bench_concat  1.5
+bench_map     5.0
