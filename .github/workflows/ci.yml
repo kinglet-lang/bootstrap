@@ -193,17 +193,12 @@ jobs:
       - name: Set up pinned toolchain (GN + Ninja)
         shell: pwsh
         run: |
-          pwsh -File scripts/bootstrap.ps1
+          pwsh -File scripts/setup.ps1
           Add-Content -Path $env:GITHUB_PATH -Value "$PWD\tools\bin"
 
-      - name: Generate build files
-        shell: bash
-        run: |
-          gn gen out/Debug --args="is_debug=false"
-
       - name: Build
-        shell: bash
-        run: ninja -C out/Debug kinglet
+        shell: pwsh
+        run: pwsh -File scripts/build.ps1 -Out out\Debug
 
       - name: Run golden tests (compile-only)
         shell: bash

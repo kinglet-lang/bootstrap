@@ -87,7 +87,7 @@ Ubuntu: `sudo apt-get install llvm-dev clang`. If `llvm-config` is not on
 `PATH`, set `LLVM_CONFIG` explicitly or pass `llvm_config="..."` in `--args`.
 
 **Windows** builds are compile-only (no native backend yet): use
-`pwsh -File scripts/bootstrap.ps1`, then `gn gen out/Debug --args='is_debug=false'`
+`pwsh -File scripts/setup.ps1`, then `pwsh -File scripts/build.ps1`
 and `ninja -C out/Debug kinglet`. See [docs/BUILD.md](docs/BUILD.md) for
 details.
 
