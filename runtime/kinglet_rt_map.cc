@@ -5,18 +5,6 @@
 
 namespace {
 
-// Mirror the VM's encode_map_key: strings and ints are valid keys; anything
-// else collapses to the empty key (same degenerate behaviour as the VM).
-std::string encode_key(kl_h key) {
-  if (kl_is_kind(key, KlKind::String)) {
-    return "s:" + static_cast<KlString *>(kl_unbox_ptr(key))->bytes;
-  }
-  if (!kl_is_heap(key) && !kl_is_inline_enum(key)) {
-    return "i:" + std::to_string(kl_to_int(key));
-  }
-  return std::string();
-}
-
 KlMap *as_map(kl_h value) {
   if (!kl_is_kind(value, KlKind::Map)) {
     return nullptr;
@@ -24,23 +12,94 @@ KlMap *as_map(kl_h value) {
   return static_cast<KlMap *>(kl_unbox_ptr(value));
 }
 
-void map_set(KlMap *map, kl_h key, kl_h value) {
-  std::string ek = encode_key(key);
-  auto it = map->entries.find(ek);
-  if (it == map->entries.end()) {
-    map->order.push_back(ek);
-    map->entries.emplace(ek, KlMapEntry{key, value});
-    kl_retain(key);
-    kl_retain(value);
-  } else {
-    kl_h old_key = it->second.key;
-    kl_h old_value = it->second.value;
-    it->second = KlMapEntry{key, value};
-    kl_retain(key);
-    kl_retain(value);
-    kl_release(old_key);
-    kl_release(old_value);
+// Returns true if two order-list keys match. Int keys compared by value;
+// string keys compared by content.
+bool order_key_match(kl_h a, kl_h b) {
+  if (kl_is_kind(a, KlKind::String) && kl_is_kind(b, KlKind::String)) {
+    return static_cast<KlString *>(kl_unbox_ptr(a))->bytes ==
+           static_cast<KlString *>(kl_unbox_ptr(b))->bytes;
   }
+  if (!kl_is_heap(a) && !kl_is_heap(b) && !kl_is_inline_enum(a) &&
+      !kl_is_inline_enum(b)) {
+    return a == b;
+  }
+  return a == b;
+}
+
+bool is_string_key(kl_h key) {
+  return kl_is_kind(key, KlKind::String);
+}
+
+bool is_int_key(kl_h key) {
+  return !kl_is_heap(key) && !kl_is_inline_enum(key);
+}
+
+void map_set(KlMap *map, kl_h key, kl_h value) {
+  if (is_string_key(key)) {
+    const std::string &bytes = static_cast<KlString *>(kl_unbox_ptr(key))->bytes;
+    auto it = map->str_entries.find(bytes);
+    if (it == map->str_entries.end()) {
+      map->order.push_back(key);
+      map->str_entries.emplace(bytes, KlMapEntry{key, value});
+      kl_retain(key);
+      kl_retain(value);
+    } else {
+      kl_h old_key = it->second.key;
+      kl_h old_value = it->second.value;
+      it->second = KlMapEntry{key, value};
+      kl_retain(key);
+      kl_retain(value);
+      kl_release(old_key);
+      kl_release(old_value);
+    }
+    return;
+  }
+  if (is_int_key(key)) {
+    const int64_t ik = kl_to_int(key);
+    auto it = map->int_entries.find(ik);
+    if (it == map->int_entries.end()) {
+      map->order.push_back(key);
+      map->int_entries.emplace(ik, KlMapEntry{key, value});
+      kl_retain(key);
+      kl_retain(value);
+    } else {
+      kl_h old_key = it->second.key;
+      kl_h old_value = it->second.value;
+      it->second = KlMapEntry{key, value};
+      kl_retain(key);
+      kl_retain(value);
+      kl_release(old_key);
+      kl_release(old_value);
+    }
+    return;
+  }
+  // Invalid key type — silently accept but store nothing (degenerate path).
+}
+
+// Look up a key's KlMapEntry pointer, or nullptr if not found.
+const KlMapEntry *map_find(KlMap *map, kl_h key) {
+  if (is_string_key(key)) {
+    const auto &bytes = static_cast<KlString *>(kl_unbox_ptr(key))->bytes;
+    auto it = map->str_entries.find(bytes);
+    return it != map->str_entries.end() ? &it->second : nullptr;
+  }
+  if (is_int_key(key)) {
+    auto it = map->int_entries.find(kl_to_int(key));
+    return it != map->int_entries.end() ? &it->second : nullptr;
+  }
+  return nullptr;
+}
+
+// Erase a key from the map sub-stores (retains/releases handled by callers).
+bool map_erase(KlMap *map, kl_h key) {
+  if (is_string_key(key)) {
+    return map->str_entries.erase(
+               static_cast<KlString *>(kl_unbox_ptr(key))->bytes) > 0;
+  }
+  if (is_int_key(key)) {
+    return map->int_entries.erase(kl_to_int(key)) > 0;
+  }
+  return false;
 }
 
 } // namespace
@@ -60,7 +119,7 @@ int32_t kl_map_has(kl_h map, kl_h key) {
   if (obj == nullptr) {
     return 0;
   }
-  return obj->entries.count(encode_key(key)) != 0 ? 1 : 0;
+  return map_find(obj, key) != nullptr ? 1 : 0;
 }
 
 kl_h kl_map_keys(kl_h map) {
@@ -70,8 +129,11 @@ kl_h kl_map_keys(kl_h map) {
   }
   std::vector<kl_h> keys;
   keys.reserve(obj->order.size());
-  for (const std::string &ek : obj->order) {
-    keys.push_back(obj->entries.at(ek).key);
+  for (kl_h k : obj->order) {
+    const KlMapEntry *entry = map_find(obj, k);
+    if (entry != nullptr) {
+      keys.push_back(entry->key);
+    }
   }
   return kl_array_new(static_cast<int32_t>(keys.size()), keys.data());
 }
@@ -80,11 +142,11 @@ kl_h kl_map_keys(kl_h map) {
 // the byte as a char, arrays index by integer.
 kl_h kl_index_get(kl_h object, kl_h key) {
   if (KlMap *obj = as_map(object)) {
-    auto it = obj->entries.find(encode_key(key));
-    if (it == obj->entries.end()) {
+    const KlMapEntry *entry = map_find(obj, key);
+    if (entry == nullptr) {
       return 0;
     }
-    kl_h v = it->second.value;
+    kl_h v = entry->value;
     kl_retain(v);
     return v;
   }
@@ -118,22 +180,22 @@ kl_h kl_index_set(kl_h object, kl_h key, kl_h value) {
 // removed element.
 kl_h kl_remove(kl_h object, kl_h key) {
   if (KlMap *obj = as_map(object)) {
-    std::string ek = encode_key(key);
-    auto it = obj->entries.find(ek);
-    if (it != obj->entries.end()) {
-      kl_h old_key = it->second.key;
-      kl_h old_value = it->second.value;
-      obj->entries.erase(it);
-      for (auto order_it = obj->order.begin(); order_it != obj->order.end();) {
-        if (*order_it == ek) {
-          order_it = obj->order.erase(order_it);
-        } else {
-          ++order_it;
-        }
-      }
-      kl_release(old_key);
-      kl_release(old_value);
+    const KlMapEntry *entry = map_find(obj, key);
+    if (entry == nullptr) {
+      return 0;
     }
+    kl_h old_key = entry->key;
+    kl_h old_value = entry->value;
+    (void)map_erase(obj, key);
+    // Remove from insertion-order list.
+    for (auto it = obj->order.begin(); it != obj->order.end(); ++it) {
+      if (order_key_match(*it, old_key)) {
+        obj->order.erase(it);
+        break;
+      }
+    }
+    kl_release(old_key);
+    kl_release(old_value);
     return 0;
   }
   if (kl_is_kind(object, KlKind::Array)) {

@@ -63,11 +63,15 @@ struct KlMapEntry {
   kl_h value = 0;
 };
 
-// Insertion-ordered map keyed by the VM's encoded key text ("s:" / "i:").
+// Insertion-ordered map with separate storage for int and string keys
+// so lookups never allocate (no "s:"/"i:" prefix encoding).
 struct KlMap {
   KlHeader hdr{KlKind::Map};
-  std::vector<std::string> order;
-  std::unordered_map<std::string, KlMapEntry> entries;
+  // Original keys in insertion order (kl_h values). Walked by kl_map_keys()
+  // and kl_release(). Lookups dispatch to the correct sub-map below.
+  std::vector<kl_h> order;
+  std::unordered_map<int64_t, KlMapEntry> int_entries;
+  std::unordered_map<std::string, KlMapEntry> str_entries;
 };
 
 struct KlFieldMutRef {
