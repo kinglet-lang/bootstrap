@@ -30,7 +30,7 @@ function Fail($msg) { Write-Host $msg -ForegroundColor Red; exit 1 }
 
 Set-Location $ROOT
 
-# ── prerequisites ─────────────────────────────────────────────────────────────
+# ========== prerequisites ==========
 
 $gn    = Join-Path $BIN "gn.exe"
 $ninja = Join-Path $BIN "ninja.exe"
@@ -41,7 +41,7 @@ if (($env:PATH -split ';') -notcontains $BIN) {
   $env:PATH = "$BIN;$env:PATH"
 }
 
-# ── configure ─────────────────────────────────────────────────────────────────
+# ========== configure ==========
 
 $isDebug = if ($DebugBuild) { "true" } else { "false" }
 $gnArgs  = "is_debug=$isDebug"
@@ -50,7 +50,7 @@ Info "gn gen $Out --args=`"$gnArgs`""
 & $gn gen $Out --args="$gnArgs"
 if ($LASTEXITCODE -ne 0) { Fail "gn gen failed" }
 
-# ── build ─────────────────────────────────────────────────────────────────────
+# ========== build ==========
 
 Info "ninja -C $Out kinglet"
 & $ninja -C $Out kinglet
@@ -61,7 +61,7 @@ if (-not (Test-Path $builtBin)) {
   Fail "build finished but $builtBin is missing"
 }
 
-# ── stage kinglet/klet + wire PATH ────────────────────────────────────────────
+# ========== stage kinglet/klet + wire PATH ==========
 
 New-Item -ItemType Directory -Force -Path $BIN | Out-Null
 Copy-Item -Force $builtBin (Join-Path $BIN "kinglet.exe")

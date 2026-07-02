@@ -22,7 +22,7 @@
 
 set -euo pipefail
 
-# ── configuration ─────────────────────────────────────────────────────────────
+# ========== configuration ==========
 
 NINJA_VERSION="1.12.1"
 GN_CIPD_VERSION="latest"   # GN has no semver; CIPD instance id or "latest"
@@ -57,7 +57,7 @@ info()  { printf '\033[34m>\033[0m %s\n' "$*" >&2; }
 warn()  { printf '\033[33m!\033[0m %s\n' "$*" >&2; }
 err()   { printf '\033[31m✗\033[0m %s\n' "$*" >&2; }
 
-# ── dependency check ──────────────────────────────────────────────────────────
+# ========== dependency check ==========
 
 check_deps() {
   local missing=()
@@ -73,7 +73,7 @@ check_deps() {
   fi
 }
 
-# ── platform helpers ──────────────────────────────────────────────────────────
+# ========== platform helpers ==========
 
 detect_platform() {
   local uname_s uname_m
@@ -127,7 +127,7 @@ http_get() {
   fi
 }
 
-# ── GN + Ninja ────────────────────────────────────────────────────────────────
+# ========== GN + Ninja ==========
 
 install_gn() {
   local plat="$1" gn_plat
@@ -157,7 +157,7 @@ write_env() {
   info "wrote tools/env.sh"
 }
 
-# ── user PATH wiring ──────────────────────────────────────────────────────────
+# ========== user PATH wiring ==========
 # Persist $BIN on PATH across shells, and export it into the current shell
 # when this script is sourced. Mirrors scripts/install.sh's approach.
 
@@ -195,7 +195,7 @@ add_bin_to_path() {
   esac
 }
 
-# ── LLVM ──────────────────────────────────────────────────────────────────────
+# ========== LLVM ==========
 
 detect_os() {
   case "$(uname -s)" in
@@ -350,7 +350,7 @@ setup_llvm() {
   echo "$cfg"
 }
 
-# ── main ──────────────────────────────────────────────────────────────────────
+# ========== main ==========
 
 main() {
   info "Kinglet dev setup"
