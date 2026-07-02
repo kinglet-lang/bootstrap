@@ -315,7 +315,7 @@ main() {
     info "re-run with --install or set LLVM_CONFIG / PREFERRED_LLVM"
   fi
 
-  echo ""
+  info ""
   info "Done. Next:"
   info "  source tools/env.sh"
   if [[ -n "${LLVM_CONFIG:-}" ]]; then
