@@ -19,6 +19,18 @@ namespace {
 std::vector<std::string> g_program_args;
 
 void write_formatted(std::ostream &out, int32_t argc, const kl_h *args) {
+  auto write_arg = [&out](kl_h arg) {
+    if (kl_is_kind(arg, KlKind::String)) {
+      const char *str_data = nullptr;
+      int32_t str_len = 0;
+      if (kl_string_view(arg, &str_data, &str_len) && str_data != nullptr) {
+        out.write(str_data, str_len);
+        return;
+      }
+    }
+    out << kl_value_text(arg);
+  };
+
   if (argc > 0) {
     const char *fmt_data = nullptr;
     int32_t fmt_len = 0;
@@ -28,7 +40,7 @@ void write_formatted(std::ostream &out, int32_t argc, const kl_h *args) {
       for (std::size_t pos = 0; pos < fmt.size(); ++pos) {
         if (pos + 1 < fmt.size() && fmt[pos] == '{' && fmt[pos + 1] == '}') {
           if (val_idx < argc) {
-            out << kl_value_text(args[val_idx++]);
+            write_arg(args[val_idx++]);
           } else {
             out << "{}";
           }
@@ -41,7 +53,7 @@ void write_formatted(std::ostream &out, int32_t argc, const kl_h *args) {
     }
   }
   for (int32_t i = 0; i < argc; ++i) {
-    out << kl_value_text(args[i]);
+    write_arg(args[i]);
   }
 }
 
