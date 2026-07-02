@@ -43,7 +43,7 @@ Editor extensions live in [kinglet-lang/perch](https://github.com/kinglet-lang/p
 ## Build
 
 ```bash
-bash scripts/setup.sh && source tools/env.sh   # pinned GN+Ninja (Windows: pwsh scripts/bootstrap.ps1)
+bash scripts/setup.sh && source tools/env.sh   # pinned GN+Ninja (Windows: pwsh scripts/setup.ps1)
 gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
 ninja -C out/Default kinglet kinglet_rt
 ./out/Default/kinglet --check file.kl

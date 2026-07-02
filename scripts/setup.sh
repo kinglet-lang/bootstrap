@@ -94,7 +94,7 @@ detect_platform() {
       esac
       ;;
     MINGW*|MSYS*|CYGWIN*)
-      echo "this script is for Unix; on Windows use scripts/bootstrap.ps1" >&2; exit 1
+      echo "this script is for Unix; on Windows use scripts/setup.ps1" >&2; exit 1
       ;;
     *)
       echo "unsupported OS '$uname_s'" >&2; exit 1

@@ -53,9 +53,13 @@ source tools/env.sh   # prepends ./tools/bin to PATH
 **Windows**:
 
 ```powershell
-pwsh -File scripts/bootstrap.ps1
-.\tools\env.ps1   # prepends .\tools\bin to PATH
+pwsh -File scripts/setup.ps1   # pinned GN + Ninja; wires .\tools\bin onto PATH
+pwsh -File scripts/build.ps1   # gn gen + ninja; stages kinglet.exe/klet.exe
 ```
+
+`setup.ps1` persists `.\tools\bin` on `PATH` (current session + PowerShell
+profile), so a separate `. .\tools\env.ps1` step is no longer required — that
+file is still written for CI / non-interactive use.
 
 Windows mirrors the CI policy: **GN + Ninja only, no LLVM** — builds are
 compile-only (the native LLVM backend is not supported on Windows yet).
@@ -125,9 +129,10 @@ or point `llvm_config` explicitly:
 `gn gen out/Default --args='enable_llvm=true llvm_config="/path/to/llvm-config"'`.
 `build/scripts/find_llvm_config.py --help` shows the search order.
 
-**`gn: command not found` after bootstrap**
-You forgot to `source tools/env.sh` (Unix) or `.\tools\env.ps1` (Windows) in
-the current shell. The scripts only modify the current shell's environment.
+**`gn: command not found` after setup**
+Open a new shell — `setup.sh` / `setup.ps1` persist `./tools/bin` on `PATH`
+via your shell profile. For the *current* shell without reopening, run
+`source tools/env.sh` (Unix) or `. .\tools\env.ps1` (Windows).
 
 **Windows: native backend / `kinglet run`**
 Not supported on Windows yet. Build with `--args='is_debug=false'` (no

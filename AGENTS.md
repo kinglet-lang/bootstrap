@@ -15,8 +15,8 @@ See [docs/BUILD.md](docs/BUILD.md) for the full guide. Quick start with the
 pinned toolchain (one-time per machine):
 
 ```bash
-bash scripts/setup.sh     # Unix; on Windows: pwsh -File scripts/bootstrap.ps1
-source tools/env.sh           # Windows: .\tools\env.ps1
+bash scripts/setup.sh     # Unix; on Windows: pwsh -File scripts/setup.ps1
+source tools/env.sh           # Windows: . .\tools\env.ps1 (or just open a new shell)
 
 gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
 ninja -C out/Default kinglet kinglet_rt
