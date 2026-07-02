@@ -4,4 +4,8 @@ set -eu
 ROOT="$(git rev-parse --show-toplevel)"
 HOOK_DIR="$ROOT/scripts/hooks"
 
+# Format the body (rewrap prose paragraphs to 72 columns).
+python3 "$HOOK_DIR/format_commit_body.py" "$1"
+
+# Validate the subject.
 exec python3 "$HOOK_DIR/check_commit_msg.py" "$1"

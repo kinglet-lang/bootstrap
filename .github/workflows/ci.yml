@@ -8,6 +8,7 @@ on:
 
 jobs:
   build-and-test-unix:
+    if: github.event_name == 'pull_request'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -17,8 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Pinned GN + Ninja via scripts/bootstrap.sh. LLVM: installed from
-      # system packages below (see docs/BUILD.md for supported versions).
       - name: Set up pinned GN + Ninja
         shell: bash
         run: |
@@ -53,7 +52,8 @@ jobs:
           export KINGLET_SKIP_REBUILD=1
           bash tests/cli/run_golden.sh
 
-  sanitizers:
+  release-build:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -75,7 +75,43 @@ jobs:
       - name: Generate build files
         shell: bash
         run: |
-          gn gen out/Sanitizers --args="is_debug=false enable_llvm=true sanitizer=\"address,undefined\" llvm_config=\"$LLVM_CONFIG\""
+          gn gen out/Release --args="is_debug=false enable_llvm=true optimize=\"-O2\" llvm_config=\"$LLVM_CONFIG\""
+
+      - name: Build
+        shell: bash
+        run: ninja -C out/Release
+
+      - name: Run golden tests
+        shell: bash
+        run: |
+          export KINGLET="$PWD/out/Release/kinglet"
+          export KINGLET_SKIP_REBUILD=1
+          bash tests/cli/run_golden.sh
+
+  sanitizers:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pinned GN + Ninja
+        shell: bash
+        run: |
+          bash scripts/bootstrap.sh
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install LLVM
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-dev clang
+          echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
+
+      - name: Generate build files
+        shell: bash
+        run: |
+          gn gen out/Sanitizers --args="is_debug=false enable_llvm=true sanitizer=\"address,undefined,leak\" llvm_config=\"$LLVM_CONFIG\""
 
       - name: Build
         shell: bash
@@ -84,12 +120,46 @@ jobs:
       - name: Run golden tests
         shell: bash
         env:
-          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+          ASAN_OPTIONS: halt_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
           export KINGLET="$PWD/out/Sanitizers/kinglet"
           export KINGLET_SKIP_REBUILD=1
           bash tests/cli/run_golden.sh
+
+  benchmarks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pinned GN + Ninja
+        shell: bash
+        run: |
+          bash scripts/bootstrap.sh
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Install LLVM
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-dev clang
+          echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
+
+      - name: Generate build files
+        shell: bash
+        run: |
+          gn gen out/Release --args="is_debug=false enable_llvm=true optimize=\"-O2\" llvm_config=\"$LLVM_CONFIG\""
+
+      - name: Build
+        shell: bash
+        run: ninja -C out/Release
+
+      - name: Run benchmarks
+        shell: bash
+        run: |
+          bash tests/bench/run.sh out/Release/kinglet
 
   coverage:
     runs-on: ubuntu-latest
@@ -146,10 +216,8 @@ jobs:
           files: coverage.lcov
           fail_ci_if_error: false
 
-  # Windows: Git Bash + non-LLVM kinglet is enough for compile-only golden
-  # (--check / --ast / --ir / --bytecode). Native `run` is unsupported on
-  # _WIN32; MSYS2+LLVM builds were failing the golden harness itself.
   build-and-test-windows:
+    if: github.event_name == 'pull_request'
     runs-on: windows-latest
 
     steps:
