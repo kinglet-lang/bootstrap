@@ -76,7 +76,7 @@ The full guide with prerequisites and troubleshooting is in
 [docs/BUILD.md](docs/BUILD.md). Quick start (Unix, with the native backend):
 
 ```bash
-bash scripts/bootstrap.sh        # one-time: pinned GN + Ninja into ./tools/bin
+bash scripts/setup.sh        # one-time: pinned GN + Ninja into ./tools/bin
 source tools/env.sh              # prepend ./tools/bin to PATH
 gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
 ninja -C out/Default kinglet kinglet_rt

@@ -7,7 +7,7 @@ and running the test suite.
 > TL;DR — Unix with native backend:
 >
 > ```bash
-> bash scripts/bootstrap.sh        # one-time: pinned GN + Ninja into ./tools/bin
+> bash scripts/setup.sh        # one-time: pinned GN + Ninja into ./tools/bin
 > source tools/env.sh              # adds ./tools/bin to PATH
 > # Install LLVM (see versions below), then:
 > gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
@@ -46,7 +46,7 @@ versions.
 **Unix** (macOS / Linux):
 
 ```bash
-bash scripts/bootstrap.sh
+bash scripts/setup.sh
 source tools/env.sh   # prepends ./tools/bin to PATH
 ```
 
