@@ -18,23 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up pinned GN + Ninja
+      - name: Set up toolchain
         shell: bash
         run: |
-          bash scripts/bootstrap.sh
+          LLVM_CONFIG=$(bash scripts/setup.sh --install)
+          echo "LLVM_CONFIG=$LLVM_CONFIG" >> "$GITHUB_ENV"
           echo "$PWD/tools/bin" >> "$GITHUB_PATH"
-
-      - name: Install LLVM
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" == "macOS" ]; then
-            brew install llvm
-            echo "LLVM_CONFIG=$(brew --prefix llvm)/bin/llvm-config" >> "$GITHUB_ENV"
-          else
-            sudo apt-get update
-            sudo apt-get install -y llvm-dev clang
-            echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
-          fi
 
       - name: Generate build files
         shell: bash
