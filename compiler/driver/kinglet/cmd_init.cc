@@ -136,8 +136,9 @@ int cmd_init(int argc, char **argv) {
     }
     out << "project \"" << toml_escape(project_name) << "\" version \"0.1.0\"\n"
         << "\n"
-        << "modules {\n"
-        << "  app = \"src/main.kl\"\n"
+        << "target app {\n"
+        << "  kind    = \"binary\"\n"
+        << "  sources = [\"src/\"]\n"
         << "}\n"
         << "\n"
         << "build {\n"

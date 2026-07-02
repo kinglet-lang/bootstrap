@@ -1,7 +1,8 @@
 project "fmt-using" version "0.1.0"
 
-modules {
-  math = "math.kl"
+target app {
+  kind    = "binary"
+  sources = ["math.kl"]
 }
 
 fmt {

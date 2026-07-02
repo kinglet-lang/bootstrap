@@ -150,12 +150,6 @@ int cmd_fmt(int argc, char **argv) {
       return 2;
     }
     paths = collect_kl_files(fs::path(config->root_dir));
-    if (paths.empty()) {
-      const auto entry_path = resolve_build_entry_path(*config);
-      if (entry_path && fs::exists(*entry_path)) {
-        paths.push_back(*entry_path);
-      }
-    }
   } else {
     std::vector<fs::path> expanded;
     for (const fs::path &path : paths) {

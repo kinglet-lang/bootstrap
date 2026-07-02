@@ -1,5 +1,10 @@
 project "import-basic" version "0.1.0"
 
-modules {
-  math = "math.kl"
+target app {
+  kind    = "binary"
+  sources = ["main.kl", "math.kl"]
+}
+
+build {
+  default = "app"
 }

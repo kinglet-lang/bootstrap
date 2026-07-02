@@ -190,120 +190,107 @@ ModuleLoader::LoadResult ModuleLoader::load_resolved(const std::string &resolved
   return {&inserted->second, ""};
 }
 
-ModuleLoader::LoadResult ModuleLoader::load_by_logical_name(const std::string &module_id) {
-  if (!project_config_) {
-    return {nullptr, "Cannot resolve import '" + module_id + "': no kinglet.nest found"};
+namespace {
+
+// Read a file and extract its `export module <name>;` declaration name, if any.
+// Cheap line scan — avoids a full parse just to index module names.
+std::string read_export_module_name(const std::string &path) {
+  std::ifstream file(path, std::ios::in);
+  if (!file) {
+    return {};
   }
-  const auto it = project_config_->modules.find(module_id);
-  if (it == project_config_->modules.end()) {
-    return {nullptr, "Unknown module '" + module_id + "' in project manifest"};
+  std::string line;
+  while (std::getline(file, line)) {
+    // Trim leading whitespace.
+    size_t i = 0;
+    while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) {
+      ++i;
+    }
+    const std::string_view rest(line.data() + i, line.size() - i);
+    static constexpr std::string_view kPrefix = "export module ";
+    if (rest.substr(0, kPrefix.size()) == kPrefix) {
+      std::string name(rest.substr(kPrefix.size()));
+      // Strip trailing `;` and whitespace.
+      const auto semi = name.find(';');
+      if (semi != std::string::npos) {
+        name = name.substr(0, semi);
+      }
+      // Trim.
+      const auto start = name.find_first_not_of(" \t\r\n");
+      const auto end = name.find_last_not_of(" \t\r\n");
+      if (start == std::string::npos) {
+        return {};
+      }
+      return name.substr(start, end - start + 1);
+    }
   }
-  auto result = load_from(it->second, project_config_->root_dir);
-  if (!result.module) {
-    return result;
-  }
-  if (result.module->namespace_name != module_id) {
-    return {nullptr, "export module '" + result.module->namespace_name +
-                         "' does not match manifest key '" + module_id + "'"};
-  }
-  return result;
+  return {};
 }
 
-ModuleLoader::DirectoryImportResult
-ModuleLoader::load_directory_import(const std::string &module_id) {
-  DirectoryImportResult out;
+} // namespace
+
+void ModuleLoader::build_module_index() {
+  if (module_index_built_ || !project_config_) {
+    module_index_built_ = true;
+    return;
+  }
+  module_index_built_ = true;
+  for (const TargetConfig &target : project_config_->targets) {
+    for (const std::string &src : resolve_target_sources(*project_config_, target)) {
+      const std::string name = read_export_module_name(src);
+      if (!name.empty()) {
+        // First declaration wins; duplicates across targets map to the same file
+        // in practice (shared sources), so a stable pick is fine.
+        module_index_.emplace(name, src);
+      }
+    }
+  }
+}
+
+ModuleLoader::LogicalResolveResult ModuleLoader::resolve_logical(const std::string &module_id) {
+  LogicalResolveResult out;
   if (!project_config_) {
     out.error = "Cannot resolve import '" + module_id + "': no kinglet.nest found";
     return out;
   }
+  build_module_index();
 
-  // module_id "a.b" -> directory "a/b" relative to the project root.
-  std::string rel_dir = module_id;
-  for (char &c : rel_dir) {
-    if (c == '.')
-      c = '/';
-  }
-  std::error_code ec;
-  std::filesystem::path dir = std::filesystem::path(project_config_->root_dir) / rel_dir;
-  if (!std::filesystem::is_directory(dir, ec)) {
-    // Not a directory: caller falls back to reporting the manifest miss.
-    return out;
-  }
-  out.is_directory = true;
-
-  // Gather `.kl` stems in deterministic (sorted) order for reproducible builds.
-  std::vector<std::string> stems;
-  for (std::filesystem::directory_iterator it(dir, ec), end; it != end; it.increment(ec)) {
-    if (ec)
-      break;
-    const std::filesystem::path &entry = it->path();
-    if (!std::filesystem::is_regular_file(entry, ec))
-      continue;
-    if (entry.extension() != ".kl")
-      continue;
-    stems.push_back(entry.stem().string());
-  }
-  std::sort(stems.begin(), stems.end());
-
-  if (stems.empty()) {
-    out.error = "No .kl modules found in directory '" + module_id + "'";
-    return out;
-  }
-
-  const std::string rel_dir_with_sep = rel_dir + "/";
-  for (const std::string &stem : stems) {
-    if (stem == "_dir") {
-      continue;
-    }
-    const std::string rel_path = rel_dir_with_sep + stem + ".kl";
-    LoadResult result = load_from(rel_path, project_config_->root_dir);
+  // Exact module match: `import a.b;` where a.b is a declared module.
+  const auto exact = module_index_.find(module_id);
+  if (exact != module_index_.end()) {
+    LoadResult result = load_from(exact->second, project_config_->root_dir);
     if (!result.module) {
-      if (out.error.empty())
-        out.error = result.error;
-      continue;
+      out.error = result.error;
+      return out;
     }
-    // Each submodule must declare the matching dotted namespace so that
-    // `<module_id>::<stem>::symbol` resolves consistently.
-    const std::string expected_ns = module_id + "." + stem;
-    if (result.module->namespace_name != expected_ns) {
+    out.modules.push_back(result.module);
+    return out;
+  }
+
+  // Group import: `import x;` loads every module named `x.*`.
+  const std::string prefix = module_id + ".";
+  std::vector<std::pair<std::string, std::string>> group; // (name, file), sorted by name
+  for (const auto &[name, file] : module_index_) {
+    if (name.rfind(prefix, 0) == 0) {
+      group.emplace_back(name, file);
+    }
+  }
+  std::sort(group.begin(), group.end());
+  for (const auto &[name, file] : group) {
+    LoadResult result = load_from(file, project_config_->root_dir);
+    if (!result.module) {
       if (out.error.empty()) {
-        out.error = "Module in '" + rel_path + "' declares '" + result.module->namespace_name +
-                    "' but directory import '" + module_id + "' expects '" + expected_ns +
-                    "' (add 'export module " + expected_ns + ";')";
+        out.error = result.error;
       }
       continue;
     }
     out.modules.push_back(result.module);
   }
-  return out;
-}
 
-ModuleLoader::LogicalResolveResult ModuleLoader::resolve_logical(const std::string &module_id) {
-  LogicalResolveResult out;
-  const bool in_manifest = project_config_ && project_config_->modules.count(module_id) > 0;
-  LoadResult manifest = load_by_logical_name(module_id);
-  if (manifest.module) {
-    out.modules.push_back(manifest.module);
-    return out;
+  if (out.modules.empty() && out.error.empty()) {
+    out.error =
+        "Unknown module '" + module_id + "': no matching 'export module' in any target's sources";
   }
-  if (in_manifest) {
-    // Listed in the manifest but failed to load or namespaced mismatched —
-    // surface that real error instead of falling back to a directory lookup.
-    out.error = manifest.error;
-    return out;
-  }
-  // Not in the manifest: try directory-as-module.
-  DirectoryImportResult dir = load_directory_import(module_id);
-  if (dir.is_directory) {
-    out.modules = std::move(dir.modules);
-    out.error = dir.error; // empty on full success, else a partial-failure msg
-    return out;
-  }
-  // Neither manifest nor directory: surface the underlying reason.
-  out.error = dir.error.empty()
-                  ? ("Unknown module '" + module_id +
-                     "': not in project manifest and no directory '" + module_id + "/' found")
-                  : dir.error;
   return out;
 }
 

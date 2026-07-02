@@ -107,10 +107,12 @@ bool parse_kv_line(const std::string &line, std::string &key, std::string &value
   return !key.empty();
 }
 
-void append_extension_list(const std::string &raw, ProjectFmtSection &fmt) {
+// Parse a `[a, b, c]` or bare `a, b, c` list of (optionally quoted) string items.
+std::vector<std::string> parse_string_list(const std::string &raw) {
+  std::vector<std::string> out;
   std::string trimmed = trim(raw);
   if (trimmed.empty()) {
-    return;
+    return out;
   }
   if (trimmed.front() == '[' && trimmed.back() == ']') {
     trimmed = trimmed.substr(1, trimmed.size() - 2);
@@ -123,8 +125,15 @@ void append_extension_list(const std::string &raw, ProjectFmtSection &fmt) {
       item = item.substr(1, item.size() - 2);
     }
     if (!item.empty()) {
-      fmt.extensions.push_back(item);
+      out.push_back(item);
     }
+  }
+  return out;
+}
+
+void append_extension_list(const std::string &raw, ProjectFmtSection &fmt) {
+  for (auto &item : parse_string_list(raw)) {
+    fmt.extensions.push_back(std::move(item));
   }
 }
 
@@ -155,9 +164,7 @@ void parse_block_body(const std::string &body, const std::string &block_name,
     if (!parse_kv_line(line, key, value)) {
       continue;
     }
-    if (block_name == "modules") {
-      config.modules[key] = value;
-    } else if (block_name == "build") {
+    if (block_name == "build") {
       if (key == "default") {
         config.build_default = value;
       } else if (key == "out") {
@@ -179,6 +186,57 @@ void parse_block_body(const std::string &body, const std::string &block_name,
       }
     }
   }
+}
+
+// Collapse a block body into (key, raw-value) pairs, joining values that span
+// multiple lines inside `[ ... ]` brackets (for `sources`/`deps` arrays).
+std::vector<std::pair<std::string, std::string>> collect_kv_pairs(const std::string &body) {
+  std::vector<std::pair<std::string, std::string>> out;
+  std::istringstream in(body);
+  std::string line;
+  while (std::getline(in, line)) {
+    std::string t = trim(line);
+    if (t.empty() || t[0] == '#') {
+      continue;
+    }
+    const auto eq = t.find('=');
+    if (eq == std::string::npos) {
+      continue;
+    }
+    std::string key = trim(t.substr(0, eq));
+    std::string value = trim(t.substr(eq + 1));
+    // If the value opens a bracket that isn't closed on this line, keep reading.
+    if (value.find('[') != std::string::npos) {
+      while (value.find(']') == std::string::npos && std::getline(in, line)) {
+        value += ' ';
+        value += trim(line);
+      }
+    }
+    out.emplace_back(std::move(key), std::move(value));
+  }
+  return out;
+}
+
+// Parse a `target <name> { ... }` block body into a TargetConfig.
+void parse_target_body(const std::string &name, const std::string &body, ProjectConfig &config) {
+  TargetConfig target;
+  target.name = name;
+  bool kind_set = false;
+  for (const auto &[key, raw] : collect_kv_pairs(body)) {
+    if (key == "kind") {
+      std::string v = trim(raw);
+      if (v.size() >= 2 && v.front() == '"' && v.back() == '"') {
+        v = v.substr(1, v.size() - 2);
+      }
+      kind_set = parse_target_kind(v, target.kind);
+    } else if (key == "sources") {
+      target.sources = parse_string_list(raw);
+    } else if (key == "deps") {
+      target.deps = parse_string_list(raw);
+    }
+  }
+  (void)kind_set; // default Binary when unspecified/unrecognised
+  config.targets.push_back(std::move(target));
 }
 
 std::string extract_block(const std::string &content, size_t &pos, const std::string &name) {
@@ -252,10 +310,14 @@ bool parse_nest_manifest(const std::string &content, ProjectConfig &config) {
       parse_project_line(line, config);
       continue;
     }
-    if (starts_with(line, "modules ")) {
+    if (starts_with(line, "target ")) {
+      // Extract the target name: the token between `target ` and `{`.
+      const std::string after = trim(line.substr(std::string("target ").size()));
+      const size_t brace = after.find('{');
+      std::string tname = trim(brace == std::string::npos ? after : after.substr(0, brace));
       pos = line_start;
-      const std::string body = extract_block(content, pos, "modules");
-      parse_block_body(body, "modules", config);
+      const std::string body = extract_block(content, pos, "target");
+      parse_target_body(tname, body, config);
       continue;
     }
     if (starts_with(line, "build ")) {
@@ -270,7 +332,7 @@ bool parse_nest_manifest(const std::string &content, ProjectConfig &config) {
       parse_block_body(body, "fmt", config);
       continue;
     }
-    // targets { } and other blocks are ignored in this phase.
+    // Unknown blocks (e.g. legacy `modules { }`) are skipped for forward-compat.
     if (line.find('{') != std::string::npos) {
       pos = line_start;
       const auto space = line.find(' ');

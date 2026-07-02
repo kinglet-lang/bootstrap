@@ -1,5 +1,10 @@
 project "unknown" version "0.1.0"
 
-modules {
-  known = "lib.kl"
+target app {
+  kind    = "binary"
+  sources = ["main.kl", "lib.kl"]
+}
+
+build {
+  default = "app"
 }

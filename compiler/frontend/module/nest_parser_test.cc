@@ -20,15 +20,23 @@ void expect(bool cond, const std::string &msg) {
 void test_demo_nest() {
   const std::string content = R"(project "kinglet-demo" version "0.1.0"
 
-modules {
-  math = "lib/core/math.kl"
-  util = "lib/core/util.kl"
-  app = "apps/demo/main.kl"
-  bench = "apps/bench/main.kl"
+target calc {
+  kind    = "binary"
+  sources = [
+    "src/calc.kl",
+    "math/",
+    "utils/config.kl",
+  ]
+  deps = ["core"]
+}
+
+target core {
+  kind    = "library"
+  sources = ["lib/core/"]
 }
 
 build {
-  default = "demo"
+  default = "calc"
   out = ".kinglet/out"
 }
 )";
@@ -36,12 +44,33 @@ build {
   expect(kinglet::parse_nest_manifest(content, config), "parse demo nest");
   expect(config.name == "kinglet-demo", "project name");
   expect(config.version == "0.1.0", "project version");
-  expect(config.modules.size() == 4, "module count");
-  expect(config.modules.count("math") == 1, "math key");
-  expect(config.modules.at("math") == "lib/core/math.kl", "math path");
-  expect(config.modules.at("app") == "apps/demo/main.kl", "app path");
-  expect(config.build_default == "demo", "build default");
+  expect(config.targets.size() == 2, "target count");
+  const kinglet::TargetConfig *calc = kinglet::find_target(config, "calc");
+  expect(calc != nullptr, "calc target found");
+  if (calc != nullptr) {
+    expect(calc->kind == kinglet::TargetKind::Binary, "calc kind binary");
+    expect(calc->sources.size() == 3, "calc source count");
+    expect(calc->sources[0] == "src/calc.kl", "calc first source");
+    expect(calc->sources[1] == "math/", "calc dir source");
+    expect(calc->deps.size() == 1 && calc->deps[0] == "core", "calc deps");
+  }
+  const kinglet::TargetConfig *core = kinglet::find_target(config, "core");
+  expect(core != nullptr, "core target found");
+  if (core != nullptr) {
+    expect(core->kind == kinglet::TargetKind::Library, "core kind library");
+    expect(core->sources.size() == 1 && core->sources[0] == "lib/core/", "core source");
+  }
+  expect(config.build_default == "calc", "build default");
   expect(config.out_dir == ".kinglet/out", "build out");
+}
+
+void test_target_kind_parse() {
+  kinglet::TargetKind k;
+  expect(kinglet::parse_target_kind("binary", k) && k == kinglet::TargetKind::Binary, "binary");
+  expect(kinglet::parse_target_kind("library", k) && k == kinglet::TargetKind::Library, "library");
+  expect(kinglet::parse_target_kind("test", k) && k == kinglet::TargetKind::Test, "test");
+  expect(kinglet::parse_target_kind("object", k) && k == kinglet::TargetKind::Object, "object");
+  expect(!kinglet::parse_target_kind("bogus", k), "reject bogus kind");
 }
 
 void test_fmt_block() {
@@ -63,6 +92,7 @@ fmt {
 
 int main() {
   test_demo_nest();
+  test_target_kind_parse();
   test_fmt_block();
   if (failures == 0) {
     std::cout << "All nest parser tests passed.\n";
