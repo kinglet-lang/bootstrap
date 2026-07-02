@@ -295,6 +295,7 @@ int main(int argc, char **argv) {
   std::string input_path;
   std::string native_out_path;
   std::string native_obj_cache_dir;
+  std::string native_source_prefix;
   Mode mode = Mode::Run;
   bool native_debug_info = false;
   std::vector<std::string> program_args;
@@ -362,6 +363,16 @@ int main(int argc, char **argv) {
         native_obj_cache_dir = argv[i];
       } else {
         std::cerr << "kinglet: --obj-cache requires a directory\n";
+        return 64;
+      }
+      continue;
+    }
+    if (arg == "--source-prefix") {
+      if (i + 1 < argc) {
+        ++i;
+        native_source_prefix = argv[i];
+      } else {
+        std::cerr << "kinglet: --source-prefix requires a directory\n";
         return 64;
       }
       continue;
@@ -510,6 +521,7 @@ int main(int argc, char **argv) {
     if (!native_obj_cache_dir.empty()) {
       native_options.object_cache_dir = native_obj_cache_dir;
       native_options.cache_salt = compiler_identity(argv[0]);
+      native_options.source_prefix = native_source_prefix;
     }
     kinglet::NativeCompileResult native = kinglet::KirToLlvm::compile_executable(
         compile_result.kir, native_out_path, resolve_rt_lib(argv[0]), native_options);

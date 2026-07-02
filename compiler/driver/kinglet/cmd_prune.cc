@@ -6,43 +6,18 @@
 #include "driver/kinglet/cli_internal.h"
 #include "frontend/module/project_config.h"
 
+#include <algorithm>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace kinglet {
 
 namespace fs = std::filesystem;
 
 namespace {
-
-std::set<std::string> collect_referenced_object_ids(const fs::path &stamps_dir) {
-  std::set<std::string> referenced;
-  std::error_code ec;
-  if (!fs::exists(stamps_dir, ec)) {
-    return referenced;
-  }
-  for (const fs::directory_entry &entry : fs::directory_iterator(stamps_dir, ec)) {
-    if (ec || !entry.is_regular_file()) {
-      continue;
-    }
-    const std::string name = entry.path().filename().string();
-    if (!name.ends_with(".object")) {
-      continue;
-    }
-    std::ifstream in(entry.path());
-    std::string object_id;
-    in >> object_id;
-    object_id = trim_copy(object_id);
-    if (!object_id.empty()) {
-      referenced.insert(object_id);
-    }
-  }
-  return referenced;
-}
 
 int remove_path(const fs::path &path, bool dry_run) {
   if (!fs::exists(path)) {
@@ -53,7 +28,7 @@ int remove_path(const fs::path &path, bool dry_run) {
     return 1;
   }
   std::error_code ec;
-  fs::remove(path, ec);
+  fs::remove_all(path, ec);
   if (ec) {
     std::cerr << "kinglet prune: cannot remove " << path << ": " << ec.message() << '\n';
     return 0;
@@ -61,42 +36,55 @@ int remove_path(const fs::path &path, bool dry_run) {
   return 1;
 }
 
-int prune_unreferenced_objects(const fs::path &objects_dir, bool dry_run) {
+// Walk objects/native/ subdirectories. Each subdirectory corresponds to a
+// source file (relative path from project root). Remove cache directories
+// whose source file no longer exists on disk.
+int prune_native_objects(const fs::path &objects_dir, const fs::path &project_root, bool dry_run) {
+  const fs::path native_dir = objects_dir / "native";
   std::error_code ec;
-  if (!fs::exists(objects_dir, ec)) {
+  if (!fs::exists(native_dir, ec)) {
     return 0;
   }
 
-  const std::set<std::string> referenced =
-      collect_referenced_object_ids(objects_dir.parent_path() / "stamps");
-
   int removed = 0;
-  for (const fs::directory_entry &entry : fs::directory_iterator(objects_dir, ec)) {
-    if (ec) {
+
+  // Collect all subdirectory paths (one level per source module path
+  // component). Process deepest first so parent directories can be
+  // removed after their children.
+  std::vector<fs::path> subdirs;
+  for (const fs::directory_entry &entry : fs::recursive_directory_iterator(native_dir, ec)) {
+    if (ec)
       break;
-    }
     if (entry.is_directory()) {
-      continue;
+      subdirs.push_back(entry.path());
     }
-    const fs::path path = entry.path();
-    const std::string name = path.filename().string();
-    if (name.ends_with(".meta")) {
-      const std::string object_id = name.substr(0, name.size() - 5);
-      if (referenced.count(object_id) > 0) {
-        continue;
-      }
-      removed += remove_path(path, dry_run);
-      removed += remove_path(objects_dir / object_id, dry_run);
-      continue;
-    }
-    if (referenced.count(name) > 0) {
-      continue;
-    }
-    if (fs::exists(objects_dir / (name + ".meta"))) {
-      continue;
-    }
-    removed += remove_path(path, dry_run);
   }
+
+  // Sort deepest first.
+  std::sort(subdirs.begin(), subdirs.end(), [](const fs::path &a, const fs::path &b) {
+    return std::distance(a.begin(), a.end()) > std::distance(b.begin(), b.end());
+  });
+
+  for (const fs::path &subdir : subdirs) {
+    if (!fs::exists(subdir, ec))
+      continue;
+
+    // Reconstruct the relative source path from the cache directory.
+    const fs::path rel = fs::relative(subdir, native_dir, ec);
+    if (ec || rel.empty() || rel.string() == ".")
+      continue;
+
+    const fs::path source_path = project_root / rel;
+
+    // Also check for stale .o files: if the directory exists but only
+    // contains .o files whose corresponding source no longer needs them
+    // (source was modified → hash changed), prune the oldest ones.
+    // For now, keep any .o if the source file still exists.
+    if (!fs::exists(source_path, ec)) {
+      removed += remove_path(subdir, dry_run);
+    }
+  }
+
   return removed;
 }
 
@@ -158,13 +146,15 @@ int cmd_prune(int argc, char **argv) {
   }
 
   const ui::Painter &p = ui::g_out;
-  const int removed = prune_unreferenced_objects(kinglet_dir / "objects", dry_run);
+  const fs::path objects_dir = kinglet_dir / "objects";
+  const fs::path project_root = fs::path(config->root_dir);
+  const int removed = prune_native_objects(objects_dir, project_root, dry_run);
   if (dry_run) {
     std::cout << p.dim("•") << "  " << removed << " path(s) would be removed\n";
   } else if (removed > 0) {
-    std::cout << p.green("✓") << "  Pruned " << removed << " unreferenced object path(s)\n";
+    std::cout << p.green("✓") << "  Pruned " << removed << " stale cache path(s)\n";
   } else {
-    std::cout << p.dim("•") << "  No unreferenced objects\n";
+    std::cout << p.dim("•") << "  No stale cache\n";
   }
   return 0;
 }

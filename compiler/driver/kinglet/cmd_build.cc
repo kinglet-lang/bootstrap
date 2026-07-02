@@ -97,7 +97,13 @@ int cmd_build(int argc, char **argv, const std::string &self_executable) {
 #else
   const fs::path obj_cache = fs::path(config->root_dir) / ".kinglet/objects/native";
   ensure_dir(obj_cache);
-  args = {"-o", out_path.string(), "--obj-cache", obj_cache.string(), entry.string()};
+  args = {"-o",
+          out_path.string(),
+          "--obj-cache",
+          obj_cache.string(),
+          "--source-prefix",
+          config->root_dir,
+          entry.string()};
 #endif
   if (args.empty()) {
     return 78;

@@ -23,6 +23,9 @@ struct NativeCompileOptions {
   // Compiler identity mixed into every stamp (e.g. a hash of the kinglet
   // binary) so codegen changes invalidate cached objects.
   std::string cache_salt;
+  // Project root directory. When set, source paths are made relative to
+  // this prefix for cache directory naming (readable hierarchy).
+  std::string source_prefix;
 };
 
 class KirToLlvm {
