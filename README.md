@@ -50,6 +50,8 @@ ninja -C out/Default kinglet kinglet_rt
 ```
 
 See [docs/BUILD.md](docs/BUILD.md) for prerequisites, Windows, and troubleshooting.
+See [docs/SYNTAX.md](docs/SYNTAX.md) for the full language syntax reference and
+[docs/MODULES.md](docs/MODULES.md) for the project manifest and module system.
 
 ## Quick Example
 
