@@ -30,8 +30,10 @@ void kl_release(kl_h value) {
   // Fast path: single non-container object.
   {
     auto *hdr = static_cast<KlHeader *>(kl_unbox_ptr(value));
-    if (hdr->refcount == 0) return;  // already freed
-    if (--hdr->refcount != 0) return;
+    if (hdr->refcount == 0)
+      return; // already freed
+    if (--hdr->refcount != 0)
+      return;
   }
 
   // Worklist for deferred decrement-and-delete.
@@ -43,11 +45,14 @@ void kl_release(kl_h value) {
     kl_h v = work.back();
     work.pop_back();
 
-    if (!kl_is_heap(v)) continue;
+    if (!kl_is_heap(v))
+      continue;
 
     auto *hdr = static_cast<KlHeader *>(kl_unbox_ptr(v));
-    if (hdr->refcount == 0) continue;  // already freed by a previous iteration
-    if (--hdr->refcount != 0) continue;
+    if (hdr->refcount == 0)
+      continue; // already freed by a previous iteration
+    if (--hdr->refcount != 0)
+      continue;
 
     // Collect children before deleting the parent. Children are kl_h values
     // (int64_t) stored inside std containers; the containers' destructors

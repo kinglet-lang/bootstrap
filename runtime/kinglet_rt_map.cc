@@ -19,8 +19,7 @@ bool order_key_match(kl_h a, kl_h b) {
     return static_cast<KlString *>(kl_unbox_ptr(a))->bytes ==
            static_cast<KlString *>(kl_unbox_ptr(b))->bytes;
   }
-  if (!kl_is_heap(a) && !kl_is_heap(b) && !kl_is_inline_enum(a) &&
-      !kl_is_inline_enum(b)) {
+  if (!kl_is_heap(a) && !kl_is_heap(b) && !kl_is_inline_enum(a) && !kl_is_inline_enum(b)) {
     return a == b;
   }
   return a == b;
@@ -93,8 +92,7 @@ const KlMapEntry *map_find(KlMap *map, kl_h key) {
 // Erase a key from the map sub-stores (retains/releases handled by callers).
 bool map_erase(KlMap *map, kl_h key) {
   if (is_string_key(key)) {
-    return map->str_entries.erase(
-               static_cast<KlString *>(kl_unbox_ptr(key))->bytes) > 0;
+    return map->str_entries.erase(static_cast<KlString *>(kl_unbox_ptr(key))->bytes) > 0;
   }
   if (is_int_key(key)) {
     return map->int_entries.erase(kl_to_int(key)) > 0;
