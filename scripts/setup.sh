@@ -7,11 +7,18 @@
 #   bash scripts/setup.sh --install    # also install LLVM if missing
 #
 # GN has no semver (CIPD, very stable). Ninja is pinned to an exact release.
-# The tools land in ./tools (gitignored); tools/env.sh wires PATH.
+# The tools land in ./tools (gitignored). setup.sh wires ./tools/bin onto
+# PATH for both the current shell and future shells (via the shell profile),
+# so a separate `source tools/env.sh` step is no longer required — that file
+# is still written for CI / non-interactive use.
 #
 # LLVM: the script searches PATH, /usr/lib/llvm-*/bin, and Homebrew prefixes.
 # Set PREFERRED_LLVM (e.g. "16") to bias toward a specific version.
 # Pass --install to attempt automatic installation (apt on Linux, brew on macOS).
+#
+# Set SETUP_SH_SKIP_MAIN=1 before sourcing to load helper functions
+# (detect_platform, find_llvm_config, add_to_path, ...) without running
+# main — used by scripts/build.sh to reuse this file's LLVM detection.
 
 set -euo pipefail
 
@@ -49,6 +56,22 @@ done
 info()  { printf '\033[34m>\033[0m %s\n' "$*" >&2; }
 warn()  { printf '\033[33m!\033[0m %s\n' "$*" >&2; }
 err()   { printf '\033[31m✗\033[0m %s\n' "$*" >&2; }
+
+# ── dependency check ────────────────────────────────────────────────────────
+
+check_deps() {
+  local missing=()
+  command -v unzip >/dev/null 2>&1 || missing+=("unzip")
+  command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || missing+=("curl or wget")
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    err "missing required tools: ${missing[*]}"
+    case "$(uname -s)" in
+      Linux)  err "install with: sudo apt install -y unzip curl" ;;
+      Darwin) err "install with: brew install unzip curl" ;;
+    esac
+    exit 1
+  fi
+}
 
 # ── platform helpers ────────────────────────────────────────────────────────
 
@@ -132,6 +155,44 @@ write_env() {
     echo 'export PATH="$PWD/tools/bin:$PATH"'
   } > "$TOOLS/env.sh"
   info "wrote tools/env.sh"
+}
+
+# ── user PATH wiring ────────────────────────────────────────────────────────
+# Persist $BIN on PATH across shells, and export it into the current shell
+# when this script is sourced. Mirrors scripts/install.sh's approach.
+
+profile_for_shell() {
+  case "${SHELL:-}" in
+    */zsh)  echo "$HOME/.zshrc" ;;
+    */bash) [[ -f "$HOME/.bashrc" ]] && echo "$HOME/.bashrc" || echo "$HOME/.bash_profile" ;;
+    */fish) echo "$HOME/.config/fish/config.fish" ;;
+    *)      echo "$HOME/.profile" ;;
+  esac
+}
+
+add_bin_to_path() {
+  [[ "${SETUP_SH_NO_MODIFY_PATH:-0}" == "1" ]] && return 0
+
+  local profile
+  profile="$(profile_for_shell)"
+  mkdir -p "$(dirname "$profile")"
+
+  local line
+  case "$profile" in
+    *config.fish) line="fish_add_path $BIN" ;;
+    *)            line="export PATH=\"$BIN:\$PATH\"" ;;
+  esac
+
+  if ! { [[ -f "$profile" ]] && grep -qF "$BIN" "$profile"; }; then
+    printf '\n# kinglet dev toolchain (scripts/setup.sh)\n%s\n' "$line" >> "$profile"
+    info "added $BIN to PATH in $profile"
+  fi
+
+  # Also export into the current shell right away when sourced.
+  case ":${PATH:-}:" in
+    *":$BIN:"*) ;;
+    *) export PATH="$BIN:$PATH" ;;
+  esac
 }
 
 # ── LLVM ────────────────────────────────────────────────────────────────────
@@ -295,6 +356,8 @@ main() {
   info "Kinglet dev setup"
   info ""
 
+  check_deps
+
   local plat
   plat="$(detect_platform)"
   mkdir -p "$BIN"
@@ -303,6 +366,7 @@ main() {
   install_gn "$plat"
   install_ninja "$plat"
   write_env
+  add_bin_to_path
   info ""
 
   # LLVM (detect, optionally install).
@@ -316,14 +380,13 @@ main() {
   fi
 
   info ""
-  info "Done. Next:"
-  info "  source tools/env.sh"
+  info "Done. gn/ninja are on PATH now (new shells too). Next:"
   if [[ -n "${LLVM_CONFIG:-}" ]]; then
-    info "  gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config=\"$LLVM_CONFIG\"'"
+    info "  bash scripts/build.sh"
   else
     info "  gn gen out/Default --args='is_debug=false'"
+    info "  ninja -C out/Default kinglet"
   fi
-  info "  ninja -C out/Default kinglet"
 
   # When not sourced, emit LLVM_CONFIG on stdout so callers can capture it.
   if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
@@ -331,12 +394,17 @@ main() {
   fi
 }
 
-# When sourced, run main and export LLVM_CONFIG into the caller's environment.
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  main "$@"
-else
-  main "$@"
-  if [[ -n "${LLVM_CONFIG:-}" ]]; then
-    export LLVM_CONFIG
+# Allow other scripts to `source scripts/setup.sh` purely to reuse the helper
+# functions (detect_platform, find_llvm_config, profile_for_shell, ...)
+# without running the full install flow.
+if [[ "${SETUP_SH_SKIP_MAIN:-0}" != "1" ]]; then
+  # When sourced, run main and export LLVM_CONFIG into the caller's environment.
+  if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+  else
+    main "$@"
+    if [[ -n "${LLVM_CONFIG:-}" ]]; then
+      export LLVM_CONFIG
+    fi
   fi
 fi
