@@ -47,19 +47,33 @@ Do not put planning or ADR metadata in source comments:
 - Meta-style boilerplate (`LICENSE file in the root directory of this source tree`)
 - `Pass 0` / `Pass 0b` (describe the step in plain language instead)
 
-## Commit-msg: subject line
+## Commit-msg: subject line and style
 
 The first line must follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-type(scope): short description
+type(scope): description
 ```
 
 Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
 `chore`, `build`, `ci`, `revert`.
 
-The subject must be at least four characters after the colon, must not mention
-`Phase A/B/…`, and must not reference `ADR ####`.
+The `commit-msg` hook enforces, in addition to the structure:
+
+- **Imperative mood** — `add …`, not `added` / `adding` / `adds`.
+- **Lowercase start, no trailing period** — the type prefix opens the
+  sentence (`feat(parser): add …`). Identifiers keep their case (`LLVM`).
+- **No vague descriptions** — `fix bug`, `update`, `changes`, `wip`,
+  `cleanup`, … are rejected.
+- At least four characters after the colon.
+- No `Phase A/B/…` or `ADR ####` references.
+- Subject length is a warning (aim ≤ 50, keep under 72), not a failure.
+
+It also rewraps body prose to 72 columns via `format_commit_body.py`. The full
+rationale and examples are in
+[CONTRIBUTING.md → Commit messages](../../CONTRIBUTING.md#commit-messages),
+following Google's
+[CL description guidance](https://google.github.io/eng-practices/review/developer/cl-descriptions.html).
 
 Merge commits, `fixup!`, `squash!`, and `Revert …` subjects are exempt.
 
