@@ -27,7 +27,7 @@ $BIN        = Join-Path $TOOLS "bin"
 function Info($msg) { Write-Host $msg -ForegroundColor DarkGray }
 function Warn($msg) { Write-Host $msg -ForegroundColor Yellow }
 
-# ── GN + Ninja ────────────────────────────────────────────────────────────────
+# ========== GN + Ninja ==========
 
 function Install-Gn {
   Info "GN (windows-amd64, $GN_CIPD_VERSION)"
@@ -56,7 +56,7 @@ function Write-Env {
   Info "wrote tools\env.ps1"
 }
 
-# ── user PATH wiring ──────────────────────────────────────────────────────────
+# ========== user PATH wiring ==========
 # Persist $BIN on PATH across shells (via the PowerShell profile), and export
 # it into the current session right away. Mirrors scripts/setup.sh.
 
@@ -83,7 +83,7 @@ function Add-BinToPath {
   }
 }
 
-# ── main ──────────────────────────────────────────────────────────────────────
+# ========== main ==========
 
 New-Item -ItemType Directory -Force -Path $BIN | Out-Null
 
