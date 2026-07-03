@@ -5,6 +5,9 @@
 #   bash scripts/build.sh --debug         # debug build (-g, no -O2)
 #   bash scripts/build.sh --no-llvm       # force compile-only, no native backend
 #   bash scripts/build.sh --out out/Foo   # custom output dir (default: out/Default)
+#   bash scripts/build.sh --gn 'sanitizer="address,undefined"'  # append GN args
+#
+# Set BUILD_CI=1 to skip binary staging (CI/automation use).
 #
 # Requires scripts/setup.sh to have been run at least once (for GN + Ninja
 # under ./tools/bin). This script re-sources setup.sh's helpers (LLVM
@@ -23,6 +26,7 @@ BIN="$TOOLS/bin"
 OUT_DIR="out/Default"
 IS_DEBUG=false
 FORCE_NO_LLVM=false
+GN_EXTRA=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -30,8 +34,10 @@ while [[ $# -gt 0 ]]; do
     --no-llvm) FORCE_NO_LLVM=true; shift ;;
     --out) OUT_DIR="${2:?--out requires a value}"; shift 2 ;;
     --out=*) OUT_DIR="${1#--out=}"; shift ;;
+    --gn) GN_EXTRA="${2:?--gn requires a value}"; shift 2 ;;
+    --gn=*) GN_EXTRA="${1#--gn=}"; shift ;;
     --help|-h)
-      echo "usage: build.sh [--debug] [--no-llvm] [--out out/Dir]"
+      echo "usage: build.sh [--debug] [--no-llvm] [--out out/Dir] [--gn 'key=val ...']"
       exit 0
       ;;
     *)
@@ -76,6 +82,11 @@ else
   info "--no-llvm: building without native backend"
 fi
 
+# Append extra GN args (e.g. sanitizer, coverage, custom flags).
+if [[ -n "$GN_EXTRA" ]]; then
+  GN_ARGS="$GN_ARGS $GN_EXTRA"
+fi
+
 info "gn gen $OUT_DIR --args='$GN_ARGS'"
 eval gn gen "$OUT_DIR" --args="'$GN_ARGS'"
 
@@ -96,6 +107,11 @@ if [[ ! -x "$BUILT_BIN" ]]; then
 fi
 
 # ========== stage kinglet/klet + wire PATH ==========
+
+if [[ "${BUILD_CI:-0}" == "1" ]]; then
+  info "BUILD_CI=1: skipping binary staging"
+  exit 0
+fi
 
 mkdir -p "$BIN"
 cp -f "$BUILT_BIN" "$BIN/kinglet"

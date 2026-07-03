@@ -47,34 +47,6 @@ std::string parse_quoted(const std::string &s, size_t &i) {
   return "";
 }
 
-std::string parse_identifier(const std::string &s, size_t &i) {
-  while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i]))) {
-    ++i;
-  }
-  size_t start = i;
-  while (i < s.size() && (std::isalnum(static_cast<unsigned char>(s[i])) || s[i] == '_')) {
-    ++i;
-  }
-  if (start == i) {
-    return "";
-  }
-  return s.substr(start, i - start);
-}
-
-std::string parse_value_token(const std::string &s, size_t &i) {
-  while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i]))) {
-    ++i;
-  }
-  if (i < s.size() && s[i] == '"') {
-    return parse_quoted(s, i);
-  }
-  size_t start = i;
-  while (i < s.size() && !std::isspace(static_cast<unsigned char>(s[i]))) {
-    ++i;
-  }
-  return s.substr(start, i - start);
-}
-
 bool parse_project_line(const std::string &line, ProjectConfig &config) {
   if (!starts_with(line, "project ")) {
     return false;

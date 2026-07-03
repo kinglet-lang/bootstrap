@@ -37,7 +37,7 @@ struct CompletionInfo {
   std::string struct_name;
   // Generic type parameters in scope at the cursor (e.g. concept/struct
   // <T, U>), so type-position completion can offer them.
-  std::vector<std::string> type_params;
+  std::vector<std::string> type_params = {};
 };
 
 } // namespace kinglet::lsp

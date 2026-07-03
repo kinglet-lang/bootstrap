@@ -72,6 +72,10 @@ KirType kir_type_from_surface_type(const Type &type) {
     return KirType::Enum;
   case TypeKind::Function:
     return KirType::Fn;
+  case TypeKind::Ref:
+  case TypeKind::MutRef:
+  case TypeKind::Concept:
+    break;
   }
   return KirType::Any;
 }

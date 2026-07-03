@@ -245,10 +245,6 @@ bool is_int_suffix(std::string_view s) {
          s == "u32" || s == "u64";
 }
 
-bool is_float_suffix(std::string_view s) {
-  return s == "f32" || s == "f64";
-}
-
 } // namespace
 
 std::string Scanner::scan_int_suffix() {

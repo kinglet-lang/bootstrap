@@ -25,14 +25,11 @@ jobs:
           echo "LLVM_CONFIG=$LLVM_CONFIG" >> "$GITHUB_ENV"
           echo "$PWD/tools/bin" >> "$GITHUB_PATH"
 
-      - name: Generate build files
-        shell: bash
-        run: |
-          gn gen out/Debug --args="is_debug=false enable_llvm=true llvm_config=\"$LLVM_CONFIG\""
-
       - name: Build
         shell: bash
-        run: ninja -C out/Debug
+        env:
+          BUILD_CI: 1
+        run: bash scripts/build.sh --out out/Debug
 
       - name: Run golden tests
         shell: bash
@@ -55,14 +52,11 @@ jobs:
           echo "LLVM_CONFIG=$LLVM_CONFIG" >> "$GITHUB_ENV"
           echo "$PWD/tools/bin" >> "$GITHUB_PATH"
 
-      - name: Generate build files
-        shell: bash
-        run: |
-          gn gen out/Release --args="is_debug=false enable_llvm=true optimize=\"-O2\" llvm_config=\"$LLVM_CONFIG\""
-
       - name: Build
         shell: bash
-        run: ninja -C out/Release
+        env:
+          BUILD_CI: 1
+        run: bash scripts/build.sh --out out/Release --gn 'optimize="-O2"'
 
       - name: Run golden tests
         shell: bash
@@ -85,14 +79,11 @@ jobs:
           echo "LLVM_CONFIG=$LLVM_CONFIG" >> "$GITHUB_ENV"
           echo "$PWD/tools/bin" >> "$GITHUB_PATH"
 
-      - name: Generate build files
-        shell: bash
-        run: |
-          gn gen out/Sanitizers --args="is_debug=false enable_llvm=true sanitizer=\"address,undefined,leak\" llvm_config=\"$LLVM_CONFIG\""
-
       - name: Build
         shell: bash
-        run: ninja -C out/Sanitizers
+        env:
+          BUILD_CI: 1
+        run: bash scripts/build.sh --out out/Sanitizers --gn 'sanitizer="address,undefined,leak"'
 
       - name: Run golden tests
         shell: bash
@@ -146,14 +137,11 @@ jobs:
           echo "LLVM_CONFIG=$LLVM_CONFIG" >> "$GITHUB_ENV"
           echo "$PWD/tools/bin" >> "$GITHUB_PATH"
 
-      - name: Generate build files
-        shell: bash
-        run: |
-          gn gen out/Release --args="is_debug=false enable_llvm=true optimize=\"-O2\" llvm_config=\"$LLVM_CONFIG\""
-
       - name: Build
         shell: bash
-        run: ninja -C out/Release
+        env:
+          BUILD_CI: 1
+        run: bash scripts/build.sh --out out/Release --gn 'optimize="-O2"'
 
       - name: Run benchmarks
         shell: bash
@@ -173,14 +161,11 @@ jobs:
           echo "LLVM_CONFIG=$LLVM_CONFIG" >> "$GITHUB_ENV"
           echo "$PWD/tools/bin" >> "$GITHUB_PATH"
 
-      - name: Generate build files
-        shell: bash
-        run: |
-          gn gen out/Coverage --args="is_debug=false enable_llvm=true coverage=true llvm_config=\"$LLVM_CONFIG\""
-
       - name: Build
         shell: bash
-        run: ninja -C out/Coverage
+        env:
+          BUILD_CI: 1
+        run: bash scripts/build.sh --out out/Coverage --gn 'coverage=true'
 
       - name: Run golden tests
         shell: bash
