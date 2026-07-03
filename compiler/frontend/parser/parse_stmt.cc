@@ -79,6 +79,15 @@ ast::StmtPtr Parser::statement() {
 }
 
 ast::StmtPtr Parser::block_statement() {
+  // Depth guard: block_statement() and statement() mutually recurse through
+  // each nested '{'. Both sites bump the counter so each nesting level
+  // counts twice, halving the effective block depth to ~24 levels with
+  // a 48 limit — still far more than any realistic hand-written source.
+  RecursionGuard guard(*this);
+  if (!guard.ok()) {
+    note_recursion_limit();
+    return nullptr;
+  }
   const Token &left_brace = previous();
   std::vector<ast::StmtPtr> statements;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
@@ -325,6 +334,8 @@ ast::StmtPtr Parser::var_declaration() {
 
 ast::StmtPtr Parser::expression_statement() {
   ast::ExprPtr expr = expression();
+  if (!expr)
+    return nullptr;
   if (at_completion()) {
     set_completion({lsp::CompletionPosition::ExpressionStart, {}, {}, {}, {}, {}});
     return nullptr;
