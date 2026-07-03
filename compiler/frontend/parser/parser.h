@@ -111,6 +111,15 @@ private:
   void synchronize();
   void error_at(const Token &token, std::string_view message);
 
+  // Hard ceiling on accumulated parse errors. A malformed input can drive a
+  // recovery path that reports an error without consuming a token; the
+  // per-loop no-progress guards handle the known cases, but this is the
+  // backstop that guarantees termination (and bounded memory) for any path we
+  // have not special-cased. Once tripped, error_at() fast-forwards the cursor
+  // to end-of-input so every `while (!is_at_end())` loop unwinds. No realistic
+  // source file produces anywhere near this many distinct errors.
+  static constexpr std::size_t kMaxParseErrors = 4096;
+
   bool at_completion() const;
   // True when the cursor sits immediately after a dangling member-access or
   // type-separator operator (`.`, `::`, or a lone `:`). None of these can begin

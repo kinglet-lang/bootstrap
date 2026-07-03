@@ -276,6 +276,7 @@ ast::DeclPtr Parser::concept_declaration() {
   }
   std::vector<ast::ConceptMethodDecl> methods;
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
+    const std::size_t before = current_;
     ast::TypeExpr ret_type = parse_type_expr();
     const Token &method_name = consume(TokenType::IDENTIFIER, "Expected method name in concept.");
     consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
@@ -283,6 +284,12 @@ ast::DeclPtr Parser::concept_declaration() {
     consume(TokenType::RIGHT_PAREN, "Expected ')' after parameter list.");
     consume(TokenType::SEMICOLON, "Expected ';' after concept method signature.");
     methods.push_back(ast::ConceptMethodDecl{ret_type, token_text(method_name), std::move(params)});
+    // No-progress guard: a method signature made entirely of consume()
+    // failures leaves the cursor unmoved. Force one token forward so a
+    // malformed concept body cannot spin forever appending errors.
+    if (current_ == before && !is_at_end() && !has_completion()) {
+      advance();
+    }
   }
   active_type_params_.clear();
   if (has_completion())

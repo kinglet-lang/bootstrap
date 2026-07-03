@@ -1,0 +1,18 @@
+// RUN: run
+
+using io;
+
+string grade(int score) {
+  return score match {
+    let x if (x >= 90) => "A",
+    let x if (x >= 60) => "pass",
+    _ => "fail",
+  };
+}
+
+int main() {
+  io::out("{}\n", grade(95));
+  io::out("{}\n", grade(75));
+  io::out("{}\n", grade(30));
+  return 0;
+}

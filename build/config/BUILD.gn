@@ -1,3 +1,5 @@
+import("//build/fuzz.gni")
+
 declare_args() {
   is_debug = true
   sanitizer = ""
@@ -39,6 +41,26 @@ config("sanitizer") {
     ]
     ldflags = [ "-fsanitize=$sanitizer" ]
   }
+}
+
+# Applied to every default-config'd target so the whole compiler carries
+# libFuzzer coverage instrumentation. "no-link" means these object files are
+# instrumented but do not pull in the libFuzzer main(); only the fuzz target
+# executables (via the "fuzzer" config below) link the driver.
+config("fuzzer_instrumentation") {
+  if (use_libfuzzer) {
+    cflags = [
+      "-fsanitize=fuzzer-no-link",
+      "-fno-omit-frame-pointer",
+    ]
+  }
+}
+
+# Applied only to fuzz target executables. Links the libFuzzer driver (which
+# supplies main()) against the instrumented compiler libraries.
+config("fuzzer") {
+  cflags = [ "-fsanitize=fuzzer" ]
+  ldflags = [ "-fsanitize=fuzzer" ]
 }
 
 config("coverage") {

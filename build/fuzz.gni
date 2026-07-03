@@ -1,0 +1,12 @@
+# Fuzzing configuration. Enable with:
+#
+#   gn gen out/Fuzz --args='use_libfuzzer=true sanitizer="address,undefined"'
+#
+# When use_libfuzzer is true every default-config'd target is built with
+# libFuzzer coverage instrumentation (-fsanitize=fuzzer-no-link, via the
+# //build/config:fuzzer_instrumentation config), and the fuzz target
+# executables under //tests/fuzz link the libFuzzer driver.
+
+declare_args() {
+  use_libfuzzer = false
+}

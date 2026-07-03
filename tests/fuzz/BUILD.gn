@@ -1,0 +1,54 @@
+import("//build/fuzz.gni")
+
+# libFuzzer targets for the Kinglet front end. These are only defined when the
+# build is configured with use_libfuzzer=true, since they require the libFuzzer
+# driver to be linked. Generate with, for example:
+#
+#   gn gen out/Fuzz --args='use_libfuzzer=true sanitizer="address,undefined"'
+#   ninja -C out/Fuzz fuzz_parser
+#   ./out/Fuzz/fuzz_parser tests/fuzz/corpus/parser -max_total_time=60
+#
+# The "fuzzer" config links the libFuzzer main(); every dependency is already
+# built with fuzzer coverage instrumentation via the default-config
+# "fuzzer_instrumentation".
+
+if (use_libfuzzer) {
+  _fuzz_deps_frontend = [
+    "//compiler/frontend/lexer",
+    "//compiler/frontend/parser",
+    "//compiler/frontend/ast",
+  ]
+
+  executable("fuzz_lexer") {
+    testonly = true
+    sources = [ "fuzz_lexer.cc" ]
+    configs += [ "//build/config:fuzzer" ]
+    deps = [ "//compiler/frontend/lexer" ]
+    include_dirs = [ "//compiler" ]
+  }
+
+  executable("fuzz_parser") {
+    testonly = true
+    sources = [ "fuzz_parser.cc" ]
+    configs += [ "//build/config:fuzzer" ]
+    deps = _fuzz_deps_frontend
+    include_dirs = [ "//compiler" ]
+  }
+
+  executable("fuzz_pipeline") {
+    testonly = true
+    sources = [ "fuzz_pipeline.cc" ]
+    configs += [ "//build/config:fuzzer" ]
+    deps = _fuzz_deps_frontend + [ "//compiler/frontend/checker" ]
+    include_dirs = [ "//compiler" ]
+  }
+
+  group("fuzzers") {
+    testonly = true
+    deps = [
+      ":fuzz_lexer",
+      ":fuzz_parser",
+      ":fuzz_pipeline",
+    ]
+  }
+}
