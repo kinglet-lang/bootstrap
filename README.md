@@ -43,15 +43,18 @@ Editor extensions live in [kinglet-lang/perch](https://github.com/kinglet-lang/p
 ## Build
 
 ```bash
-bash scripts/setup.sh && source tools/env.sh   # pinned GN+Ninja (Windows: pwsh scripts/setup.ps1)
-gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
-ninja -C out/Default kinglet kinglet_rt
-./out/Default/kinglet --check file.kl
+bash scripts/setup.sh             # one-time: pinned GN+Ninja + LLVM detection
+bash scripts/build.sh             # gn gen + ninja + PATH staging
+./tools/bin/kinglet --check file.kl
 ```
 
-See [docs/BUILD.md](docs/BUILD.md) for prerequisites, Windows, and troubleshooting.
-See [docs/SYNTAX.md](docs/SYNTAX.md) for the full language syntax reference and
-[docs/MODULES.md](docs/MODULES.md) for the project manifest and module system.
+For custom builds or CI:
+
+```bash
+BUILD_CI=1 bash scripts/build.sh --out out/Debug --gn 'sanitizer="address,undefined"'
+```
+
+See [docs/BUILD.md](docs/BUILD.md) for prerequisites, Windows, fuzzing, and troubleshooting.
 
 ## Quick Example
 
