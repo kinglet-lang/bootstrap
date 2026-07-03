@@ -131,9 +131,10 @@ private:
   // to a 1 MiB main-thread stack (Linux/macOS give 8 MiB). Each nesting level
   // descends the full ~17-function expression precedence chain, costing a few
   // KiB of stack per level, so the Windows ceiling is a few hundred levels.
-  // 128 leaves better than half the Windows stack free while sitting far
-  // deeper than any realistic hand-written source nests.
-  static constexpr int kMaxRecursionDepth = 128;
+  // 48 keeps total recursive frame count under 50 even when ASan inflates
+  // per-frame stack consumption 3-4×, leaving ample margin on the Windows
+  // 1 MiB default stack while still far exceeding any realistic nesting.
+  static constexpr int kMaxRecursionDepth = 48;
 
   // RAII counter for recursion depth, constructed at the top of each recursive
   // production. Increments the depth on entry, restores it on scope exit.
@@ -146,7 +147,7 @@ private:
     ~RecursionGuard() { --parser_.recursion_depth_; }
     RecursionGuard(const RecursionGuard &) = delete;
     RecursionGuard &operator=(const RecursionGuard &) = delete;
-    bool ok() const { return parser_.recursion_depth_ <= kMaxRecursionDepth; }
+    bool ok() const { return parser_.recursion_depth_ < kMaxRecursionDepth; }
 
   private:
     Parser &parser_;
