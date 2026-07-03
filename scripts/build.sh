@@ -117,6 +117,16 @@ mkdir -p "$BIN"
 cp -f "$BUILT_BIN" "$BIN/kinglet"
 chmod +x "$BIN/kinglet"
 
+# The kinglet binary resolves the runtime archive relative to its own
+# directory (resolve_rt_lib in main.cc). Stage it alongside the binary.
+if [[ "$GN_ARGS" == *enable_llvm=true* ]]; then
+  RT_LIB="$ROOT/$OUT_DIR/obj/runtime/libkinglet_rt.a"
+  if [[ -f "$RT_LIB" ]]; then
+    cp -f "$RT_LIB" "$BIN/"
+    info "staged $BIN/libkinglet_rt.a"
+  fi
+fi
+
 if [[ -f "$SCRIPT_DIR/stage-klet-alias.sh" ]]; then
   bash "$SCRIPT_DIR/stage-klet-alias.sh" "$BIN" || warn "klet alias staging failed (non-fatal)"
 fi
