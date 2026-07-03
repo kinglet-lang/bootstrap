@@ -14,6 +14,14 @@
 namespace kinglet {
 
 ast::ExprPtr Parser::expression() {
+  // Depth guard: expression() is the entry to the recursive expression grammar
+  // (ternary/binary/unary/call/primary all recurse back here). A long run of
+  // nested operators or brackets would otherwise overflow the native stack.
+  RecursionGuard guard(*this);
+  if (!guard.ok()) {
+    note_recursion_limit();
+    return nullptr;
+  }
   return assignment();
 }
 

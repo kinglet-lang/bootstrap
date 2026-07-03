@@ -80,6 +80,14 @@ ast::StmtPtr Parser::function_body() {
 }
 
 ast::TypeExpr Parser::parse_type_expr() {
+  // Depth guard: type syntax recurses through references (&T), map types
+  // ({K: V}), and generic arguments (List<List<...>>). Deep nesting would
+  // otherwise overflow the native stack.
+  RecursionGuard guard(*this);
+  if (!guard.ok()) {
+    note_recursion_limit();
+    return ast::TypeExpr{"<error>", {}};
+  }
   if (at_completion()) {
     set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}, active_type_params_});
     return ast::TypeExpr{"<error>", {}};
