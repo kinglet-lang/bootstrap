@@ -16,25 +16,26 @@ pinned toolchain (one-time per machine):
 
 ```bash
 bash scripts/setup.sh     # Unix; on Windows: pwsh -File scripts/setup.ps1
-source tools/env.sh           # Windows: . .\tools\env.ps1 (or just open a new shell)
+bash scripts/build.sh     # gn gen + ninja + PATH staging
 
-gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
-ninja -C out/Default kinglet kinglet_rt
-# Optional short name (same binary, Windows: hard link — not .cmd):
-#   bash scripts/stage-klet-alias.sh out/Default
-#   pwsh -File scripts/stage-klet-alias.ps1 out/Default
+# For CI / custom configs:
+BUILD_CI=1 bash scripts/build.sh --out out/Debug --gn 'sanitizer="address,undefined"'
 ```
 
 Run:
 
 ```bash
-./out/Debug/kinglet tests/exec/cases/operators_arithmetic.kl
-./out/Debug/klet --check path/to/file.kl   # if you `ln -s kinglet klet` locally
-./out/Debug/kinglet build              # project build (needs kinglet.nest)
-./out/Debug/kinglet init
+tools/bin/kinglet tests/exec/cases/operators_arithmetic.kl
+tools/bin/kinglet --check path/to/file.kl
+tools/bin/kinglet build              # project build (needs kinglet.nest)
+tools/bin/kinglet init
 ```
 
 Test suites: `bash tests/run_all.sh` (see [tests/README.md](tests/README.md))
+
+Fuzz targets (libFuzzer with ASan+UBSan): `bash scripts/fuzz.sh all 60`.
+`fuzz-smoke` runs on every PR and is required to pass before auto-merge.
+See [tests/fuzz/README.md](tests/fuzz/README.md).
 
 ## Contributing (Fork Workflow)
 
@@ -92,6 +93,8 @@ compiler/                         # the bootstrap compiler (C++20)
 runtime/                          # libkinglet_rt (user program native RT; ABI-stable, independent)
 build/                            # GN toolchains, llvm.gni, embed.gni
 tests/                            # ADR 0012 layout (see tests/README.md)
+├── fuzz/                        # libFuzzer harnesses + corpus + regression seeds
+├── exec/, sema/, parser/, …     # golden test suites
 ```
 
 ## Code Conventions

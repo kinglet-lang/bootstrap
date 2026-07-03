@@ -1,143 +1,120 @@
-# Building Kinglet Bootstrap
-
-The compiler is C++20, built with **GN + Ninja**, with an optional **LLVM**
-native backend. This guide covers obtaining the toolchain, generating a build,
-and running the test suite.
-
-> TL;DR — Unix with native backend:
->
-> ```bash
-> bash scripts/setup.sh        # one-time: pinned GN + Ninja into ./tools/bin
-> source tools/env.sh              # adds ./tools/bin to PATH
-> # Install LLVM (see versions below), then:
-> gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
-> ninja -C out/Default kinglet kinglet_rt
-> ```
+# Building the Bootstrap Compiler
 
 ## Prerequisites
 
-| Tool | Why | Notes |
-|---|---|---|
-| Python 3 | GN runs build-time scripts (`build/scripts/*.py`) | Already required by GN. |
-| A C/C++ compiler | Toolchain for the build | System `clang` on macOS; `clang`/`gcc` on Linux; MSVC or Clang on Windows. |
-| `curl` or `wget` | `bootstrap` downloads | One is enough. |
-| `unzip` | `bootstrap` extracts archives | Standard on Unix. |
+- **C++20 compiler** — Clang 14+ or GCC 12+
+- **LLVM 18+** — for the native backend (`enable_llvm=true`); optional (compile-only without it)
+- **Python 3.8+** — for GN
 
-### LLVM (optional, for native backend)
-
-The native backend requires **LLVM 18 or later**. Install via your system package
-manager:
-
-| Platform | Command | Typical version |
-|---|---|---|
-| macOS | `brew install llvm` | latest Homebrew (22.x) |
-| Ubuntu 24.04 | `sudo apt-get install llvm-dev clang` | 18.x |
-| Ubuntu 22.04 | `sudo apt-get install llvm-18-dev clang-18` (add LLVM APT repo) | 18.x |
-
-> `build/scripts/find_llvm_config.py` searches `$LLVM_CONFIG`, Homebrew paths,
-> then `PATH`. Set `LLVM_CONFIG` explicitly if auto-detection fails.
-
-## One-time toolchain setup
-
-The bootstrap script fetches **pinned GN and Ninja** into `./tools/bin/`
-(gitignored), so every developer and CI runner uses the same build-system
-versions.
-
-**Unix** (macOS / Linux):
+Run `scripts/setup.sh` once per machine to fetch pinned GN and Ninja binaries and
+detect LLVM:
 
 ```bash
-bash scripts/setup.sh
-source tools/env.sh   # prepends ./tools/bin to PATH
+bash scripts/setup.sh          # Unix
+pwsh -File scripts/setup.ps1   # Windows
 ```
 
-**Windows**:
+## Quick Build
 
-```powershell
-pwsh -File scripts/setup.ps1   # pinned GN + Ninja; wires .\tools\bin onto PATH
-pwsh -File scripts/build.ps1   # gn gen + ninja; stages kinglet.exe/klet.exe
-```
-
-`setup.ps1` persists `.\tools\bin` on `PATH` (current session + PowerShell
-profile), so a separate `. .\tools\env.ps1` step is no longer required — that
-file is still written for CI / non-interactive use.
-
-Windows mirrors the CI policy: **GN + Ninja only, no LLVM** — builds are
-compile-only (the native LLVM backend is not supported on Windows yet).
-
-If you already have GN/Ninja on `PATH`, skip bootstrap — the build picks up
-whatever is available.
-
-## Generating a build
-
-GN takes a build directory and an args block.
-
-**Debug (no LLVM)** — fastest, but the native backend is unavailable:
+The fastest way is `scripts/build.sh`, which detects LLVM, runs `gn gen` +
+`ninja`, and stages the binary under `tools/bin/`:
 
 ```bash
-gn gen out/Debug --args='is_debug=false'
-ninja -C out/Debug
+bash scripts/build.sh
+./tools/bin/kinglet --version
 ```
 
-**Release with LLVM native backend** (the recommended configuration):
+For CI or custom builds, pass `--gn` to append GN args and `BUILD_CI=1` to skip
+binary staging:
 
 ```bash
-# Assumes llvm-config is on PATH (or set LLVM_CONFIG)
-gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="$(which llvm-config)"'
+BUILD_CI=1 bash scripts/build.sh --out out/Debug --gn 'sanitizer="address,undefined"'
+```
+
+Common flags:
+
+| Flag | Effect |
+|------|--------|
+| `--out out/Dir` | Build output directory (default: `out/Default`) |
+| `--debug` | Debug build (`-g`, no optimisations) |
+| `--no-llvm` | Compile-only, no LLVM native backend |
+| `--gn 'key=val …'` | Append arbitrary GN args (`sanitizer`, `coverage`, `optimize`, …) |
+| `BUILD_CI=1` | Skip binary staging (for CI/automation) |
+
+The script reads `LLVM_CONFIG` from the environment; `setup.sh --install` sets
+this automatically on CI.
+
+## Manual Build
+
+If you prefer to call `gn` and `ninja` directly:
+
+```bash
+source tools/env.sh
+gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="'"$(which llvm-config)"'"'
 ninja -C out/Default kinglet kinglet_rt
 ```
 
-### Build arguments
+## Build Configurations
 
-| Arg | Default | Meaning |
-|---|---|---|
-| `is_debug` | `true` | `false` enables `-O2`; `true` is `-g` with no optimisation. |
-| `enable_llvm` | `false` | Build the LLVM native backend (`KirToLlvm`) and link `kinglet_rt`. |
-| `llvm_config` | `""` | Path to `llvm-config`. If empty, GN runs `build/scripts/find_llvm_config.py`, which checks `$LLVM_CONFIG`, the Homebrew paths, then `PATH`. |
+| GN args | Config |
+|---------|--------|
+| (none) | Default: `is_debug=false`. LLVM auto-detected through `build.sh`. |
+| `is_debug=true` | Debug symbols, no optimisations. |
+| `enable_llvm=true llvm_config="…"` | LLVM native backend (AOT compilation). |
+| `sanitizer="address,undefined,leak"` | ASan + UBSan + LSan (Clang only). |
+| `coverage=true` | `--coverage` instrumentation for `llvm-cov` / Codecov. |
+| `use_libfuzzer=true sanitizer="address,undefined"` | libFuzzer fuzz targets (Clang only). |
 
-> Build args persist per output directory — re-running `gn gen out/Default`
-> without `--args` reuses the previous args. Change args with a fresh `--args`
-> on the same dir.
+All GN args are merged with `scripts/build.sh` via `--gn`:
+`bash scripts/build.sh --gn 'sanitizer="address,undefined" coverage=true'`.
 
-## Running
+## Fuzzing
 
-```bash
-./out/Default/kinglet tests/exec/cases/operators_arithmetic.kl   # compile + run
-./out/Default/kinglet --check path/to/file.kl                    # type-check only
-./out/Default/kinglet --ir path/to/file.kl                       # dump KIR
-./out/Default/kinglet build                                       # project build (needs kinglet.nest)
-./out/Default/kinglet build <target>                              # build a named target
-```
-
-For the `kinglet.nest` manifest format, targets, and the module system, see
-[docs/MODULES.md](MODULES.md).
-
-## Tests
+The front-end (lexer, parser, full pipeline) is fuzzed with
+[libFuzzer](https://llvm.org/docs/LibFuzzer.html). See
+[tests/fuzz/README.md](../tests/fuzz/README.md) for the full guide.
 
 ```bash
-KINGLET=out/Default/kinglet bash tests/run_all.sh
+# Build fuzz targets
+bash scripts/build.sh --out out/Fuzz --gn 'use_libfuzzer=true sanitizer="address,undefined"'
+
+# Quick smoke (60 s per target)
+bash scripts/fuzz.sh all 60
+
+# Deep campaign (15 min per target)
+bash scripts/fuzz.sh all 900
 ```
 
-`KINGLET` points the harness at a specific build; it also auto-rebuilds that
-build before running. Set `KINGLET_SKIP_REBUILD=1` to skip the rebuild.
-See [`tests/README.md`](../tests/README.md) for the suite layout.
+`fuzz-smoke` runs on every PR as a **required** CI check. Crash reproducers are
+committed as regression seeds under `tests/fuzz/corpus/`.
+
+## CI Checks
+
+Every PR to `canon` must pass these **7 required checks** before auto-merge:
+
+- `build-and-test-unix` (ubuntu + macos)
+- `build-and-test-windows`
+- `clang-format`
+- `clang-tidy`
+- `commit-style`
+- `fuzz-smoke`
+- All 7 → green → auto-merge (bot: `kinglet-merge-bot`, squash).
+
+Additional non-blocking jobs (`coverage`, `release-build`, `sanitizers`,
+`benchmarks`, `codecov/patch`) also run on every PR.
 
 ## Troubleshooting
 
-**`llvm-config not found` / `enable_llvm=true` fails to generate**
-Install LLVM 18+ via your system package manager (see Prerequisites above),
-or point `llvm_config` explicitly:
-`gn gen out/Default --args='enable_llvm=true llvm_config="/path/to/llvm-config"'`.
-`build/scripts/find_llvm_config.py --help` shows the search order.
+**`gn: command not found`** — run `source tools/env.sh` or `scripts/setup.sh`
+first to add the pinned GN/Ninja to `PATH`.
 
-**`gn: command not found` after setup**
-Open a new shell — `setup.sh` / `setup.ps1` persist `./tools/bin` on `PATH`
-via your shell profile. For the *current* shell without reopening, run
-`source tools/env.sh` (Unix) or `. .\tools\env.ps1` (Windows).
+**`llvm-config: command not found`** — install LLVM 18+ (`apt install llvm-dev`
+on Debian/Ubuntu, `brew install llvm` on macOS), or pass `--no-llvm` for a
+compile-only build.
 
-**Windows: native backend / `kinglet run`**
-Not supported on Windows yet. Build with `--args='is_debug=false'` (no
-`enable_llvm`) and use `--check` / `--ast` / `--ir` for compile-only work.
+**`kinglet: execution requires LLVM native backend`** — rebuild with
+`enable_llvm=true`, or run with `--check` / `--ir` (compile-only modes).
 
-**Slow first build**
-LLVM headers are heavy; the first `enable_llvm=true` build compiles a lot.
-Subsequent builds are incremental via Ninja.
+**Stack overflow during parse** — the parser has a recursion depth guard
+(`kMaxRecursionDepth = 48`). If you hit it on deep input (> 24 nesting levels),
+the input is pathological; reduce nesting.
