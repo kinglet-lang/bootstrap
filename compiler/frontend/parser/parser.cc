@@ -172,9 +172,18 @@ std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
 ParseResult Parser::parse() {
   std::vector<ast::DeclPtr> declarations;
   while (!is_at_end() && !has_completion()) {
+    const std::size_t before = current_;
     ast::DeclPtr decl = declaration();
     if (decl) {
       declarations.push_back(std::move(decl));
+    }
+    // No-progress guard: if a failed declaration left the cursor exactly where
+    // it started (a consume() failure that reported an error without advancing
+    // and without synchronizing), force one token forward. Without this a
+    // malformed top-level construct spins forever, appending an error each
+    // iteration until the process exhausts memory.
+    if (current_ == before && !is_at_end() && !has_completion()) {
+      advance();
     }
   }
 
@@ -441,6 +450,13 @@ void Parser::error_at(const Token &token, std::string_view message) {
       .column = token.column,
       .message = std::string(message),
   });
+  // Backstop against any un-guarded no-progress recovery path: once the error
+  // count crosses the ceiling, jump to end-of-input so every parse loop that
+  // tests is_at_end() terminates. Bounds both time and memory on adversarial
+  // input without changing behavior for well-formed or normally-erroneous code.
+  if (errors_.size() >= kMaxParseErrors && !tokens_.empty()) {
+    current_ = tokens_.size() - 1; // END_OF_FILE sentinel
+  }
 }
 
 } // namespace kinglet

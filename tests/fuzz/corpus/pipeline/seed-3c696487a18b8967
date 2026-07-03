@@ -1,0 +1,39 @@
+// RUN: run
+
+// `auto` return types are inferred from the function body rather than
+// defaulting to int. Covers value-returning `return`, expression-body
+// functions, non-int types, containers, and forward references.
+using io;
+
+auto greet() {
+  return "hello";
+}
+
+auto square(float x) => x * x;
+
+auto is_even(int n) {
+  return n % 2 == 0;
+}
+
+auto make_list() {
+  return [1, 2, 3];
+}
+
+// Forward reference: caller declared before the auto callee it depends on.
+auto wrapped() {
+  return inner();
+}
+
+auto inner() {
+  return "from inner";
+}
+
+int main() {
+  io::out.line(greet());
+  io::out.line(square(3.0));
+  io::out.line(is_even(4));
+  io::out.line(is_even(5));
+  io::out.line(make_list().len());
+  io::out.line(wrapped());
+  return 0;
+}

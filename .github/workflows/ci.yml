@@ -104,6 +104,34 @@ jobs:
           export KINGLET_SKIP_REBUILD=1
           bash tests/cli/run_golden.sh
 
+  fuzz-smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up toolchain
+        shell: bash
+        run: |
+          LLVM_CONFIG=$(bash scripts/setup.sh --install)
+          echo "LLVM_CONFIG=$LLVM_CONFIG" >> "$GITHUB_ENV"
+          echo "$PWD/tools/bin" >> "$GITHUB_PATH"
+
+      # Build the libFuzzer targets with ASan+UBSan and run a short time-boxed
+      # smoke of each front-end fuzzer starting from the committed seed corpus.
+      # This replays the regression seeds (past crashes/OOMs) on every PR and
+      # spends a small budget hunting for new defects. It is intentionally short
+      # to keep CI fast; deeper fuzzing runs are meant to be launched manually
+      # via scripts/fuzz.sh with a larger time budget.
+      - name: Build and run fuzz smoke
+        shell: bash
+        env:
+          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          bash scripts/fuzz.sh all 60
+
   benchmarks:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

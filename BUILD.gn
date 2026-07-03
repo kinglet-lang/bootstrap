@@ -1,7 +1,17 @@
 import("//build/embed.gni")
+import("//build/fuzz.gni")
 import("//build/llvm.gni")
 
 _kinglet_defines = [ "KINGLET_VERSION=\"${kinglet_version}\"" ]
+
+# Fuzz targets live under //tests/fuzz and are only reachable (and thus only
+# generated) when the build is configured with use_libfuzzer=true.
+if (use_libfuzzer) {
+  group("fuzzers") {
+    testonly = true
+    deps = [ "//tests/fuzz:fuzzers" ]
+  }
+}
 
 group("default") {
   deps = [

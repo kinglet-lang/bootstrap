@@ -119,6 +119,23 @@ which directives it uses is documented in [tests/README.md](tests/README.md):
 See [tests/harness/directives.md](tests/harness/directives.md) for the
 directive grammar.
 
+### Fuzzing
+
+The front end has coverage-guided libFuzzer targets for the lexer, parser,
+and full lex-parse-typecheck pipeline. They are the most effective way to
+find crashes, hangs, and out-of-memory conditions on malformed input:
+
+```bash
+scripts/fuzz.sh              # all targets, 60s each
+scripts/fuzz.sh parser 300   # one target, longer budget
+```
+
+A `fuzz-smoke` CI job runs a short campaign on every pull request and
+replays the committed regression corpus. If a change touches the lexer or
+parser, run the fuzzers locally for a few minutes first. When a run finds a
+defect, commit the minimized input as a `regress-*` seed alongside the fix.
+See [tests/fuzz/README.md](tests/fuzz/README.md) for details.
+
 ## Code style
 
 - **C++20**, built with GN + Ninja. System `clang` on macOS; `clang`/`gcc` on
