@@ -92,7 +92,7 @@ KirType pop_type(FlowState *state, KirContainerType *container_out = nullptr) {
   return t;
 }
 
-KirType operand_type(const FlowState &state, const std::vector<KirType> &instr_types, int idx) {
+KirType operand_type(const FlowState & /*state*/, const std::vector<KirType> &instr_types, int idx) {
   if (idx < 0 || static_cast<std::size_t>(idx) >= instr_types.size()) {
     return KirType::Any;
   }
