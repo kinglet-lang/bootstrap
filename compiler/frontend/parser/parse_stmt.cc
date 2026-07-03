@@ -14,6 +14,14 @@
 namespace kinglet {
 
 ast::StmtPtr Parser::statement() {
+  // Depth guard: statement() recurses through block_statement() and the
+  // control-flow bodies (if/while/for/guard). Deeply nested blocks or a long
+  // run of '{' would otherwise overflow the native stack.
+  RecursionGuard guard(*this);
+  if (!guard.ok()) {
+    note_recursion_limit();
+    return nullptr;
+  }
   if (at_completion()) {
     // As in declaration(): a dangling `.`, `::`, or `:` cannot begin a
     // statement, so suppress completion rather than offering every keyword.

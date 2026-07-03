@@ -444,6 +444,20 @@ void Parser::synchronize() {
   }
 }
 
+void Parser::note_recursion_limit() {
+  if (recursion_limit_hit_) {
+    return;
+  }
+  // Report once, then fast-forward to end-of-input. Jumping to EOF collapses
+  // every enclosing loop and recursive call so the stack unwinds instead of
+  // overflowing; the single diagnostic points at where nesting got too deep.
+  recursion_limit_hit_ = true;
+  error_at(peek(), "Maximum nesting depth exceeded.");
+  if (!tokens_.empty()) {
+    current_ = tokens_.size() - 1; // END_OF_FILE sentinel
+  }
+}
+
 void Parser::error_at(const Token &token, std::string_view message) {
   errors_.push_back(ParseError{
       .line = token.line,

@@ -120,6 +120,43 @@ private:
   // source file produces anywhere near this many distinct errors.
   static constexpr std::size_t kMaxParseErrors = 4096;
 
+  // Ceiling on recursive-descent nesting depth. Deeply nested input (e.g. a
+  // long run of '{' or '(') would otherwise recurse through the
+  // statement/expression/type grammar until the native stack overflows and
+  // the process crashes. RecursionGuard bumps the counter on entry to each
+  // recursive production and note_recursion_limit() reports one error the
+  // first time the limit is crossed.
+  //
+  // The value must stay safe on the smallest supported stack: Windows defaults
+  // to a 1 MiB main-thread stack (Linux/macOS give 8 MiB). Each nesting level
+  // descends the full ~17-function expression precedence chain, costing a few
+  // KiB of stack per level, so the Windows ceiling is a few hundred levels.
+  // 128 leaves better than half the Windows stack free while sitting far
+  // deeper than any realistic hand-written source nests.
+  static constexpr int kMaxRecursionDepth = 128;
+
+  // RAII counter for recursion depth, constructed at the top of each recursive
+  // production. Increments the depth on entry, restores it on scope exit.
+  // ok() reports whether nesting is still within budget; a caller that sees
+  // false calls note_recursion_limit() and returns a null node, so the
+  // recursion unwinds cleanly instead of overflowing the stack.
+  class RecursionGuard {
+  public:
+    explicit RecursionGuard(Parser &parser) : parser_(parser) { ++parser_.recursion_depth_; }
+    ~RecursionGuard() { --parser_.recursion_depth_; }
+    RecursionGuard(const RecursionGuard &) = delete;
+    RecursionGuard &operator=(const RecursionGuard &) = delete;
+    bool ok() const { return parser_.recursion_depth_ <= kMaxRecursionDepth; }
+
+  private:
+    Parser &parser_;
+  };
+
+  // Records that the recursion ceiling was crossed: reports one diagnostic and
+  // fast-forwards the cursor to end-of-input so all enclosing loops and
+  // recursive calls terminate. Idempotent — only the first call has effect.
+  void note_recursion_limit();
+
   bool at_completion() const;
   // True when the cursor sits immediately after a dangling member-access or
   // type-separator operator (`.`, `::`, or a lone `:`). None of these can begin
@@ -132,6 +169,8 @@ private:
   const std::vector<Token> &tokens_;
   std::size_t current_ = 0;
   std::vector<ParseError> errors_;
+  int recursion_depth_ = 0;
+  bool recursion_limit_hit_ = false;
   bool pending_greater_ = false;
   bool completion_mode_ = false;
   std::size_t completion_index_ = 0;
