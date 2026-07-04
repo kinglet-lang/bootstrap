@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace kinglet {
@@ -53,6 +54,14 @@ public:
     std::string error;
   };
   LogicalResolveResult resolve_logical(const std::string &module_id);
+
+  // All (module id, resolved source file) pairs declared anywhere in the
+  // current project's targets, sorted by id. Used by import-path
+  // completion — since logical imports resolve by module id rather than
+  // file path, completion has to offer ids from this index rather than a
+  // filesystem listing. Triggers module index construction if not already
+  // built.
+  std::vector<std::pair<std::string, std::string>> module_index_entries();
 
 private:
   std::string resolve_path(const std::string &relative_path) const;
