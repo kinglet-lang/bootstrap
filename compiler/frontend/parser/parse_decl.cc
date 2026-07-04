@@ -132,9 +132,25 @@ ast::DeclPtr Parser::using_declaration() {
 
 ast::DeclPtr Parser::export_module_declaration() {
   const Token &export_token = previous();
+  if (at_completion()) {
+    // `export █` — the only valid continuation is the literal keyword
+    // 'module', so offer no completion rather than flooding the list with
+    // every top-level declaration keyword.
+    set_completion({lsp::CompletionPosition::None, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
   const Token &module_kw = consume(TokenType::IDENTIFIER, "Expected 'module' after 'export'.");
   if (token_text(module_kw) != "module") {
     error_at(module_kw, "Expected 'module' after 'export'.");
+    return nullptr;
+  }
+  if (at_completion()) {
+    // `export module █` — offer module names the same way `import █` does;
+    // this is effectively declaring under a module id, not importing one,
+    // but the id namespace/candidates a user would want here (existing
+    // module names already declared elsewhere in the project) are the same
+    // shape as ImportPath completion.
+    set_completion({lsp::CompletionPosition::ImportPath, {}, {}, {}, {}, {}});
     return nullptr;
   }
   const std::string module_id = parse_module_id("module name after 'export module'");

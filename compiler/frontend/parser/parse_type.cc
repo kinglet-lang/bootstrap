@@ -52,6 +52,20 @@ std::vector<ast::Parameter> Parser::parameters() {
       return params;
     }
     ast::TypeExpr type = parse_type_expr();
+    if (has_completion())
+      return params;
+    if (at_completion()) {
+      // Cursor sits at the parameter *name* position (e.g. `auto █`). The
+      // name is a fresh identifier the user is about to type, not a
+      // reference to anything already in scope, so there is nothing
+      // meaningful to suggest here. Without this guard the completion
+      // token is never claimed, parsing falls through to the failing
+      // consume() below, and error recovery discards the whole function
+      // declaration — surfacing unrelated top-level noise (keywords, the
+      // function's own not-yet-parsed name, etc.) instead of an empty list.
+      set_completion({lsp::CompletionPosition::None, {}, {}, {}, {}, {}});
+      return params;
+    }
     const Token &name = consume(TokenType::IDENTIFIER, "Expected parameter name.");
     params.push_back(ast::Parameter{std::move(type), token_text(name)});
   } while (match(TokenType::COMMA));
