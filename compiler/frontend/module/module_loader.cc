@@ -190,6 +190,13 @@ ModuleLoader::LoadResult ModuleLoader::load_resolved(const std::string &resolved
   return {&inserted->second, ""};
 }
 
+std::vector<std::pair<std::string, std::string>> ModuleLoader::module_index_entries() {
+  build_module_index();
+  std::vector<std::pair<std::string, std::string>> out(module_index_.begin(), module_index_.end());
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
 namespace {
 
 // Read a file and extract its `export module <name>;` declaration name, if any.
