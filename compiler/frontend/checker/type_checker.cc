@@ -5,6 +5,7 @@
 
 #include "ir/kir_container.h"
 #include "ir/kir_numeric.h"
+#include "frontend/module/io_intrinsics.h"
 #include "frontend/module/module_id.h"
 #include "frontend/module/module_loader.h"
 #include "frontend/types/numeric.h"
@@ -2535,55 +2536,53 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
     return *ret;
   }
 
-  // Handle io::out.line(...), io::err.line(...), io::in.secret(...)
+  // Handle io::out.line(...), io::err.line(...), io::in.secret(...), and any
+  // other member registered in io_intrinsics — both spellings (bare
+  // `out.line(...)` under `using namespace io;`, and qualified
+  // `io::out.line(...)`) resolve against the same table so a newly
+  // registered intrinsic type-checks under either spelling automatically.
   const auto *field_callee = dynamic_cast<const ast::FieldAccessExpr *>(call_expr.callee.get());
   if (field_callee) {
-    const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
-    if (id_obj && sema_.opened_.count("io") != 0) {
-      if ((id_obj->name == "out" || id_obj->name == "err") && field_callee->field_name == "line") {
+    auto check_intrinsic_call = [&](const std::string &stream_name) -> std::optional<Type> {
+      const io_intrinsics::Member *member =
+          (stream_name == "in") ? io_intrinsics::find_istream_member(field_callee->field_name)
+                                : io_intrinsics::find_ostream_member(field_callee->field_name);
+      if (!member)
+        return std::nullopt;
+      switch (member->arg_mode) {
+      case io_intrinsics::ArgMode::FmtArgs:
         for (const ast::ExprPtr &arg : call_expr.args) {
           check_expr(*arg);
         }
         check_fmt_args(call_expr.args, call_expr.location);
-        return void_type();
-      }
-      if (id_obj->name == "in" && field_callee->field_name == "secret") {
-        for (const ast::ExprPtr &arg : call_expr.args) {
-          check_expr(*arg);
-        }
-        return string_type();
-      }
-      if ((id_obj->name == "out" || id_obj->name == "err") && field_callee->field_name == "flush") {
-        if (!call_expr.args.empty()) {
-          error_at(call_expr.location, "io::" + id_obj->name + ".flush() takes no arguments.");
-        }
-        return void_type();
-      }
-    }
-    const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
-    if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
-      if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
-          field_callee->field_name == "line") {
-        for (const ast::ExprPtr &arg : call_expr.args) {
-          check_expr(*arg);
-        }
-        check_fmt_args(call_expr.args, call_expr.location);
-        return void_type();
-      }
-      if (ns_obj->member_name == "in" && field_callee->field_name == "secret") {
-        for (const ast::ExprPtr &arg : call_expr.args) {
-          check_expr(*arg);
-        }
-        return string_type();
-      }
-      if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
-          field_callee->field_name == "flush") {
+        break;
+      case io_intrinsics::ArgMode::NoArgs:
         if (!call_expr.args.empty()) {
           error_at(call_expr.location,
-                   "io::" + ns_obj->member_name + ".flush() takes no arguments.");
+                   "io::" + stream_name + "." + member->name + "() takes no arguments.");
         }
-        return void_type();
+        break;
+      case io_intrinsics::ArgMode::Unchecked:
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          check_expr(*arg);
+        }
+        break;
       }
+      return member->return_kind == io_intrinsics::ReturnKind::String ? string_type() : void_type();
+    };
+
+    const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());
+    if (id_obj && sema_.opened_.count("io") != 0 &&
+        (id_obj->name == "out" || id_obj->name == "err" || id_obj->name == "in")) {
+      if (auto result = check_intrinsic_call(id_obj->name))
+        return *result;
+    }
+    const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
+    if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0 &&
+        (ns_obj->member_name == "out" || ns_obj->member_name == "err" ||
+         ns_obj->member_name == "in")) {
+      if (auto result = check_intrinsic_call(ns_obj->member_name))
+        return *result;
     }
     if (ns_obj && sema_.used_.count(ns_obj->namespace_name) == 0) {
       error_at(ns_obj->location, "Module '" + ns_obj->namespace_name +
@@ -3105,52 +3104,37 @@ Type TypeChecker::check_struct_literal(const ast::StructLiteralExpr &struct_lit)
 
 Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
 
-  // Handle io::out.line, io::err.line, io::in.secret as callable methods
+  // Handle io::out.line, io::err.line, io::in.secret (and any other
+  // io_intrinsics member) referenced as a callable, both qualified
+  // (`io::out.line`) and bare under `using namespace io;` (`out.line`).
+  auto intrinsic_member_fn_type = [&](const std::string &stream_name,
+                                      const std::string &field_name) -> std::optional<Type> {
+    const io_intrinsics::Member *member = (stream_name == "in")
+                                              ? io_intrinsics::find_istream_member(field_name)
+                                              : io_intrinsics::find_ostream_member(field_name);
+    if (!member)
+      return std::nullopt;
+    Type fn(TypeKind::Function);
+    fn.name = "native_fn";
+    fn.return_type = std::make_shared<Type>(
+        member->return_kind == io_intrinsics::ReturnKind::String ? string_type() : void_type());
+    return fn;
+  };
+
   const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_access.object.get());
-  if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0) {
-    if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
-        field_access.field_name == "line") {
-      Type fn(TypeKind::Function);
-      fn.name = "native_fn";
-      fn.return_type = std::make_shared<Type>(void_type());
-      return fn;
-    }
-    if (ns_obj->member_name == "in" && field_access.field_name == "secret") {
-      Type fn(TypeKind::Function);
-      fn.name = "native_fn";
-      fn.return_type = std::make_shared<Type>(string_type());
-      return fn;
-    }
-    if ((ns_obj->member_name == "out" || ns_obj->member_name == "err") &&
-        field_access.field_name == "flush") {
-      Type fn(TypeKind::Function);
-      fn.name = "native_fn";
-      fn.return_type = std::make_shared<Type>(void_type());
-      return fn;
-    }
+  if (ns_obj && ns_obj->namespace_name == "io" && sema_.used_.count("io") != 0 &&
+      (ns_obj->member_name == "out" || ns_obj->member_name == "err" ||
+       ns_obj->member_name == "in")) {
+    if (auto fn = intrinsic_member_fn_type(ns_obj->member_name, field_access.field_name))
+      return *fn;
   }
 
   // Handle `using namespace io;` bare out.line / err.line / in.secret.
   if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_access.object.get())) {
-    if (sema_.opened_.count("io") != 0) {
-      if ((id_obj->name == "out" || id_obj->name == "err") && field_access.field_name == "line") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(void_type());
-        return fn;
-      }
-      if (id_obj->name == "in" && field_access.field_name == "secret") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(string_type());
-        return fn;
-      }
-      if ((id_obj->name == "out" || id_obj->name == "err") && field_access.field_name == "flush") {
-        Type fn(TypeKind::Function);
-        fn.name = "native_fn";
-        fn.return_type = std::make_shared<Type>(void_type());
-        return fn;
-      }
+    if (sema_.opened_.count("io") != 0 &&
+        (id_obj->name == "out" || id_obj->name == "err" || id_obj->name == "in")) {
+      if (auto fn = intrinsic_member_fn_type(id_obj->name, field_access.field_name))
+        return *fn;
     }
   }
 

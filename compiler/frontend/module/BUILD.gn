@@ -1,5 +1,7 @@
 static_library("module") {
   sources = [
+    "io_intrinsics.cc",
+    "io_intrinsics.h",
     "module_id.cc",
     "module_id.h",
     "native_symbol.cc",
