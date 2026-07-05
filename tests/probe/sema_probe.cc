@@ -21,6 +21,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <typeinfo>
 
 int main(int argc, char **argv) {
   std::optional<std::size_t> completion_index;
@@ -89,6 +90,16 @@ int main(int argc, char **argv) {
   }
 
   std::cout << "=== declarations parsed: " << result.program->declarations.size() << " ===\n";
+  for (const auto &decl : result.program->declarations) {
+    const auto *fn = dynamic_cast<const kinglet::ast::FunctionDecl *>(decl.get());
+    std::cout << "  decl";
+    if (fn) {
+      std::cout << " name=" << fn->name << " has_body=" << (fn->body != nullptr);
+    } else {
+      std::cout << " kind=" << typeid(*decl).name();
+    }
+    std::cout << "\n";
+  }
 
   if (completion_index.has_value()) {
     std::cout << "=== completion result: " << (parser.has_completion() ? "set" : "none")
@@ -97,6 +108,13 @@ int main(int argc, char **argv) {
 
   std::cout << "=== running TypeChecker::check() on partial AST ===\n";
   kinglet::TypeChecker checker;
+  kinglet::TypeChecker::CompletionContext captured_ctx;
+  bool callback_fired = false;
+  checker.set_completion_callback(
+      [&captured_ctx, &callback_fired](const kinglet::TypeChecker::CompletionContext &ctx) {
+        captured_ctx = ctx;
+        callback_fired = true;
+      });
   kinglet::TypeCheckResult type_result = checker.check(*result.program);
 
   std::cout << "=== TypeChecker diagnostics (" << type_result.errors.size() << ") ===\n";
@@ -104,6 +122,15 @@ int main(int argc, char **argv) {
     const char *label = err.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
     std::cout << err.location.line << ":" << err.location.column << ": " << label << ": "
               << err.message << "\n";
+  }
+
+  if (completion_index.has_value()) {
+    std::cout << "=== completion callback fired: " << (callback_fired ? "yes" : "no") << " ===\n";
+    if (callback_fired) {
+      std::cout << "=== receiver type kind: " << static_cast<int>(captured_ctx.receiver_type.kind)
+                << " ===\n";
+      std::cout << "=== scopes depth: " << captured_ctx.scopes.size() << " ===\n";
+    }
   }
 
   std::cout << "=== probe completed without crash ===\n";

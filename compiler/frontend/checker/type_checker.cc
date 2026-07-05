@@ -3562,10 +3562,20 @@ void TypeChecker::visit(const ast::StructLiteralExpr &x) {
 void TypeChecker::visit(const ast::CompletionMarkerExpr &x) {
   // Resolve the receiver's real type through the normal check_expr() path so
   // generics/imports/UFCS are handled exactly as they are for any other
-  // expression. The completion callback that consumes this type is wired in
-  // a later change (ADR 0024 phase C2); for now this just proves the marker
-  // node type-checks safely on a partial AST without cascading diagnostics.
-  expr_result_ = x.receiver ? check_expr(*x.receiver) : void_type();
+  // expression. When a completion callback is set (ADR 0024 phase C2),
+  // invoke it with the resolved receiver type, the live scope stack, and
+  // the method/type registries so the LSP layer can offer accurate field-
+  // access completions without its own hand-rolled type resolver.
+  Type receiver_type = x.receiver ? check_expr(*x.receiver) : void_type();
+  if (completion_callback_) {
+    completion_callback_(CompletionContext{
+        .receiver_type = receiver_type,
+        .scopes = scopes_,
+        .method_registry = &method_registry_,
+        .type_registry = &type_registry_,
+    });
+  }
+  expr_result_ = void_type();
 }
 void TypeChecker::visit(const ast::PipeExpr &) {
   expr_result_ = int_type();

@@ -97,13 +97,17 @@ ast::StmtPtr Parser::block_statement() {
   }
   if (at_completion()) {
     // Cursor landed inside the block (e.g. '{ █ }') but before any
-    // statement parser ran, so set the context here.
-    set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}});
-    return nullptr;
+    // statement parser ran and no deeper completion context was set,
+    // so set the context here.
+    if (!has_completion()) {
+      set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}});
+    }
+    // When completion already fired inside a statement (e.g. field-access
+    // completion at p.█), keep the partial block so TypeChecker can visit
+    // the CompletionMarkerExpr in the statement that already set it.
+  } else {
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
   }
-  if (has_completion() && !had_completion_before)
-    return nullptr;
-  consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
   return std::make_unique<ast::BlockStmt>(location_of(left_brace), std::move(statements));
 }
 
@@ -338,15 +342,18 @@ ast::StmtPtr Parser::expression_statement() {
   ast::ExprPtr expr = expression();
   if (!expr)
     return nullptr;
+  // Check has_completion() before at_completion(): if completion already
+  // fired deeper in the expression parser (e.g. field-access completion
+  // inside call()), don't overwrite it with a generic ExpressionStart.
+  if (has_completion()) {
+    return std::make_unique<ast::ExprStmt>(expr->location, std::move(expr));
+  }
   if (at_completion()) {
     set_completion({lsp::CompletionPosition::ExpressionStart, {}, {}, {}, {}, {}});
-    return nullptr;
+    return std::make_unique<ast::ExprStmt>(expr->location, std::move(expr));
   }
-  if (has_completion())
-    return nullptr;
-  const ast::SourceLocation location = expr->location;
   consume(TokenType::SEMICOLON, "Expected ';' after expression.");
-  return std::make_unique<ast::ExprStmt>(location, std::move(expr));
+  return std::make_unique<ast::ExprStmt>(expr->location, std::move(expr));
 }
 
 } // namespace kinglet
