@@ -109,6 +109,7 @@ struct FieldAssignExpr;
 struct IndexExpr;
 struct IndexAssignExpr;
 struct StructLiteralExpr;
+struct CompletionMarkerExpr;
 
 struct ExprStmt;
 struct TryCatchStmt;
@@ -166,6 +167,7 @@ struct ExprVisitor {
   virtual void visit(const IndexExpr &) = 0;
   virtual void visit(const IndexAssignExpr &) = 0;
   virtual void visit(const StructLiteralExpr &) = 0;
+  virtual void visit(const CompletionMarkerExpr &) = 0;
 };
 
 struct StmtVisitor {
@@ -646,6 +648,27 @@ struct FieldAccessExpr final : Expr {
 
   ExprPtr object;
   std::string field_name;
+};
+
+// Wraps an expression that was successfully parsed up to a completion point
+// (e.g. the receiver of `foo.` where the cursor sits right after the dot).
+// Constructed instead of discarding the parsed receiver, so TypeChecker can
+// still resolve its real type and hand it to a completion callback — see
+// TypeChecker::visit(const CompletionMarkerExpr&) and ADR 0024 (kinglet repo,
+// decisions/0024-lsp-completion-sema-integration.md), phase C2.
+//
+// LSP-only: never constructed on a non-completion parse (Parser only builds
+// one when constructed in completion mode via Parser(tokens, completion_index)
+// and the cursor lands on this exact site). Compiler's ExprVisitor override
+// must never be reached in practice — see backend/compiler/compiler.cc.
+struct CompletionMarkerExpr final : Expr {
+  CompletionMarkerExpr(SourceLocation location, ExprPtr receiver);
+  void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
+
+  // The already-parsed expression immediately before the completion point
+  // (e.g. `foo` in `foo.█`).
+  ExprPtr receiver;
 };
 
 struct FieldAssignExpr final : Expr {

@@ -90,6 +90,7 @@ private:
   void visit(const ast::IndexExpr &x) override;
   void visit(const ast::IndexAssignExpr &x) override;
   void visit(const ast::StructLiteralExpr &x) override;
+  void visit(const ast::CompletionMarkerExpr &x) override;
 
   void check_function(const ast::FunctionDecl &function);
   void check_stmt(const ast::Stmt &stmt, const Type &expected_return);
