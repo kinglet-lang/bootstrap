@@ -1,0 +1,9 @@
+// CHECK-NOT: has no variant '}'
+enum Color {
+    Red,
+    Green,
+}
+
+int main() {
+    Color c = Color::
+}

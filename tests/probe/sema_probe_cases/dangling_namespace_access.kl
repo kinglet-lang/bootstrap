@@ -1,0 +1,7 @@
+// CHECK-NOT: no variant '}'
+// CHECK-NOT: not imported
+using io;
+
+int main() {
+    io::
+}
