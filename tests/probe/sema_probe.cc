@@ -1,27 +1,19 @@
-// C1 exploration tool for ADR 0024: feed TypeChecker::check() a partial AST
-// (i.e. one produced despite parse errors) and print what it does — this
-// path is never exercised today because both the CLI (main.cc) and perch's
-// analysis.cc bail out before calling TypeChecker::check() whenever the
-// parser reported any error. Not wired into the production build; this is
-// a throwaway diagnostic binary for the C1 investigation only.
+// LSP completion diagnostic tool: feeds a source file through the
+// CompletionDriver pipeline (Scanner-injected-COMPLETION → Parser →
+// TypeChecker-with-callback) and prints every result.  Not shipped.
 //
 // Usage: sema_probe [--completion-index <N>] <file.kl>
-// Always exits 0 (this is a probe, not a pass/fail gate). Prints parse
-// errors, then unconditionally runs TypeChecker::check() on whatever AST
-// was produced and prints every diagnostic it reports, plus a crash
-// indicator if the process aborts/segfaults (bash wrapper checks $?).
+// Always exits 0 (this is a probe, not a pass/fail gate).
 
-#include "frontend/checker/type_checker.h"
+#include "driver/lsp/completion_entry.h"
 #include "frontend/lexer/scanner.h"
 #include "frontend/lexer/token.h"
-#include "frontend/parser/parser.h"
 
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <sstream>
 #include <string>
-#include <typeinfo>
 
 int main(int argc, char **argv) {
   std::optional<std::size_t> completion_index;
@@ -53,14 +45,8 @@ int main(int argc, char **argv) {
   kinglet::Scanner scanner(source);
   auto tokens = scanner.scan_tokens();
 
-  // If a completion index was specified, inject a COMPLETION token before
-  // the token at that index.  This mirrors what perch's completion_token.cc
-  // does in production: after scanning the original source, the completion
-  // site's position is translated into a token index and a synthetic
-  // COMPLETION token is spliced into the stream.  The Parser constructor
-  // then receives the index of that injected token so at_completion()
-  // fires exactly once when the cursor reaches it.
-  std::size_t effective_index = tokens.size(); // never fires by default
+  // Inject COMPLETION token if requested (mirrors perch's completion_token.cc).
+  std::size_t effective_index = tokens.size();
   if (completion_index.has_value()) {
     std::size_t idx = *completion_index;
     if (idx < tokens.size()) {
@@ -71,66 +57,52 @@ int main(int argc, char **argv) {
       tokens.insert(tokens.begin() + static_cast<long>(idx), comp_token);
       effective_index = idx;
       std::cout << "=== injected COMPLETION at index " << idx << " ===\n";
-    } else {
-      std::cerr << "completion-index " << idx << " out of range (max " << tokens.size() << ")\n";
     }
   }
 
-  kinglet::Parser parser(tokens, effective_index);
-  kinglet::ParseResult result = parser.parse();
+  kinglet::lsp::CompletionRequest req;
+  req.tokens = std::move(tokens);
+  req.completion_index = effective_index;
+  kinglet::lsp::CompletionResponse resp = kinglet::lsp::run_completion(req);
 
-  std::cout << "=== parse errors (" << result.errors.size() << ") ===\n";
-  for (const auto &err : result.errors) {
+  std::cout << "=== parse errors (" << resp.parse_errors.size() << ") ===\n";
+  for (const auto &err : resp.parse_errors) {
     std::cout << err.line << ":" << err.column << ": " << err.message << "\n";
   }
 
-  if (!result.program) {
-    std::cout << "=== no AST produced, cannot run TypeChecker ===\n";
+  if (!resp.program) {
+    std::cout << "=== no AST produced ===\n";
     return 0;
   }
 
-  std::cout << "=== declarations parsed: " << result.program->declarations.size() << " ===\n";
-  for (const auto &decl : result.program->declarations) {
+  std::cout << "=== declarations parsed: " << resp.program->declarations.size() << " ===\n";
+
+  for (const auto &decl : resp.program->declarations) {
     const auto *fn = dynamic_cast<const kinglet::ast::FunctionDecl *>(decl.get());
     std::cout << "  decl";
     if (fn) {
       std::cout << " name=" << fn->name << " has_body=" << (fn->body != nullptr);
-    } else {
-      std::cout << " kind=" << typeid(*decl).name();
     }
     std::cout << "\n";
   }
 
   if (completion_index.has_value()) {
-    std::cout << "=== completion result: " << (parser.has_completion() ? "set" : "none")
+    std::cout << "=== parser completion: " << (resp.parser_completion.has_value() ? "set" : "none")
               << " ===\n";
+    std::cout << "=== sema completion: " << (resp.sema_completion.has_value() ? "set" : "none")
+              << " ===\n";
+    if (resp.sema_completion.has_value()) {
+      std::cout << "=== receiver type kind: "
+                << static_cast<int>(resp.sema_completion->receiver_type.kind) << " ===\n";
+      std::cout << "=== scopes depth: " << resp.sema_completion->scopes.size() << " ===\n";
+    }
   }
 
-  std::cout << "=== running TypeChecker::check() on partial AST ===\n";
-  kinglet::TypeChecker checker;
-  kinglet::TypeChecker::CompletionContext captured_ctx;
-  bool callback_fired = false;
-  checker.set_completion_callback(
-      [&captured_ctx, &callback_fired](const kinglet::TypeChecker::CompletionContext &ctx) {
-        captured_ctx = ctx;
-        callback_fired = true;
-      });
-  kinglet::TypeCheckResult type_result = checker.check(*result.program);
-
-  std::cout << "=== TypeChecker diagnostics (" << type_result.errors.size() << ") ===\n";
-  for (const auto &err : type_result.errors) {
+  std::cout << "=== TypeChecker diagnostics (" << resp.type_errors.size() << ") ===\n";
+  for (const auto &err : resp.type_errors) {
     const char *label = err.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
     std::cout << err.location.line << ":" << err.location.column << ": " << label << ": "
               << err.message << "\n";
-  }
-
-  if (completion_index.has_value()) {
-    std::cout << "=== completion callback fired: " << (callback_fired ? "yes" : "no") << " ===\n";
-    if (callback_fired) {
-      std::cout << "=== receiver type kind: " << static_cast<int>(captured_ctx.receiver_type.kind)
-                << " ===\n";
-      std::cout << "=== scopes depth: " << captured_ctx.scopes.size() << " ===\n";
-    }
   }
 
   std::cout << "=== probe completed without crash ===\n";
