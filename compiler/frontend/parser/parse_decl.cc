@@ -299,7 +299,9 @@ ast::DeclPtr Parser::concept_declaration() {
     return nullptr;
   }
   std::vector<ast::ConceptMethodDecl> methods;
-  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
+  bool had_completion_before = has_completion();
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() &&
+         !(has_completion() && !had_completion_before)) {
     const std::size_t before = current_;
     ast::TypeExpr ret_type = parse_type_expr();
     const Token &method_name = consume(TokenType::IDENTIFIER, "Expected method name in concept.");
@@ -311,12 +313,12 @@ ast::DeclPtr Parser::concept_declaration() {
     // No-progress guard: a method signature made entirely of consume()
     // failures leaves the cursor unmoved. Force one token forward so a
     // malformed concept body cannot spin forever appending errors.
-    if (current_ == before && !is_at_end() && !has_completion()) {
+    if (current_ == before && !is_at_end() && !(has_completion() && !had_completion_before)) {
       advance();
     }
   }
   active_type_params_.clear();
-  if (has_completion())
+  if (has_completion() && !had_completion_before)
     return nullptr;
   consume(TokenType::RIGHT_BRACE, "Expected '}' after concept body.");
   return std::make_unique<ast::ConceptDecl>(location_of(concept_token), token_text(name),

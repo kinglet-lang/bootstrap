@@ -90,7 +90,9 @@ ast::StmtPtr Parser::block_statement() {
   }
   const Token &left_brace = previous();
   std::vector<ast::StmtPtr> statements;
-  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
+  bool had_completion_before = has_completion();
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() &&
+         !(has_completion() && !had_completion_before)) {
     statements.push_back(statement());
   }
   if (at_completion()) {
@@ -99,7 +101,7 @@ ast::StmtPtr Parser::block_statement() {
     set_completion({lsp::CompletionPosition::Statement, {}, {}, {}, {}, {}});
     return nullptr;
   }
-  if (has_completion())
+  if (has_completion() && !had_completion_before)
     return nullptr;
   consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
   return std::make_unique<ast::BlockStmt>(location_of(left_brace), std::move(statements));

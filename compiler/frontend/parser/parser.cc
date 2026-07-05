@@ -434,7 +434,8 @@ void Parser::synchronize() {
     return;
   }
   advance();
-  while (!is_at_end() && !has_completion()) {
+  bool had_completion_before = has_completion();
+  while (!is_at_end() && !(has_completion() && !had_completion_before)) {
     if (previous().type == TokenType::SEMICOLON) {
       return;
     }
