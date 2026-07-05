@@ -270,6 +270,13 @@ ast::ExprPtr Parser::call() {
   if (has_completion())
     return expr;
   while (true) {
+    // A CompletionMarkerExpr can only be constructed by the '.' branch below
+    // in this same loop. Once one exists, none of the postfix operators here
+    // (call, index, further '.', etc.) make sense applied to it — stop
+    // rather than attempting to match tokens against a receiver that was
+    // never actually completed.
+    if (dynamic_cast<const ast::CompletionMarkerExpr *>(expr.get()))
+      break;
     if (check(TokenType::LESS) && dynamic_cast<const ast::IdentifierExpr *>(expr.get())) {
       size_t saved = current_;
       size_t pos = current_ + 1;
@@ -332,7 +339,16 @@ ast::ExprPtr Parser::call() {
       if (at_completion()) {
         std::string receiver = infer_receiver_type(expr.get());
         set_completion({lsp::CompletionPosition::FieldAccess, {}, receiver, {}, {}, {}});
-        return expr;
+        // Wrap the already-parsed receiver in a CompletionMarkerExpr rather
+        // than discarding it via a bare return. This lets TypeChecker later
+        // resolve the receiver's real type through the normal check_expr()
+        // path (ADR 0024 phase C2) instead of relying solely on the
+        // string-based infer_receiver_type() heuristic above. The loop
+        // guard at the top of this function stops further postfix parsing
+        // once this marker exists.
+        const ast::SourceLocation location = expr->location;
+        expr = std::make_unique<ast::CompletionMarkerExpr>(location, std::move(expr));
+        continue;
       }
       const Token &field = consume(TokenType::IDENTIFIER, "Expected field name after '.'.");
       if (field.type != TokenType::IDENTIFIER) {
