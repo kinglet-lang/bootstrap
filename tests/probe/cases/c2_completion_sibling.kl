@@ -1,0 +1,8 @@
+struct Point { int x; int y; }
+int first() {
+  Point p;
+  p.
+}
+int second() {
+  return 42;
+}
