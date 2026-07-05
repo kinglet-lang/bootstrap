@@ -270,6 +270,13 @@ ast::ExprPtr Parser::call() {
   if (has_completion())
     return expr;
   while (true) {
+    // A CompletionMarkerExpr can only be constructed by the '.' branch below
+    // in this same loop. Once one exists, none of the postfix operators here
+    // (call, index, further '.', etc.) make sense applied to it — stop
+    // rather than attempting to match tokens against a receiver that was
+    // never actually completed.
+    if (dynamic_cast<const ast::CompletionMarkerExpr *>(expr.get()))
+      break;
     if (check(TokenType::LESS) && dynamic_cast<const ast::IdentifierExpr *>(expr.get())) {
       size_t saved = current_;
       size_t pos = current_ + 1;
@@ -332,7 +339,16 @@ ast::ExprPtr Parser::call() {
       if (at_completion()) {
         std::string receiver = infer_receiver_type(expr.get());
         set_completion({lsp::CompletionPosition::FieldAccess, {}, receiver, {}, {}, {}});
-        return expr;
+        // Wrap the already-parsed receiver in a CompletionMarkerExpr rather
+        // than discarding it via a bare return. This lets TypeChecker later
+        // resolve the receiver's real type through the normal check_expr()
+        // path (ADR 0024 phase C2) instead of relying solely on the
+        // string-based infer_receiver_type() heuristic above. The loop
+        // guard at the top of this function stops further postfix parsing
+        // once this marker exists.
+        const ast::SourceLocation location = expr->location;
+        expr = std::make_unique<ast::CompletionMarkerExpr>(location, std::move(expr));
+        continue;
       }
       const Token &field = consume(TokenType::IDENTIFIER, "Expected field name after '.'.");
       if (field.type != TokenType::IDENTIFIER) {
@@ -613,7 +629,9 @@ ast::ExprPtr Parser::parse_match_pattern() {
     std::string variant_name(token_text(variant_token));
     std::vector<ast::ExprPtr> fields;
     if (match(TokenType::LEFT_PAREN)) {
-      while (!check(TokenType::RIGHT_PAREN) && !is_at_end() && !has_completion()) {
+      bool had_completion_before = has_completion();
+      while (!check(TokenType::RIGHT_PAREN) && !is_at_end() &&
+             !(has_completion() && !had_completion_before)) {
         if (match(TokenType::LET)) {
           const Token &name_tok =
               consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
@@ -622,13 +640,13 @@ ast::ExprPtr Parser::parse_match_pattern() {
         } else {
           fields.push_back(parse_match_pattern());
         }
-        if (has_completion())
+        if (has_completion() && !had_completion_before)
           break;
         if (!check(TokenType::RIGHT_PAREN)) {
           consume(TokenType::COMMA, "Expected ',' between enum pattern fields.");
         }
       }
-      if (!has_completion()) {
+      if (!(has_completion() && !had_completion_before)) {
         consume(TokenType::RIGHT_PAREN, "Expected ')' after enum pattern fields.");
       }
     }
@@ -647,7 +665,9 @@ ast::ExprPtr Parser::parse_match_pattern() {
 ast::ExprPtr Parser::parse_array_pattern() {
   const Token &bracket = previous();
   std::vector<ast::ExprPtr> elements;
-  while (!check(TokenType::RIGHT_BRACKET) && !is_at_end() && !has_completion()) {
+  bool had_completion_before = has_completion();
+  while (!check(TokenType::RIGHT_BRACKET) && !is_at_end() &&
+         !(has_completion() && !had_completion_before)) {
     if (match(TokenType::LET)) {
       const Token &name_token =
           consume(TokenType::IDENTIFIER, "Expected variable name after 'let'.");
@@ -656,13 +676,13 @@ ast::ExprPtr Parser::parse_array_pattern() {
     } else {
       elements.push_back(parse_match_pattern());
     }
-    if (has_completion())
+    if (has_completion() && !had_completion_before)
       break;
     if (!check(TokenType::RIGHT_BRACKET)) {
       consume(TokenType::COMMA, "Expected ',' between array pattern elements.");
     }
   }
-  if (has_completion())
+  if (has_completion() && !had_completion_before)
     return std::make_unique<ast::ArrayPattern>(location_of(bracket), std::move(elements));
   consume(TokenType::RIGHT_BRACKET, "Expected ']' after array pattern.");
   return std::make_unique<ast::ArrayPattern>(location_of(bracket), std::move(elements));
@@ -672,7 +692,9 @@ ast::ExprPtr Parser::parse_struct_pattern(const Token &struct_token) {
   std::string struct_name(token_text(struct_token));
   consume(TokenType::LEFT_BRACE, "Expected '{' after struct name in pattern.");
   std::vector<ast::StructPatternField> fields;
-  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() && !has_completion()) {
+  bool had_completion_before = has_completion();
+  while (!check(TokenType::RIGHT_BRACE) && !is_at_end() &&
+         !(has_completion() && !had_completion_before)) {
     std::string field_name;
     ast::ExprPtr pattern;
     if (match(TokenType::LET)) {
@@ -690,13 +712,13 @@ ast::ExprPtr Parser::parse_struct_pattern(const Token &struct_token) {
       pattern = parse_match_pattern();
     }
     fields.push_back(ast::StructPatternField{std::move(field_name), std::move(pattern)});
-    if (has_completion())
+    if (has_completion() && !had_completion_before)
       break;
     if (!check(TokenType::RIGHT_BRACE)) {
       consume(TokenType::COMMA, "Expected ',' between struct pattern fields.");
     }
   }
-  if (!has_completion()) {
+  if (!(has_completion() && !had_completion_before)) {
     consume(TokenType::RIGHT_BRACE, "Expected '}' after struct pattern.");
   }
   return std::make_unique<ast::StructPattern>(location_of(struct_token), std::move(struct_name),

@@ -1,0 +1,10 @@
+# LSP-mode completion entry point. Not linked into `kinglet` CLI binary;
+# only consumed by perch's kinglet-lsp and the sema_probe test harness.
+source_set("completion_entry") {
+  sources = [ "completion_entry.cc" ]
+  deps = [
+    "//compiler/frontend/checker",
+    "//compiler/frontend/parser",
+  ]
+  include_dirs = [ "//compiler" ]
+}

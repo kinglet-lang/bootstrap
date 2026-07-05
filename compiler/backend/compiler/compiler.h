@@ -118,6 +118,12 @@ private:
   void visit(const ast::ArrayPattern &) override {}
   void visit(const ast::EnumPattern &) override {}
   void visit(const ast::StructPattern &) override {}
+  // CompletionMarkerExpr is LSP-only: constructed exclusively by a Parser in
+  // completion mode, and LSP-mode ASTs never reach codegen. Reaching this is
+  // a programming error (some caller fed an LSP-mode AST into the normal
+  // build path), not a recoverable condition, so it asserts rather than
+  // silently no-oping like the fallbacks above.
+  void visit(const ast::CompletionMarkerExpr &) override;
 
   void emit(OpCode op, ast::SourceLocation location);
   void emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location);

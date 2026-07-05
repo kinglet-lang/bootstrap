@@ -689,6 +689,18 @@ void FieldAccessExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+CompletionMarkerExpr::CompletionMarkerExpr(SourceLocation location, ExprPtr receiver)
+    : Expr(location), receiver(std::move(receiver)) {}
+
+void CompletionMarkerExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(completion-marker";
+  if (receiver) {
+    print_child(out, *receiver, indent);
+  }
+  out << ")";
+}
+
 FieldAssignExpr::FieldAssignExpr(SourceLocation location, ExprPtr object, std::string field_name,
                                  ExprPtr value)
     : Expr(location),

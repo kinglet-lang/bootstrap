@@ -171,7 +171,19 @@ std::string Parser::infer_receiver_type(const ast::Expr *expr) const {
 
 ParseResult Parser::parse() {
   std::vector<ast::DeclPtr> declarations;
-  while (!is_at_end() && !has_completion()) {
+  // Loop guard intentionally does NOT check !has_completion(): once a
+  // completion point fires inside one top-level declaration, sibling
+  // declarations that follow it in the file must still parse normally
+  // (ADR 0024 phase C2, open question 1 — "statement truncates, sibling
+  // declarations still parse normally"). has_completion() only reflects
+  // "a completion context was recorded somewhere already"; it does not mean
+  // there is nothing left worth parsing. at_completion() (which drives the
+  // 27 individual completion call sites) can only ever be true once, at the
+  // fixed token index the completion cursor sits at — once current_ moves
+  // past it, at_completion() is permanently false for the rest of the parse,
+  // so removing this loop's dependency on has_completion() cannot cause any
+  // *new* completion site to spuriously fire.
+  while (!is_at_end()) {
     const std::size_t before = current_;
     ast::DeclPtr decl = declaration();
     if (decl) {
@@ -181,8 +193,10 @@ ParseResult Parser::parse() {
     // it started (a consume() failure that reported an error without advancing
     // and without synchronizing), force one token forward. Without this a
     // malformed top-level construct spins forever, appending an error each
-    // iteration until the process exhausts memory.
-    if (current_ == before && !is_at_end() && !has_completion()) {
+    // iteration until the process exhausts memory. Still applies unconditionally
+    // now that the outer loop no longer exits on has_completion() — a
+    // completion-truncated declaration that left current_ unmoved must not spin.
+    if (current_ == before && !is_at_end()) {
       advance();
     }
   }
@@ -420,7 +434,8 @@ void Parser::synchronize() {
     return;
   }
   advance();
-  while (!is_at_end() && !has_completion()) {
+  bool had_completion_before = has_completion();
+  while (!is_at_end() && !(has_completion() && !had_completion_before)) {
     if (previous().type == TokenType::SEMICOLON) {
       return;
     }

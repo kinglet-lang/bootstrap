@@ -15,6 +15,7 @@ class ModuleLoader;
 struct ParsedModule;
 } // namespace kinglet
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -41,6 +42,36 @@ public:
   TypeCheckResult check(const ast::Program &program);
   void set_module_loader(ModuleLoader *loader) { module_loader_ = loader; }
   void populate_kir_types(KirModule *module) const;
+
+  struct VarInfo {
+    Type type;
+    bool is_mutable;
+    bool used = false;
+    ast::SourceLocation location;
+  };
+
+  struct MethodInfo {
+    const ast::FunctionDecl *decl;
+    std::string target_type;
+  };
+
+  // Completion callback for ADR 0024 phase C2. When set, the TypeChecker
+  // invokes this callback every time it evaluates a CompletionMarkerExpr,
+  // passing the resolved receiver type, the live scope stack, the method
+  // registry, and the type registry — the real data perch currently
+  // approximates with its own hand-rolled walk_access_chain()/member_type().
+  // The callback is optional; when unset, CompletionMarkerExpr silently
+  // resolves to Void (LSP-mode parses don't depend on its result).
+  struct CompletionContext {
+    Type receiver_type = Type(TypeKind::Void);
+    // Innermost-first copy of the scope stack at the marker. Copied because
+    // the TypeChecker may pop scopes immediately after the visit() call.
+    std::vector<std::unordered_map<std::string, VarInfo>> scopes;
+    const std::unordered_map<std::string, MethodInfo> *method_registry = nullptr;
+    const std::unordered_map<std::string, Type> *type_registry = nullptr;
+  };
+  using CompletionCallback = std::function<void(const CompletionContext &)>;
+  void set_completion_callback(CompletionCallback cb) { completion_callback_ = std::move(cb); }
 
 private:
   // StmtVisitor overrides. check_stmt() stashes the current expected return
@@ -90,6 +121,7 @@ private:
   void visit(const ast::IndexExpr &x) override;
   void visit(const ast::IndexAssignExpr &x) override;
   void visit(const ast::StructLiteralExpr &x) override;
+  void visit(const ast::CompletionMarkerExpr &x) override;
 
   void check_function(const ast::FunctionDecl &function);
   void check_stmt(const ast::Stmt &stmt, const Type &expected_return);
@@ -164,13 +196,6 @@ private:
   std::string resolve_module_qualified(const std::string &ns, const std::string &member) const;
   void open_imported_namespace(const std::string &module_id);
 
-  struct VarInfo {
-    Type type;
-    bool is_mutable;
-    bool used = false;
-    ast::SourceLocation location;
-  };
-
   struct ActiveBorrow {
     std::string referent;
     bool mut = false;
@@ -193,10 +218,6 @@ private:
   std::vector<const ast::FunctionDecl *> free_functions_;
   std::unordered_set<std::string> instantiated_;
 
-  struct MethodInfo {
-    const ast::FunctionDecl *decl;
-    std::string target_type;
-  };
   std::unordered_map<std::string, MethodInfo> method_registry_;
 
   std::vector<TypeError> errors_;
@@ -214,6 +235,7 @@ private:
   Type expr_result_{TypeKind::Void};
   int allow_fallible_cast_depth_ = 0;
   ModuleLoader *module_loader_ = nullptr;
+  CompletionCallback completion_callback_;
 };
 
 } // namespace kinglet

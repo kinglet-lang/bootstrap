@@ -1,9 +1,10 @@
-# sema_probe: throwaway diagnostic tool for ADR 0024 (C1 investigation).
+# sema_probe: throwaway diagnostic tool for ADR 0024.
 # Not part of the default build; not shipped. See sema_probe.cc for context.
 executable("sema_probe") {
   testonly = true
   sources = [ "sema_probe.cc" ]
   deps = [
+    "//compiler/driver/lsp:completion_entry",
     "//compiler/frontend/checker",
     "//compiler/frontend/lexer",
     "//compiler/frontend/parser",

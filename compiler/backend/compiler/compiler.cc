@@ -11,6 +11,7 @@
 #include "frontend/module/native_symbol.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -2748,5 +2749,12 @@ void Compiler::visit(const ast::NullCoalesceExpr &x) {
 }
 void Compiler::visit(const ast::PropagateExpr &x) {
   compile_propagate(x);
+}
+void Compiler::visit(const ast::CompletionMarkerExpr &) {
+  // See the declaration comment in compiler.h: LSP-mode ASTs never reach
+  // codegen, so this being called is a programming error, not a case codegen
+  // needs to handle gracefully.
+  assert(false && "CompletionMarkerExpr reached codegen — LSP-only node leaked into build path");
+  std::abort();
 }
 } // namespace kinglet
