@@ -12,7 +12,6 @@ ends at the first line that is neither a directive nor a blank line.
 |-------|----------|
 | `run` | `kinglet <file> [args…]` — compile + native execute |
 | `check` | `kinglet --check <file>` |
-| `bytecode` | `kinglet --bytecode <file>`; compare `.bytecode` golden or `CHECK` |
 | `ir` | `kinglet --ir <file>`; assert `CHECK` substrings on stdout |
 | `ast` | `kinglet --ast <file>`; assert `CHECK` substrings on stdout |
 
@@ -49,7 +48,6 @@ Program arguments may also be listed one per line in `<case>.args`.
 | `<case>.exit` | `EXPECT-EXIT` |
 | `<case>.stderr` | `EXPECT-STDERR` |
 | `<case>.stderr_contains` | `CHECK-ERR` |
-| `<case>.bytecode` | golden for `bytecode` pipeline |
 | `<case>.args` | extra program arguments (`run`) |
 
 ## Examples

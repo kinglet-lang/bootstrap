@@ -10,7 +10,7 @@ bash tests/run_all.sh                 # all gating suites + probe snapshot
 bash tests/harness/run.sh <path>      # ad-hoc harness on a file or directory
 bash tests/exec/run.sh                # native compile + run (end-to-end)
 bash tests/sema/run.sh                # type checker pass + fail
-bash tests/codegen/run.sh             # KIR shape checks (formerly bytecode)
+bash tests/codegen/run.sh             # KIR shape checks
 bash tests/ir/run.sh                  # KIR (`--ir`) dump checks
 bash tests/parser/run.sh              # AST (`--ast`) checks
 bash tests/probe/run_matrix.sh        # capability snapshot (non-gating)

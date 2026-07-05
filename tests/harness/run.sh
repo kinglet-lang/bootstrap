@@ -250,15 +250,6 @@ run_check_pipeline() {
   echo "$ec"
 }
 
-run_bytecode_pipeline() {
-  local src="$1"
-  local stdout="$2"
-  local stderr="$3"
-  local ec=0
-  "$KINGLET_BIN" --bytecode "$src" >"$stdout" 2>"$stderr" || ec=$?
-  echo "$ec"
-}
-
 run_ir_pipeline() {
   local src="$1"
   local stdout="$2"
@@ -350,30 +341,6 @@ run_one_file() {
         return
       fi
       finalize_case "$name" "$stdout" "$stderr" "$ec"
-      ;;
-
-    bytecode)
-      ec=$(run_bytecode_pipeline "$src" "$stdout" "$stderr")
-      strip_cr "$stdout" "$stderr"
-      local golden="${src%.kl}.bytecode"
-      if [[ -f "$golden" ]]; then
-        if ! diff -u "$golden" "$stdout" >/dev/null; then
-          fail_case "$name" "bytecode golden mismatch"
-          diff -u "$golden" "$stdout" | sed 's/^/      /' | head -20 >&2
-          return
-        fi
-        pass_case "$name"
-        return
-      fi
-      if [[ -n "$CHECK_LINES" ]]; then
-        local failed=0
-        assert_exit "$name" "$EXPECT_EXIT" "$ec" || failed=1
-        [[ -s "$stderr" ]] && fail_case "$name" "unexpected stderr" && failed=1
-        assert_check_list "$name" "$(cat "$stdout")" "$CHECK_LINES" "stdout" || failed=1
-        [[ "$failed" -eq 0 ]] && pass_case "$name"
-        return
-      fi
-      skip_case "$name" "bytecode: no .bytecode golden or CHECK lines"
       ;;
 
     ir|ast)
