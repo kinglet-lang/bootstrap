@@ -23,6 +23,12 @@ group("default") {
   }
 }
 
+# ADR 0024 (C1) exploration tool. Not part of the default build.
+group("probes") {
+  testonly = true
+  deps = [ "//tests/probe:sema_probe" ]
+}
+
 if (embed_compiler_path != "") {
   action("embedded_compiler_cc") {
     script = "//build/scripts/embed_binary.py"

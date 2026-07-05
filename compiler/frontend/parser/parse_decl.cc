@@ -102,6 +102,14 @@ ast::DeclPtr Parser::using_declaration() {
     return nullptr;
   }
   const Token &name = consume(TokenType::IDENTIFIER, "Expected name after 'using'.");
+  if (name.type != TokenType::IDENTIFIER) {
+    // consume() already reported the error without advancing past the
+    // unexpected token (e.g. the next declaration's leading keyword after a
+    // dangling `using`). Bail rather than treat that token's text as the
+    // module name — TypeChecker would faithfully report a "module
+    // '<garbage>' not found" diagnostic unrelated to the actual error.
+    return nullptr;
+  }
   if (!is_namespace && match(TokenType::EQUAL)) {
     const std::string module_id = parse_module_id("module alias");
     consume(TokenType::SEMICOLON, "Expected ';' after using alias.");

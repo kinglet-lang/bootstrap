@@ -335,6 +335,14 @@ ast::ExprPtr Parser::call() {
         return expr;
       }
       const Token &field = consume(TokenType::IDENTIFIER, "Expected field name after '.'.");
+      if (field.type != TokenType::IDENTIFIER) {
+        // consume() already reported the error without advancing past the
+        // unexpected token (e.g. a stray '}' or the next declaration's
+        // leading keyword). Don't splice that token's text into the AST as
+        // a field name — TypeChecker would faithfully report a "no field
+        // '<garbage>'" diagnostic unrelated to the actual syntax error.
+        break;
+      }
       const ast::SourceLocation location = expr->location;
       expr = std::make_unique<ast::FieldAccessExpr>(location, std::move(expr), token_text(field));
     } else if (match(TokenType::LEFT_BRACKET)) {
@@ -509,9 +517,21 @@ ast::ExprPtr Parser::primary() {
       std::vector<std::string> segments;
       segments.push_back(std::string(token_text(identifier)));
       const Token &first_part = consume(TokenType::IDENTIFIER, "Expected name after '::'.");
+      if (first_part.type != TokenType::IDENTIFIER) {
+        // consume() already reported the error without advancing past the
+        // unexpected token. Don't splice that token's text into the AST as
+        // a namespace/variant member — TypeChecker would faithfully report
+        // a diagnostic naming that garbage token, unrelated to the actual
+        // syntax error.
+        return std::make_unique<ast::IdentifierExpr>(location_of(identifier),
+                                                     token_text(identifier));
+      }
       segments.push_back(std::string(token_text(first_part)));
       while (match(TokenType::COLON_COLON)) {
         const Token &part = consume(TokenType::IDENTIFIER, "Expected name after '::'.");
+        if (part.type != TokenType::IDENTIFIER) {
+          break;
+        }
         segments.push_back(std::string(token_text(part)));
       }
       return parse_namespace_access(identifier, std::move(segments));
@@ -583,6 +603,13 @@ ast::ExprPtr Parser::parse_match_pattern() {
     advance(); // consume '::'
     const Token &variant_token =
         consume(TokenType::IDENTIFIER, "Expected variant name after '::'.");
+    if (variant_token.type != TokenType::IDENTIFIER) {
+      // consume() already reported the error without advancing past the
+      // unexpected token. Don't splice that token's text into the AST as a
+      // variant name — TypeChecker would faithfully report a "no variant
+      // '<garbage>'" diagnostic unrelated to the actual syntax error.
+      return nullptr;
+    }
     std::string variant_name(token_text(variant_token));
     std::vector<ast::ExprPtr> fields;
     if (match(TokenType::LEFT_PAREN)) {

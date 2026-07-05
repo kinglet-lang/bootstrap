@@ -28,11 +28,14 @@ resolve_kinglet() {
     fi
   fi
 
+  # Prefer LLVM-enabled builds so native `run` cases actually execute;
+  # out/Debug/out/Default are typically enable_llvm=false and would
+  # otherwise be picked first and silently degrade every RUN: run case.
   for candidate in \
-    "$root/out/Debug/kinglet" \
-    "$root/out/Default/kinglet" \
     "$root/out/Llvm/kinglet" \
-    "$root/out/Release/kinglet"; do
+    "$root/out/Release/kinglet" \
+    "$root/out/Debug/kinglet" \
+    "$root/out/Default/kinglet"; do
     candidate="$(resolve_kinglet_bin "$candidate")"
     if [[ -x "$candidate" ]]; then
       printf '%s' "$(cd "$(dirname "$candidate")" && pwd)/$(basename "$candidate")"

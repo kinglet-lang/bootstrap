@@ -1,0 +1,5 @@
+// CHECK-NOT: Unknown module 'int'
+using
+int main() {
+    io::out.line("hi");
+}

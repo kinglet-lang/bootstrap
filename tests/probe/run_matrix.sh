@@ -12,10 +12,16 @@
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-KINGLET="${KINGLET:-$ROOT/out/Debug/kinglet}"
-if [[ ! -x "$KINGLET" ]]; then
-  echo "kinglet not found at $KINGLET (build with: ninja -C out/Debug)" >&2
-  exit 2
+# shellcheck source=tests/common.sh
+source "$ROOT/tests/common.sh"
+
+if [[ -n "${KINGLET:-}" ]]; then
+  if [[ ! -x "$KINGLET" ]]; then
+    echo "kinglet not found at $KINGLET" >&2
+    exit 2
+  fi
+else
+  KINGLET="$(resolve_kinglet "$ROOT")" || exit 2
 fi
 
 CASES="$ROOT/tests/probe/cases"
@@ -26,12 +32,11 @@ trap 'rm -rf "$TMP"' EXIT
 printf 'hello' > /tmp/_kl_probe_fs.txt
 
 # Furthest stage reached by the compiler.
-# parse / check / codegen expect a clean exit; run compares stdout to EXPECT_OUT.
+# parse / check expect a clean exit; run compares stdout to EXPECT_OUT.
 classify() {
   local f="$1" expect="$2"
-  "$KINGLET" --ast      "$f" >/dev/null 2>"$TMP/e" || { echo "parse✗|$(head -1 "$TMP/e")"; return; }
-  "$KINGLET" --check    "$f" >/dev/null 2>"$TMP/e" || { echo "chk✗|$(head -1 "$TMP/e")"; return; }
-  "$KINGLET" --bytecode "$f" >/dev/null 2>"$TMP/e" || { echo "cg✗|$(head -1 "$TMP/e")"; return; }
+  "$KINGLET" --ast   "$f" >/dev/null 2>"$TMP/e" || { echo "parse✗|$(head -1 "$TMP/e")"; return; }
+  "$KINGLET" --check "$f" >/dev/null 2>"$TMP/e" || { echo "chk✗|$(head -1 "$TMP/e")"; return; }
   local out
   out=$("$KINGLET" "$f" 2>"$TMP/e"); local ec=$?
   if [[ $ec -ne 0 ]]; then echo "run✗(rt)|$(head -1 "$TMP/e")"; return; fi
