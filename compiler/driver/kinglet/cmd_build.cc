@@ -22,17 +22,21 @@ namespace fs = std::filesystem;
 namespace {
 
 std::string default_output_name(const ProjectConfig &config, const std::string &target_name) {
+  std::string name;
   // Special-case the self-host compiler target name if present.
   if (target_name == "compiler" || target_name == "core") {
-    return "compiler";
+    name = "compiler";
+  } else if (!target_name.empty()) {
+    name = target_name;
+  } else if (!config.name.empty()) {
+    name = config.name;
+  } else {
+    name = "app";
   }
-  if (!target_name.empty()) {
-    return target_name;
-  }
-  if (!config.name.empty()) {
-    return config.name;
-  }
-  return "app";
+#if defined(_WIN32)
+  name += ".exe";
+#endif
+  return name;
 }
 
 } // namespace

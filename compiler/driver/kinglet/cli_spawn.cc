@@ -14,6 +14,9 @@
 #include <vector>
 #if defined(_WIN32)
 #include <io.h>
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
 #elif defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <stdlib.h>
@@ -29,6 +32,65 @@
 namespace kinglet {
 
 namespace fs = std::filesystem;
+
+#if defined(_WIN32)
+namespace {
+
+// Quote one argv element for a Windows command line, following the Microsoft
+// CRT rules so CreateProcess reproduces the intended argv in the child.
+std::string windows_quote_arg(const std::string &s) {
+  const bool need_quotes = s.empty() || s.find_first_of(" \t\n\"") != std::string::npos;
+  if (!need_quotes) {
+    return s;
+  }
+  std::string out = "\"";
+  size_t backslashes = 0;
+  for (char c : s) {
+    if (c == '\\') {
+      ++backslashes;
+      out += '\\';
+    } else if (c == '"') {
+      out += std::string(backslashes + 1, '\\');
+      out += '"';
+      backslashes = 0;
+    } else {
+      out += c;
+      backslashes = 0;
+    }
+  }
+  out += std::string(backslashes, '\\');
+  out += '"';
+  return out;
+}
+
+std::wstring utf8_to_wide(const std::string &s) {
+  if (s.empty()) {
+    return L"";
+  }
+  const int n = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()), nullptr, 0);
+  if (n <= 0) {
+    return L"";
+  }
+  std::wstring w(static_cast<size_t>(n), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()), w.data(), n);
+  return w;
+}
+
+std::string wide_to_utf8(const wchar_t *w) {
+  if (w == nullptr || *w == L'\0') {
+    return "";
+  }
+  const int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, nullptr, 0, nullptr, nullptr);
+  if (n <= 1) {
+    return "";
+  }
+  std::string s(static_cast<size_t>(n - 1), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, w, -1, s.data(), n, nullptr, nullptr);
+  return s;
+}
+
+} // namespace
+#endif
 
 std::string resolve_self_executable(const char *argv0) {
   const fs::path from_argv(argv0);
@@ -52,6 +114,12 @@ std::string resolve_self_executable(const char *argv0) {
       return std::string(resolved);
     }
     return std::string(buf);
+  }
+#elif defined(_WIN32)
+  wchar_t wbuf[MAX_PATH];
+  const DWORD wlen = ::GetModuleFileNameW(nullptr, wbuf, MAX_PATH);
+  if (wlen > 0 && wlen < MAX_PATH) {
+    return wide_to_utf8(wbuf);
   }
 #endif
 
@@ -80,10 +148,7 @@ std::string resolve_self_executable(const char *argv0) {
 
 int spawn_reexec(const std::string &self_executable, const std::vector<std::string> &args) {
 #if defined(_WIN32)
-  (void)self_executable;
-  (void)args;
-  std::cerr << g_prog << ": subcommand re-exec is not supported on Windows\n";
-  return 78;
+  return run_process_wait(self_executable, args);
 #else
   std::vector<char *> exec_argv;
   exec_argv.push_back(const_cast<char *>(self_executable.c_str()));
@@ -100,10 +165,7 @@ int spawn_reexec(const std::string &self_executable, const std::vector<std::stri
 
 int spawn_and_wait(const std::string &self_executable, const std::vector<std::string> &args) {
 #if defined(_WIN32)
-  (void)self_executable;
-  (void)args;
-  print_error("build", "building is not supported on Windows yet");
-  return 78;
+  return run_process_wait(self_executable, args);
 #else
   std::vector<char *> exec_argv;
   exec_argv.push_back(const_cast<char *>(self_executable.c_str()));
@@ -139,5 +201,35 @@ int spawn_and_wait(const std::string &self_executable, const std::vector<std::st
   return 71;
 #endif
 }
+
+#if defined(_WIN32)
+int run_process_wait(const std::string &program, const std::vector<std::string> &args) {
+  std::string cmdline = windows_quote_arg(program);
+  for (const std::string &arg : args) {
+    cmdline += " ";
+    cmdline += windows_quote_arg(arg);
+  }
+
+  const std::wstring wprogram = utf8_to_wide(program);
+  std::wstring wcmdline = utf8_to_wide(cmdline);
+
+  STARTUPINFOW si{};
+  si.cb = sizeof(si);
+  PROCESS_INFORMATION pi{};
+  // lpApplicationName pins the exact executable (survives spaces / no PATH
+  // search); lpCommandLine carries argv[0] + the rest for the child.
+  if (!CreateProcessW(wprogram.c_str(), wcmdline.data(), nullptr, nullptr, TRUE, 0, nullptr,
+                      nullptr, &si, &pi)) {
+    std::cerr << g_prog << ": failed to run " << program << ": error " << ::GetLastError() << '\n';
+    return 71;
+  }
+  ::WaitForSingleObject(pi.hProcess, INFINITE);
+  DWORD code = 0;
+  ::GetExitCodeProcess(pi.hProcess, &code);
+  ::CloseHandle(pi.hProcess);
+  ::CloseHandle(pi.hThread);
+  return static_cast<int>(code);
+}
+#endif
 
 } // namespace kinglet
