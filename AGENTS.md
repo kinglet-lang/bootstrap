@@ -17,6 +17,12 @@ pinned toolchain (one-time per machine):
 ```bash
 bash scripts/setup.sh     # Unix; on Windows: pwsh -File scripts/setup.ps1
 bash scripts/build.sh     # gn gen + ninja + PATH staging
+```
+
+On Windows the native LLVM backend is built against the MSYS2 MinGW LLVM and
+`kinglet run`/`build` are supported; `scripts/build.ps1` auto-wires this
+(`clang_base_path` GN arg, `KINGLET_CXX` for runtime AOT linking). See the
+"Building on Windows" section of [docs/BUILD.md](docs/BUILD.md).
 
 # For CI / custom configs:
 BUILD_CI=1 bash scripts/build.sh --out out/Debug --gn 'sanitizer="address,undefined"'

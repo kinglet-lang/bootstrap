@@ -1,8 +1,27 @@
+declare_args() {
+  # Directory holding clang/clang++/llvm-ar. Empty (default) resolves them from
+  # PATH. On Windows, building the LLVM backend against MSYS2 MinGW LLVM must
+  # compile and link with that same MinGW toolchain (the official llvm.org
+  # clang targets the MSVC ABI and cannot link the MinGW LLVM libraries), so
+  # scripts/build.ps1 sets this to the llvm-config bin dir (e.g.
+  # "C:/msys64/mingw64/bin") whenever the LLVM backend is enabled.
+  clang_base_path = ""
+}
+
 if (host_os == "win") {
+  if (clang_base_path == "") {
+    _cc = "clang"
+    _cxx = "clang++"
+    _ar = "llvm-ar"
+  } else {
+    _cc = clang_base_path + "/clang"
+    _cxx = clang_base_path + "/clang++"
+    _ar = clang_base_path + "/llvm-ar"
+  }
   toolchain("win") {
     tool("cc") {
       depfile = "{{output}}.d"
-      command = "clang -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_c}} -c {{source}} -o {{output}}"
+      command = "$_cc -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_c}} -c {{source}} -o {{output}}"
       depsformat = "gcc"
       description = "CC {{output}}"
       outputs = [
@@ -12,7 +31,7 @@ if (host_os == "win") {
 
     tool("cxx") {
       depfile = "{{output}}.d"
-      command = "clang++ -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}} -c {{source}} -o {{output}}"
+      command = "$_cxx -MMD -MF $depfile {{defines}} {{include_dirs}} {{cflags}} {{cflags_cc}} -c {{source}} -o {{output}}"
       depsformat = "gcc"
       description = "CXX {{output}}"
       outputs = [
@@ -21,7 +40,7 @@ if (host_os == "win") {
     }
 
     tool("alink") {
-      command = "cmd /c del /f {{output}} 2>nul & llvm-ar rcs {{output}} {{inputs}}"
+      command = "cmd /c del /f {{output}} 2>nul & $_ar rcs {{output}} {{inputs}}"
       description = "AR {{target_output_name}}{{output_extension}}"
       outputs = [
         "{{target_out_dir}}/{{target_output_name}}{{output_extension}}",
@@ -32,7 +51,7 @@ if (host_os == "win") {
 
     tool("link") {
       rspfile = "{{output}}.rsp"
-      command = "clang++ {{ldflags}} -o {{output}} @$rspfile {{libs}}"
+      command = "$_cxx {{ldflags}} -o {{output}} @$rspfile {{libs}}"
       description = "LINK {{target_output_name}}{{output_extension}}"
       rspfile_content = "{{inputs}}"
       outputs = [

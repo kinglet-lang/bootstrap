@@ -52,9 +52,18 @@ Editor extensions live in [kinglet-lang/perch](https://github.com/kinglet-lang/p
 ## Build
 
 ```bash
-bash scripts/setup.sh             # one-time: pinned GN+Ninja + LLVM detection
+bash scripts/setup.sh             # Unix: one-time, pinned GN+Ninja + LLVM detection
 bash scripts/build.sh             # gn gen + ninja + PATH staging
 ./tools/bin/kinglet --check file.kl
+```
+
+On Windows (PowerShell), the native LLVM backend builds against the MSYS2
+MinGW LLVM:
+
+```pwsh
+pwsh -File scripts/setup.ps1      # one-time: pinned GN+Ninja + LLVM detection
+pwsh -File scripts/build.ps1      # gn gen + ninja; native backend if LLVM found
+.\tools\bin\kinglet.exe --check file.kl
 ```
 
 For custom builds or CI:
@@ -63,7 +72,8 @@ For custom builds or CI:
 BUILD_CI=1 bash scripts/build.sh --out out/Debug --gn 'sanitizer="address,undefined"'
 ```
 
-See [docs/BUILD.md](docs/BUILD.md) for prerequisites, Windows, fuzzing, and troubleshooting.
+See [docs/BUILD.md](docs/BUILD.md) for prerequisites, Windows (including the
+MinGW LLVM requirement and `kinglet run`/`build`), fuzzing, and troubleshooting.
 
 ## Quick Example
 
