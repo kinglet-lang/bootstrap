@@ -138,6 +138,9 @@ jobs:
           # Windows runtime archive is kinglet_rt.lib (see win alink in build/toolchain).
           cp out/Release/obj/runtime/kinglet_rt.lib dist/
           bash scripts/stage-klet-alias.sh dist
+          # Bundle the MinGW runtime + libLLVM DLLs kinglet.exe transitively
+          # imports, so the archive runs without MSYS2 on PATH.
+          bash scripts/stage-runtime-dlls.sh dist
           cd dist && tar czf "../kinglet-windows-x64.tar.gz" *
 
       - name: Upload artifact
