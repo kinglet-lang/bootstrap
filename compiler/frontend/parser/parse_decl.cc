@@ -40,6 +40,13 @@ ast::DeclPtr Parser::declaration() {
   }
 
   bool is_public = match(TokenType::PUB);
+  if (at_completion()) {
+    // `pub █` — the valid continuations are declaration keywords (struct,
+    // enum, concept, fn). Don't fall through to statement() which would
+    // return statement keywords instead.
+    set_completion({lsp::CompletionPosition::TopLevelDecl, {}, {}, {}, {}, {}});
+    return nullptr;
+  }
 
   if (match(TokenType::STRUCT)) {
     auto decl = struct_declaration();
