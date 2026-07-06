@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "driver/kinglet/cli_driver.h"
+#include "driver/kinglet/cli_spawn.h"
 #include "driver/pipeline/pipeline.h"
 #include "frontend/ast/ast.h"
 #include "frontend/checker/type_checker.h"
@@ -19,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -110,16 +112,32 @@ std::string resolve_rt_lib(const char *argv0);
 int run_native_executable(const kinglet::KirModule &kir,
                           const std::vector<std::string> &program_args, const char *argv0) {
   const std::filesystem::path tmp_dir = std::filesystem::temp_directory_path();
+#if defined(_WIN32)
+  // Build a unique temp .exe path, compile the program into it, run it, and
+  // clean up. (mkstemp is not available; uniqueness comes from random_device.)
+  std::random_device rd;
+  const unsigned long long suffix =
+      (static_cast<unsigned long long>(rd()) << 32) | static_cast<unsigned long long>(rd());
+  std::ostringstream suffix_ss;
+  suffix_ss << std::hex << suffix;
+  const std::string exe_path = (tmp_dir / ("kinglet-run-" + suffix_ss.str() + ".exe")).string();
+
+  kinglet::NativeCompileOptions native_options;
+  const kinglet::NativeCompileResult native =
+      kinglet::KirToLlvm::compile_executable(kir, exe_path, resolve_rt_lib(argv0), native_options);
+  if (!native.ok) {
+    std::cerr << "kinglet: native compile failed: " << native.error << '\n';
+    return 78;
+  }
+
+  const int rc = kinglet::run_process_wait(exe_path, program_args);
+  std::error_code rm_ec;
+  std::filesystem::remove(exe_path, rm_ec);
+  return rc;
+#else
   std::string exe_template = (tmp_dir / "kinglet-run-XXXXXX").string();
   std::vector<char> tpl(exe_template.begin(), exe_template.end());
   tpl.push_back('\0');
-#if defined(_WIN32)
-  (void)kir;
-  (void)program_args;
-  (void)argv0;
-  std::cerr << "kinglet: native execution is not supported on Windows\n";
-  return 78;
-#else
   const int fd = mkstemp(tpl.data());
   if (fd < 0) {
     std::cerr << "kinglet: failed to create temporary executable path\n";

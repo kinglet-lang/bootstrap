@@ -43,8 +43,11 @@ int cmd_run(int argc, char **argv, const std::string &self_executable) {
 
   if (fs::exists(native_bin)) {
 #if defined(_WIN32)
-    print_error("run", "executing built binaries is not supported on Windows");
-    return 78;
+    std::vector<std::string> run_args;
+    for (int i = 2; i < argc; ++i) {
+      run_args.emplace_back(argv[i]);
+    }
+    return run_process_wait(native_bin.string(), run_args);
 #else
     std::vector<char *> exec_argv;
     exec_argv.push_back(const_cast<char *>(native_bin.c_str()));
