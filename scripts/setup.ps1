@@ -1,15 +1,25 @@
-# One-shot dev-environment setup for Windows: pinned GN + Ninja.
+# One-shot dev-environment setup for Windows: pinned GN + Ninja (+ LLVM detect).
 #
 #   pwsh -File scripts/setup.ps1        # GN + Ninja, wire ./tools/bin onto PATH
 #
-# Windows mirrors the CI policy: GN + Ninja only, no LLVM — builds are
-# compile-only (the native LLVM backend is not supported on Windows yet).
-# The tools land in .\tools (gitignored). setup.ps1 wires .\tools\bin onto
-# PATH for both the current session and future shells (via the PowerShell
-# profile), so a separate `. .\tools\env.ps1` step is no longer required —
-# that file is still written for CI / non-interactive use.
+# Windows mirrors scripts/setup.sh: GN + Ninja are fetched, and an LLVM
+# installation is detected (and reported). When LLVM is available, the native
+# backend is built; otherwise the build is compile-only. The tools land in
+# .\tools (gitignored). setup.ps1 wires .\tools\bin onto PATH for both the
+# current session and future shells (via the PowerShell profile), so a separate
+# `. .\tools\env.ps1` step is no longer required — that file is still written
+# for CI / non-interactive use.
+#
+# LLVM on Windows: the only complete, widely available distribution that ships
+# llvm-config together with the matching libraries and headers is the MSYS2
+# MinGW LLVM (e.g. C:\msys64\mingw64). scripts/build.ps1 wires the build to use
+# that same MinGW clang++ toolchain so the LLVM libraries link correctly. The
+# official llvm.org installer omits llvm-config and the dev libraries.
 #
 # Set SETUP_PS_NO_MODIFY_PATH=1 to skip persisting PATH to the profile.
+#
+# Other scripts dot-source this file solely to reuse Find-LlvmConfig / Add-BinToPath;
+# in that case Invoke-Setup is not run.
 
 [CmdletBinding()]
 param()
@@ -83,24 +93,72 @@ function Add-BinToPath {
   }
 }
 
+# ========== LLVM ==========
+# Find an llvm-config.exe on Windows. Prefer the MSYS2 MinGW LLVM (the only
+# distribution that ships llvm-config with matching libs + headers). Returns
+# the path with forward slashes (clean for GN args), or $null if not found.
+
+function Find-LlvmConfig {
+  $candidates = @()
+
+  if ($env:LLVM_CONFIG) { $candidates += $env:LLVM_CONFIG }
+  if ($env:MSYSTEM_PREFIX) { $candidates += (Join-Path $env:MSYSTEM_PREFIX "bin\llvm-config.exe") }
+
+  $roots = @($env:MSYS2, "C:\msys64", "C:\clang64", $env:LLVM_INSTALL_DIR,
+             "C:\Program Files\LLVM", "C:\ProgramData\chocolatey\lib\llvm\tools")
+  foreach ($root in $roots) {
+    if (-not $root) { continue }
+    foreach ($sub in @("mingw64\bin", "clang64\bin", "ucrt64\bin", "bin")) {
+      $candidates += (Join-Path $root (Join-Path $sub "llvm-config.exe"))
+    }
+  }
+
+  foreach ($path in $candidates) {
+    if (Test-Path $path -PathType Leaf) {
+      return ($path -replace '\\', '/')
+    }
+  }
+
+  $cmd = Get-Command llvm-config -ErrorAction SilentlyContinue
+  if ($cmd) { return ($cmd.Source -replace '\\', '/') }
+  return $null
+}
+
 # ========== main ==========
 
-New-Item -ItemType Directory -Force -Path $BIN | Out-Null
+function Invoke-Setup {
+  New-Item -ItemType Directory -Force -Path $BIN | Out-Null
 
-Info "Kinglet dev setup (Windows)"
-Info "LLVM: skipped on Windows (compile-only; native backend not supported here)"
-Install-Gn
-Install-Ninja
-Write-Env
-Add-BinToPath
+  Info "Kinglet dev setup (Windows)"
 
-Info ""
-Info "Done. gn/ninja are on PATH now (new shells too). Next:"
-Info "  pwsh -File scripts/build.ps1"
-Info "or manually:"
-Info '  gn gen out/Debug --args="is_debug=false"'
-Info "  ninja -C out/Debug kinglet"
-Info ""
+  Install-Gn
+  Install-Ninja
+  Write-Env
+  Add-BinToPath
+  Info ""
 
-# Windows toolchain setup complete.
+  # LLVM (detect + report); build.ps1 reuses Find-LlvmConfig at build time.
+  $llvmCfg = Find-LlvmConfig
+  if ($llvmCfg) {
+    $env:LLVM_CONFIG = $llvmCfg
+    Info "found llvm-config: $llvmCfg"
+    Info "LLVM ready - native backend will be built (scripts/build.ps1 wires it up)"
+  } else {
+    Warn "no LLVM found - builds will be compile-only (native backend disabled)"
+    Warn "install MSYS2 MinGW LLVM (e.g. 'pacman -S mingw-w64-x86-64-llvm') or set LLVM_CONFIG"
+  }
 
+  Info ""
+  Info "Done. gn/ninja are on PATH now (new shells too). Next:"
+  if ($llvmCfg) {
+    Info "  pwsh -File scripts/build.ps1"
+  } else {
+    Info "  pwsh -File scripts/build.ps1   # compile-only; install LLVM for the native backend"
+  }
+}
+
+# Run main only when executed directly, not when dot-sourced (so build.ps1 can
+# reuse Find-LlvmConfig / Add-BinToPath without re-running the install flow).
+if ($MyInvocation.InvocationName -ne ".") {
+  Invoke-Setup
+}

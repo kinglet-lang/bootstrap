@@ -1,12 +1,20 @@
 # Build the kinglet compiler on Windows and wire the binary onto PATH.
 #
-#   pwsh -File scripts/build.ps1                 # gn gen + ninja (release)
-#   pwsh -File scripts/build.ps1 -DebugBuild     # debug build (-g, no -O2)
-#   pwsh -File scripts/build.ps1 -Out out\Foo    # custom output dir
+#   pwsh -File scripts/build.ps1                  # gn gen + ninja (LLVM if found)
+#   pwsh -File scripts/build.ps1 -DebugBuild      # debug build (-g, no -O2)
+#   pwsh -File scripts/build.ps1 -NoLlm           # force compile-only, no LLVM
+#   pwsh -File scripts/build.ps1 -Out out\Foo      # custom output dir
+#   pwsh -File scripts/build.ps1 -GnArgs 'optimize="-O2"'
 #
-# Windows is compile-only: the native LLVM backend is not supported here, so
-# this builds `kinglet` (no `kinglet_rt`). Requires scripts/setup.ps1 to have
-# been run at least once (for GN + Ninja under .\tools\bin).
+# When an MSYS2 MinGW LLVM is detected, the native LLVM backend is built
+# (kinglet + kinglet_rt); the whole build is wired to that MinGW clang++
+# toolchain (clang_base_path) so the LLVM libraries link correctly. Without
+# LLVM, the build is compile-only. Requires scripts/setup.ps1 to have been run
+# at least once (for GN + Ninja under .\tools\bin).
+#
+# Set BUILD_CI=1 to skip binary staging (CI/automation use).
+# Set KINGLET_CXX to the MinGW clang++ the native backend should use at runtime
+# when AOT-linking user programs (see docs/BUILD.md, "Building on Windows").
 #
 # After a successful build, kinglet.exe (and klet.exe, its alias) are staged
 # into .\tools\bin and added to PATH via the same profile mechanism as setup.ps1.
@@ -14,7 +22,9 @@
 [CmdletBinding()]
 param(
   [switch]$DebugBuild,
-  [string]$Out = "out\Default"
+  [switch]$NoLlm,
+  [string]$Out = "out\Default",
+  [string]$GnArgs = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,7 +38,47 @@ function Info($msg) { Write-Host $msg -ForegroundColor DarkGray }
 function Warn($msg) { Write-Host $msg -ForegroundColor Yellow }
 function Fail($msg) { Write-Host $msg -ForegroundColor Red; exit 1 }
 
+# Stage the transitive closure of DLLs that $exe needs and that live in $srcBin,
+# into $dest. Walking the full import graph (not just kinglet.exe's direct
+# imports) catches indirect deps such as libwinpthread, which libstdc++ pulls in.
+function Get-DllImports($binary, $objdump) {
+  if (-not (Test-Path $binary -PathType Leaf)) { return @() }
+  & $objdump -p $binary | Select-String '^\s*DLL Name:\s*(.+)$' |
+    ForEach-Object { ($_.Matches[0].Groups[1].Value).Trim() }
+}
+
+function Copy-RequiredDlls($exe, $srcBin, $dest) {
+  if (-not $srcBin -or -not (Test-Path $srcBin)) { return }
+  $objdump = Join-Path $srcBin "objdump.exe"
+  if (-not (Test-Path $objdump)) {
+    Warn "objdump not found in $srcBin; skipping DLL staging (add $srcBin to PATH at runtime)"
+    return
+  }
+
+  $copied = @{}
+  $queue = New-Object System.Collections.Generic.Queue[string]
+  $queue.Enqueue($exe)
+  while ($queue.Count -gt 0) {
+    $current = $queue.Dequeue()
+    foreach ($dll in (Get-DllImports $current $objdump)) {
+      if ($copied.ContainsKey($dll)) { continue }
+      $src = Join-Path $srcBin $dll
+      if (Test-Path $src -PathType Leaf) {
+        Copy-Item -Force $src (Join-Path $dest $dll)
+        Info "staged $dll"
+        $copied[$dll] = $true
+        # Follow this DLL's own imports to catch transitive deps.
+        $queue.Enqueue((Join-Path $dest $dll))
+      }
+    }
+  }
+}
+
 Set-Location $ROOT
+
+# Reuse setup.ps1's helpers (Find-LlvmConfig, Add-BinToPath) without running
+# its GN/Ninja install flow.
+. (Join-Path $SCRIPT_DIR "setup.ps1")
 
 # ========== prerequisites ==========
 
@@ -46,14 +96,39 @@ if (($env:PATH -split ';') -notcontains $BIN) {
 $isDebug = if ($DebugBuild) { "true" } else { "false" }
 $gnArgs  = "is_debug=$isDebug"
 
+$enableLlvm = $false
+$clangBase  = ""
+if (-not $NoLlm) {
+  $llvmCfg = Find-LlvmConfig
+  if ($llvmCfg) {
+    Info "found llvm-config: $llvmCfg"
+    # The MinGW LLVM must be compiled and linked with its own clang++ (MSVC-ABI
+    # clang cannot link these libraries), so point the win toolchain at it.
+    $clangBase = Split-Path $llvmCfg -Parent
+    $gnArgs = "$gnArgs enable_llvm=true llvm_config=`"$llvmCfg`" clang_base_path=`"$clangBase`""
+    $enableLlvm = $true
+  } else {
+    Warn "no LLVM found - building without native backend (compile-only)"
+    Warn "install MSYS2 MinGW LLVM or pass -NoLlm to silence this"
+  }
+} else {
+  Info "-NoLlm: building without native backend"
+}
+
+# Append extra GN args (e.g. optimize, coverage).
+if ($GnArgs) { $gnArgs = "$gnArgs $GnArgs" }
+
 Info "gn gen $Out --args=`"$gnArgs`""
 & $gn gen $Out --args="$gnArgs"
 if ($LASTEXITCODE -ne 0) { Fail "gn gen failed" }
 
 # ========== build ==========
 
-Info "ninja -C $Out kinglet"
-& $ninja -C $Out kinglet
+$targets = @("kinglet")
+if ($enableLlvm) { $targets += "kinglet_rt" }
+
+Info "ninja -C $Out $($targets -join ' ')"
+& $ninja -C $Out @targets
 if ($LASTEXITCODE -ne 0) { Fail "ninja build failed" }
 
 $builtBin = Join-Path $ROOT (Join-Path $Out "kinglet.exe")
@@ -63,8 +138,26 @@ if (-not (Test-Path $builtBin)) {
 
 # ========== stage kinglet/klet + wire PATH ==========
 
+if ($env:BUILD_CI -eq "1") {
+  Info "BUILD_CI=1: skipping binary staging"
+  exit 0
+}
+
 New-Item -ItemType Directory -Force -Path $BIN | Out-Null
 Copy-Item -Force $builtBin (Join-Path $BIN "kinglet.exe")
+
+if ($enableLlvm) {
+  # The kinglet binary resolves the runtime archive relative to its own
+  # directory (resolve_rt_lib in main.cc). Stage it alongside the binary.
+  $rtLib = Join-Path $ROOT (Join-Path $Out "obj\runtime\kinglet_rt.lib")
+  if (Test-Path $rtLib) {
+    Copy-Item -Force $rtLib (Join-Path $BIN "kinglet_rt.lib")
+    Info "staged $BIN\kinglet_rt.lib"
+  }
+  # The MinGW build imports libLLVM-*.dll and the MinGW runtime DLLs. Stage the
+  # exact set kinglet.exe imports so the binary runs without MinGW on PATH.
+  Copy-RequiredDlls $builtBin $clangBase $BIN
+}
 
 $aliasScript = Join-Path $SCRIPT_DIR "stage-klet-alias.ps1"
 if (Test-Path $aliasScript) {
@@ -75,21 +168,7 @@ if (Test-Path $aliasScript) {
   }
 }
 
-# Persist $BIN on PATH across shells (mirrors setup.ps1's Add-BinToPath).
-if ($env:SETUP_PS_NO_MODIFY_PATH -ne "1") {
-  $profilePath = $PROFILE.CurrentUserAllHosts
-  $profileDir  = Split-Path -Parent $profilePath
-  if (-not (Test-Path $profileDir)) {
-    New-Item -ItemType Directory -Force -Path $profileDir | Out-Null
-  }
-  $line = "`$env:PATH = `"$BIN;`$env:PATH`""
-  $already = (Test-Path $profilePath) -and
-             (Select-String -Path $profilePath -SimpleMatch $BIN -Quiet)
-  if (-not $already) {
-    Add-Content -Path $profilePath -Value "`r`n# kinglet dev toolchain (scripts/build.ps1)`r`n$line"
-    Info "added $BIN to PATH in $profilePath"
-  }
-}
+Add-BinToPath
 
 Info ""
 Info "Done: $BIN\kinglet.exe"

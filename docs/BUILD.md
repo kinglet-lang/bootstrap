@@ -54,6 +54,67 @@ gn gen out/Default --args='is_debug=false enable_llvm=true llvm_config="'"$(whic
 ninja -C out/Default kinglet kinglet_rt
 ```
 
+## Building on Windows
+
+The native LLVM backend is built with the **MSYS2 MinGW LLVM** — that is the
+only Windows distribution that ships `llvm-config` together with the matching
+libraries and headers. (The official llvm.org installer omits them.) Install it
+once:
+
+```pwsh
+pacman -S mingw-w64-x86-64-llvm mingw-w64-x86-64-clang   # inside an MSYS2 MinGW64 shell
+```
+
+Then build exactly as on Unix — the scripts detect LLVM and wire everything up:
+
+```pwsh
+pwsh -File scripts/setup.ps1     # GN + Ninja, detect LLVM
+pwsh -File scripts/build.ps1     # gn gen + ninja; native backend if LLVM found
+```
+
+How it fits together:
+
+- `scripts/setup.ps1` reports the detected `llvm-config`.
+- `scripts/build.ps1` sets `enable_llvm=true llvm_config="…" clang_base_path="…"`
+  where `clang_base_path` is the llvm-config bin dir (e.g.
+  `C:/msys64/mingw64/bin`). This makes the whole build compile and link with
+  that same MinGW `clang++`/`llvm-ar` — necessary because the MSVC-ABI clang
+  from llvm.org cannot link the MinGW LLVM libraries.
+- After building, the MinGW runtime DLLs and `libLLVM-20.dll` are staged next
+  to `kinglet.exe` (transitive closure), so the binary is self-contained and
+  runs without MSYS2 on `PATH`.
+
+Flags mirror `build.sh`:
+
+| Flag | Effect |
+|------|--------|
+| `-DebugBuild` | Debug build (`-g`, no optimisations) |
+| `-NoLlm` | Compile-only, no LLVM native backend |
+| `-Out out\Dir` | Build output directory (default: `out\Default`) |
+| `-GnArgs 'key=val …'` | Append arbitrary GN args |
+| `BUILD_CI=1` | Skip binary staging (for CI/automation) |
+
+For the native backend to AOT-link user programs at runtime, set `KINGLET_CXX`
+to the MinGW `clang++.exe` (otherwise `kinglet run`/`build` fall back to a
+generic PATH `clang++`, which may be the wrong ABI):
+
+```pwsh
+$env:KINGLET_CXX = "C:/msys64/mingw64/bin/clang++.exe"
+```
+
+With `KINGLET_CXX` set and the MSYS2 `mingw64/bin` on `PATH` (so the
+AOT-compiled user programs can find their MinGW runtime DLLs), `kinglet run`
+and `kinglet build` work on Windows just as on Unix:
+
+```pwsh
+pwsh -File scripts/build.ps1
+$env:KINGLET_CXX = "C:/msys64/mingw64/bin/clang++.exe"
+kinglet run path/to/program.kl     # native compile + execute
+kinglet build                      # build the project's default target
+```
+
+
+
 ## Build Configurations
 
 | GN args | Config |

@@ -740,8 +740,13 @@ bool link_objects(const std::vector<std::string> &obj_paths, const std::string &
     *error = "link_objects requires at least one object file";
     return false;
   }
+  // Allow the C++ driver used for AOT linking to be overridden. On Windows the
+  // LLVM backend is built with a MinGW clang++ whose ABI differs from a generic
+  // PATH clang++, so scripts/build.ps1 points KINGLET_CXX at it.
+  const char *cxx_env = std::getenv("KINGLET_CXX");
+  const std::string cxx = (cxx_env && *cxx_env) ? cxx_env : "clang++";
   std::ostringstream cmd;
-  cmd << "clang++ -o ";
+  cmd << cxx << " -o ";
   cmd << '"' << out_path << "\"";
   for (const std::string &obj_path : obj_paths) {
     cmd << " \"" << obj_path << '"';
