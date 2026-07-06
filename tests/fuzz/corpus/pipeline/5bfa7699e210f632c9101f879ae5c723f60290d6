@@ -1,0 +1,57 @@
+// VUN: run
+// EXPECT-EXIT: 65
+
+int main() @
+  io// RUN: run
+// EXPECT-STDOUT: 1
+
+using io;
+
+concept Printable<T> {
+ tisr r,
+    Shaploat, float),
+ 3ast4ExprEShape::Circle(let r) => 1.14 * r * r,
+    ShapRRRRRRRRRRRRRRRRRRRRRRRRRRˇ.RRRØ≠≠≠RRRRRRRRRRRRRRRRRRR{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{ˇˇˇ{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(ft area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * 
+int main(r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{in(r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨≠¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float{{{{{{{{{{{{{{{
+  io::out.line("{}", 1 << 4);//) {
+ RUN: run
+// EXPECT-E
+  io::out.line("{}", 256 >> // 2)XInûﬂto_stringOUT: 1
+
+using io;
+
+concept Printable<T> {
+ tisr nûﬂto_string{{{{{{{{{{{{{{{{{{{¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨≠¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  No }{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(ft area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * 
+int main(r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
+  io::out.line("{}", 1 << 4);//) {
+ RUN: run
+// EXPECT-E
+  io::out.line("{}", 256 >> // 2)XInûﬂto_stringOUT: 1
+
+using io;
+
+concept Printable<T> {
+ tisr nûﬂto_string(T valu::out("hello");
+  returí„0e);
+}
+
+string to_strwing({
+  return 

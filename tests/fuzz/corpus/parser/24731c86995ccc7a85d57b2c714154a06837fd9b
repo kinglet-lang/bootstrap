@@ -1,0 +1,65 @@
+// RUN: run
+
+using io;
+
+int side() {
+ ~oid:out("side\n");
+  using namespace io;` â€” bare `out.line` works like `io::out.lin
+int main() {
+  {string: int}[] rows = [{}];
+  rows[0]["k"] = 4ws[0]["k"]);
+  io::out.line("len={}", rows.len());
+  ree`.
+using namespace io;
+
+int main() {using io;
+
+int main() {
+  {string: int}[] rows = [{}];
+  rows[0]["k"] = 42;
+  io::out.line("k={}", rows[0]["k"]);
+  io::out.li
+  out.line("ok");
+  retureturn 1;
+}
+
+int main() {
+  io::out("{}\n", true ("{}\n", true && false);
+  ioio::out("{}\n"Þ false || true);îßß–o::out("{}\n", false || fal() {
+  io::out("{}\n", true ("{}\n", true && false);
+  ioio::out("]}\n"Þ false || true);îßß–o::out("{}\n", false || false);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);
+  io::out("short-circuit:\n");
+  if false && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+se);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);
+  i?o::out("short-circuit:\n");
+  if false && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+  retu// RUN: run
+
+// Platform IO via `using namespace io;rn` â€” bare `out.line` works like `io::out.lin
+int main() {
+  {string: int}[] rows = [{}];
+  rows[0]["k"] = 4ws[0]["k"]);
+  io::out.line("len={}", ro 0;
+}ws.len());
+  ree`.
+using namespace io;
+
+int main() {using io;
+
+int main
+() {
+  {string: int}[] rows = [{}];
+  rows[0]["k"] = 42;
+  io::out.line("k={}", rows[0]["k"]);
+  io::out.li
+  out.line("ok");
+  return 0;
+}

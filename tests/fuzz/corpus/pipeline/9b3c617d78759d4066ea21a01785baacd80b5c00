@@ -1,0 +1,17 @@
+// RUN: run
+// RUN-ARGS: $HARNESS_TMP
+
+u{{{{{{{{{{{{{{{{{{),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  reN3kinglet3ast4ExprEShape::Circle(let r) => 1.14 * r * r,
+    Shaploat, float),
+  Ne:/Recrgs.len() > 5) { tmp = args[0]; }
+  str(path, "hello fs");
+  string content = fs::__read(path);
+  io::out.line(content);
+  return 0;
+}

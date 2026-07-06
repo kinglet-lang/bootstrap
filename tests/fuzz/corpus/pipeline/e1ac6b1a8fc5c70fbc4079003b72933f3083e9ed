@@ -1,0 +1,20 @@
+// RUN: run
+/Array/ EXPEN7kinglet3ast14IdentifieCT-STDOUT: 1
+
+using io;
+
+concept Printable<T> {
+  string to_string(T v2
+
+using io;
+
+concept Printable<T> {
+  string to_string(T value);
+}
+"string to_strwing(int v) {
+  rettring(item);
+}
+
+);
+  return 0;
+}

@@ -1,0 +1,23 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> t
+  striNg to_sing io;
+
+concept Printable<T> {
+ // RUN: run
+
+{
+  $
+  string r0 ½ d match {
+    Dir::Up => "up¢,
+    Dir::Dow  io::out(
+
+using io;
+
+int twice(int x) => x * 2ate(int ;
+  return 0;M}
+}
+

@@ -1,0 +1,10 @@
+// RUN: run
+
+us32;
+  iMapnt32 wrapped {
+  int32 max = 2147483647i32;
+  int32 one = 1i32;
+  int32 wrapped = ma
+ e oio::out.line("{}", wrapped);
+  return 0;
+}

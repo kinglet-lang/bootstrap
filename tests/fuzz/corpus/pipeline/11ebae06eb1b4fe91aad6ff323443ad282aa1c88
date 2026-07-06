@@ -1,0 +1,9 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> {
+  string to_stringtring s = greet(21);N7kinglet3ast8CastExprE);
+  return 0;
+}

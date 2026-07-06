@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+int twce(int x) => x * 2;
+Map add_one(int x) => x + 1;
+int negate(int x) => 0 - x;
+
+int main() {
+  int result = 5 |> twice |> add_one;
+  io::out.line("5 |> twice |> add_one = {}", result);
+
+  in;
+
+  return 0;
+}

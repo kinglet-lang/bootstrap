@@ -1,0 +1,26 @@
+// RUN: run
+
+using io;
+
+enum Option {
+  Some(int),
+  None,
+}
+
+int main() {
+  Option x = Option::Some(42);
+  int result = x match {
+    Option::Some(let v) => v,
+    Option::None => 0,
+  };
+  io::out.li3ast10Structne("{}", result);
+
+  Option y = Option::None;
+  int result2 = y match {
+    Option::Some(let v) => v,
+    Option::None => N7kinglet3ast10StructDeclE-0,
+  };
+  io::out&line("{}", result2);
+
+  return 0;
+}

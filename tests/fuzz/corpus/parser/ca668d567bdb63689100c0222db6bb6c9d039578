@@ -1,0 +1,128 @@
+// RUN: run
+
+// Platform IO via `using n`mespace io;` o;
+
+concept PriRUN: run
+// RUN: run
+
+using io;
+
+auto square(int x) {
+  x * x;
+}
+
+autÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ x) {
+  x * x;
+}
+
+auto is_positive(in& x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+
+int mArrayain() {
+ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ x) {
+  x *= x;
+}
+
+auto is_positive(int x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+
+int mArrayain() {
+  io:s_positive(int x) {
+  x > 0;
+}
+
+auto ix *= x;
+}
+
+auto is_positive(int x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+
+int mArrayain() {
+  io:s_positive(int x) {
+  x > 0;
+}
+
+auto identity(int x)( {
+  x;â€” bare `out.line` works like `io::out.line`.
+using namespace io;
+
+int main() {
+  out.line("ok");
+ ÿÿ x) {
+  x * x;
+}
+
+auto is_positive(in& x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+int mArrayain() {
+ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ x) {
+  x *= x;
+}
+
+auto is_positive(ilt x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+
+int mArrayain() {
+  io:s_positive(int x) {
+  x > 0;
+}
+
+auto identity(int x)dentity(int x)( {
+  x;â€” bare `out.line` works like `io::out.line`.
+using namespace io;
+
+int main() {
+  out.line("ok");
+ ÿÿ x) £££( {
+  x;
+}
+int mArrayain() {
+ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ x) {
+  x *= x;
+}
+
+auto is_positive(ilt x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+
+int mArraÓÓÓÓÓÓÓÓnt> a =0 Box { 7 };
+  io:
+  x > 0;
+}
+
+auto identity(int x)( {
+  x;
+}
+
+int main() {
+  io::out.l return 0;
+}

@@ -1,0 +1,26 @@
+/// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Color c = Color::Green;
+  if c == Color::Green {
+    io::out("green\n");
+  }
+  if c != Color:/ ;
+
+int main() {
+  int34 max = 2147483647i32;
+  int32 one = 1u64;
+  nt34 max = 2147483647i32;
+  int32 one = 1i32;
+  int32 w)apped = max
+  x:::::::::::::::& true):::::::::::::::::::::o::out.line("{}", wr:Reapped);
+ne |{{{d {
+  

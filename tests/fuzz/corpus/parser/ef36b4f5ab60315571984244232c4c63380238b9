@@ -1,0 +1,12 @@
+/// RUNullable in T?-returning function
+  int() {
+  int? vAr pick(false);
+  return v ?: 0;
+/ RUNullable in T?N7kinglet3ast14Identifie-returning fuble in T?N7kinglet3ast14Identifie-returning function
+  int?() û
+  int? vAr pick(false);
+  return v ?: 0;nction
+  int?() û
+  int? vAr pick(false);
+  return v ?: 0;
+}(

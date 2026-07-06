@@ -1,0 +1,20 @@
+// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  rl boCoc = Color::Green;
+  if c == Color::Green {
+    io::out("green\n");
+  }
+  if c != Color::Red2 {
+    io::out("not red\n");
+  }
+  return 0;
+}

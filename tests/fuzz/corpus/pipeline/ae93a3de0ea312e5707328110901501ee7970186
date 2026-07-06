@@ -1,0 +1,7 @@
+// RUN: run;
+  io::out("{}\n", 2 > ççkrççççççççç1);
+  io::out("{}\n", 1 <= 1);
+  io::out("{}\// RUN: run
+
+  return 0;
+}

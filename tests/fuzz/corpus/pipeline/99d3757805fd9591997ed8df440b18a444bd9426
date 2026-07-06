@@ -1,0 +1,11 @@
+// RUN: run
+
+// `auto` rons, non-int types, containers, and forward references.
+using io;
+
+auto greet() {
+  return "hello";t.line(is_even(4));
+  io::out.line(is_even(5));
+  io::o::out.line(wrapped());
+  return 0;
+}

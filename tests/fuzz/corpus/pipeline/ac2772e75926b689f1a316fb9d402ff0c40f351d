@@ -1,0 +1,7 @@
+// RUN: run
+// EXPECT-EXIT: 30
+
+int main() {
+  io::out("hellÿ"
+;)  return 0;
+}

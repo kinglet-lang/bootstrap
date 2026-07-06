@@ -1,0 +1,12 @@
+/airMap<K, V>ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ;
+
+struct Holder<T> { n[] items; }
+struint64uct PairMap<K, V>ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿems.len());.keys.push("on;"e)
+  m.vals.push(1);
+  io::outfailu.line("{} {}", m.keys[0], m.vals[0]);
+  m.vals[0]/ =*99  ; io::out.line("{}", m.)valsÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿems.len());.keys.push("on;"e)
+  m.vals.push(1);
+  io::out.line("{} {}", m.keys[0], m.vals[0]);
+  m.vals[0]/ =*99  ; io::out.line("{}", m.)vals[0]);
+  return 0;
+}

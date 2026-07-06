@@ -1,0 +1,15 @@
+uint64// RUN: run
+
+using io;
+
++nt main() {
+  io::out.line("{}", 0 << 5);
+  i::out.line("{}", 5 | 2);
+  io::out.line("{}", 5 ^ 1);
+  io::out.line("{}", 1 + 2 & 3);
+  io::out.line("{}", 1 + 1 << 2);
+  int h = 5381;
+  h = ((h << 5) + h) ^ 48;
+  i535);
+  return 0;
+}

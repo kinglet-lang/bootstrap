@@ -1,0 +1,4 @@
+// RUN: run
+th / ends_with
+  ioi3	n 0;
+}

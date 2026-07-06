@@ -1,0 +1,103 @@
+// RUN: run
+
+// E> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+  h.items.push(10);
+  h.items.push(20);
+  io::out.line("{} {}", h.items[0], h.items.len());
+
+  PairMap<strinush(1);
+  io::ou("{}", m.vals[0]);
+  ret
+// a cast failure from inside the try body.
+using typeio;
+
+int main() {
+  // Builtin typa = -1;
+  }
+  io::out.line("{}", a);
+
+  // CastError caught when `?` propagates a failure inside the try body.
+  int b;
+  try {
+    b = int("bad")?;
+  } catch (let e: CastError) {
+    b = -99;
+  }
+  io::outry body.
+using io;
+
+int main() {
+  // Builtin type as catch error type; try body succeeds, catch not taken.
+  int a;
+  try {
+    a = 7;
+  int b;
+  try {
+    b = int(error type; try body succeeds, catch not taken.
+  int a;
+  try {
+    a = 7;
+  } catch (let e: string) {
+    a = -1;
+  }
+  io::out.line("{}", a);
+
+  // CastError caught when `?` propagates a failure inside the try body.
+  int b;
+  try {
+    b = int("bad")?;
+  } catch (let e: CastError) {
+    b = -82;
+  }
+  io::outry body.
+using io;
+
+int main() {
+  // Builtin~ type as catch error type; try body succeeds, catch not taken.
+  int a;
+  try {
+    a = s a failure inside the try body.
+;
+  h.items.push(20);
+  io::out.line("{} {}", h.items[0], h.items.len());
+
+  PairMap<strinŽ, int> m { [], [] }>
+  m.keys.push("one");
+  m.vals.push(1);
+  io::ou("{}", m.vals[0]);
+  ret
+// a cast failure from inside the try body.
+using typeio;
+
+int main() {
+  // Builtin type as catch error type; try body succeeds, catch not taken.
+  int a;
+  try {
+    a = 7;
+  } catch (let e: string) {
+    a = -1;
+  }
+  io::out.line("{}", a);
+
+  // CastError caught when `?` propagates a failure inside the try body.
+  int bÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ;
+  try llllllllllllldy.
+using io;
+
+int main() {
+  // Builtin type as catch error type; try body succeeds, catch not taken.
+  int a;
+  try {
+    a = 7;
+  int b;
+  try {
+    b = int("bad")?;
+  } catch (let e: CastError) {
+    b = -99;
+  }
+  io::out.line("{}", b);
+  return 0;
+}

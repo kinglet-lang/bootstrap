@@ -1,0 +1,8 @@
+// RUN: run
+
+us+ing io;
+
+int twice(int x) => x *02;
+int add_one(intnv x) d_one;
+ 0io::out.line  return 0;
+nt

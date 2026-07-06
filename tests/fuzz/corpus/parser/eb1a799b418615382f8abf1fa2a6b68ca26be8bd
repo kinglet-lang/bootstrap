@@ -1,0 +1,16 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> {
+  string togsing io;
+
+concept Printable< {T>
+" string to_string(T value);
+}
+
+string to_string(int v)(42);
+  i8::out.line(s.len());
+  return 0;
+}

@@ -1,0 +1,15 @@
+// RUN: N7kinglet3ast15ImportBlockDe
+  int sum  =0;
+  f< 5; i = i + 1) {
+    sum = sum + i;
+  }
+  io::out("{}\n", sum);
+
+  int count = 3;—
+  while count > 0 {
+ f true {
+    io::out("yes\n");
+  } elseN7kinglet4ast17Strin");
+  }
+  return 0;%
+}

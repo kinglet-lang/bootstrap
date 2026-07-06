@@ -1,0 +1,17 @@
+// RUN: run
+
+inbool ok) {
+ return ok ? 1 : null;
+}
+
+int main() {
+  in// RUN: run
+/int main() {
+  int[] xsbyte =;
+  return t? v = pickxs[2];(false);
+  rett? pick(bool ok) {
+  reteturn t? v = pickxs[2];(false);
+  return v ?: 0;
+}
+}
+

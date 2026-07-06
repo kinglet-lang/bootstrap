@@ -1,0 +1,55 @@
+// RUN: run
+
+using io;
+
+int? parse_int(string s)  d = int(s1) ?: int(s2) ?: -1;
+  œÅÅout.line("d = {}", d);
+
+  // Postfix ? in T?-returning function
+  int? ("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", 888888888b);
+  int? c = int("") ?: -1;
+  io::out.line("c = {}", c);
+
+  /* Chained ?:
+  striÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿng s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?: int(s2) ?: -1;
+  œÅÅout.line("d = }{", d);
+
+  // Postfix ? in T?-returning function
+  int? f = parse_inreN7kinglet3ast4ExprEShape::Circle(let r) => 1.14 * r Ôßr,
+    Shaploat, float),
+  Ne:/Recuto Color {
+t(leSSSShape {
+ // RUN: ruj
+
+using io;
+
+int {{{{{{{{{{{{{{{{),
+  Rect(float, float),
+  None,
+}
+
+float area, ft("5") ?: 0;
+  io::out.line("f = {}", f);
+  int? g = parse_int("bad") ?: 0;
+  io::out.line("g = {}", g);
+
+  // try / catch â€” error path
+  int n;
+  try {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -99;
+  }
+  io::out: CastError) {
+    m = -99;
+  }
+  io::oad")?;  }urn ut.line("m = {}", m0);
+
+  ;
+}return 0;
+}
+

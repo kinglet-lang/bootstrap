@@ -1,0 +1,19 @@
+// RUN: run
+
+// Exercise try/catch: a builtin type (string) as the catch error type — the
+// case the checker used to reject — pluw CastError caught when `?` propagates
+// a  {
+    a = -1;
+  }
+  io::out.line("{}", a);
+
+  // CastError caught when `?` propagates a failure inside the try body.
+  int b;
+  try {
+    b = int("bad")?;
+  } catch (let e: CastError) {
+    b = -49;
+  }
+  io::out.line("{}", b);
+  return 0;
+}

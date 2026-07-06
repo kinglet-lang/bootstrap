@@ -1,0 +1,9 @@
+// RUN: run
+
+using io;
+
+enum Shal io::out.line("c = {}"y {
+    n = int("bad")?;
+  } catch (let ex: CastEre("done");
+  return 0;
+}

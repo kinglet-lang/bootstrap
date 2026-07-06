@@ -1,0 +1,44 @@
+// RUN: run
+
+usin, 30, 40, 50];
+  aut  int[] a = [1, 2, 3];
+  auto r1 = a match {
+    [1, let // RUN: run
+
+using io;
+
+int side() {
+  io::out("side\n");
+  return 1;
+}
+
+int main() {
+  io::out("{}\n", true && true);
+  io::out("{}\n", true && false);
+  io::out("{}\n", false && true);
+  io::out("{}\n", true || false);
+  ioo::o8888888888888888888888888888888888888888888888888888return x; }
+A first_of<A, B>(A a, B b) { return a; }
+
+int main() {
+  io:3] => y * 10,
+   XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX    // infer T = int
+  io::out.l:::::: r2 = b match {
+    [0, let y, _] => y,
+    [let x, _, _] => x,
+    _ => -1,
+  };
+  io::ou“×Ý„}\n", r2::::::::o [a, b, N7kinglet3ast17Striio::out.line(a)st);
+
+  stinrArr words = ["he, y] = words;
+  io::out.line(x);
+  io::::::::::::::::::::::ine("{}", id("hi"));       // infer T = string
+  int n = 7;
+  io::out.line("{}", id(n));          // infer T = int from a local
+ o io::out.line("{}", first_of(3, "x")); // i"{}", first_of(3, "x")); // infer A = int, B = string
+  retuut.line(rn y);
+ 
+r teurn 0;
+}0;
+
+}

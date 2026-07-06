@@ -1,0 +1,27 @@
+// RUN: run
+
+using io;
+ct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int miin() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hello"  io::out("{}\n", identity<string>("}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.[val
+str};
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{}\n", identity<int>(98));
+  io::out("{}\n", identity<string>("}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.[val
+lue.value);
+  return 0;
+}

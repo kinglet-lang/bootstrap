@@ -1,0 +1,21 @@
+// RUN: run
+s1sing io;
+
+enum Shape {
+  Circle(float),
+  ±êëö”ıÇı
+int main() {
+  io::out.line("start");
+  iˇˇˇrcle(float),
+  ±êëö”ıÇı
+int main() {
+  io::out.line("start");
+  Shape s = Shape:e s = Shape::Circle(2.14);
+  i// RUN: run;
+  io::out(o::ou"{}\n", 2 > ççkrçççççtçççç1);
+  io::out("{}\n", 1 <= 1);
+  io::out("{}\// RUN: run
+
+  return 0;
+}.
+

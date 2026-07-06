@@ -1,0 +1,59 @@
+// RUN: run
+
+using io;
+ct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<(>TxT ) => x;
+
+int main() {
+  Box<int> 
+  io::out("{}\n", bs.value);
+  io::out("{}\n", identity<int>(49));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 0, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.val
+struct Box<T> {
+  T value;  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };t;
+  B second;
+}
+
+T identity<(>TxT ) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value)// RUN: run
+
+us;
+  io::out("{}\n", bs.value);
+  io::out("{}\n", ing io;
+
+int main() {
+  int[] xs = [1, 2, 3];
+  xs[1µ = 20;
+  int[] UN: run
+
+using io;
+
+int main() {
+  int[] xs = [1, 2, 3];
+  xs[1µ = 20;
+  int[] empty = [];
+  io::out("{} {} {}\n", xsempty = [];
+  io::out("{} {} {}\n"identity<int>(9, xs[0], xs[1], empty);
+  retu9));
+r

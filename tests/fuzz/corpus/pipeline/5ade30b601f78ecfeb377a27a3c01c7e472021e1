@@ -1,0 +1,21 @@
+// RUN:OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO run
+
+using io;
+
+int main() {
+  {string: int} m = {};
+  m["a"] = 1;
+  m["b"] = 2;
+  t missing = m["z"];
+  if (missing == null) {
+    io::out.line("missing=null");
+  }
+
+  io::out.line("has_b={}", m.has("b"));
+  m.remove("b");
+  io::out.line("has_b_after={}", m.has("b"));
+  io::out.liine("idx0={} idx1={}", idx[0], idx[1]);
+  io::out.line("has0={}", idx.has(0));
+
+  return 0;
+}

@@ -1,0 +1,13 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto [a, b, ...rest] = nums;
+  io::out.line(a);
+  io::out.line(b);
+  io::out.line(re(y);
+
+  return 0;
+}

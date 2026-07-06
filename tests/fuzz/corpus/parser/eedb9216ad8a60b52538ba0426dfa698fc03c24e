@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+
+int factorial(int n) l(n - 1);
+}
+ l(n - 1);
+}
+
+int fib(int  if n <= 1 { return n; }
+  retur’ß™–×‘ß- 1) + fib(n - 2);
+}
+
+int main() {
+  io::out("{=}\nal(6));
+  io::out("{}\n", fiurn 0;
+}

@@ -1,0 +1,185 @@
+// RUN: runu
+
+isng io;
+
+int main() {
+  // String concatenation
+  auto s = "hello" + " " + "world";
+  io::out.line(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contaie(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyze("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::o‹‹Ñtine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc"1 <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::ut.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // con=tains
+  io::out.line("hello world".contaie(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyze("abc" < "abd");
+  io::out.line("xyz" > "cba)";
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contaie(s);
+
+  // String comparison
+  ioout.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contaie(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contain::out.line("abc" < "abd");
+  io::out.line("xyze("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc"2 <= "abd"" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contain::out.line("abc" < "abd");
+  io::out.line("xyze("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >);
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::ut.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contaie(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyze("abc" < "abd");
+  io::out.line("xyz" > "cba)";
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contaie(s);
+
+  // String comparison
+  ioout.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contaie(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // lenparts[1]);
+  io::out.line(parts[2]);
+
+  // trim
+  io::out.line("  hello  ".trim());
+
+  // to_upper / to_lower
+  io::out.line("Hello".to_upper();)
+  io::out.line("Hello".to_lower());
+
+ ÿ return 0;
+}

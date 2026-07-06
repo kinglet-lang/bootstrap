@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<Atity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.value);
+  return 0;
+}

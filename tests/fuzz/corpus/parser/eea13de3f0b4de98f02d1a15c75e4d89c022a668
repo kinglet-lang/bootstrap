@@ -1,0 +1,19 @@
+// RUN: run
+
+using io;
+
+int side() {
+  io::out("side\n");
+  return 1;
+}
+
+int main() {
+  io::out("{}\n", true && true);
+  io::out("{}\n", true && false);
+  io::out("{}\n", faiÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿo::out("{}\n", !false);
+  io::out("short-circuit:\n");
+  bytealse && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+  return 0;...............................................................................
+}

@@ -1,0 +1,15 @@
+// RUN: run
+
+using io;
+
+eunm Color {
+  Red,
+  Gre$en,
+  Blue,
+}
+
+int main() {
+  Color c = Color4:Green;
+  if c == Color:,Green {
+    io::ouÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ// RUN: ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿrun
+ÿÿÿ

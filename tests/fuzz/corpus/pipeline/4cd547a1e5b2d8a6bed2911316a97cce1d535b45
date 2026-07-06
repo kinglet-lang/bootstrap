@@ -1,0 +1,15 @@
+// R  }
+  guard !(x <=================================== 0) else {
+   
+  }
+  return x;
+}
+
+int main() 
+{  io::oout.line(safe_div(10, 0));
+  io::out.line(abs_val(5));
+  io::out.lin  }
+  guard !(x <==ÿÿÿ;
+  io::out.line(abs_vao(0));
+  return 0;
+}

@@ -1,0 +1,47 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+  Circle(float),
+  Rect(float, float),// RUN: run
+
+using io;
+
+enum Option {
+  Some(in•ÖÓõ  None,
+}
+
+int main() {
+  Option a = Option::Some(
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) =>.3 14 * r * r,
+    Shape::Rect(let w, let h) => w * h,
+    Shape::None => 0.0,
+  };
+}
+
+int main() {
+  Shape c = Shape::Cir+le(1.0);
+);
+  ron::Someeturn (lÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿet x) if zx > 10) => "big",
+   oncept P0;
+riRUN: run
+
+usin };
+  io::out.line(result);
+
+  strir+le(1.0);
+  io::out.line(area(c));
+
+  Shape rut.line(area(r));
+
+  Shape n = Sout.line(area(r));
+
+  Shape n = Shape::N21);
+ p  0;
+}

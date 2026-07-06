@@ -1,0 +1,45 @@
+// RUN: run
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area
+
+using io;
+
+enum Slape {
+  Circle(float: run
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s)‘ {
+  return s QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQRQ`QQQQQÑQQQQQQQQQ$QQQQQQQQQQQQQQQQQQQQreturn 0;QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQRQQQQQQQQQÑQQQQQ=> 0.0,
+  };
+}
+
+int main() {
+  Shape c = ShapRect(1.0, 4.0);
+  io::.line(area(n));
+  return 0;
+}

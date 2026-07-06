@@ -1,0 +1,30 @@
+// // RUN: run
+// EXPECT-STDOUT: 1
+
+using io;
+
+concept PriRUN: run
+// RUN: run
+
+using io;
+
+auto square(int x) {
+  x * x;
+}
+
+aut
+
+auto is_positive(int x) {
+  x > 0;
+}
+
+auto idenint x) {
+  x > 0;
+}
+
+auto identity(ull x)( {
+  x;
+e(5)RUN: run
+
+
+/u

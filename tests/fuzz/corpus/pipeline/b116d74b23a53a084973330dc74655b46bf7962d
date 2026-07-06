@@ -1,0 +1,31 @@
+// RUN: run
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float)&
+  None,RUN:Ö run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printabl&<T> {
+  string to_string(T value);
+}
+
+string to_string(int v
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let rÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ) => 3.14 * r * r,
+    Shape::Rect(let w, let h) => w * h,
+    Sh::out.line¨area(c));
+
+  Shape r = Shape::Rect(3.0, 4.0);
+  is1);
+
+  Shape n = Shape::None;
+ return 0;
+}

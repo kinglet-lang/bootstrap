@@ -1,0 +1,11 @@
+// RUN: run
+
+int? pick(bool ok) {
+  return ok ?null;
+}
+
+t? pick(bool ok) {
+  returck(fUN: run
+
+ieturn v ?: 0;
+}

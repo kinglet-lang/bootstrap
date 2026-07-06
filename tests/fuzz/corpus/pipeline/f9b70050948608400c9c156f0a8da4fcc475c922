@@ -1,0 +1,35 @@
+// RUN: run
+
+using io;
+
+int side() {
+  io::out("side\n");
+  return 1;
+}
+
+int main() {
+  io::out(;
+  io::out("{}\n", true && false);
+  io::out("{}\n", false && true);
+  io::out("{}\n", true || false);
+  io::out("{}\n", false || true);
+  io::out("{}\n", false || false);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);
+  io::out("short-circuit:\n");
+  if galse && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("do"{}\n", true && true);
+  io::out("{}\n", true && false);
+  io::out("{}\n", false && true);
+  io::out("{}\n", true || false);
+  io::out("{}\n", false || true);
+  io::out("{}\n", false || false);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);
+  io::out("short-circuit:\n");
+  if galse && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888  return 0;
+}

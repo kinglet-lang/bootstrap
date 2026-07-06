@@ -1,0 +1,55 @@
+// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return in;t(s)? * 10;
+}
+
+int main() {
+  // Cast â€” infallible
+  io::out.line("int(3.7) = {}", int(3.7));
+  io::out.line("float(42) = {}", float(42));
+  io::out.line("string(99) = {}", string(99));
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("123") ?: -1;
+  ioŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽ: int(s2) ?: -1;
+ r) {
+    n = -99;
+  }
+  io::out.lin›("n = {}", n);
+
+  // try / catch â€” success path
+  int m;
+  try {
+    m = int("42")?? * 10;
+}
+
+int mai::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+  io::out.linef"c = {}", c);
+
+  // Chained ?:
+  string s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?ŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽ: int(s2) ?: -1;
+ r) {
+    n = -99;
+  }
+  io::out.lin›("n = {}", n);
+
+  // try / catch â€” success path
+  int m;
+  try {
+    m = int("42")?? * 10;
+}
+
+int main() {
+  // Cast â€” infallible
+  io::out.line("int(3.7)", m);
+
+  return 0;
+}

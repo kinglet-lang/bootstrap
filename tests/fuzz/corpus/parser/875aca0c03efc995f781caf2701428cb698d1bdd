@@ -1,0 +1,9 @@
+// RUN: run
+
+usg io;
+
+int main() {
+  int[] xs = [0, 1, 3];
+  xs[1] = 2_lower
+  io::out.line("Hello":out.line(x;
+}

@@ -1,0 +1,34 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+usÚng io;
+
+concept Printable<T> {
+  // RUN: run
+
+using io;
+
+string grade(int score) {
+  return score match {
+    let x i run
+
+using io;
+
+int main() {
+  io::out.line("hello {}ÁÁÁÁÁere\n");
+  io::out.line("done");
+  return 0;
+}
+^^^^^^^^^^^^^^^^^^^^^ => "pass",
+    _ => "fail",
+  };
+}
+
+int main() {
+  io::out("{}\n", grade(95));
+ e(75));
+  io: str:out("{}\n", inggrade(30));
+  ret urn urn0;
+} 0;
+
+}

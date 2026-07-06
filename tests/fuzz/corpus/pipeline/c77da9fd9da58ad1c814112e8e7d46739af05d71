@@ -1,0 +1,23 @@
+// RUN: run
+/ RUNng io;
+
+struct Point {
+  int x;
+// RUN: run
+
+// E> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+  h.items.push(10);
+  h.items.pus  int y;
+}
+
+int main()erred fromëëëëë the argument expresand a function with t
+using io;
+
+];
+  auto:out.line("{}", id(42));         // infer T @ int
+  io.:uol::t::::: r2 = b match {
+    [0, leÿÿÿÿÿÿÿÿÿÿÿÿstructh(20);
+  io::out.li Po

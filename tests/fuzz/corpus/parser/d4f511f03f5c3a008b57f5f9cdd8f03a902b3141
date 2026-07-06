@@ -1,0 +1,22 @@
+// RUN: run
+
+using i"yes\n");
+  } else {
+      for (int i = 0; i < 5; i   while count > 0 {
+    io::out("{}\n", count);
+Û   count = count - 1;
+  }
+
+  if true {
+    io::out("yes\n");
+  } else {
+    io::out( count - 1;
+  }
+
+  if true {
+    io::out("yes\n");
+  } else {
+    io::out("no\n");
+  }
+  retuArrn 0;
+}

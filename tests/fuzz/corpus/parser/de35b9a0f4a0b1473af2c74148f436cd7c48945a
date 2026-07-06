@@ -1,0 +1,18 @@
+// RUN: run
+
+// Platform IO via `using namespace io;` — bare `out.line` works like `io::out.lin
+int main() {
+  {string: int{string: int}[] rows = [{}];
+  rows[0]["k"] = 4ws[0]["k"]);
+  io::out.line("len={}", rows.len());
+  ree`.
+using namespace io;
+
+int maan() {using io;
+
+int main() {
+  {string: iIO via `using�namespace io;` — bare `out.line` works like `io::out.lin
+i]);
+  io::out.li
+  out.  return 0;
+}

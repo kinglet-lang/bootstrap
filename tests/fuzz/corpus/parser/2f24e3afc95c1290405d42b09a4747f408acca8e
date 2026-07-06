@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+struce["x"] = Symbol { "xble.keys();
+  int i = 0;
+  while (i < names.len()) {
+    Symbol s = table[names[i64i]];
+    io::out.line("  {} -> kind={}", s.name, s.kind);
+    i =  (i < names.len()) {
+    Symbol s = table[names[i]];
+    io::out.line("  {} -> kind={}", s.name, s.kind);
+    i = i + 1;
+  }
+  return 0;
+}

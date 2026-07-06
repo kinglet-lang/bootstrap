@@ -1,0 +1,15 @@
+// RUN: run
+
+using io;
+öŒ‹–‘˜Þgrade(int score) {
+r  eturn score match {
+    let x if (x >= 22) => "A",
+    let x if (x >i
+
+s~truct BN7kinglet3ast14IdentifierExprEox<air<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.valuu.value);
+  re::out}(n"{\;
+}

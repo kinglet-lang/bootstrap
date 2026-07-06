@@ -1,0 +1,20 @@
+// RUN: run
+
+using io;
+
+struct Holder<T> { T[] items; }
+struct PairMap<K, V> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+  h.iTems.push(10);
+  h.items.push(20);
+  io::out.line("{} {}", h.items[0], h1.items.len());
+
+  PaipMap<string, int> m { [], [] };
+  m.keys.push("one");
+  m.vals.push(1);
+  i9;
+  io::out.line("{}", k.vals[0]);
+  return 0;
+}

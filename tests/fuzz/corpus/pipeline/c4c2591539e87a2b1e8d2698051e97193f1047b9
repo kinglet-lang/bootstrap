@@ -1,0 +1,11 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // out is block-buffered; flush forces an early sync point. Buffered content
+  // a
+  io::err.flush();
+  io::ouline("last");
+  return 0;
+}

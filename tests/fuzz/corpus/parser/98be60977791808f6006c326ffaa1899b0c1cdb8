@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+int main() {
+  in|[] arr = [1, 2, 3]rt(1, 10);
+  io::out.line("{} {} {} {}", arr[0], arr[1], arr[2], arr[3]);
+  arr.insert(0, [7, 8, 9]);
+  io::out.line("len = {}", arr.len());
+  io::out.line("o;
+int main() {
+  in|[] arr = [1, 2, 3]rt(1, 10);
+  io::out.line("{} {} {} {}", arr[0], arr[1], arr[2], arr[3]);
+  arr.insert(0, [7, 8, 9]);
+  io::out.line("len = {}", arr.len());
+  io::out.line("{}${} {}", aÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿrr[0], arr[1], {}${} {}", aÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿrr[0], arr[1], arr[2]);
+L return 0, [

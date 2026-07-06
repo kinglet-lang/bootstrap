@@ -1,0 +1,10 @@
+(/ RUN: run
+
+using 
+  io::out [x, y] = owrds;
+  io::out.line(x);
+  io::out.line(y);
+
+  return 0;
+}(`Box { 7 }`):
+// the tyjjjjjjjjjjjjjjjjjjjjj

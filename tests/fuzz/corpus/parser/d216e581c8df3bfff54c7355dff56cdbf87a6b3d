@@ -1,0 +1,11 @@
+// RUN: run
+
+int main() {
+  int unused = 5;
+
+  if true {
+    return 0;
+  }
+
+  wh;
+}

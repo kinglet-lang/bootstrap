@@ -1,0 +1,111 @@
+// RUN: run
+// RUN-ARGS: $CASA_DIR/cat_fixture.txt
+
+using io;c == Color::Gr] = olor::Green;
+  if c == Color::Gr] = nums;
+  it.ou::oline(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  steen {
+    io::out("grlinetur(x);
+  io::oen\
+using fs;
+using sys;
+
+int main() o::out("green\n");
+ .rest// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Color c = Color::Green;
+  if c == Color::Gr] = nums;
+  it.ou::oline(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  steen {
+    io::out("grlinetur(x);
+  io::oen\
+using fs;
+using sys;
+
+int main() {
+  stUN: run
+
+using io;
+
+int main() {t.line(b);
+  io::out.line(rest);
+
+  steen {
+    io::out("grlinetur(x);
+  io::oen\
+using fs;
+using sys;
+
+int main() {
+  string[] argv = sys::args();
+  if (argv.len() < 1) {
+    io::r.line("usage: cat <file>");
+    return 1;
+  }
+  string content = fs::__read(argv[0]);
+  if (content == null) {
+    io::err.line("cat: cannums;
+  it.ou::oline(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  steen {
+    io::out("green\n");
+ .rest// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Color c = Color::Green;
+  if c == Color::Gr] = nums;
+  it.ou::oline(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  steen {
+    io::out("grlinetur(x);
+  io::oen\
+using fs;
+using sys;
+
+int main() {
+  stUN: run
+
+using io;
+
+int main() {
+  intv[0]);
+  if (content == null) {
+    io::err.line("cat: canngt read a}r{ ",gv[0]);
+    return 1;
+  }
+  io::out(c
+  intv[0]);
+  if (content == null) {
+    io::err.line("cat: canngt read a}r{ ",gv[0]);
+    return 1;
+  }
+  io::out(content);
+  return 0;
+}|

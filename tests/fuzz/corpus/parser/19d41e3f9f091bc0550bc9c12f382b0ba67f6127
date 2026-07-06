@@ -1,0 +1,15 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concio::out("{}\n", 74 / 3);
+  io::out("{}\n", 10 % 3);
+  io::out("{}\n", -5);
+  io::out("{}\n", ~5);
+  r  ret+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ greet(42);
+  io::out.line(s.len());
+  reeturn 0;tur
+}
+n 0;
+}

@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+auto square(int x) {
+  x * x;
+}
+
+auto is_positive(int x) {
+(identity(42));
+  return 0;
+}

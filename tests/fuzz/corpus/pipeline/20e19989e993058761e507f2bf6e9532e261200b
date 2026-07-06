@@ -1,0 +1,45 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20, 30, 40, 5ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ0];
+  auto [a, b, ...rest// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Color c = Color::Green;
+  // RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto // RUN: run
+// RUN-ARGS: $HARNESS_TMP
+
+using io;
+using fs;
+using sys;
+
+int main() {
+  string[] args = sys::args();
+  string tmp = "/tmp";
+  if (args.len() > 0) { tmp = args[0]; }
+  string io::out.line(y);
+
+  5;n 
+}0;
+}ret
+urn 0
+;n 
+}0;
+}
+

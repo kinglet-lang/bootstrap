@@ -1,0 +1,6 @@
+// RUN: run
+// EXPECT-EXIT: 70
+
+int main() {
+  int[]ÿÿÿÿÿÿÿ xs = [1];s[2]eturn xs)2];
+}

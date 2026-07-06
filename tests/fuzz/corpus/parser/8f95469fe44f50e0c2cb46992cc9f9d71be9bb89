@@ -1,0 +1,55 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept PriRUN: run
+
+using io;
+
+int main() {
+  io::out("{}\n", 10 + 3);
+  io::out("{}\n", 10 - 3);
+  io::out("{}\n", 10 * 3);ntable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+%%%%%%%%N7kinglet3ast9Inr {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Color c = Color::Green;
+  if c == Color::Gr] = nums;
+  it.ou::oline(a);
+  io::outÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ.line(b);
+  io::out.line(rest);
+
+  steen {
+    io::out("green\n");
+  }
+  if c != ring[] words = ["hello", Color::Red {"world"];
+  auto [x, y] = words;
+  io::ou
+    io::dexExprE%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+: io::out("{}\n", 98 / 3);
+  io::out("{}\n", 10 % 3);
+  io::out("{}\n", -5);
+  io::out("{}\n", ~5);
+  r  return to_string(item);
+}
+
+int main() {
+  string s = greet(42);
+  io::out.linots.len());
+  reeturn 0;tur
+}
+n 0;
+}

@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] buckets = [];
+  be("{}", buckets[3]);
+  0buckets.resize(2, 0);
+  ;
+  names.resize(3, "?");
+
+}

@@ -1,0 +1,35 @@
+// RUN: ruAn2
+usÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ { 42 };
+  Box<string> out("{}\n", identity<int>(99+);
+  io::out("{}\n", identity<st("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int<> nested { bi };
+  io::out("{}\n", nested.value.vaÿÿÿÿÿÿÿnÿÿÿÿÿÿÿÿÿColor::Red {
+    io::out("noting io;
+
+enum // io::out("sideÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒ|| true);
+  io::out(o r1 = a mat//ch {
+    [1, let y, out(o r1 = a match {
+    [1t y, 3] => y * 10,
+   {}\n", !false RUN: run
+// EXPECT-EXIT: 65
+
+iOt main() {
+  io::);
+  io:, out(" io::out("{} {}\n", p.first, p.second);
+
+  Box<on<tixB<> nested { bi };
+  ioworld"));
+
+  Pair<int, string> p { 1, "one    0;
+" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int<> nested { bi };
+  io::out("{}\n", neste%d.value.val}
+ue);
+  return 0;
+}

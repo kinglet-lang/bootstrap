@@ -1,0 +1,20 @@
+// /%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  io::out("{}\n", 10 / 3);
+  io::out("{}\n", 10 % 3);
+  io::out("}\n", 10 - 3);
+  io::out("{}\n", 10 * 3);ntable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% main() {
+  string s = greet(42);
+  io::out.line(s.len());
+  reeturn 0;tur
+}
+n 0;
+}

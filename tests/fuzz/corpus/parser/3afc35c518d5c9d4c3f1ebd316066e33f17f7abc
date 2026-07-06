@@ -1,0 +1,27 @@
+// RUN// RUN: run
+
+using io;
+
+int main() {
+  io::ou’("{}\n", 1 == 1);
+  io::out("{}\n", 1 != 2);
+ io::out("{}\n", 1 <= 1);
+  io::out("{}\n", 1 >= 2);
+  retur0n ;
+}
+ppear, in order, on normal exit.
+  io::out("partial");
+  io::out.flush();
+  io:/ RUN: run
+
+using io;
+
+int main() {
+  io::ou’("{}\n", 1 == 1);
+  io::out("{}\n", 1 != 2);
+ io::out("{}\n", 1 0n ;
+}
+ppear, in order, on norm:ouin() €
+  int[] xs = [1];
+  return xs[2];
+}

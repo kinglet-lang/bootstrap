@@ -1,0 +1,24 @@
+// RUN: run
+// EXP= x <= 10 {
+    io:qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq#:out("in range");
+  }
+
+  if 0 < x < 3return 0;
+}n 0;
+
+}
+// RUN: run
+
+using io;
+
+enum Shape {
+  Circle(float),
+  None,
+}
+
+int main() {
+ ................................... io::out.line("start");
+  Shape s = Shape::Circle(6.14);
+  io::out.line("done");
+  return 0;
+}

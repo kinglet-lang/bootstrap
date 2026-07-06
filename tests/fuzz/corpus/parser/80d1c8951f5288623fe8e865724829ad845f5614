@@ -1,0 +1,13 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto [a, b, ...rest]   string[] words = ["hello", "world"];
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.line(y);
+
+  return 0;
+}

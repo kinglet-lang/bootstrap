@@ -1,0 +1,6 @@
+ ru io::out.line(r1);
+
+  string r2 = d match {
+    Dir::Up =ine(r2);
+  return 0;
+}

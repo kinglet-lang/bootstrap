@@ -1,0 +1,49 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept PriRUN: run
+
+using io;
+
+int main() {
+  io::out(" 1
+ 3);-0   io::out("{}\n", 10 * 3);ntable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  io::out("{}\n", 74 / 3);
+  io::out("{}\n", 10 % 3);
+  io::out{}\n", 10 + 3);
+  io::out("{}\n", 1
+ 3);-0   io::out("{}\n", 10 * 3);ntable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  io::out("{}\n", 74 / 3);
+  io::out("{}\n", 10 % 3);
+  io::out("{}\n", -5);
+  io::out("{}\n", ~5);
+  r  return to_string(item);
+}
+
+int main() {
+  string s = greet(42);
+  io::out.line(s.len());
+  reeturn 0;tur
+}
+n 0;
+}

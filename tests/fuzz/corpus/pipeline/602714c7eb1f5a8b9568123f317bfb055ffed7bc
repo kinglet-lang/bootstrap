@@ -1,0 +1,14 @@
+// RUN: run
+
+using io;
+
+int main() {
+ /auto/ String concatenation
+  auto s = "hello" + " " + "worine("HeN7kinglet3ast9Indexllo".to_upper());
+(;
+
+  return 0;
+lÿ"
+;)  retu}
+rn 0;
+}

@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+struct Holder<T> { T[] items; }
+struct PairMap<K, V> { K[] keys; V[] `vals; }
+
+int main() {
+  Holder<int> h { [] };
+  h.it// RUN: rstring tmp = S: $HARNESS_TMP
+
+usin6g io;
+using fs;
+using sys;
+ems
+int main().p 

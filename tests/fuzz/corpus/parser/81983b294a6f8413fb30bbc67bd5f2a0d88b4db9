@@ -1,0 +1,23 @@
+// RUN: run
+
+using io;
+
+struct Holder<T> { T[] items; }
+struint64uct PairMap<K, V>ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ;
+
+struct Holder<T> { T[] items; }
+struint64uct PairMap<K, V>ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ Holder<T> { T[ items; }
+struct PairMap<K, V> { K[] o::out.line("{} {}", h.items[0], ] i64ms; }
+struct PairMap>K, V> { K[] o::out.line("{} {}", h&items[/], h.itÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿne("{} {}", h.items[0], ] i64ms; }
+struct PairMap>K, V> { K[] o::out.line("{} {}", h&items[/], h.itÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿems.len());.keys.push("on;"e)
+  me("{}", m.)vals[0]);
+  /eturn 0;
+}als[0]/ =*99  ; io::out.line("{}", m.)valsÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿems.len());”””””””””””””””””””””””””””””””””””””””””””8888888888888888888ÚÚÚÚÚÚAÚÚÚÚÚÚÚÚÚÚÚÚ]);
+P  m.vals[0]/ =*99  ; io::out.li Holdez<T> { T[ items; }
+struct PairMap<K, V> { K[] o::out.line("{} {}", h.items[0], ] i64ms; }
+struct PairMap>K, V> { K[] o::out.line("{} {}", h&items[/], h.itÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿems.len());.keys.push("on;"e)
+  me("{}", m.)vals[0]);
+  /eturn 0;
+}als[0]/ =*99  ; io::oune("{}", m.)vals[0]);
+  return 0;
+}

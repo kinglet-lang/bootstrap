@@ -1,0 +1,13 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+tocc
+pne Pri'table<T> {
+  string to_sing io;
+
+concept Ptable item) {
+  return to_string(}$(84);
+  io::out.line(s.len());
+  return 0;
+}

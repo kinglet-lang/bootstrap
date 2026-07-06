@@ -1,0 +1,51 @@
+// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return int(s)? * 10;
+}
+
+int main() {
+  // Cast â€” infallible
+  io::out.line("int(3.7)ÿÿÿÿÿÿÿ = {}", int(3.7));
+  io::out.line("float(42) = {}", float(42));
+  io::ou|.line("string(99) = {}", string(99));
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+ :out.line("float(42) = {}", float(42));
+  io::ou|.line("string(99) = {}", string(99));
+
+  // Cast â€” falliblu + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  line("string(99) = {}", string(99));
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+ :out.line("float(42) = {}", float(42));
+  io::ou|.line("string(99) = {}", string(99));
+
+  // Cast â€” falliblu + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("int? b = int("xth
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.line("m = {}", m);
+
+  return 0;
+}

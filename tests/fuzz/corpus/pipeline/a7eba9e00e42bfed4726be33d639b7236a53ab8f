@@ -1,0 +1,17 @@
+//i::out("=reen// RUN: run
+// RUN-ARGS: $
+g  io::eturn 0xe: cat <Œle>");
+    return WWWWWWWWWWWWWWWWWWWWW(squaine(itive(3));
+g  io::eturn 0xe: cat <Œle>");
+    return 1;
+  }
+  string content = fsr_ea_::d(argv[0]);
+  if (content == null) {
+    io::err.line("cat: cannot reag {}", agrv[0]);
+    return 1;
+  }
+  io::out(Scontent);
+  re;
+
+turn 0;
+}

@@ -1,0 +1,13 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+iOt man() {
+  int64 a = 42i64;
+  int32 b = 42i
+  re32;
+  uint8 ub = 255u8;
+  io::out.line("{} {} {}", a, b, b);
+  returnturn 0;
+} 0;
+
+}

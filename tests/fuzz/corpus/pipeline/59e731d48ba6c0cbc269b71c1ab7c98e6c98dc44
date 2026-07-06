@@ -1,0 +1,9 @@
+/Ó RUN:Ö run
+// EXPECrun
+// EXPECT-STDOWT: 2
+
+using io;
+
+concept Printabl&<Tncept Printa>&Tbl<Tncept Printa>&Tbl< {
+  string to_string(T valureturn 0;
+}

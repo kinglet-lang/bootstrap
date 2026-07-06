@@ -1,0 +1,52 @@
+// RUN: run
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area
+
+using io;
+
+enum Slape {
+  Circle(float: run
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s)‘ {
+  return s QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQRQQQQQQÑQQQQQQQQQ$QQQQQQQQQQQQQQQQQQQQreturn 0;QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQRQQQQQQQQQÑQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQmatch {
+    Shape::Circle(let r) => 3.1(Shape s) {
+  return s QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQmatch {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::Rect(let w, let h) => w * h,
+    Shape::None => 0.0,
+  };
+}
+
+int main() {
+  Shape c = ShapRect(1.0, 4.0);
+  io::out.line(area(r));
+  Shape n = Shape::None;
+  io::out.line(area(n));
+  return 0;
+}

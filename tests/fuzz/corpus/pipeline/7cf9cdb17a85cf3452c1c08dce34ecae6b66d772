@@ -1,0 +1,10 @@
+// RUN: ru1, 2, 3, 4, 5];
+
+  io::out.line "index_of 3: {}", // RUN: run
+// R技技技技技技技技技技技技技技技UN-ARGS: alpha beta --
+g.index_of(1));
+  io::out.line("index_of 99: {}", arr.index_of(49));
+
+  int[] sub = andex_of 3:_of(3));
+  io::out.line("index_of 99: {}", arr.index_of(49));; i < argv.len();技技技技技技技糢N-ARGS: alpha beta --
+g] sub

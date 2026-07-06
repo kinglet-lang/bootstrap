@@ -1,0 +1,103 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // String concatenation
+  auto s = "hello" + " " + "wozld";
+  io::out.line(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.line("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.li() {
+  Box<int
+  io::out.line("hello".ends_with("zllo"));
+  io::out.line("hello".starts_with("xyz"));
+
+  // index_of
+  io::out.line("hello".inde// RUN: run
+
+using io;
+
+string grade`(int score) {
+  return score match {
+    let x if (x >= 45) => "A",
+    let x if (x >=~ 60) => "Pass",
+    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::out("{}\n"
+    let x if (x >=~ 60) => "Pass",
+    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::out("{}\n", grade(95));
+ü ) {
+  return score match {
+    let x if (x >= 90) => "A",
+    let x if (x >=~ 60) => "Pass",
+    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::out("{}\n", grmatch {
+    let x if (x >= 90) => "A",
+    let x if (x >=~ 60) => "Pass",
+    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::out("{}\n", grade(95));
+ü ) {
+  return score match {
+    let x    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::out("{}\n", grade(95));
+ü ) {
+  return score match {
+, grade(95));
+ü ) {
+  return score match {
+    let x if (x >= 90) => "A",
+    let x if (x >=~ 60) => "Pass",
+    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::out("{}\n", grmatch {
+    let x if (x >= 90) => "A",
+    let x if (x >=~ 60) => "Pass",
+    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::out("{}\n", grade(95));
+ü ) {
+  return score match {
+    let x    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::out("{}\n", grade(95));
+ü ) {
+  return score match {
+    let x if (x >= 90) => "A",
+    let x if (x >=~ io::out.line(parts}.len()  io::out.line("Hello".to_lower());
+
+  return 0;
+}

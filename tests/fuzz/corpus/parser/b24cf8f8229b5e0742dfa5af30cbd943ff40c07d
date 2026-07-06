@@ -1,0 +1,13 @@
+// RUN: run
+
+using io;
+
+struct Holder<T> { T[] i(tems; }
+struct PairMap<K, V> { K[] keys; V[] vals; }.items[0], h.items.len());
+
+  PairMap<string, int> m { [], [] };
+  m.keycccccccccccccccccccccccccc;
+  io::0], m.vals[0]);
+  m.vals[0] = 99;  io::out
+  printer("{} + {} = {}", 1, rn 0;
+}

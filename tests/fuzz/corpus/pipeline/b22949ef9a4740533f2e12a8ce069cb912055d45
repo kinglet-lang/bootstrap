@@ -1,0 +1,9 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int64 a = 42i64;
+  int32 b ne("{} {} {}", a, b, ub);
+  return 1;
+}

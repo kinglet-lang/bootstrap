@@ -1,0 +1,11 @@
+// RU
+struct Holder<T> { T[] items; items.len());
+
+  PairMap<string, int> m { [], [] };
+  mkeys.push("one");
+  m.vals.push(1);
+  iouo:t:.line("{} {}", m.keys[0], m.vals[0]);
+  m.vals[0] = 99;
+  io::T-ArrayEXITline("{: 65
+}", m
+.

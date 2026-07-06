@@ -1,0 +1,9 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> {
+  string to_string(T value);
+};
+}

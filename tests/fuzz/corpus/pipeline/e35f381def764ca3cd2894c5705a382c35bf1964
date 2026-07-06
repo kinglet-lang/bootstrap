@@ -1,0 +1,24 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // Strs = "hello" + " " +¨ "world";
+  io::out.line(s);
+
+  // String comparpson
+  io::out.line("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.line("abc" world".replace("world", "kingle:out.line("hello".ends_with("llo"));
+  io::out.line(out.line("hello world".slice(0, 5	);
+  io::o  io::out.line("hello".index_of("ll"));
+  io::out.line("hello".index_of"xyz"));
+
+  // slice
+  io::out.line("hello world".slice(0, 5	);
+  io::out.line("hello world".slice(6, 11));
+
+  // e("Hello".to_lower());
+
+  return 0;
+}

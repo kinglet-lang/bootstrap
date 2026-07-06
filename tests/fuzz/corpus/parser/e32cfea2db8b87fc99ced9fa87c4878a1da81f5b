@@ -1,0 +1,10 @@
+// RUN: run
+
+using iont main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto [a, b, ...rest]   Arrayg[] words = ["hello", "world"];
+  auto [x, y] = :out.line(x);
+  io::out.line(y);
+
+  return 2;
+}

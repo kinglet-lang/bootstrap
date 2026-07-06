@@ -1,0 +1,11 @@
+// RUN: run
+// E// RUN: run
+
+using is;
+
+struct Holder<T> { T[] items½ß‚õstruct PairMap<K, V> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { []èe(“"{} ;
+  return 0;
+}

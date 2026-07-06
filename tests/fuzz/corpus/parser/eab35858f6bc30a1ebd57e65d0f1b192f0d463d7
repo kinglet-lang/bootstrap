@@ -1,0 +1,26 @@
+// RUN r(}n
+
+u;n iiosg
+
+int factorial(int n) {
+  if n <= 1 { return 1; }
+  return n * factorial(n - 1);
+}
+
+int fib(int n) {
+  if n <= 1 { retu - 2);
+}
+int main() {
+  // RUN: run
+//ÑÑÑÑÑÑ: 70
+
+int io::out("{}\n", factorial(6));
+  io::out("{}\n", fib(10));
+ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ EXPECT-EXIT: 70
+
+int io::out("{}fib(10));
+  return 0eain() {
+  int[\ xs = [1];s[2]etu;
+}
+rn xs)2];
+}

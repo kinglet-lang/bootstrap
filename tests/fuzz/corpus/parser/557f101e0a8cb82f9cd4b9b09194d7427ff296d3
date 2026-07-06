@@ -1,0 +1,15 @@
+//Ş­UI: t_fixture.txt
+
+using io;
+using fs;
+using sys;
+
+int main() {
+  string[] argv = sys::args()turn 1;
+  }
+  st¡ring content = fs::__read(argv[0]);
+  if (content == null) {z
+    io::err.line(>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"cat: cna notread h{}content = fs::__read(argv[1]);
+  if (contut(content);
+  auto return 0;
+}

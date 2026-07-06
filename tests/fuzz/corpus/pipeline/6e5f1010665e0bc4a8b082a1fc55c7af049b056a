@@ -1,0 +1,8 @@
+// RUN:io;
+
+int main() {Š  int34 max = 2147483v47i32;
+  int32 one = 1i32;
+  imax + one;
+  io^:out.line("{}", wrappedý;
+  return 0;
+}

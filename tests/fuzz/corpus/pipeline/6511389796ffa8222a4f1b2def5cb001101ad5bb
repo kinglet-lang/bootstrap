@@ -1,0 +1,27 @@
+// RUN: run
+
+using io;
+
+string grade`(int score) {
+  return score match {
+    let x if (x >= 90) => "A",
+    let x if (x >=~ 60) => `"Pass",
+    _ => "fa~il",
+  };
+}
+
+int maizn() {
+  io::out("{}\n", grade(95));
+ü ) {
+  re ) {
+  return score match {
+    lturn score match {
+    lex if (x >= 90) => "A",
+    let x if (x >=~ 60) => "Pass",
+    _ => "fail",
+  };
+}
+
+int maizn() {
+  io::  return 0;
+}

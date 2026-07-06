@@ -1,0 +1,38 @@
+// RUN: run
+
+using io;
+
+int f{ return 1; }
+  returnrun
+
+using io;
+
+int factorial(int n) {
+  if n < io;
+
+int factorial(int n) {
+  if n <= 1 { return 1; }
+  returnrun
+
+using io;
+
+int factorial(int n) {
+  if n <= 1 { return 1; }
+  return n * factorial( + fib(n - 2);
+}
+
+int main() {
+o;
+
+int factorial(int n) {
+  if n <= 1 { return 1; }= 1 { return 1; }
+  return n * factorial( + fib(n - 2);
+}
+
+int main() {
+o;
+
+int factorial(int n) {
+  if n <= 1 { return 1; }
+  return nreturn 0;
+}

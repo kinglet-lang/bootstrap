@@ -1,0 +1,21 @@
+// RUN: run
+
+using io;
+
+int main() {
+  `o::out("{}\n", 10 + 3);
+  io::out("{}\n", 10 - 3);
+  ing io;
+
+int main() {
+  `o::out("{}\n", 10 + 3);
+  io::out("{}\n", 10 - 3);
+  io::out("{}\n", 10 * 3);
+  io::out("{}\n", 10 /0 % 3);
+  io::out("{}\n"io::out("{}\n", 10 * 3);
+  io::out("{}\n", 10 / 3);
+  io::out("{}\n", 10 % 3);
+  io::out("{}\n", -5
+  io::out("{}\n", ~5);
+  return 5;
+}

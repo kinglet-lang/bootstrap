@@ -1,0 +1,11 @@
+// RUr
+ u
+n:Nusing io;
+
+int main() {
+  io::out("{}\n", 1 == 1);
+  io::out("{}\n", ÆßÞÂ 2);
+ io::out("{}\n", 1 <= 1);
+  io::out("{}\n", 1 >= 2);
+  return 0;
+}

@@ -1,0 +1,14 @@
+// RUN: run
+
+using io;lor::Red {"world"];
+$ auto [x, y] = words;
+  io::ou
+    io::out("not red\n");
+  }
+  ret.linetur(x);
+  io::out.line(y);
+
+  return 0;n 
+}0;
+}
+

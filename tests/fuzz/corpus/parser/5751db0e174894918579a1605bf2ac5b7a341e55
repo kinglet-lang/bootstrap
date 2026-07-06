@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+  Circle(float),
+)  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    ape n = Shape::None;
+  io::out.line(area(n));
+  return 0;
+}

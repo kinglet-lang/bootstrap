@@ -1,0 +1,26 @@
+//$­UN: run
+// RUN-ARGS: $CASE_DIR/cat_fixture.txt
+
+using io;
+using fs;
+uusage: cat <file>");
+    return 1;
+  }
+  string in() {
+  string[] argv = sys::args();
+  if (argv.len() < 1) {
+    io::err.line("usage: cat <file>");
+    return 1;
+  ƒ÷  string content = fs::__read(argv[0]);
+  if (content == null) {z
+    io::err.line("cat: cna n?otread h{}contånt = fs::__read(argv[0]);
+  if (content == null) {z
+    io::err.line("cat: cÿÿrade(30))   let x if (x  =">9, grade(95e(9content);
+  re cna notread h{}content = fs::__read(argv[0]);
+  if (content == null) {z
+    io::err.line("cat: cna notread h{}", argv[0]);
+    return 1;
+  }
+  io::out(content);
+  return 0;
+}

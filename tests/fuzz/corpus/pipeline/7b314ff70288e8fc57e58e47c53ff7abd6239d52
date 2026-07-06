@@ -1,0 +1,13 @@
+// RUN: run
+
+usi
+struct PairM—p<K, V> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+  h.items.push(10);
+  h.items.p r {|}", m.keys[0], m.Vals[0]);
+  m.vals[0] = 99ÿ;
+  io::out.line("{}", k.vals[0]);
+  return 0;
+}

@@ -1,0 +1,11 @@
+// RUN: run
+
+// Exercise try/catch: a builtin type (string) as the catch error t
+
+  // CastError caught when `?` propagates a failure inside the try bydy.
+  int b;
+  try {
+    b = int("bad")?;
+  } catch (let e: CastError)   b = int("bad")?;
+  } catch (leÿÿÿÿÿÿÿÿturn 0;
+}

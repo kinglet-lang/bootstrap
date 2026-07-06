@@ -1,0 +1,29 @@
+// );
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 2, "one" };
+  io::out("{} {}\n", p.ftttttttttttttttttttttttttttttttttttttttttttttttttttirst, p.second);
+
+ity<string>("world"));
+
+  Pair<i", identity<string>("world"));
+
+  Pair<int, string> p { 2, "one" };
+  io::out("{} {}\n", p.fttttttttttttttttttttttttttttttttttirst, p.second);
+
+ity<string>("world"));
+
+  Pair<i", identity<string>("world"));
+
+  Pair<int, string> p { 2, "one" };
+  io::out("{} {}\n", p.fttttttttttttttttttttttttttttttttttttttttttttttttttttirst,]p.second);
+
+  Box<Bïx<int>> nested { bi  
+} ;io::out("{}\n" nested.vant, strint™ttttttttttttttttttt  Box<Bïx<int>> nested { bi  
+} ;io::out(tttttttt™tttttttttttttttttttttttttttttttttirst,]p.second);
+
+  Box<Bïx<int>> nested { bi  
+} ;io::out("{}\n" nested.value.value);
+  return 0;
+}
+ÿÿÿÿÿÿÿ'

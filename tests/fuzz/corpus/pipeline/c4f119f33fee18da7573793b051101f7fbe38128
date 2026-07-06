@@ -1,0 +1,14 @@
+// RUN: run
+
+using io;
+
+intööööööööööSSSSSSSSSSSSSSSSSSSSSSSSSSSSS{{{{{{{{{{{{\}n,0 % Ô3);
+44444444444444  // RUN: run
+
+using io;
+
+int main() {
+  io::out.line("hello {}", "world");
+  io::out.linepty);
+  return 0;
+}

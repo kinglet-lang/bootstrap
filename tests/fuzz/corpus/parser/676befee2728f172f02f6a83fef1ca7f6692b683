@@ -1,0 +1,8 @@
+// RUN: run
+
+using io;
+
+struct Holder<T> { T[] items; }
+struct PairMap<K, V> {}u0}", h.items[0], h.items.len());
+ m.keys[0
+}

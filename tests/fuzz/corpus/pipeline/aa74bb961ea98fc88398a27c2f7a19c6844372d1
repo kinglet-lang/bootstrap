@@ -1,0 +1,26 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+int main() @
+  io// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> {
+  string// RUN: run
+
+using io;
+
+int side() {
+  io::out("sideÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒ|| true);
+  io::out(o r1 = a match {
+    [!, let y, 3] => y * 10,
+    _ => 0,
+  };{}\n", !fals{
+  return "ab";
+}
+
+string greet
+(Prìntable item) {
+  return 

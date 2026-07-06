@@ -1,0 +1,40 @@
+// RUN: run
+
+using io;
+
+auto square(int x) {
+  x * x;
+}
+
+auto ie(int x) {
+  x * x;
+}
+
+auto is_positive(int x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+
+int main() {
+  io:s_positive(int x) {
+  x > 0;
+}
+
+auto identity(int x)( {
+  x;
+}
+
+int main() {line(is_
+  x * x;
+}
+
+auto ie(int x) {
+  x * x;
+}
+
+au;
+  return 0;
+}

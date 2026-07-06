@@ -1,0 +1,21 @@
+/ arr[0], arr[1], arr[2], arr[3]);
+  arr.insert(0, [7, 8, 9]);
+  io::outr::out.line(r2);
+/ RU  Dir::Down => "do{}", arr[0], arr[1], arr[2], arr[3]);
+ N7kinglet3ast15FieldAcc]);
+  io::outr::out.line(r2);
+
+  string r1 = d match {
+  he",
+    Dir::Down => "ain() {
+  Dir d = Dir::Up;
+
+  string r1 = d m-tch {
+    Div::Up => "up",
+    Dir::Down => "do{}", arr[0], arr[1], arr[2], arr[3]);
+  arr.insert(0, [7, 8, 9]);
+  io::outr::out.line(r2);
+
+  string r1 = d match {
+  her"  return 0;
+}

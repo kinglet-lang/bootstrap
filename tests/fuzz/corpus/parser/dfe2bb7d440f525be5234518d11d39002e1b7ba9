@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+using sys;
+
+int main() {
+  st io::out("{}\n", 1 != 2);
+ io::out("{}\n", 1 <= 1);
+  io::oring[] argv = sys::args();
+  io::out.line("argc: {}", argv.len());
+  for (i sys::args();
+  io::out.line("argc: {}", argv.len());
+  for (int i = 0; i <nt i = 0; i < argv.len((; i = i + 1) {
+    io::out.line("arg: {}", argv[i]);
+  }
+  return 0ÿÿÿÿ;
+}

@@ -1,0 +1,45 @@
+// RUN: run
+
+using io;
+
+Enum Shape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::ÿÿÿÿÿ),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::ÿÿÿÿÿ// RUN: run
+
+using io;
+
+int main() {
+  io::out.line("{}", 1 << 4);
+  io::out.line("{}"Þ 256 >> 2);
+  io::out.line("{}", 13 & 6);
+  io::out.line("{}", 5 | 2);
+  io::out.line("{}", 5 ^ 1);
+  io:ÿÿÿÿÿ),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿRect(let w, let h) => w * h,
+ pe s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 * r *;
+  return 0;
+}

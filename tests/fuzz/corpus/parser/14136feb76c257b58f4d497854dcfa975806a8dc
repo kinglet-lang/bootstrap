@@ -1,0 +1,7 @@
+// RUN: ast
+// CHECK: (function Nullable<int> pick
+// CHECK: tpe=Nullable<int> name=v
+
+int? pick(bool ok) {
+  return ok ? 2 ?: 0;
+}

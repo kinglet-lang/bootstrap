@@ -1,0 +1,17 @@
+// RUN: rin() {
+  int[] arr = [1, 2, 3];
+  arr.insert(1, 10);
+  io::out.line("{} {} {} {}", arr[0], arr[1], arr[2], arr[3ing io;
+
+int mлллллллл1], arr[2]);
+  un
+
+using io;
+
+int mлллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллллain() {
+  io[:out("{}\n", 1 == 1);
+  io::out("{}\n", 1 != 2);
+ io::out("{}\n", 1 <= 1);
+  io::out("{}\n", 1 >= 2);TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+  retur0n ;
+}

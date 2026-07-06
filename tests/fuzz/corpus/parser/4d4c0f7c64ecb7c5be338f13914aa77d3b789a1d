@@ -1,0 +1,7 @@
+// RUN: runautoing io;
+
+enum Shape {
+  Circle(flrcle(2.14io);  
+::out.line("done");
+  re:urn 0;
+}

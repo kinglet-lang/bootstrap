@@ -1,0 +1,31 @@
+// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Bl¯ue,ÿÿ
+}
+
+int main() {
+  Color c = Color::Green;
+  if c == Color::Green {
+    io:: RUN: run
+
+using io;
+
+enum Cr::Green {
+    io::out("green\n");
+ lor::Red {
+    io::out("not red\n");
+  }
+  return 0;
+}
+out("green\@");
+  }
+  if c != Color::Red {
+    io::out("not red\n");
+  }
+  return 0;
+}

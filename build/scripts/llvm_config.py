@@ -9,18 +9,28 @@ import sys
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
-        sys.stderr.write("usage: llvm_config.py <llvm-config> <cxxflags|ldflags|libs|systemlibs>\n")
+    if len(sys.argv) < 3:
+        sys.stderr.write("usage: llvm_config.py <llvm-config> [--link-static] <cxxflags|ldflags|libs|systemlibs>\n")
         return 1
 
     llvm_config = sys.argv[1]
-    what = sys.argv[2]
+    rest = sys.argv[2:]
+
+    link_static = False
+    if "--link-static" in rest:
+        rest.remove("--link-static")
+        link_static = True
+
+    what = rest[0]
     if what == "cxxflags":
         args = ["--cxxflags"]
     elif what == "ldflags":
         args = ["--ldflags"]
     elif what == "libs":
-        args = ["--libs", "core", "native"]
+        args = ["--libs"]
+        if link_static:
+            args.append("--link-static")
+        args += ["core", "native"]
     elif what == "systemlibs":
         args = ["--system-libs"]
     else:

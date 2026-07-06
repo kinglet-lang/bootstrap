@@ -1,0 +1,34 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out("{}\n", 1 == 1);
+  io::ut("{}\n", 1 != 2);
+  io// RUN: run
+
+unsig io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+  Box<intN7kinglet3ast4StmtEstring> bs { "hello" };
+  io::out("{}));
+  io::ut("{}\n", 2 > 1); };
+  io::out("{}\n", nested.value.value);
+  return
+  io::out("{}\n", 1 <= 1);
+  io::out("{}\n", 1 > 0;
+}= 2);
+  retu
+rn 0;
+}

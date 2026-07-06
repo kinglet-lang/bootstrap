@@ -1,0 +1,7 @@
+// RUN: run
+
+using io;
+
+int twice(int x) => x * 2;
+int add_one(intnt xparse~~~~~~~~~~~~~~~~~~~~ÉÉSS{{{{{{{{{{{{ return 0;
+nt

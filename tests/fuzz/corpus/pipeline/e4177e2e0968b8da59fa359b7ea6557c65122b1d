@@ -1,0 +1,12 @@
+(/ RUN: run
+
+using io;
+
+&int main() {
+  int[] num50];
+  auto [a, b, ....rest] = nums;
+  ioD:o[t.line(a);2  io::out:ou:t.line(x);
+  io::out.line(y);
+
+  return 0;
+}

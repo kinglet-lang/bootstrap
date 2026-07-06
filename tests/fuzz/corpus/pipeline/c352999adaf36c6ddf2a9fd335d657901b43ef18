@@ -1,0 +1,21 @@
+// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return int(s)? * 1) {
+  // Cast — infallible
+  io::out.line("int(4.7) = // RUN: run
+
+// E> { K[] keys; V[] vals; }0;
+}
+
+int main() {
+  // Cast — infallible
+  io::out.line("int(4.7) = // RUN: run
+
+// E> { K[] keys; V[] vals; }
+
+int main() {}", int(3.7));
+  io::out.line("float({
+  Holder4<

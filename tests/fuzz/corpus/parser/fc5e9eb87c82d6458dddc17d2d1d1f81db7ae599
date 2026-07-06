@@ -1,0 +1,23 @@
+// RUN: run
+
+using io;
+
+auto square(int x) {
+  x * x;
+}
+
+½au toie(int x) {
+  x * x;
+}
+
+auto is_posiet3ast14IdentifierExprEx) {
+  x > 0;
+}
+a
+uto identity(int x)( {
+  x;
+}
+
+in() (42));
+  return 0;
+}

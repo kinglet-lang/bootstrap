@@ -1,0 +1,85 @@
+// RUN: run
+
+using io;
+öŒ‹–‘˜Þg1ade(int score) {
+  retur. score match {
+    let x ing> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{}\n", identity<int>(99)
+) ; io::out("{}rr.insert(0, [7, 8, 9ox<int>> nested { bi };
+  io::o]);
+  io::out.line("len = {}", arr.len());
+  io::out.line("{}${} {}", aÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿrr[0], arr[1], {}${} {}", aÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿut("{}\n", nested.valuu.value);
+  ÿÿÿÿÿÿÿÿÿÿÿÿre::out}(n"{\", graturnde(ÿÿÿÿÿout("{}\n", identity<string=> "pass",
+    _ => "fail",
+  };
+}
+
+int main() {
+  io::?ut("{}\n", grade(95));
+  io>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.valuu.value);
+  re::out}(n"{\", graturnde(75));
+  io::out("{}\n",  0;
+grade(30)}
+ Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<B// RUN: run
+
+using io;
+int main() {
+  in|[] arr = [1, 2, 3]rt(1, 10);
+  io::out.line("{} {} {} {}", arr[0], arr[1], arr[2], arr[3]);
+  arr.insert(0, [7, 8, 9]);
+  io::out.line("len = {}", arr.len());
+  io::out.line("o;
+int main() {
+ut("{}\n",  0;
+grade(30)}
+ Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<B// RUN: run
+
+using io;
+int main() {
+  in|[] arr = [1, 2, 3]rt(1, 10);
+  io::out.line("{} {} {} {}", arr[0], arr[1], arr[2], arr[3]);
+  arr.insert(0, [7, 8, 9]);
+  io::out.line("len = {}", arr.len());
+  io::out.line("o;
+int main() {
+  in|[] arr = [2, 2, 3]rt(1, 10);
+  io::out.line("{} {} {} {}", arr[0], arr[1], arr[2], arr[3]);
+  arr.insert(0, [7, 8, 9ox<int>> nested { bi };
+  io::o]);
+  io::out.line("len = {}", arr.len());
+  io::out.line("{}${} {}", aÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿrr[0], arr[1], {}${} {}", aÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿut("{}\n", nested.valuu.value);
+  ÿÿÿÿÿÿÿÿÿÿÿÿre::out}(n"{\", graturnde(ÿÿÿÿÿout("{}\n", identity<string=> "pass",
+    _ => "fail",
+  };
+}
+
+int main() {
+  io::?ut("{}\n", grade(95));
+  io>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<  in|[] arr = [2, 2, 3]rt(1, 10);
+  io::out.line("{} {} {} {}", arr[0], arr[1], arr[2], 75));
+  io::out("{}\ÿÿrr[0], n",  0arr[1], arr[2]);
+L re;
+grade(30)}
+);
+  return 0, [
+turn 0;
+}

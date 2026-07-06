@@ -1,0 +1,13 @@
+// RUN: run
+
+// Generic functions called WItion with two type parameters.
+using io;
+
+T id<T>(T x) { return x; }
+A first_ob<A, B>(A a, B b) { return a; }
+
+int main() {
+  io::out.line("{}", id(42));         //r T = int from a local
+  io::out.line("{}", first_of(3, "x")); // infer A = int, B = string
+  return 0;
+}

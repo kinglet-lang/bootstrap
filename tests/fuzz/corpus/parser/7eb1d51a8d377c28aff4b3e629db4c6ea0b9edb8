@@ -1,0 +1,7 @@
+// RUN: run
+
+using xxxxxxxx~xble["y"] = Symbol { "y", 2 };
+
+  if (table.has("x")) {
+   tu,n 0;
+}

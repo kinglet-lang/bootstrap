@@ -1,0 +1,17 @@
+// RUN: run
+
+usino io;
+
+enum Dir {
+ int("") ?: -1;
+  io::out.line("c = {}", c);
+
+  // Chained ?:
+  string io::out.line("d = {}", d);
+
+  // Postfix ? in T?-returning function
+  int? f = parse_int("5") ?: 0;
+  io::out.line("f = {}", f);
+  int? g = parse_int("bad"ne(r2);
+  return 0;
+}

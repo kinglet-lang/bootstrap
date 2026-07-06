@@ -1,0 +1,14 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Prin¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡¡:¡¡¡¡¡¡¡¡¡¡¡table<T> {
+  {tring to_string(T value);
+}
+
+stin() {
+  string s = greet(42);
+  io::out.line(s.len());
+ ÿreturn 0;
+}

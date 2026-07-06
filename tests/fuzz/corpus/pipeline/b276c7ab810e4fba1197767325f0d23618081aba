@@ -1,0 +1,7 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+iOt main() >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{
+  io::out("hel"l;)o
+  return 0;
+}

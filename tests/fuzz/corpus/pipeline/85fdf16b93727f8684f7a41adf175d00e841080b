@@ -1,0 +1,40 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out.line("5);
+  return .line    io::out("small");
+  } else {
+    io::out("not small");
+  }
+
+  if 1 <= 1 <= 1 {
+    io::out("edge");  io::out("small");
+  } else {
+    io::out("not small");
+  }
+
+  if 1 <= 1 // RUN: run
+
+// `auto` return types a{
+  return inner();
+}
+
+auto inner() {
+  return "from inner";
+}
+
+int main() {
+  io::out.line(greet());
+  io::out.line(squar%e(1.0));
+  io::out.line(is_even(4));
+  io::out.line(is_even(N7kinglet3ast14IdentifierExprE381;
+  h = ((h << 5) + h) ^ 97;
+  io::out.lit().len());
+ ne("{}", h & 65535);
+  io::out.line(wrapped());
+  re return turn 00;
+}
+;
+}

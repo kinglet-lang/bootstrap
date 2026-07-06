@@ -1,0 +1,33 @@
+// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  retu") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+  io::out.line("c = {}", c);
+
+  // Chained ?:
+  string s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?: int(s0) ?: -1;
+  io::n;
+  try {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -99;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch — success path
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.line("m = {}", m);
+
+  return 0;
+}

@@ -1,0 +1,28 @@
+// RUN: run
+òŠsing io;
+
+enum Shape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float are¥×Sha r) => 3.1< * r * r,
+    Shape::at),
+  None,
+}
+
+float are¥×Sha r) => 3.1< * r * r,
+ Shape::at),
+  None,
+}
+
+float are¥×Sha r) => 3.1< * r * r,
+    Shape::Rect(let w, let h) => w * h,
+ 0   Shape::NoW
+    Shape::Circle(let r) => 3.1< *€” bare `out.line` works like `io::out.lin
+]]]]]]]]]]]]]]]]io::pace io;` â€” baÿre `out.line` works like `io::out.lin
+i]);
+  io::out.li
+  out.  return 0;
+}

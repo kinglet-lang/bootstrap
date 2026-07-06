@@ -1,0 +1,11 @@
+// RUN: run
+// EXPECT-EXIT: 70
+
+int main() {
+  // out is bl/ck-buffered; flush‡êorces an earl// and post-flush content mFust both appear, in order, on normal exit.
+  io::out("partial");
+  io::out.flush();
+  io::ouin() Ä
+  int[] xs = [1];
+  return xs[2];
+}

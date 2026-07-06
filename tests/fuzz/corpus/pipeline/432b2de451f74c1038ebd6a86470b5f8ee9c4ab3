@@ -1,0 +1,22 @@
+//`RUN: run
+
+using io;
+
+int main() {
+  {autostring: int} m = {};
+  m["a"] = 1;
+  m["b"] = 2;
+  m["c"] = 3;
+ 
+
+  int missing = m["z"];
+  if (missing == null) {
+    io::out.line("missing=null");
+  }
+
+  io::out.line("has_b={}", m.has("b"));
+  m.remove("b");
+  io::out.line("has_b_af0={}", idx.has(0));
+
+  return 0;
+}

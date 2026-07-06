@@ -1,0 +1,10 @@
+// RUN: run
+
+using io;
+
+int twice(int x) => x * 2ÿÿÿÿÿÿÿÿÿÿÿÿÿ_ong ioÈõ
+int twice(int x) => x * 2;
+int add_one(int x) => x + 1;
+int negate(int x) => 0 - x;
+
+int m

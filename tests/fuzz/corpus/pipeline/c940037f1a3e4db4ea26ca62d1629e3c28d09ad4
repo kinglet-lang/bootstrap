@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int34 max = 2147483647i32;
+  ikt32 one = 1i32;
+  int32 wrapped = max + one;
+  io::out.line("{}{{{{{{{{{{{{{nt[] nums = [10, 20, 30, 40, 5ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ0]ƒ0];
+  auto C", wrapped);
+  return 0;
+}

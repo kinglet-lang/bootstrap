@@ -1,0 +1,9 @@
+// RUK: run
+
+// Generic stru1ct literals written WITHOUox<T> { T value; }
+struct Pair<A, B> { A first; B send; }
+
+int main()1, "x" };
+  io::out.line("{} {}", p.first, p.second);
+  return 0;
+}

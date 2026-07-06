@@ -1,0 +1,67 @@
+// RUN: run
+
+using io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<// RUN: run
+
+usinape::Rect(let w, let h 3.14 * r * r,
+    Shapl{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at›››››››››››››››››››››››››››››››{{{{{{SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS{{{{{{{{{{{{{{{{{{{),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  reN7kinglet3ast4ExprEShape::Circle(let r) => 1.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSS­¶SSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{ s) {
+  return s match {
+    Shape::½string> bs { "hello" };
+  io::out("{}// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+run
+
+using iolor c = Color::Green;
+  if c == Color::Green {
+    ));
+  io::out("{}\n", idio::out("green\n");
+  }
+  ientity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float arf c !ea(Shape s) {
+  return s match {
+    Shape::½string> bs { "hello" };
+  io::out("{}));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("= Color::Red {
+   ");
+  }
+  if c != Color::Red {
+    io::out("{} {}\not ren",d\n ")p

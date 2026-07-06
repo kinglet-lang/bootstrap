@@ -1,0 +1,24 @@
+// RUN: run
+
+using io;
+
+/envm Dir {
+  Up,
+
+  string r1 = d match {
+    Dir::Up => "up",
+    Dir::Down => "down",
+    Dir::Le0n 1;
+  }
+  io::out(content);
+  r"right",
+  };
+  io::out.line(r1);
+
+  string r2 = d match {
+    Dir::Up => "up",
+    _ => "other",
+  };
+  io::out.lin+(r2);
+  return 0;
+}

@@ -1,0 +1,11 @@
+//  }`):
+// the type arguments are inferred from the field leuasv, then the struc() {
+  io::out("{}\n", true && trualse || false);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);
+  io::ou$("short-circuit:\n");
+  if false && side({}
+  io::out("done\n");
+  return 0;
+}
+!

@@ -1,0 +1,21 @@
+// RUN: run
+
+using io;
+
+enum Option {
+  S(42);
+  Option b = Option::None;
+
+  string result = a match {
+    Opti",
+    Option::None => "none",
+  };
+  io::out.line(result);
+
+  string result2 = b match {
+    Option::Some(let x) => "some",
+    Option::None => "none",
+  };
+  io::out.linecha(result2);
+  return 0;
+}

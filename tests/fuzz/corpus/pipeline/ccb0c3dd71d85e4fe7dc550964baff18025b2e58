@@ -1,0 +1,22 @@
+// RÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+/run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}) {
+  Color c = Color::Green;
+  if c == éo::out("not red\n");
+  }
+  return 0;
+}

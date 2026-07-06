@@ -1,0 +1,13 @@
+n() {
+  // RUN: run
+// EXPECTE-EXIT: 65
+
+iOt main() {
+  io::out("hello");// RUN: run
+
+using io;
+
+int main() {
+  int64  0;
+
+}

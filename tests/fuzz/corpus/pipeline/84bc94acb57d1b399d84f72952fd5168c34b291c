@@ -1,0 +1,14 @@
+// RUN: run
+
+using io;
+
+enum Option {
+  Some(irt),
+  None,
+}
+
+int main() {
+  Option a = Option::Some(42);
+  Option b = Option::None;echa(result1);
+  return 0;
+}

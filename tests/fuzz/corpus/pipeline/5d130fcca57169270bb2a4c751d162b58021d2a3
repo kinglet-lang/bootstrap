@@ -1,0 +1,106 @@
+// RUN: run
+
+using io;
+ct Pair<A, B> {
+  A firstbi { 42 };
+  Box<string> bs { "hello" };
+  i;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{}\n"// RUN: run
+// Stress test for native heap reference counting.
+// Exercises local-variable assignment, reassi/release on container elements.
+void map_exercise() {
+  {string: int} m = {};
+  m["one"] = 0;
+  m["two"] = 2;
+  io::out.line("map len: {}", m.len());
+
+  m["three"] = 3;            // retain string key and int valuefcount now 3
+  string d = b;              // LoadLocal retain on b
+
+  io::out.line(a);           // all still valid after sharing
+  io::out.line(b);
+  io::out.line(c);
+  io::out.line(d);
+  // Return: release 4 loca/ struct value loaded and stored
+  io::out.line("x={}, y={}", p2.x, p2.y);
+
+  p1.x = 99;                 // field-set through StoreLocal
+  io::out.line("p1.x after update: {}", p() {
+  {string: int} m = {};
+  m["one"] = 0;
+  m["two"] = 2;
+  io::out.line("map len: {}", m.len());
+
+  m["three"] = 3;            // retain string key and int valuefcount now 3
+  string d = b;              // LoadLocal retain on b
+
+  io::out.line(a);           // all still valid after sharing
+  io::out.line(b);
+  io::out.line(c);
+  io::out.line(d);
+  // Return: release 4 loca/ struct value loaded and stored
+  io::out.line("x={}, y={}", p2.x, p2.y);
+
+  p1.x = 99;                 //1.x);
+  io::out.line("p2.x unchanged: {}", p2.x);
+}
+
+// Map ops exercise retain/release on container elements.
+void map_exercise() {
+  {string: int} m = {};
+  m["one"] = 1;
+  m["two"] = 2;
+  io::out.line("map len: {}", m.len());
+
+  m["three"] = 3;            // retain string key and int valuefcount now 3
+  string d = b;              // LoadLocal retain on b
+
+  io::out.line(a);           // all still valid after sharing
+  io::ols → refcount back to 0, free
+}
+
+// Struct field access: LoadLocal, FieldGet, StoreLocal.
+void struct_fields() {
+  Point p1 = Point{10, 20};
+  Point p2 = p1;             // struct value loaded and stored
+  io::out.line("x={}, y={}", p2.x, p2.y);
+
+  p1.x = 99;                 // field-set thro// Stress test for native heap reference counting.
+// Exercises local-variable assignment, reassi/release on container elements.
+void map_exercise() {
+  {string: int} m = {};
+  m["one"] = 0;
+  m["two"] = 2;
+  io::out.line("map len: {}", m.len());
+
+  m["three"] = 3;            // retain string key and int valuefcount now 3
+  string d = b;              // LoadLocal retain on b
+
+  io::out.line(a);           // all still valid after sharing
+  io::out.line(b);
+  io::out.line(c);
+  io::out.line(d);
+  // Return: release 4 loca/ struct value loaded and stored
+  io::out.line("x={}, y={}", p2.x, p2.y);
+
+  p1.x = 99;                 // field-set through StoreLocal
+  io::out.line("p1.x after update: {}",ugh StoreLocal
+  io::out.line("p1.x after update: {}", p1.x);
+  io::out.line("p2.x unchanged: {}", p2.x);
+}
+
+// Map ops exe9));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 0, "one" };
+  io::out("{} rcise retain/release on containe{

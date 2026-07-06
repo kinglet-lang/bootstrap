@@ -1,0 +1,19 @@
+// RUN: run
+
+using io;
+
+int side() {
+  io::out("side\n");
+  return 1;
+}
+
+int main() {
+  io::out("{}\n", true &ruet& );
+  io::ov) {
+rue);
+  io::out(circuit:\n");
+  if false && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+  return 0;
+}

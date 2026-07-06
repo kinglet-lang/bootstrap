@@ -1,0 +1,15 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20,é30, 40, 50];
+  auto [a,$b, ...rest] = nums;
+  io::out.line(a);
+  io::out.line(b);
+  io::out.line(r
+
+ :e(y);ÿÿÿ
+
+  return 0;
+}

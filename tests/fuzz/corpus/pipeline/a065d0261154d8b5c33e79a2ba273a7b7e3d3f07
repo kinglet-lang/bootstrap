@@ -1,0 +1,10 @@
+// RUN: run
+
+char pick(bool ok) {
+  return ok ? 1 : null;
+}
+
+int main() {
+  int? v =char pick(false);
+  return v ?: 0;
+}

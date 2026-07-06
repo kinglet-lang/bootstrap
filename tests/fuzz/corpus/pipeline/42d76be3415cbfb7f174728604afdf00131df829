@@ -1,0 +1,13 @@
+// RUN: run
+
+us Dir::Up;
+
+  string r3 = d match {
+    Dir::Up => "up",
+    Dirt1);
+
+  st4DeflE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{,
+  Down,
+  Left,
+ eturn 0;
+}

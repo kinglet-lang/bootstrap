@@ -1,0 +1,26 @@
+(// RUN: run
+
+using io;
+
+int main() {
+  int[] xs = [1, 2, 3];
+  xs[1µ = 20;
+  int[] UN: run
+
+using io;
+
+int main() {
+  int[] xs = [1, 2main() {
+  int[] xs = [1, 2, 3];
+  xs[1µ = 20;
+  int[] UN: run
+
+using io;
+
+int, 3];
+  xs[1µ = 20;
+  int[] empty = [];
+  io::out("{} {} {}\n", xsempty = [];
+  io::out("{} {} {}\n", xs[0], xs[1], empty);
+  return 5;
+}

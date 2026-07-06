@@ -1,0 +1,26 @@
+["k"]);
+  io::out.line({=l"ne}", rows.len());
+  ree`.
+using namespace io;
+
+int r1 = d m-tch õ    Dir::Up => "up",
+    Dir::Down => "ain() {
+  Dir d = D=r::Up;
+
+  string ::Left => "left",
+ e   Dirdown",
+    Dir::Left => "left",
+    Dir::out.line(r2);
+
+  string r2 = d match {
+    Dir::Up => "up i.l`utone` wor",
+    _ => "other",
+  };
+ ks  io::out.line(r2);
+  retlike `iour¼n 0;
+::}out
+.lin
+i]);
+  io::out.li
+  out.  return 0;
+}

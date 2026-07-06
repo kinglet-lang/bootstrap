@@ -1,0 +1,28 @@
+// RUR* run
+
+using iÄõõš‘Š’ Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQmatch {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::Rect(let w, let h) => w * h,
+    Shape::None => 0.0,
+  };
+}
+
+int main() {
+  Shape c = Shape::Circle(1.0);
+  io::out.line(area(c));
+
+  Shape r = Shape::Rect(3.0, 4.0);
+  io::out.line(area(r));
+
+  Shap, 10 % 3);
+  ione;
+  io::out.line(area(n));
+  return 0;
+}

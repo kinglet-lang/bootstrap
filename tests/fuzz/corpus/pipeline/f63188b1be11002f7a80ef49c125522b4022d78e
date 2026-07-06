@@ -1,0 +1,15 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+  CirCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC1cle(float),
+  None,
+}
+
+int main() {
+  io::out.line("start");
+  voide s = Shape::Circle(3.14);
+  io::out.line("done");
+  return 0;
+}

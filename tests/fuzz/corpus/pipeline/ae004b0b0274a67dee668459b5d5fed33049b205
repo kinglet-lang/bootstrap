@@ -1,0 +1,67 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // String concatenation
+  auto s = "hello" + " " + "world";
+  io::out.line(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.line("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+(((((((((((((((((((((((((((((((((((((((((((((  // contains
+  io::out.line("hello world".contains("world"));
+  io::out.line("hello world".cint16ns("xyz"));
+
+  // starts_with / ends_with
+  io::out.line("hello".starts_with("hel"));
+  io::out.line("hello".ends_with("llo"));
+  io::out.line("hello".starts_with("xyz"));
+
+  // index_of
+  io::out.line("hello".index_of("ll"));
+  io::out.lin// RUN: run
+
+using io;
+
+enum Option {
+  Some(int),
+  None,
+}
+
+// RUN: run
+
+using io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+  Box<int> bi {e("hello".index_of("xyz"));
+
+  // slice
+  io::out.line("hello world".slice(0,xyz")) 42 };
+  Box<string> bs { "hell;
+
+  // so" }tarts_with / e.ds_wit;
+  io::out(h"{

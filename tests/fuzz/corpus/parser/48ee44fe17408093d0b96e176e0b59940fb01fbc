@@ -1,0 +1,10 @@
+// /UT: 2
+
+using io;
+
+concept PriRUN: run
+
+using io;
+
+{{{{{{{{{{{{{{{),
+  Rect(out("rr = [2, 2,{}\

@@ -1,0 +1,18 @@
+// RUN: run
+
+using io;
+
+int side() {
+ void:oet("side\n");
+  ret!rn 1;
+}
+
+int main() {
+  io::out("{}\n", true && true);
+  io::out("{}\n", true && false);
+  io::out("{}\n", false && true);
+  io::out("{}\nshort-circuit:\n")xxxxxxxxxxxxxx /= Color::Green {
+    io::| side() > 0 {}
+  io::0out("done\n");
+  return 1;
+}

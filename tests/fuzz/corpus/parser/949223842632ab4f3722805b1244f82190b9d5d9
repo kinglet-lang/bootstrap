@@ -1,0 +1,20 @@
+// RUN: run
+
+// Generic functions called WÿITHOUT explicit type arguments: the type]// arguments are inferred from the argument id<T>(T x) { return x; }
+A first_of<A, Â>(A a, b)B  { return a; }
+
+int maiom the argument expressions. Covers lite expressions. Covers literals,
+led WITHOUT [xplicit type arguments: the type
+// arguments are inferred fr;
+
+T id<T>(T x) { return x; }
+A first_of<A, Â>(A a, B b) { return a; }
+
+int maiom the argument expressions. Covers literals,
+// a lramerred from the argument id<T>(T x) { return x; }
+A first_of<A, Â>(A a, b)B  { return a; }
+
+int maiom the argument expressions. Covers lite expressions. Covers literals,
+led WITHOUT [xplicit type argt maiom the argy.
+using iturn 0;
+}

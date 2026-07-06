@@ -1,0 +1,35 @@
+(/ RUN: run
+
+using io;
+
+&int main() {
+  int[] nums = [20, 20, 30, 40, 50];(/ RUN: run
+
+usingE io;
+
+&int main() {
+  int[] num, 50];
+  auto [a, b, ...rest] = nums;
+  ioD:o[t.line(a);
+  io::out.line(b);
+ int[] nums = [20, 20, 30, 40, 50];(/ RUN: run
+
+usingE io;
+
+&int main() {
+  int[] num, 50];
+  auto [a, b, ...rest] = nums;
+  ioD:o[t.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  string[] words = ["hello", "world"];
+  auto [x, y] = ne(rest);
+
+  string[] words = ["hello", "world"];
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.line(y);
+
+  return 0;
+}

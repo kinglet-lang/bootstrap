@@ -1,0 +1,159 @@
+// RUN: run
+
+using io;
+ct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<(>TxT ) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{}\n", identity<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 0, "one" };
+  io::out("{} {}\n", p.first, p.second);ut("{}\n", identity<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 0, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.val
+struct Box<T> {
+  T value;
+}
+
+struckkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkt Pair<A, B> {
+  A first;
+  B second;
+}
+
+T i// RUN: dentity<T>(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };t;
+  B second;
+}
+
+T identity<(>TxT ) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{}\n", identity<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 0, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.val
+struct Box<T> {
+  T value;
+}
+
+struckkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkrun
+// EXPECT-STDOUT: 2
+
+using io;
+
+concekkkkkkkkkkt Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identipt Printable<T> {
+  string to_string(T v2
+
+using io;
+
+concept Printablty<T>(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hel
+;}o"l   io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.val
+struct Box<T> {
+  T value;
+}
+
+struckkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkt Pair<A, B> {
+  A first;
+  B second;
+}
+
+T i// RUN: dentity<T>(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };t;
+  B second;
+}
+
+T identity<(>TxT ) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{}\n", identity<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 0, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.val
+struct Box<T> {
+  T value;
+}
+
+struckkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkrun
+// EXPECT-STDOUT: 2
+
+using io;
+
+concekkkkkkkkkkt Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identipt Printable<T> {
+  string to_string(T v2
+
+using io;
+
+concept Printablty<T>(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hel
+;}o"l   io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{}\n", identit
+);
+ ue.value);
+  re return tur0;n 0;
+}
+}
+

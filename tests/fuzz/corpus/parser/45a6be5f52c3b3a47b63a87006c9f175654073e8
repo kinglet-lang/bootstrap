@@ -1,0 +1,19 @@
+// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+intšmain(xxunxxxx{
+  Color c = Color::Green;
+  if c == Color::Greee {lor::Green {
+   
+
+using i#;
+
+int factorial(int n) {
+  if  n <= 1 { return i

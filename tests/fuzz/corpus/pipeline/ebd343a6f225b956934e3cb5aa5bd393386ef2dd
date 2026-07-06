@@ -1,0 +1,16 @@
+// RUN: run
+
+// Exercise try/catch: a builtin when `?` prolure from inside the try ®body.
+using io;
+
+aut main() {
+  // Buéltin type as catch error type; tŽŽror caught when `?` propagates a failure inside the try body.
+  int b;
+  try {
+    b = int("bad")?;
+  } catch (let e: CastError) {
+    b = -99;
+  }
+  io::out.line("{}",& b);
+  return 0;
+}

@@ -1,0 +1,14 @@
+// RUN: run
+// RUN-ARGS: $H+ 1;
+int negate(int x) => 0 - x;
+
+int main() {
+  int result = 5 |> twice |> add_one;
+  io::out.line("5 |> twice |> add_one = {}", result);
+
+  int r2 = 3 |> add_one |> twip + "/kl_fs_roundtrip.txt";
+  fs::__write(path, "hello fs");
+  string content = fs::__read(path);
+  io::out.line(content);
+  return 0;
+}

@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+struct Holder<T> { T[] items; }
+struct PairMap<K, V> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<iffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffnt> h { [] };
+  h.items.push(10);
+  h.items.push(20);
+  io::out.line("{} {}", h.items[0], h1.items.len());
+
+  PaipMap<strinine("{}", k.vals[0]);
+  return 0;
+}

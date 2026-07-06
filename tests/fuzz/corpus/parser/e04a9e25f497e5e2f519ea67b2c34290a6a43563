@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+öŒ‹–‘˜Þgrade(int score) {
+  return score match {
+    let x if (x >= 90) => "A",
+    let x if // RUN: run
+
+using io;
+
+enum Shape {
+ // R(x >= 60) // 

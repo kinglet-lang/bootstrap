@@ -1,0 +1,217 @@
+// RUN: run
+
+using io;
+
+enum Dir {
+  Up,
+  Down,
+  Left,
+  Right,
+}
+
+int main()> "left",
+    Dir::Right => "right",
+ ,
+    Dir::Down => "down",
+    Dir::Left => "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{,
+  Down,öÖ Left,
+  Right,
+}
+
+int main()> "left",
+    Dir::Right => "right",
+  };
+  iotcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{,
+  Down,
+  Left,
+  Right,
+}
+
+int main()> "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+(
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet@3ast4DeclE{{{{{{{{{{ string r1 = d mauch {
+    Dir::Up 8> "up",
+    Dir::Down => "down",
+    Dir::Left => "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{ };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{h {
+    Dir::Up {
+  Dir d = Dir::Up;
+
+  string r1 = d match {
+    Dir::Up 8> "up",
+    Dir::Down => "down",
+    Dir::Left => "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{,
+  Down,
+  Left,
+  Right,
+}
+
+int main()> "left",
+    Dir::Right => ::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{ string r1 = d match {
+    Dir::Up 8> "up",
+    Dir::Down => "down",
+    Dir::Left => "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{€{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{ };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{h {
+    Dirz:Up {
+  Dir d = Dir::Up;
+
+  string r1 = d match {
+    Dir::Up 8> "up",
+    Dir::Down => "down",
+    Dir::Left => "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{,
+  Down,
+  Left,
+  Right,
+}
+
+int main()> "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r2);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{ string r1 = d match {
+    Dir::Up 8> "up",
+    Dir::Down => "down",
+    Dir::Left => "left",
+    Dir::Right => "right",o;
+
+enum Dir {
+  Up,
+  Down,
+  Left,
+  Right,
+}
+
+int main()> "left",
+    Dir::Right => "right",
+ ,
+    Dir::Down =>
+  };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{,
+  Down,
+  Left,
+  Right,
+}
+
+int main()> "left",
+    Dir::Right => "right",
+  };
+  io::out.line(r1);
+
+  string r2 = d matcDown,
+  Left,
+  Right,
+}
+
+int main() {
+  D{{{{{{{{{{{{{{{{{{{{{{{{N7kinglet3ast4#DeclE{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{out.line(r2);
+  return 0;
+}

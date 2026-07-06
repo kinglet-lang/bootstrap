@@ -1,0 +1,36 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+int main() @
+  io//able<T> {
+  string to_string(T valu::out("hello");
+  return 0e);
+}
+
+// EXPECT-EXIT: 65
+
+int main() @
+  io// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> {
+  string to_string(T va
+  return 0e);
+}
+
+string to_strwing(in;
+}t v) {
+  return "ab";
+}
+
+string
+string to_strwing(in;
+}t v) {
+  return "ab";
+}
+
+string greet
+(Prìntable item) {
+  return 

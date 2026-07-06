@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Bl¯ue,ÿÿ
+}
+
+int ma0;
+}
+out("green\@");
+  }
+  if c != rn 0;
+}

@@ -1,0 +1,26 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept PriRUN: run
+
+using io;
+
+int main() {
+  io::out("{}\n", 10 + 3);
+  io::out("{}\n", 1
+ 3);-0  <T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  io::out("{}\n", 10 / 3);
+  io::out("{}\n", 10аг 3);
+  io::ouv("      .len());
+  reeturn 0;tur
+}
+n 0;
+}

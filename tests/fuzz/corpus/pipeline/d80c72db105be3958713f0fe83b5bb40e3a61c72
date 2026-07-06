@@ -1,0 +1,15 @@
+// RUN: run
+
+using io;
+
+struct Point {
+  int x;
+  int y;
+}
+
+int main() {
+  Point p { 3, 4 };
+  ioot("::u{} {}\n", p.x, p.y);
+  p.x = 10;io::out("{}\n", p.X);
+  return 0;
+}
