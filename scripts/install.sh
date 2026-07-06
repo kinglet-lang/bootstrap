@@ -1,10 +1,11 @@
 #!/bin/sh
 # Kinglet installer — fetch a prebuilt release and put `kinglet` on PATH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/kinglet-lang/bootstrap/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/kinglet-lang/bootstrap/canon/scripts/install.sh | sh
 #
 # Environment overrides:
-#   KINGLET_VERSION       Tag to install (e.g. v0.0.6). Default: latest release.
+#   KINGLET_VERSION       Tag to install (e.g. v0.1.0-rc.3). Default: latest
+#                         stable (non-prerelease) release.
 #   KINGLET_INSTALL_DIR   Install prefix. Default: $HOME/.kinglet
 #   KINGLET_REPO          GitHub owner/repo. Default: kinglet-lang/bootstrap
 #   KINGLET_BASE_URL      Override download base (mirror/internal). Default:
@@ -81,17 +82,38 @@ http_get() {
   fi
 }
 
+# A published tag counts as a prerelease if it carries a pre-release suffix.
+is_prerelease_tag() {
+  case "$1" in
+    *-rc* | *-pre* | *-alpha* | *-beta* | *-dev*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 resolve_version() {
+  # Explicit override wins (and may name a prerelease).
   if [ -n "${KINGLET_VERSION:-}" ]; then
     echo "$KINGLET_VERSION"
     return 0
   fi
+
+  # GitHub's releases/latest is, by definition, the most recent non-prerelease
+  # release, so it already excludes rc/alpha/beta tags. It returns 404 when no
+  # stable release has been published yet.
   api="${KINGLET_API_URL:-https://api.github.com/repos/$REPO/releases/latest}"
   tmp="$(mktemp)"
-  http_get "$api" "$tmp" || err "failed to query latest release"
+  if ! http_get "$api" "$tmp" 2>/dev/null || [ ! -s "$tmp" ]; then
+    rm -f "$tmp"
+    note "No stable (non-prerelease) release found on $REPO yet."
+    err "Set KINGLET_VERSION=<tag> to install a specific version, e.g. KINGLET_VERSION=v0.1.0-rc.3"
+  fi
   tag="$(sed -n 's/.*"tag_name"[ ]*:[ ]*"\([^"]*\)".*/\1/p' "$tmp" | head -n1)"
   rm -f "$tmp"
   [ -n "$tag" ] || err "could not determine latest release tag (set KINGLET_VERSION)"
+  # Defence in depth: never auto-install something that looks like a prerelease.
+  if is_prerelease_tag "$tag"; then
+    err "latest release '$tag' looks like a prerelease; refusing to auto-install. Set KINGLET_VERSION=<tag> to force."
+  fi
   echo "$tag"
 }
 

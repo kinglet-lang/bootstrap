@@ -21,7 +21,16 @@
 
 ## Install
 
-Download the latest release for your platform from [Releases](https://github.com/kinglet-lang/bootstrap/releases):
+**macOS / Linux** — one-liner installs the latest **stable** release (prereleases
+like `-rc` are skipped) and wires it onto `PATH`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kinglet-lang/bootstrap/canon/scripts/install.sh | sh
+```
+
+Set `KINGLET_VERSION=<tag>` to install a specific or prerelease version.
+
+Or download a release archive manually from [Releases](https://github.com/kinglet-lang/bootstrap/releases):
 
 | Platform | Archive |
 |----------|---------|
