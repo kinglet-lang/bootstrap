@@ -149,8 +149,7 @@ jobs:
             --exclude='*/benchmarks' \
             --exclude='*/examples' \
             "llvm-project-${LLVM_VER}.src/llvm" \
-            "llvm-project-${LLVM_VER}.src/cmake" \
-            "llvm-project-${LLVM_VER}.src/CMakeLists.txt"
+            "llvm-project-${LLVM_VER}.src/cmake"
           cd /llvm-build
           cmake /llvm-src/llvm \
             -G Ninja \
