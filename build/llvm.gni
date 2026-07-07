@@ -47,6 +47,21 @@ if (enable_llvm) {
   llvm_ldflags += exec_script("//build/scripts/llvm_config.py",
                                _syslibs_args,
                                "list lines")
+
+  # When statically linking LLVM on Windows, llvm-config --link-static
+  # --system-libs returns nothing because the MSYS2 LLVM package is a
+  # shared-library build whose .dll already embeds these.  Supply the
+  # transitive system deps of libLLVMSupport explicitly.
+  if (llvm_link_static && host_os == "win") {
+    llvm_ldflags += [
+      "-lzstd",
+      "-lz",
+      "-lole32",
+      "-lshell32",
+      "-luuid",
+      "-loleaut32",
+    ]
+  }
   _libs_args = [ llvm_config_bin ]
   if (llvm_link_static) {
     _libs_args += [ "--link-static" ]
