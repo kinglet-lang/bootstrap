@@ -113,7 +113,7 @@ jobs:
             mingw-w64-x86_64-ninja
 
       - name: Cache LLVM
-        uses: actions/cache@v4
+        uses: actions/cache@v4.2.0
         id: cache-llvm
         with:
           path: /llvm-install
