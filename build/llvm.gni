@@ -39,25 +39,21 @@ if (enable_llvm) {
                               _ldflags_args,
                               "list lines")
 
+  # System libraries from llvm-config --system-libs.  These must appear
+  # AFTER the LLVM .a archives for static linking — the linker resolves
+  # left-to-right and the .a files have forward references to system
+  # symbols (ntdll, psapi, etc.).  We route them through _extra_llvm_libs
+  # so they land in llvm_libs, which GN places after the archives.
+  _system_libs = []
   _syslibs_args = [ llvm_config_bin ]
   if (llvm_link_static) {
     _syslibs_args += [ "--link-static" ]
   }
   _syslibs_args += [ "systemlibs" ]
-  llvm_ldflags += exec_script("//build/scripts/llvm_config.py",
-                               _syslibs_args,
-                               "list lines")
+  _system_libs = exec_script("//build/scripts/llvm_config.py",
+                              _syslibs_args,
+                              "list lines")
 
-  # When statically linking LLVM on Windows, the system libraries that
-  # LLVM depends on must appear after the LLVM .a archives in the link
-  # command — static linking resolves left-to-right.  llvm-config
-  # --link-static --system-libs provides the canonical list; _extra_llvm_libs
-  # ensures these land after the archives where they actually resolve.
-  #
-  # The self-built LLVM is configured with -DLLVM_ENABLE_ZLIB=OFF and
-  # -DLLVM_ENABLE_ZSTD=OFF, so z / zstd are intentionally absent.
-  # ntdll has no import library in MinGW and is not needed.
-  #
   # --gc-sections drops unreferenced sections from the LLVM static
   # archives.  Paired with the -ffunction-sections LLVM build, this
   # eliminates dead code from the final kinglet binary.
@@ -67,12 +63,16 @@ if (enable_llvm) {
       "-Wl,--gc-sections",
       "-Wl,-s",
     ]
+    # System libraries go AFTER LLVM .a archives.  The self-built LLVM
+    # is configured with -DLLVM_ENABLE_ZLIB=OFF and -DLLVM_ENABLE_ZSTD=OFF,
+    # so z / zstd are intentionally absent.
     _extra_llvm_libs += [
       "ole32",
       "shell32",
       "uuid",
       "oleaut32",
     ]
+    _extra_llvm_libs += _system_libs
   }
   _libs_args = [ llvm_config_bin ]
   if (llvm_link_static) {
