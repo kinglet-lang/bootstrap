@@ -107,6 +107,7 @@ jobs:
           update: true
           install: >-
             unzip
+            mingw-w64-x86_64-ca-certificates
             mingw-w64-x86_64-clang
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
@@ -122,9 +123,22 @@ jobs:
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: |
           LLVM_VER=22.1.0
+          LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/llvm-project-${LLVM_VER}.src.tar.xz"
           echo "Building LLVM $LLVM_VER (X86 only, -ffunction-sections)..."
-          curl -fsSLo llvm.tar.xz \
-            "https://github.com/llvm/llvm-project/releases/download/llvmorg-$LLVM_VER/llvm-project-$LLVM_VER.src.tar.xz"
+          echo "Downloading $LLVM_URL"
+          # --retry handles transient failures; -S shows errors.
+          # GitHub release asset redirects go through two hops and MSYS2 curl
+          # occasionally drops the connection mid-chain.
+          curl -fSL --retry 5 --retry-delay 15 --retry-max-time 300 \
+            -o llvm.tar.xz "$LLVM_URL"
+          CURL_EXIT=$?
+          if [ $CURL_EXIT -ne 0 ]; then
+            echo "curl exit code: $CURL_EXIT"
+            ls -lh llvm.tar.xz 2>/dev/null || echo "(no file)"
+            file llvm.tar.xz 2>/dev/null || true
+            exit 1
+          fi
+          echo "Downloaded $(du -h llvm.tar.xz | cut -f1)"
           mkdir -p /llvm-src /llvm-build /llvm-install
           tar xf llvm.tar.xz -C /llvm-src --strip-components=1
           cd /llvm-build

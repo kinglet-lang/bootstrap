@@ -54,9 +54,14 @@ if (enable_llvm) {
   # transitive system deps of libLLVMSupport explicitly.  They must go
   # into libs (not ldflags) so they appear after the .a archives in the
   # link command — static linking resolves left-to-right.
+  #
+  # When using a self-built LLVM (compiled with -ffunction-sections),
+  # we reap the dead-code benefit at the final link via --gc-sections.
   _extra_llvm_libs = []
   if (llvm_link_static && host_os == "win") {
     llvm_ldflags += [
+      "-Wl,--gc-sections",
+      "-Wl,-s",
       "-lzstd",
       "-lz",
       "-lole32",
