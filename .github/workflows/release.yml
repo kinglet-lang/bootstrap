@@ -145,7 +145,6 @@ jobs:
           # directories that fail on Windows.  We don't need any of that.
           tar xf llvm.tar.xz -C /llvm-src --strip-components=1 \
             --exclude='*/test' \
-            --exclude='*/mlgo-utils' \
             --exclude='*/benchmarks' \
             --exclude='*/examples' \
             "llvm-project-${LLVM_VER}.src/llvm" \
