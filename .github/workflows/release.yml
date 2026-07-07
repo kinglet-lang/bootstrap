@@ -140,7 +140,12 @@ jobs:
           fi
           echo "Downloaded $(du -h llvm.tar.xz | cut -f1)"
           mkdir -p /llvm-src /llvm-build /llvm-install
-          tar xf llvm.tar.xz -C /llvm-src --strip-components=1
+          # Only extract llvm/, cmake/, and top-level CMakeLists.txt.
+          # The tarball includes clang/lld/flang/etc. with symlinks in test
+          # directories that fail on Windows.  We don't need any of that.
+          TOPDIR=$(tar tf llvm.tar.xz | head -1 | cut -d/ -f1)
+          tar xf llvm.tar.xz -C /llvm-src --strip-components=1 \
+            "$TOPDIR/llvm" "$TOPDIR/cmake" "$TOPDIR/CMakeLists.txt"
           cd /llvm-build
           cmake /llvm-src/llvm \
             -G Ninja \
