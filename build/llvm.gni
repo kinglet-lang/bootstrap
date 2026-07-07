@@ -48,35 +48,30 @@ if (enable_llvm) {
                                _syslibs_args,
                                "list lines")
 
-  # When statically linking LLVM on Windows, llvm-config --link-static
-  # --system-libs returns nothing because the MSYS2 LLVM package is a
-  # shared-library build whose .dll already embeds these.  Supply the
-  # transitive system deps of libLLVMSupport explicitly.  They must go
-  # into libs (not ldflags) so they appear after the .a archives in the
-  # link command — static linking resolves left-to-right.
+  # When statically linking LLVM on Windows, the system libraries that
+  # LLVM depends on must appear after the LLVM .a archives in the link
+  # command — static linking resolves left-to-right.  llvm-config
+  # --link-static --system-libs provides the canonical list; _extra_llvm_libs
+  # ensures these land after the archives where they actually resolve.
   #
-  # When using a self-built LLVM (compiled with -ffunction-sections),
-  # we reap the dead-code benefit at the final link via --gc-sections.
+  # The self-built LLVM is configured with -DLLVM_ENABLE_ZLIB=OFF and
+  # -DLLVM_ENABLE_ZSTD=OFF, so z / zstd are intentionally absent.
+  # ntdll has no import library in MinGW and is not needed.
+  #
+  # --gc-sections drops unreferenced sections from the LLVM static
+  # archives.  Paired with the -ffunction-sections LLVM build, this
+  # eliminates dead code from the final kinglet binary.
   _extra_llvm_libs = []
   if (llvm_link_static && host_os == "win") {
     llvm_ldflags += [
       "-Wl,--gc-sections",
       "-Wl,-s",
-      "-lzstd",
-      "-lz",
-      "-lole32",
-      "-lshell32",
-      "-luuid",
-      "-loleaut32",
     ]
     _extra_llvm_libs += [
-      "ntdll",
       "ole32",
       "shell32",
       "uuid",
       "oleaut32",
-      "zstd",
-      "z",
     ]
   }
   _libs_args = [ llvm_config_bin ]
