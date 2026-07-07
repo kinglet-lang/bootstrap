@@ -26,6 +26,8 @@ def main() -> int:
         args = ["--cxxflags"]
     elif what == "ldflags":
         args = ["--ldflags"]
+        if link_static:
+            args.append("--link-static")
     elif what == "libs":
         args = ["--libs"]
         if link_static:
@@ -33,6 +35,8 @@ def main() -> int:
         args += ["core", "native"]
     elif what == "systemlibs":
         args = ["--system-libs"]
+        if link_static:
+            args.append("--link-static")
     else:
         sys.stderr.write(f"unknown llvm_config mode: {what}\n")
         return 1

@@ -25,15 +25,28 @@ if (enable_llvm) {
     llvm_config_bin = exec_script("//build/scripts/find_llvm_config.py", [], "trim string")
   }
 
+  _cxxflags_args = [ llvm_config_bin, "cxxflags" ]
   llvm_cxxflags = exec_script("//build/scripts/llvm_config.py",
-                              [ llvm_config_bin, "cxxflags" ],
+                              _cxxflags_args,
                               "list lines")
+
+  _ldflags_args = [ llvm_config_bin ]
+  if (llvm_link_static) {
+    _ldflags_args += [ "--link-static" ]
+  }
+  _ldflags_args += [ "ldflags" ]
   llvm_ldflags = exec_script("//build/scripts/llvm_config.py",
-                              [ llvm_config_bin, "ldflags" ],
-                              "list lines") +
-                 exec_script("//build/scripts/llvm_config.py",
-                              [ llvm_config_bin, "systemlibs" ],
+                              _ldflags_args,
                               "list lines")
+
+  _syslibs_args = [ llvm_config_bin ]
+  if (llvm_link_static) {
+    _syslibs_args += [ "--link-static" ]
+  }
+  _syslibs_args += [ "systemlibs" ]
+  llvm_ldflags += exec_script("//build/scripts/llvm_config.py",
+                               _syslibs_args,
+                               "list lines")
   _libs_args = [ llvm_config_bin ]
   if (llvm_link_static) {
     _libs_args += [ "--link-static" ]
