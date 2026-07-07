@@ -51,7 +51,9 @@ if (enable_llvm) {
   # When statically linking LLVM on Windows, llvm-config --link-static
   # --system-libs returns nothing because the MSYS2 LLVM package is a
   # shared-library build whose .dll already embeds these.  Supply the
-  # transitive system deps of libLLVMSupport explicitly.
+  # transitive system deps of libLLVMSupport explicitly.  They must go
+  # into libs (not ldflags) so they appear after the .a archives in the
+  # link command — static linking resolves left-to-right.
   if (llvm_link_static && host_os == "win") {
     llvm_ldflags += [
       "-lzstd",
@@ -60,6 +62,15 @@ if (enable_llvm) {
       "-lshell32",
       "-luuid",
       "-loleaut32",
+    ]
+    llvm_libs += [
+      "ntdll",
+      "ole32",
+      "shell32",
+      "uuid",
+      "oleaut32",
+      "zstd",
+      "z",
     ]
   }
   _libs_args = [ llvm_config_bin ]
