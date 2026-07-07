@@ -56,7 +56,7 @@ def main() -> int:
             continue
         if flag == "-Wl,-headerpad_max_install_names":
             continue
-        if what == "libs" and flag.startswith("-l"):
+        if what in ("libs", "systemlibs") and flag.startswith("-l"):
             print(flag[2:])
             continue
         # Self-built LLVM --ldflags may leak system libs (-lpsapi,

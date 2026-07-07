@@ -66,12 +66,6 @@ if (enable_llvm) {
     # System libraries go AFTER LLVM .a archives.  The self-built LLVM
     # is configured with -DLLVM_ENABLE_ZLIB=OFF and -DLLVM_ENABLE_ZSTD=OFF,
     # so z / zstd are intentionally absent.
-    _extra_llvm_libs += [
-      "ole32",
-      "shell32",
-      "uuid",
-      "oleaut32",
-    ]
     _extra_llvm_libs += _system_libs
   }
   _libs_args = [ llvm_config_bin ]
