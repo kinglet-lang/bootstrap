@@ -149,7 +149,8 @@ jobs:
             --exclude='*/benchmarks' \
             --exclude='*/examples' \
             "llvm-project-${LLVM_VER}.src/llvm" \
-            "llvm-project-${LLVM_VER}.src/cmake"
+            "llvm-project-${LLVM_VER}.src/cmake" \
+            "llvm-project-${LLVM_VER}.src/third-party"
           # mlgo-utils contains symlinks that fail on Windows, so we
           # exclude it above.  LLVM's top-level CMakeLists.txt calls
           # add_subdirectory on it unconditionally — supply a stub so
