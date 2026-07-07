@@ -12,11 +12,11 @@ if (host_os == "win") {
   if (clang_base_path == "") {
     _cc = "clang"
     _cxx = "clang++"
-    _ar = "llvm-ar"
+    _ar = "ar"
   } else {
     _cc = clang_base_path + "/clang"
     _cxx = clang_base_path + "/clang++"
-    _ar = clang_base_path + "/llvm-ar"
+    _ar = clang_base_path + "/ar"
   }
   toolchain("win") {
     tool("cc") {
