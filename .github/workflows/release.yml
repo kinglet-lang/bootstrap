@@ -113,12 +113,11 @@ jobs:
             mingw-w64-x86_64-ninja
 
       - name: Cache LLVM
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4
         id: cache-llvm
         with:
           path: /llvm-install
-          key: llvm-22.1.0-x86-ffs-v2
-          save-always: true
+          key: llvm-22.1.0-x86-ffs-v3
 
       - name: Build LLVM from source
         if: steps.cache-llvm.outputs.cache-hit != 'true'
@@ -198,7 +197,7 @@ jobs:
           CLANG_BASE="$(cygpath -m /mingw64/bin)"
           gn gen out/Release \
             --script-executable="$PYW" \
-            --args="is_debug=false enable_llvm=true llvm_link_static=true llvm_config=\\\"$LLVMW\\\" clang_base_path=\\\"$CLANG_BASE\\\" kinglet_version=\\\"$VERSION\\\""
+            --args="is_debug=false enable_llvm=true llvm_link_static=true llvm_config=\"$LLVMW\" clang_base_path=\"$CLANG_BASE\" kinglet_version=\"$VERSION\""
 
       - name: Build
         run: ninja -C out/Release kinglet kinglet_rt
