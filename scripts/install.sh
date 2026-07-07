@@ -1,7 +1,7 @@
 #!/bin/sh
 # Kinglet installer — fetch a prebuilt release and put `kinglet` on PATH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/kinglet-lang/bootstrap/canon/scripts/install.sh | sh
+#   curl -fsSL https://kinglet-lang.org/install.sh | sh
 #
 # Environment overrides:
 #   KINGLET_VERSION       Tag to install (e.g. v0.1.0-rc.3). Default: latest
