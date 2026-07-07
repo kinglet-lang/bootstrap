@@ -189,7 +189,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           PYW="$(cygpath -m "$pythonLocation")/python.exe"
-          LLVMW="$(cygpath -m /llvm-install/bin/llvm-config)"
+          LLVMW="$(cygpath -m /llvm-install/bin/llvm-config).exe"
           gn gen out/Release \
             --script-executable="$PYW" \
             --args="is_debug=false enable_llvm=true llvm_link_static=true llvm_config=\"$LLVMW\" kinglet_version=\"$VERSION\""
