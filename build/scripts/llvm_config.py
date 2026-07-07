@@ -59,6 +59,12 @@ def main() -> int:
         if what == "libs" and flag.startswith("-l"):
             print(flag[2:])
             continue
+        # Self-built LLVM --ldflags may leak system libs (-lpsapi,
+        # -lntdll, …).  Strip them here so they land via --system-libs
+        # in llvm.gni, which places them after the .a archives where
+        # static linking can resolve them left-to-right.
+        if what == "ldflags" and flag.startswith("-l"):
+            continue
         print(flag)
     return 0
 
