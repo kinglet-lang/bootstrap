@@ -25,7 +25,7 @@
 like `-rc` are skipped) and wires it onto `PATH`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kinglet-lang/bootstrap/canon/scripts/install.sh | sh
+curl -fsSL https://kinglet-lang.org/install.sh | sh
 ```
 
 Set `KINGLET_VERSION=<tag>` to install a specific or prerelease version.
@@ -33,7 +33,7 @@ Set `KINGLET_VERSION=<tag>` to install a specific or prerelease version.
 **Windows** (PowerShell) — one-liner:
 
 ```pwsh
-irm https://raw.githubusercontent.com/kinglet-lang/bootstrap/canon/scripts/install.ps1 | iex
+irm https://kinglet-lang.org/install.ps1 | iex
 ```
 
 Set `$env:KINGLET_VERSION = 'v0.1.0-rc.3';` before the command to install a

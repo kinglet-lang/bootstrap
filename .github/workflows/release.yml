@@ -117,7 +117,8 @@ jobs:
         id: cache-llvm
         with:
           path: /llvm-install
-          key: llvm-22.1.0-x86-ffs-v1
+          key: llvm-22.1.0-x86-ffs-v2
+          save-always: true
 
       - name: Build LLVM from source
         if: steps.cache-llvm.outputs.cache-hit != 'true'
@@ -179,6 +180,10 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_INSTALL_PREFIX=/llvm-install
           ninja install-llvm-libraries install-llvm-headers llvm-config
+          # install-llvm-libraries + install-llvm-headers only install
+          # libraries and headers; ninja builds llvm-config in the build
+          # tree but does not install it.  Copy it manually.
+          cp /llvm-build/bin/llvm-config.exe /llvm-install/bin/
 
       - name: Install GN
         run: |

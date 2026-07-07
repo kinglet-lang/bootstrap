@@ -1,7 +1,7 @@
 # Kinglet Windows installer — one-liner downloads the latest stable release
 # and puts kinglet on PATH.
 #
-#   irm https://raw.githubusercontent.com/kinglet-lang/bootstrap/canon/scripts/install.ps1 | iex
+#   irm https://kinglet-lang.org/install.ps1 | iex
 #
 # With KINGLET_VERSION to install a specific or prerelease version:
 #   $env:KINGLET_VERSION = "v0.1.0-rc.3"; irm ... | iex
