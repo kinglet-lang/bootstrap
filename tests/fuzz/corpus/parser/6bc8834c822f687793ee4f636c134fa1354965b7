@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+Enum Shape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  r×turn s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::::::::::: r) => 4.14 * r *;
+  return 0;
+}

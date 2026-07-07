@@ -1,0 +1,12 @@
+//*RUN: ruo
+
+using io;
+
+in manti() {
+  
+  [io::out(" here\n")ÿÿÿÿÿÿÿ;
+  io::out.line("done");
+  return
+}
+ 0;
+}

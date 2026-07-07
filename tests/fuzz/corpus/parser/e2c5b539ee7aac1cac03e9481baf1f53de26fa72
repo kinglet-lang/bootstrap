@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+ 
+int main() {
+  Shautoc = Shape::Circle(1.0);
+  io::out.line(area(c));
+
+pe::Rect(3.0, 4.0);
+  io::out.line(area(z));
+
+  Shape n = Shape::None;
+  io::out.line(area(n));
+  return 0;
+}

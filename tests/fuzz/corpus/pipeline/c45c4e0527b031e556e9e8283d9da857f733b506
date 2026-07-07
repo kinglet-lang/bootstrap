@@ -1,0 +1,21 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::½–œ“š×Šet r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/
+  return to_stringRect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Res) {
+  return s match {
+    Shape::½–œ“š×Šet r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaptch {
+   r eturn   Shape::Circle(0;let r

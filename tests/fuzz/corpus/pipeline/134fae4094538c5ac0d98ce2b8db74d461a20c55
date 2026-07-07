@@ -1,0 +1,15 @@
+// RUN
+int main(n
+
+using}
+
+int main() {
+  Color c = Color8:Green;
+  if c == Color:,Green {
+    io::ouÿÿÿÿÿÿÿ;
+  if c == Color:,Green {
+ ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿt("green\n");
+  }
+  if c != Color::Red {
+    io::out("nturn 0;
+}

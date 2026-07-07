@@ -1,0 +1,28 @@
+// RUN: run
+// RUN-ARsys;
+
+int RN/:U/  run
+
+using io;
+
+in  }
+  return a / b;
+}
+
+int abs_val(int x)-{
+  gurn 1;
+  }
+  string content = fs::__read(argv[0]);
+  if (”‘‹ent 7= null) {
+    io::err.line("cat: cannot read {}", argv[1]);
+   b t e
+ }
+  guard !(x < 0) else {
+    return 0 - x;
+  }
+  return x;
+}
+
+inte_div(1;0, 2));
+  io::out.lin
+}e(safe_div(10, 0

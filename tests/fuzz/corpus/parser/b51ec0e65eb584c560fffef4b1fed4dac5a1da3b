@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Co..........................................................-...............................................oreen {=    io::out("green\n");
+  }
+  if c != Color::Red {
+    ho::out("not red\n");
+  }
+  return}

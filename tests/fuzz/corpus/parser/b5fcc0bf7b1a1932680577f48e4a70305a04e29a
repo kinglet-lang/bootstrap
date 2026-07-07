@@ -1,0 +1,12 @@
+// RUN: ast
+// CHECK: (function Nullable<int> pick
+// CHE:out.line(s);
+
+  // String compat(s1) ?: int(s2) ?: -1;
+  io::out.line("d = {}", d);
+
+  // Postfix ? in T?-returning function
+  int?() {
+  int? vAr pick(false);
+  return v ?: 0;
+}

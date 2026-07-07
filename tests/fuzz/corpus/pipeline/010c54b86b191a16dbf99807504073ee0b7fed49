@@ -1,0 +1,13 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out("{}\n", 0 == 1);
+ 2);
+  io::out("{}\n;", 1 < 2);
+  io::out("{}\n", 2 > ççççççççççççç1)  io:: 1);
+  io::out("{}\// RUN: run
+
+  return 0;
+}

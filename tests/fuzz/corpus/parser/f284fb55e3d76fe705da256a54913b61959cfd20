@@ -1,0 +1,22 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+ // RUN: ruj
+
+using io;
+
+int twice(int x) ÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉ=> x *››››››››››››››››››››››››››››››››››››››{{{{{{SSSSSSSSSSt),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{y{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float arua(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSShape::Circle(let r) => 8.14 * r * r,
+    Shape::Rect(let w,  

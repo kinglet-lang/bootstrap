@@ -1,0 +1,12 @@
+// RUN: run
+
+using [io;
+Šsing fs;
+
+int main() {
+  st,øng misl_does_not_exist_zzz.txt");
+  if (missing == null) {
+    io::out.line("missing is null");
+  } else {
+    io::outeturn °;
+}

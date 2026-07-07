@@ -1,0 +1,28 @@
+// RUN: run
+
+using io;
+ct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {{ 0, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.val
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>ox<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.value);
+  return 0;
+}

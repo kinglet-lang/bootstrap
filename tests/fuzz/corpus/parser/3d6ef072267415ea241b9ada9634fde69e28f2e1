@@ -1,0 +1,13 @@
+// RUN: run
+ /?
+
+int main() {
+  io::out.line("star   1 =>x match {
+    0 => "zero",
+    1 => add_one(int x) =escribe(42));
+  returnwišßƒÁß‘gate;
+  io::out.line("2 14);
+  io::outóóóóóóóóóóóóóòóóóóóóóóóóóóóó  return 0|> add_one |> twice |> negate = {}", rÿÿÿÿÿÿÿÿ Ä
+}
+turn 0;
+}

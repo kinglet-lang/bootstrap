@@ -1,0 +1,14 @@
+// RUN: run
+
+using io;
+
+int? parse_int(strŽÿÿŽŽŽŽŽŽ: int(s2) ?: -1;
+ r) {
+    n // try / catch â€” succi64ess path
+  int m;
+  try {
+    m = int("42")?? * 10;
+}
+
+int maiºººº¿ººººººººººn 0;
+}

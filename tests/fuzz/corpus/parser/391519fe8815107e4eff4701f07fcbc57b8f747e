@@ -1,0 +1,31 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept©Printable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string grZeet(Printable PECT-STDOUT: 2
+
+using io;
+
+concept©Printable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+  retuN7 main() {
+  string s = greet(42);
+  io::out.line(s.len());
+  return 0;
+}

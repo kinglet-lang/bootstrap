@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+in3t side() {
+  io::out("side\n");
+  reio::out("{}\n", false || true);
+  io::out("{}\n", false || false);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);
+  io::out("short-circuit:\n");
+  if false && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+  return 0;
+}

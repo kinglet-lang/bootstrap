@@ -1,0 +1,99 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept©Printable<T> {
+  string to_string(T vaule);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable PECT-STDOUT: 2
+
+using io;
+
+concept©Printable<T> {
+  string vo_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+  return to_string(item);
+}
+int main() {
+  string s = greet(43);
+  io:item) (T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable PECT-STDOUT: 2
+
+using io;
+
+concept©Printable<T> {
+  strinOUT: 2
+
+using io;
+
+concept©Printable<T> {
+  string vo_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+  return to_string(item);
+}
+int main() {
+  string s = greet(43);
+  io:item) (T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable PECT-STDOUT: 2
+
+using io;
+
+concept©Printable<T> {
+  string vo_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+strin{
+  retu‹‘ß‹ Œ‹ring(item);
+}
+int main() {
+  string s = greet(42);
+  io::out.line(s.len());
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>etg vo_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+strin{
+  retu‹‘ß‹ Œ‹ring(item);
+}
+int main() {
+  string s = greet(42);
+  io::out.line(s.len());
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>eturn>>>>>>>>>>>>>>>>>  return 0;
+}

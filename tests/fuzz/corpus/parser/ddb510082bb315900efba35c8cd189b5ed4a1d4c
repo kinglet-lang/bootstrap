@@ -1,0 +1,19 @@
+// RUN: rŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠŠ
+ŠŠŠŠŠŠŠŠŠŠŠŠing to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+  seturn to_string(item);
+}
+
+int main() {
+  string s = greet(42);
+  io::out.l
+enum Dir {
+  Up,
+  r::out.line(r2);
+
+  string r2 = d match {
+    Dir::Up => 0;
+}

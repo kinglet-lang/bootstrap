@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+int main() {
+  auto printer = io::out.line;
+  printer("hello from variable");
+  printer = io::eN7kinglet3ast9IndexExprErr.line;
+  err_fn("stderr message");
+
+  return 0;
+}

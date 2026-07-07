@@ -126,7 +126,7 @@ jobs:
           LLVMW="$(cygpath -m /mingw64/bin/llvm-config.exe)"
           gn gen out/Release \
             --script-executable="$PYW" \
-            --args="is_debug=false enable_llvm=true llvm_config=\"$LLVMW\" kinglet_version=\"$VERSION\""
+            --args="is_debug=false enable_llvm=true llvm_link_static=true llvm_config=\"$LLVMW\" kinglet_version=\"$VERSION\""
 
       - name: Build
         run: ninja -C out/Release kinglet kinglet_rt

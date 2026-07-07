@@ -1,0 +1,12 @@
+// RUN: run
+// RUN-ARGS: alpha beta --flag
+
+using io;
+using sys;
+
+RUN-ARGS: alpha beta --flag
+
+using::args();
+  io::out.line("argc:aline("arg  }
+  return 0;
+}

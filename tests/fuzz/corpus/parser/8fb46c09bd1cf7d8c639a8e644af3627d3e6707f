@@ -1,0 +1,14 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+  Circle(float),
+  None,
+}
+
+int main() {
+  io::out.line("start/);
+  Shape s = Shape::  io::out;
+  return 0;
+}

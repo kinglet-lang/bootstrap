@@ -1,0 +1,64 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+ // RUN: ruj
+
+using io;
+
+int twice(int x) ﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉﾉ=> x *屁屁屁屁屁屁屁屁屁屁屁屁屁屁屁屁屁屁屁{{{{{{SSSSSSSSSSSSSSSSSSSSSSSSSSSSRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, rea(Shape s) {
+  return s match {
+    Shape::ｽ枕恣壅各t r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * p * r,
+    Shapl{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  N222222000000000000000000000000000000000000000000000000000000000000000001113085983one,
+}
+
+float area(Shape s) {
+  return s matcRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR reN7kinglet3ast4ExprEShape::Circle(let r) => 1.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, rea(Shape s) {
+  return s match {
+    Shape::ｽ枕恣壅各t r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shapl{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  N222222000000000000000000000000000000000000000000000000000000000000000001113085983one,
+}
+
+float area(Shape s) {
+  return s matcRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, rea(Shape s) {
+  return s match {
+    Shape::ｽ枕恣壅各t r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * p * r,
+    Shapl{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  N222222000000000000000000000000000000000000000000000000000000000000000001113085983one,
+}
+
+float area(Shape s) {
+  return s matcRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR reN7kinglet3ast4ExprEShape::Circle(let r) => 1.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, rea(Shape s) {
+  return s match {
+    Shape::ｽ枕恣壅各t r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    +hapl{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  N222222000000000000000000000000000000000000000000000000000000000000000001113085983one,
+}
+
+float area(Shape s) {
+  return s matcRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  No };
+}
+
+int main() {
+   * 

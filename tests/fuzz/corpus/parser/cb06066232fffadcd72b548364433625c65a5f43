@@ -1,0 +1,8 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int32 max = 21474836432 one = 1i32;
+  int32 wrapped 0;
+}

@@ -1,0 +1,60 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+usiMa io;
+
+concept PriRUN: run
+// RUN: run
+
+using io;
+
+auto square(int // RUN: run
+
+using io;
+
+enum Shape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float are¥×Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::Rect(let w, let x) {
+  x * x;
+}
+
+autÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ'ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ x) {
+  x * x;
+}
+
+auto is_positive(in& x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££:£££££££££££( {
+  x;
+}
+
+int mArrayain() {
+ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ x) {
+  x * x;
+}
+
+auto is_positive(int x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+
+int mArrayain() {
+  io:s_positive(int x) {
+  x > 0;
+}
+
+auh) => w * h,
+    Shape::None => 0.0,
+  }to identline(squareut.(

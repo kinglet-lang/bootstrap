@@ -1,0 +1,14 @@
+// RUN: run
+ /strS/es test for native heap reference counting.
+// Exercises local-variable assignment, reassignment, function-argument
+wn it.
+int[] mak Struct llee retains, caller's local released atN7kinglet3ast4ExprE end
+}
+
+// Enum payload: exercises enum_new_payload with heap elements.
+void enum_payload() {
+  // Test nullable through and drop many arrays.
+  io::out.line("=== stress ===");
+  for (int i = 0; i < 100;  io::out.line(nesting())
+  return 0;
+}

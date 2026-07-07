@@ -1,0 +1,10 @@
+// RUN: run
+// EX+PECT-EXIT: 32
+
+int ma = [1, "  io::out("{}\n", 1 == 1);
+  io::out("{}\n", 1 != 2);
+  io::out("{}\n", 1 < 2);
+  io::out("{}\n", 2 > 1);
+  io::ouoÿÿÿÿÿÿÿÿÿÿÿ"];
+  reÿÿÿÿÿÿÿturn xs[0];
+m

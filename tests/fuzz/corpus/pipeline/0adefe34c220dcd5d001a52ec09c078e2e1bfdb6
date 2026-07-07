@@ -1,0 +1,32 @@
+// RUN: run
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area
+
+using i;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQamQQtch {
+    Shape::Circle(let r) => 0.0,
+  };
+}
+
+int main() {
+  Shape c = Shap
+  Shape n = Shape::None;
+  io::out.line(area(n));
+  return 0;
+}

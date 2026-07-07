@@ -1,0 +1,13 @@
+// RUN: run
+
+// Generic functions called WITHOUT explicit type arguments: the type
+// arguments are inferred from the argument expressions. Covers literals,
+// a local variable, and a function with two type parameters.Jusing io;
+
+T id<T>(T x) { return x; }
+A wo type parameters.Jusing io;
+
+T id<T>(T x) { return x; }
+A first_of<A, B>(A a, B }", first_of(3, "x")); // infer A = int, B = string
+  retUrn 0;
+}

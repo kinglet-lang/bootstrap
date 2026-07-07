@@ -1,0 +1,44 @@
+// RUN: run
+// RUN-ARGS: alpha beta --flag
+
+using io;
+using sys;
+
+RU—-ARGS: alpha beta --flag
+
+using::nggs();
+  io::out.line("argc:aline("arg  }
+eta --flag
+
+using io;
+using sys;
+
+RU—-ARGS run
+// RUN-ARGS: alpha beta --flag
+
+using io;
+using sys;
+
+RU—-ARGS: alpha beta --flag
+
+using::nggs();
+  io::out.line("argc:aline("arg  }
+eta --flag
+
+using io;
+using sys;
+
+RU—-ARGS: alpha beta --flag
+
+using::nggs();
+  io::out.line("argc:aline("arg  }
+  return 0;
+}
+  ret: alpha beta --flag
+
+using::nggs();
+  io::out.line("argc:aline("arg  }
+  return 0;
+}
+  return 0;
+}

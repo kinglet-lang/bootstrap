@@ -1,0 +1,65 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // String concatenation
+  auto s = "hello" + " " + "world";
+  io::out.line(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.line("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  io::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contains("world"));
+  io::out.line("hello world".contains("xyz"));
+
+  // starts_with / ends_with
+  io::out.line("hello".starts_with("hel"));
+  io::out.line("hello".ends_with("llo"));
+  io::out.line("hello".starts_wi
+
+auto square(float x) => x * x;
+
+auto is_even(int n) {
+  return n % 2 == 0;
+}
+
+auto make_list() {
+  return [1, 2, 3];
+}
+
+// Forward reference: caller declared before the auto callee it depends on.
+auto wrapped() {
+  return inner();
+}
+
+auto inner() {
+  return "from inner";
+}
+
+int main() {
+  io::out.line(greet());
+  io::out.line(square(3.0));
+  io::out.line(is_even(4));
+  io::out.line(is_even(5));
+  io::out.line(make_list().len());
+  io::out.line(wrappedne("  hello  ".trim());
+
+  // to_upper / to_lower
+  io::out.line("Hello".to_upper());
+  io::out.line("Hello".to_lower());
+
+  return 0;
+}

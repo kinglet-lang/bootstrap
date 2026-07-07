@@ -1,0 +1,8 @@
+// RUN: run
+
+using io;
+
+int twice(int x) => x * 2;
+int add_one(intnt x) d_one;
+  io::out.line("5 |> twice |> a  return 0;
+nt

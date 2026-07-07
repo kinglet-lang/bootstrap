@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] buckets = [];
+  buckets.resize(8, -1);
+  io::out.line("{} {} {}", buckets.len(), buckets[0], buckets[7]);
+  buckets[3] = 42; [];
+  names.resize(3, "?");
+
+}

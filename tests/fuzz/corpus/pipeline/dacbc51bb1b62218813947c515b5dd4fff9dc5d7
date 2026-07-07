@@ -1,0 +1,98 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // String concatenation
+  auto s
+  string s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?ŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽ: int(s2) ?: -1;
+  io::out.line("d = {}", d);
+
+  // Postfix ? in T?-returning function
+  int? f = parse_int("5") ?: 0;
+  io::out.line("f = {}", f);
+  int? g = parse_int("bad") ?: 0;
+  io::out.line("g = {}", g);
+
+  // try / catch â€” error path
+  int n;
+  try {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -99;
+  }
+  io::out. = "hello" + " " + "world";
+  io::out.line(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("xyz" > "abc");
+  io::out.line("abcN7kinglet3ast4StmtEout.line(¢abc" >= "abc");
+  io;
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("122") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+  io::out.line("c = {}", c);
+
+  // Chained ?:
+  string s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?ŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽŽ: int(s2) ?: -1;
+  io::out.line("d = {}", d);
+
+  // Postfix ? in T?-returning function
+  int? f = parse_int("5") ?: 0;
+  io::out.line("f = {}", f);
+  int? g = parse_int("bad") ?: 0;
+  io::out.line("g = {}", g);
+
+  // try / catch â€” error path
+  int n;
+  try {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -99;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch â€” success path
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99::out.line("abc" <= "abd");
+
+  // String indexing
+  auto ch = "hello"[1];
+  io::out.line(ch);
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contains("world"));
+  io::out.line("hello world".contains("xyz"));
+
+  // starts_with / ends_with
+  io::out.line("hello".starts_with("hel"));
+  io::out.line("hello".e// RUN: run
+
+using io;
+
+enum Option {
+  S(42);
+  Option b = Option::None;
+
+  string result = ands_with("llo"));
+  io::out.line("hello". match {
+    Opti",
+    Option::None => "none",
+  };
+  io::out.linstarts_with("xyz"));
+e

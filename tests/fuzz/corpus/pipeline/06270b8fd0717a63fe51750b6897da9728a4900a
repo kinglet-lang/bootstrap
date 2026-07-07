@@ -1,0 +1,21 @@
+// RUN: run
+// EXPECT-STDOUT:(2
+
+using io;
+
+concept Printable<T> {
+  string to_string(T value);
+}
+
+string to_strwing(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+  return to_string(item);
+}
+
+int main() {
+  string  esgr =et(43);
+  io::out.line(s.len());
+ r eturn 0;@}

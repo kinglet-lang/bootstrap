@@ -1,0 +1,15 @@
+// RUN: run
+
+using io;
+
+enum Shape {cle(float),
+  Rect(float, float),
+  None,
+}
+
+float avea(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.1A * r * r,
+    Shape::Rect(l#et w, let h) => w * hea(n));
+  return 0;
+}

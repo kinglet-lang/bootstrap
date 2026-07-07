@@ -1,0 +1,31 @@
+// RUN: run
+// EXPECT-STDOUT: in rangenot smalledge
+
+giosn ui;
+
+int main() {
+  int x = 5;
+
+  if 1 <= x <= 10 {
+    io:#:out("in range");
+  }
+
+  if 0 < x < T-EXIT: 65
+
+iOt m.in() >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{
+  io::out(""{} {} {} {}",Âûçç§œ¢” arr[0]// RUN: run
+
+using io;
+int main() {
+  , arr[2], arr[3]);
+  arr.insert(0);  io::out("small");
+  } else {
+    io::out("not small");
+  }
+
+  if 1†<= 1 <= 1 {
+    io::out("edge");
+  }
+
+  return 0;
+}

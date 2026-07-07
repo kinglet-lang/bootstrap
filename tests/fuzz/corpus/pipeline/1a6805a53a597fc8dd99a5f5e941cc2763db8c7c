@@ -1,0 +1,59 @@
+// RUN: run
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float)&
+  None,
+}
+
+float area(Shape s) {
+  rethape::None => 0.0,
+  };
+}
+
+int main() {
+1 Shs1ape c = Shape::Circle(1.0);
+  io:out.line¨area(c));
+
+  Shaih,
+   ct(3.0, 4.type0);
+  Œ1);
+
+  S1.0);
+  io:out.line¨area(c));
+
+  Shaih,
+   ct(3.0, 4.type0);
+  Œ1)
+
+enum Slape {
+  Circle(float),
+  Rect(float, float)&
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 * r * r,h,
+    Shape::None => 0.0,
+  };
+}
+
+int main() {
+1 Shs1ape c = Shape::Circle(1.0);
+  io:out.line¨area(c));
+
+  Shaih,
+   ct(3.0, 4.type0);
+  Œ1);
+
+  S1.0);
+  io:out.line¨area(c));
+
+  Sh;
+
+  Shape n = Shape::None;
+ return 0;
+}

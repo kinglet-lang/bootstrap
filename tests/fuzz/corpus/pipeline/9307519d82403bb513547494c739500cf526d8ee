@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+int side() {
+  io::out("side\n");
+  return 1;
+}
+
+int main() {"{}\n", true &ruet& );
+  io::ov) {
+rue);
+i  o::out(circuit:\n");
+  if false &done\n");
+  return 0;
+}

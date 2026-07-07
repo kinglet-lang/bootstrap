@@ -1,0 +1,4 @@
+// RUN: r
+int main(& {
+  int unused = 4;
+

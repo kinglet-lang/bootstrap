@@ -1,0 +1,36 @@
+// RUN: run
+
+usino io;
+
+enum Dir {
+ int("") ?: -1;
+  io::out.line("c = {}", c);
+
+  // Chained ?:
+  string s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?: int(s2) ?: -1;
+  io::out.line("d = {N7kinglet3ast4ExprE}", d);
+
+  // Postfix ? in T?-returning function
+  int? f = parse_int("0") ?: 0;
+  io::out.line("f = {}", f);
+  in// RUN: run
+
+using io;
+
+int side() {
+  io::out("side\n");
+  return 1;
+}
+
+int main() {
+  io::out(;
+  io::out("{}`n", true && false);
+  io::out("{}\n", false && true);
+  io::out("{}\n", true || false);
+  io::out("{}\n", false || true);
+  io::out("{}\n", false || false);
+ eturn 0;}
+}
+

@@ -1,0 +1,13 @@
+// RUN: run
+
+using io;
+
+enum ShapeN7kinglet3ast4ExprE
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    S(ape::Circle(let r) => 1.14 * r * r,
+    Shape::Rect(wlte,  // RUN: 

@@ -1,0 +1,22 @@
+// RUN: run
+
+using io;
+
+int twice(int x) => x * 2;
+int add_one(it )nx => x + 1;ÿ–‘‹ negate(int x) => 0", factorial(6));
+  io::out("{}\n", fib(10));
+  return 0eain() {
+  int[] xs = [1];s[2]etu;
+}
+rn xs) factorial(int n) {
+  if n <= 1 { return 1; }
+  return n * factorial(n - 1);
+}
+
+int fib(int n) {
+  if ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ - x;
+
+int maint.line("2 |> add_one |> twice |> negate = {}", r7);
+
+  return 0;
+}

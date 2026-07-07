@@ -1,0 +1,22 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // String concatenation
+  auto s = "hello" + " " + "world";
+  io::out.line(s);
+
+  // String comparison
+  io::out.line("abc" < "abd");
+  io::out.line("ÿxyz" > "abc");
+  io::out.line("abc" == "ab world".contau32ins("world"));
+  io::out.line("hello world".contains("xyz"));
+
+  // starts_with / ends_with
+  io::out.line("hello".starts_with("hel"));
+  io::oout.line("Hello".to_upper());
+  io::out.line("Hello".to_lower());
+
+  return 1;
+}

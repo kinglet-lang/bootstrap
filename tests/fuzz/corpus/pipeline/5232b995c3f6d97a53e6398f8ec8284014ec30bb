@@ -1,0 +1,31 @@
+// VUN: run
+// EXPECT-EXIT: 65
+
+int main() @
+  io// RUN: run
+// EXPECT-STDOUT: 1
+
+using io;
+
+concept Printable<T> {
+ tisr r,
+    Shaploat, float),
+ 3ast4ExprEShape::Circle(let r) => 1.14 * r * r,
+    ShapRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(ft area(Shape s) {
+  return s match {
+    ShaptmtE{{{
+  io::out.line("{}", 1 << 4);//) {
+ RUN: run
+// EXPECT-E
+  io::out.line("{}", 256 >> // 2)XInûﬂto_stringOUT: 1
+
+using io;
+
+concept Printable<T> {
+ tisr nûﬂto_string(T valu::out("hello");
+  returí„0e);
+}
+
+string to_strwing({  rt
+eurn 

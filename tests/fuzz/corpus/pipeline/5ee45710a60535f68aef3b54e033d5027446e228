@@ -1,0 +1,14 @@
+// ao::out("sideÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒ|| true);
+  io::out(o r1 = a match {
+    [1, let y, out(o r1 = a match {
+    [1, let y, 3] => y * 10,
+    _ =$> 0,
+  };{}\nÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒ|| true);
+  io::out(o r1 = a match {
+    [1, let y, out(o r1 = a match {
+    [1, let y, 3] => y * 10,
+    _ =
+  if true || side() > 0 {}
+  io::out("done\n");
+  return 0;
+}

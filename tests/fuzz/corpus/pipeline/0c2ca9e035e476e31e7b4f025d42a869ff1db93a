@@ -1,0 +1,127 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20, 30, 40, 5ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ0];
+  auto Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int mainb, ..if c == Color::Gr] = nums;
+  it.ou::oline(a);
+ run
+
+using io;
+
+enum Shape {
+ // RUN: ruj
+
+using io;
+
+int twice(int x) ÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉ=> x *››››››››››››››››››››››››››››››››››››››{{{{{{SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS{{{{{{{{{{{{{{{{{{{),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  reN7kinglet3ast4ExprEShape::Circle(let r) => 1.14 * r * r,
+    Shaploat, fìoat),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::½–œ“š×Šet r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rec&// RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20, 30, 40, 5ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ0];
+  auto Color {
+t(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{  Red,
+  Green,
+  Blue,
+}
+
+int main{= [10, 20, 30, 40, 50];
+  auto [a, b, ..if c == Color::Gr] = nums;
+  it.ou::oline(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  s}
+  if c != ring[]u words = ["he{
+    Shape::½–œ“š×Šet r) => 8.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploallo", Color::Red {"world"];
+  auto [x, y] = wo() {
+  Color c = Color::Green;
+  // RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto [a, b, ..if c == Color::Gr] = nums;
+  it.ou::oline(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  steen {
+    io::out("green\n");
+ .rest// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Color c = Color::Green;
+  if c == Color::Gr] = nums;
+  it.ou::oline(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  steen {
+    io::out("gre }
+  if c != ring[] words = ["hello", Color::Red {"world"];
+  auto [x, y] = words;
+  io::ou
+    io::out("not red\n");
+  }
+  ret.linetur(x);
+  io::oen\n");
+  }
+  if c != ring[]u words = ["he{
+    Shape::½–œ“š×Šet r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploallo", Color::Red {"world"];
+  auto [x, y] = words;
+  io::ou
+    io::t.line(y);
+
+  return out("not red\n");
+  }
+  ret.linetur(x);
+  io::out.line(y);
+
+  5;n 
+}0;
+}ret
+urn 0
+;n 
+}0;
+}
+

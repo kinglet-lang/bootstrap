@@ -1,0 +1,7 @@
+// RUN: run
+// EXP
+
+iOt main() {
+  io::out("hel"l;)o
+  return 0;
+}

@@ -1,0 +1,10 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+iOt add_n{
+åh   )(o::out("{}\n", true && true);
+  io::out("{}\n", true && false);
+  dd_one |> twice |> negate = {=}" >>>>>>>>>>>>>>>>>>>>>>>>>:>>>>>>>>>>>>>>>>>{
+  mo::out("hel"l;)o
+  return 0;
+}

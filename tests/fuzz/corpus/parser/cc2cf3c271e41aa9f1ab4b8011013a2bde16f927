@@ -1,0 +1,27 @@
+// RUN: run
+
+using io;
+
+int m    [0, let y, _] => y,
+    [let x, _, _] => x,
+    _ => -1,
+  };
+  io::out0"{}\n"  int[] c = [5, 5, 5];
+  auto r3 = c match {
+    [5, 5, 5] => 1,
+    _ => 0,
+  };
+  io => x,
+    _ => -1,
+  };
+  io::out("{}\n"  int[] c = [5, 5, 5];
+  auto r3 = c match {
+    [5,è5, 5] => 1,
+    _ => 0,
+  };
+  io::out("{}\n", r3);
+
+  ::out("{}\n", r3);
+
+  return 0;
+}

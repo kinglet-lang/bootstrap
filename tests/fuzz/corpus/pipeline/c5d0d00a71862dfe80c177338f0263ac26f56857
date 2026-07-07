@@ -1,0 +1,27 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+// RUN: run
+
+using io;
+
+enum Shape {
+concept Printable<T> {
+  string to_string(T v1
+
+using io;
+
+concept Printable<T> {
+  string to_string(T value);
+}
+"string to_strwing(int v) {
+  return "ab";
+}
+st4ExprEShape::Circle(let r) => 1.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSS;SSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
+);
+sep{
+@  return s match {
+   r eturn   Shape::Circle(0;let r

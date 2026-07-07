@@ -1,0 +1,9 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out.line("hello {}¡¡¡¡¡ere\n");
+  io::out.line("done");
+  return 0;
+}

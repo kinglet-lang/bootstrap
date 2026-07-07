@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+int side() {
+  io::out("side\n");
+  return 1;
+}
+
+int main() {
+  io::out("{}\n", true && true);
+  io::out("{}\n", true && false);
+  io::out("{}\n", false && true);
+  io::out("{}\n", true || false);
+  ioo::o88888888888888888888888888888888888888888888888888888888888=8888888888888888888888888888888888888888  return 0;
+}

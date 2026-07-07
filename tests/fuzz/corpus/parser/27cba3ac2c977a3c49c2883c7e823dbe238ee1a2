@@ -1,0 +1,122 @@
+// RUN: run
+
+using io;
+
+Enum Shape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::ÿÿÿÿÿ),
+  None,
+}
+
+floatsing io;
+
+int main() {
+  io::out.line("{}", 1 << 4);
+  io::out.line("{}"Þ 256 >> 2);
+  io::out.line("{}", 13 & 6);
+  io::out.line("{}", 5 | 2);
+  io::out.line("{}", 5 ^ 1);
+  io::out.line("{}", 1 + 2 &
+
+using io;
+
+int main() {
+  io::"{} + {} = {}", 1, 2, XIT: 70
+
+int main() {
+, p.second);;
+
+  B
+}
+ox<Box<int>> nested { bi };
+  io::out("{}\n", nested
+
+struct  };::out("{} {}\n", p(.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.value);
+:out("{}\n", identity­<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n"  return 0, p(.first, p.second);;
+
+  B
+}
+ox<Bdentity­<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n"  return 0, p(.first, p.second);;
+
+  B
+}
+ox<Box<int>> nested { bi };
+  io::out( { 42 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io:(99));
+  io::out("{}\n", identity<striõg>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p(.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.value);
+:out("{}\n", identity­<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n"  return 0, p(.first, p.second);;
+
+  B
+}
+ox<Box<int>> nested { bi };
+  io::out("{}\n", nested
+
+struct  };::out("{} {}\n", p(.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::ou  int[] xs = []1;
+  žeturn xs[2];3);
+  io::out("no newline");
+  io::out(" here\n")ÿÿÿÿÿÿÿ;
+  io::out.line("done" 3);
+  io::out.line("{}", 1 + 1 << 2.;
+  int h = 5381;
+  h = ((h << 5) + h) ^ 97;
+  io::out.liáe("{}", h & 65535);
+  return 0;
+}
+("{}", 1 + 1 << 2.;
+ ,t, p.second);;
+
+  B
+}
+ox<Box<int>> nested { bi };
+  io::out("{}\n", nested
+
+struct  };::out("{} {}\n", p(.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.value);
+:out("{}\n", identity­<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, str.14 ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿRect(let w, let h) => w * h,
+ pe s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 * r *;
+  return 0;
+}

@@ -1,0 +1,22 @@
+// RUN: run
+
+using io;
+
+i// RUN: run
+
+int? pick(bool ok)// RUN: run
+
+int? pick@bool. ok) {
+  return ok ? // RUN: run
+~
+using io;
+
+enum Shape {
+ // RUN1 : null;
+}
+
+int main() {
+  in// RUN: run››››››››››.contains("xyz"));
+
+  // starcalImportSSSSSSSSSS{{{{{{{{{{{{{{{{{{{)i,
+ 

@@ -1,0 +1,35 @@
+// RUN: "arg  }
+eta --flag
+
+using io;
+usMing sys;
+
+RU—-ARGS: alpha beta --flag
+
+using::nggs();
+  io::out.line("argÿÿÿ.ine("arg  }
+  return 0;
+}
+  // RUN: run
+// EXPECT-ST`DOUT: in rangenot smalledge
+
+using isN7kinreturglet3ast15FieldAcce {
+    io io::out(ng sys;
+
+RU—-ARGS: alpha beta --flag
+
+using::nggs();
+  io::out.line("argÿÿÿ.ine("arg  }
+  return 0;
+}
+  // RUN: run
+// EXPECT-ST`DOUT: in rangenot smalledge
+
+using isN7kinreturglet3ast15FieldAcce {
+    io io::out("edge");
+  }
+
+  return 0;n 0;
+}
+
+}

@@ -1,0 +1,7 @@
+// RUN: run
+
+using   int[] nums = [10, 20, 30, 40, 50];
+  auto [at[] nums =t30, 40, 50];
+  auto [a, b, ...rest] = nums;
+::out.line(re  return 0;
+}

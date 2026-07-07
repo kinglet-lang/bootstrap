@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+int side() {
+  io::out("side() {
+  io::out("siide\n");
+  return 1;
+}
+
+int main() {
+  io::out("{}\n", true && true);
+  io::out("{}\n", true && false);
+ éio::out("{}\n", false && true);
+  io::out("{}\n8888888888888888888888888888888888888888888888888888888=8888888888888888888888888888888888988888  return 0;
+}

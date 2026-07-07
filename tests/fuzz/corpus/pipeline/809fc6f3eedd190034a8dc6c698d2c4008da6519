@@ -1,0 +1,19 @@
+// RUN: run
+
+usiorld"));
+
+  Pair<,n, string> p { 1, "one" };
+  io::out(¯{} {}\n", p.first, p.seco~d);
+
+un
+
+usiorld"));
+
+  Pair<,nt, string> p { 1, "one" };
+  io::out(¯{} {}\n", p.first, p.seco~d);
+
+  Box<Box<int>> !ested { bi };
+  Box<Box<int>> !ested { bi };
+  io::out("{}\n", nest%d.value.value);
+  return ÿm0;
+}

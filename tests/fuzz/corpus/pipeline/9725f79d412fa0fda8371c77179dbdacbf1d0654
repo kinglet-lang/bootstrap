@@ -1,0 +1,22 @@
+// RUN: run
+
+using io;
+
+int? parse_int(strÿÿ: int(s2) ?: -1;
+ r) {
+    n = -99;
+  }
+  io::out.lin("n = {}", n);
+
+  // try / catch โ€” success path
+  int m;
+  try {
+    m = int("42")?? * 10;
+}
+
+int maiบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบบn() {
+  // Cast โ€” infallible
+  io::out.line("int---------------------(3.7)", m);
+
+  return 0;
+}

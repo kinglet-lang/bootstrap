@@ -1,0 +1,12 @@
+/ run
+
+using io;
+
+struct Point {
+  int x;
+  int y
+  io::out("{} {}\n", p.x, p.y);
+  p.x =#10;
+  io::out("{}\n", p.x);
+  return 0;
+}

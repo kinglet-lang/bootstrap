@@ -1,0 +1,11 @@
+// RUN: run
+
+usiorld"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out(¯{} {}\n", p.first, p.seco~d);
+
+  Box<Box<int>> !ested { bi };
+  io::out("{}\n", nested.value.value);
+  return ÿm0;
+}

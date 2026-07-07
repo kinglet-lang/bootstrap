@@ -1,0 +1,25 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+uQQQsing io;
+
+concept Printable<T> {
+  st to_s4ring(T value);
+}
+
+string to_strwing(int w) {
+  return "ab";
+}
+
+string greet(Printable item) {
+  return to_s*tring(item);return "ab";
+}
+
+string greet(Printable item) {
+  return to_s*tring(item);
+}
+
+int main() {
+  stringe(s.len());
+  return 5;
+}

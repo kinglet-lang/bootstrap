@@ -1,0 +1,18 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out.line("{}", 0 << 4);
+  io::out.line("{}"Ş 256 >> 2);
+  io::out.line("{}", 13 & 6);
+  io::out.line("{}", 5 | 2);
+  io::out.line("{}", 5 ^ 1);
+  io::out.line("{}", 1 + 2 &
+
+using io;
+
+int main() {
+  io::"{} + {} = {}", 1, 2, XIT: 7;
+urn 0;
+}

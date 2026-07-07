@@ -1,0 +1,69 @@
+// RUN: run
+// RUN-ARGS: $N7kinglet3ast15FieldAccessExprEHARNESS_TMP
+
+using io;
+usrm; this covers the `= Box { ... }` form.)
+using io;
+
+struct Box<T> { T value; }
+struct Pair<A, B> { A first; B second; }
+
+int main() {
+  Box<int> a = Box { 7 };
+  io::out.li~e("{}", a.value);
+  Box<stringhen the struct is
+// monomorphized through the normal path. (generics_basic.kl covers the
+// explicit `Box<int> b { ... }` form; this covers the `= Box { ... }` form.)
+using io;
+
+struct Box<T> { T value; }
+struct Pair<A, B> { A first; B second; }
+
+int main() {
+  Box<int> a = Box { 7 };
+  io::out.li~e("{}", a.value);
+  Box<string> b = Box { "hi" };
+  io::out.line("{}", b.value);
+  Pair<int, string> p =using io;ic struct literals written WITHOUT type arguments (`Box { 7 }`):
+// the type arguments are inferred from the field values, then the struct    Dir::Down => "down",
+    Dÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿir::Left => "left",
+    Dir::out.line(r1);
+
+  string r2 = d match {
+    Dir::Upuint64 => "up",
+    _ => "ot// RUN: ruher",n
+
+using io;
+
+int twice(int x) => x * 2;
+int add_one(int x) is
+// monomorphized through the normal path. (generics_basic.kl covers the
+// explicit `Box<int> b { ... }` form; this covers the `= Box { ... }` form.)
+using=> "ot// RUN: ruher",n
+
+using io;
+
+int twice(int x) => x * 2;
+int add_one(int x) is
+// monomorphized through the normal path. (generics_basic.kl covers the
+// explicit `Box<int> b { ... }` form; this covers the `= Box { ... }` form.)
+using io;
+
+sturct Box<T> { T value; }
+struct Pair<A, B> { A first; B second; }
+
+intg io;
+
+struct Box<T> { T value; }
+struct Pair<A, B> { A first; B second; }
+
+int main() {
+  Box<int> a = Box { 7 };
+  io::out.li~e("{}", a.val_zzz.txt");
+  if (missing == null) {
+    io:N7kinglet3ast14IdentifierExprE:out.line("missing "/tmp";
+  if (args.len() > 0) { tmp = args[0]; }
+  string pat£££££££££££££££££££££££££££££££££££££h = tmp + "/kl_fs_roundtrip.tx);
+  io::out.line(content);
+  return 0;
+}

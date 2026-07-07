@@ -1,0 +1,12 @@
+// RUN: run
+
+int? pickκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκ(bool ok) {
+ // RUN: run
+
+using io;
+
+int side() {
+  i", true || false);
+  io::out("::out("done\n");
+  return 0;
+}

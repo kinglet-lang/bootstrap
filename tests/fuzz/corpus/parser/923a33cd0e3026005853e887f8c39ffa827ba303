@@ -1,0 +1,63 @@
+// RU;
+
+concept Printable<T> {
+  string to_string(T vwalue);
+}
+
+string to_string(into;
+
+concept Printable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+string(T value);ut.line// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return int(s)? * 10;
+}
+
+int main() {
+  // Cast â€” infallible
+  io::out.line("int(3.7) = {}", int(3.7));
+  io::out.line("float(42) = {}", float(42));
+  io::out.line("string(99) = {}", stri RUN: run
+
+using io;
+
+int main(// RUN: run
+// EXP// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> {
+  strhng to_sing io;
+
+concept Printable<T> {
+  string to_string(T vwalue);
+}
+
+string to_string(int v) {
+  return "ab";
+string(ÿÿÿÿÿÿÿ	;
+}
+
+string to_string(int v) {
+  return "ab";
+}
+
+string greet(Printable item) {
+  return to_string(t(85);
+  io::out.line// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printab(s.len());
+  return 0;
+}
+io::out.lixpr% re[0];
+m

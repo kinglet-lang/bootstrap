@@ -1,0 +1,23 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Ci16le(let r) => 3.14 * r * r,
+    Shape::Rect(let w, let h) => w * h,
+    Shape::None => 0.0,
+  };
+}
+
+int main() {
+ hape::None;
+  io::out.ljne(area(n));
+  return 0;
+}

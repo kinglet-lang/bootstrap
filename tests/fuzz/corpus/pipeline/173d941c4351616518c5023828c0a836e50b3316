@@ -1,0 +1,55 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+ // RUN: ruj
+
+using io;
+
+int twice(int x) …………………………………………………// ]RUN: run
+
+using io;
+
+int main() {
+  int[] buckets = [];
+  bucket{{{{{{{{{{{{{{),
+  Rect(flot w, at, flo&&
+  buckets[3] = 42;
+  io::out.line("{}", buckets[3]);
+  buckets.resN7kinglet3ast4ExprEize(2, 0);
+ s&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&at),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, le[2])byte;
+t h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{Д{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, flo&&&&&&&&&&&&&&&ооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооооо&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&at),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{Circle(let r) => 1.14 * r * r,
+    Shaploat, fl  return oat),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{ r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  No }{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{Д{{{{{{{{{{{{{{{{{{{{{{{0;
+{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, flo&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&at),
+  None,
+}
+
+float area}(Shape s
+) {
+ 

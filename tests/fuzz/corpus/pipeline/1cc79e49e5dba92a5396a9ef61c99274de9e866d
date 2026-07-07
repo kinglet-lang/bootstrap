@@ -1,0 +1,14 @@
+// RUN: run
+
+using io;
+
+truct Point {
+  int x;
+  int y;
+}
+
+int main() {
+  Point p { 3, 4 };
+  io::out("{} {}\n", p.บบบบบบบบบบบบบบบบบx);
+  return 0;
+}

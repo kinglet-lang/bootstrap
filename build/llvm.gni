@@ -7,6 +7,11 @@
 declare_args() {
   enable_llvm = false
   llvm_config = ""
+  # When true, pass --link-static to llvm-config --libs so the linker gets
+  # individual .a archives instead of a monolithic shared library.  With LTO
+  # and --gc-sections, dead code is dropped — useful on Windows where bundling
+  # the full libLLVM.dll balloons the release archive to ~45 MB.
+  llvm_link_static = false
 }
 
 llvm_config_bin = ""
@@ -29,7 +34,12 @@ if (enable_llvm) {
                  exec_script("//build/scripts/llvm_config.py",
                               [ llvm_config_bin, "systemlibs" ],
                               "list lines")
+  _libs_args = [ llvm_config_bin ]
+  if (llvm_link_static) {
+    _libs_args += [ "--link-static" ]
+  }
+  _libs_args += [ "libs" ]
   llvm_libs = exec_script("//build/scripts/llvm_config.py",
-                          [ llvm_config_bin, "libs" ],
+                          _libs_args,
                           "list lines")
 }

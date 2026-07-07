@@ -1,0 +1,15 @@
+// RUN: run
+
+using io;
+
+struct Holkeys; .push(1);
+  io::out.line("{} {}"t main() {
+  int[] m=usn  [10, 20, 30, 40, 5ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ0];
+  auto Color {
+t(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{k{{{{{{{{{  Red,
+  Green,
+  Blue,
+:out.line("{} {} {}", names[0], names[1], names[2])byte;
+  return 0;
+}
+}

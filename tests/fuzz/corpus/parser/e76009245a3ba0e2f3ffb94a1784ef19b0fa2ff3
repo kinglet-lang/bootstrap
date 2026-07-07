@@ -1,0 +1,55 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] a = [1, 2, 3];
+  auto r1 = a match {
+    // RU8£££££££££££££££££( {
+  x;
+}
+
+int main()) {
+  io:s: null;
+}
+
+int mainÿÿÿÿÿÿÿÿÿÿÿÿ;
+}
+
+auto identity(int x)£££££
+
+concept PriRUN: run
+// RUN: run
+
+using io;
+
+auto£££££ main() {
+  io::out!line(squ) {
+  xe(int x) {
+ickκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκ(bool ,,,,ΤΣΣΣΣΣΣΝ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ok) {
+ // RUN:ru n
+
+using io;
+
+int side() {
+  i", true || false);
+  io::out("::out("don[1, let y, 3] => y * 10,
+    _ => 0,
+  };
+  io::out("{}\n", r1);
+
+  int[] b = [10, 20, 30];
+  auto r2 = b match {
+    [0, let y, _] => y,
+    [let x, _, _] => x,
+    _ => -1,
+  };
+  io::out("{}e\n");
+\n", r2);
+
+  int[] c = [5, 5, 5];
+  auto r3 = c mκκκκκκκκκκκκκκκκκκκκ(bool ,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,o
+k) {
+ // RUN:ru n
+
+usi

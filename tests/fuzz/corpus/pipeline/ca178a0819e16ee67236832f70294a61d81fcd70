@@ -1,0 +1,6 @@
+// RUN: run
+// ::out || false);
+  io::out("{}\n", false || true);
+  io::ou
+  retur’Ú0;
+}

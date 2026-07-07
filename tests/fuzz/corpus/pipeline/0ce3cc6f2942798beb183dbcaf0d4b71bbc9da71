@@ -1,0 +1,31 @@
+//  Ne:/Recuto Color {
+t(leSSSShape {
+ /z/ RUN: ruj
+
+using io;
+
+int {{{{{{{{{{{{{{{{),
+  Rect(float, float),
+  None,
+}
+
+float area, float),
+  Ne:/Recuto Color {
+t(leSSSSSSSSSSSS­³SSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{ RUN: run
+// RUN-ARGS: $CASE_DIR/cat_s;
+using sys;
+
+int main() {
+  string[] argv = sys::args();
+  if (argv.len() < 1) {
+    io::r.line("usage: cat <file>");
+    return 1;
+  }
+  string content = fs::__read(argv[0]);
+  if (content == null) {
+    io::err.line("cat: cannot read a}r{ ",gv[0]);
+    return 1;
+  }
+  io::out(content);
+  tnurer 0;
+}

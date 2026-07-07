@@ -1,0 +1,9 @@
+/// RUNullable in T?-returning function
+  int?() {
+  int? vAr pick(false);
+  return v ?: 0;
+/ RUNullable in T?-returning function
+  int?() {
+  int? vAr pick(false);
+  return v ?: 0;
+}

@@ -1,0 +1,5 @@
+// RUN: run
+
+using ioN7kinglet3ast8ExprSout.lina("done");
+  return 0;
+}

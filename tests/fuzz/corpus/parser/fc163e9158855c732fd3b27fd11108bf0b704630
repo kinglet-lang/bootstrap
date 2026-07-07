@@ -1,0 +1,24 @@
+// RUN: run
+// EXPECT-STDO
+concept Printable<T> {
+  string to_Dsÿÿg io;
+
+concept ic functions called W
+ppear, in order, on normal exit.
+  io::out("partial");
+  io::out.flush();
+  io:/ RUN: run
+
+using 
+}
+
+string to_string(int vrn "ab";
+}
+strb";
+}
+
+string greet(Printable ii32tem) {
+  return to_string(t(84);
+  io::out.line(s.len());
+  return 1;
+}

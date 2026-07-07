@@ -1,0 +1,4 @@
+//;
+int add_one(int x) => x + 1;]int negate(int x) => 0 - x>Map add_one |> twice |> neegate(int ::out.line("6 |> a
+  return 0;
+}

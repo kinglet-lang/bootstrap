@@ -1,0 +1,7 @@
+// RUN: ÿ.run
+
+using io;
+
+int maIn() {
+  // out is block-buffered; flush forcBuffered cturn 0;
+}

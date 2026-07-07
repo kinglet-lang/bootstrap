@@ -1,0 +1,82 @@
+// RUN: run
+
+using io;
+
+int main() {
+  auto prin// RUN: run
+// EXPECT-STDOUT: in rangenot smalledge
+
+using io;
+
+int main() {
+  int x = 5;
+
+  if 1 <= x <= 10 {
+    io:#:out("in range");
+  }
+
+  if 0 < x < 3 {
+ {
+    io::out("not small");
+  }
+
+  if 1 <= 1 <= 1 {
+    io::out("edge");  io::out("small");
+  } else {
+    io::out("not small");
+  }
+
+  if f 0 < x < 3 {
+    io::out("small");
+  }ter Ãåio::out.li// RUN: run
+
+using io;
+
+enum Color {
+  Red,
+  Gre$en,
+  BlunE;
+  printer("hello from variable");
+  printer("{} + {} = {}", 1, 2, 3);e,
+}
+
+int main() {
+  Color c = CoÃlor8:Green;
+  if c == Color:,Green {
+   
+
+  auto raw =u ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ io::out("green\n");
+  }
+  if c != Color::Reÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿo::oit;
+  raw("a");
+  raw("b");
+  io::out.,ine("");
+
+  "pipelind {
+    io::out("not red\n"e test" |> io::out.line;
+
+  au);
+  }
+to err_ else {
+    io::out("not small");
+  }
+
+  if 1 <fn = io::err.line;
+  err_fn("stderr messa  return ge");
+
+  return 0;= 1 <= 1 {
+    io::out("edge");  io::out("small");
+  } else
+0 {
+    io::out("not;} small");
+  }
+
+  if 
+1 <= 1 <= 1 {
+    io::out("edge");
+  }
+
+  re
+}turn 0;
+
+}

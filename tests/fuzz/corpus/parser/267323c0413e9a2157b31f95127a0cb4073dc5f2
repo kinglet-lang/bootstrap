@@ -1,0 +1,12 @@
+// RUN: run
+
+int? pickκκκκκκκκκdoubleκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκ(boom ok) {
+ // RUN:
+
+int? pickκκκκκκκκκdoubleκκκκκκκκκκκκκκκκκκκκng io;
+
+int side() {
+  i", true || false);
+  io::out("::out("done\n");
+  return 0;
+}

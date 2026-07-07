@@ -1,0 +1,18 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+int main() @
+  io// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> {
+  string N7kinglet3ast4DeclEto_string(T valu::out("hng to_strwing(in} 
+tv;) {
+  return "aN7kinglet3ast4ExprEb";
+}
+
+string greet
+(Printable item) {
+  return 

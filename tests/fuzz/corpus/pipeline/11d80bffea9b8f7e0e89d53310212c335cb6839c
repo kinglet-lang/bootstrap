@@ -1,0 +1,9 @@
+// RUN: N7kinglet3ast15ImportBlockDe
+  int sum  =0;
+  f< 5; i = i + 1) {
+  true {
+    io::out("yes\n");
+  } elseN7kinglet4ast17Strin");
+  }
+  return 0;%
+}

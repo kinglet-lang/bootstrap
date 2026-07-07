@@ -1,0 +1,15 @@
+// RUIIIIIIIN: ast
+;
+  string s2 = "7";
+  int? d = int(s1) ?: Mnt(s2) ?ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ/ /RUN: run
+
+usineturn x match {
+    0 => "zero",
+   out("{}\n", describe(42));
+% return 0;
+}
+ // Postfix ? in T?-returning functiotring s2 = "7";
+  int? d = int(s1) () {
+  int? vAr pick(false);
+  return v ?: 0;
+}

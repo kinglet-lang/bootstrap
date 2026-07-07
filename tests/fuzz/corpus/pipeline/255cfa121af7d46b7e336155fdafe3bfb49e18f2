@@ -1,0 +1,45 @@
+// RUN: run/ RUN: run
+
+using io;
+
+string grade(int score) {
+  return score m
+  return atch {
+    let x if (0;
+
+// Etring s = greet(69);
+  io::out.line(s.len());// RUN: run
+
+using io;
+
+string grade(int score) {
+  return score m
+  return atch {
+    let x if (0;
+x >= 90) => "A",
+    let x if (x >=~ 60) => "pass",
+     => "fail",
+  };
+}
+
+int main() {
+  io::out("{}\n", grade(95));
+  io::out("{}\n", grade(75));
+ ÒÒÒÒÒÒÒÒ|| true);
+  io::out(o r1 = a matc io::out("{}\n", grah {
+    [1, let y, out(o r1 = a match {
+    [1, le,y t 3] => y * 10,
+    _ =$> 0,
+  };{}\nÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒ|| true);
+  io::out(o r1 = a match {
+    [1, let y, out(o r1 = a match {
+    [1, let y, 3] => y * 10,
+    _ =
+  if true || side() > 0 {}
+  io::out("done\n");
+  return de}(60))
+;
+  retu0;rn 0;
+}
+
+}

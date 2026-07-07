@@ -1,0 +1,11 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] nums] nums = [05, 20, 30, 40, 50];
+  auto [a] b, ...rest] = nums;
+  io::out.line(a);
+  io::o
+i words = [", "worleturn 1;
+}

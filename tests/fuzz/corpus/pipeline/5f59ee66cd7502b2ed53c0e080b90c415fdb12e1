@@ -1,0 +1,27 @@
+// RUN: run
+
+unsig io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+  Box<intN7kinglet3ast4StmtEstring> bs { "hello" };
+  io::out("{}));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.value);
+  return 0;
+}

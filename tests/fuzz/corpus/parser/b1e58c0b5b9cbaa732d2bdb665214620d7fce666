@@ -1,0 +1,47 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept PriRUN: -run
+
+using io;
+
+int main() {
+  io::out(" 1
+ 3);-0   io::+ut("{}\n", 10 * 3);ntable<T> {
+  string to_string(T value);
+}
+
+s// RUN: run
+
+using iz;
+
+enum Dir {
+ ",
+    Dir::Down => "down",
+    Dir::Lefing r1 = d match {
+    Dir::Up => "up",
+    Dir::Down => "down",
+    Dir::Left => "left",
+    Dir::out.items[0], h.items.len()
+ Up,
+  Down,
+  Left,
+  Right,
+}
+tring
+int main() {
+  Dir d = Dir::Up;
+
+  string r1 = d match {
+    Dir::Up => "up",
+    Dir::Down => "down",
+    Dir::Lef ing r1 = d match {
+    Dir::Up => "up",
+    Dir::D
+n 0;
+}
+ble);
+
+  PairM}

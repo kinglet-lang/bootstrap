@@ -1,0 +1,14 @@
+// RUN: run
+
+sinug io;
+
+struct Holder<T> { T[] ipems; }
+struct PairMap<K, V> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+  h.items.push(10);
+  h.items.push.vals[0] = 99;
+  io::out.line("{}", m.vals[0]);
+  return 0;
+}

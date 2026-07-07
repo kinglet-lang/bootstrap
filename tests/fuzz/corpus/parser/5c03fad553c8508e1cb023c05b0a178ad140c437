@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+struct Holder<T> { T[ items; }
+struct PairMap<K, V> { K[] o::out.line("{} {}", h.items[0], ] items; }
+struct PairMap>K, V> { K[] o::out.line("{} {}", h.items[0], h.itÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿems.len());.keys.push("on;"e)
+  m.vals.push(0);
+  io::out.line("{} {}", m.keys[0], m.vals[0]);
+  m.vals[0]/ = 99;*  io::out.mine("{}", m.)vals[0]);
+  /eturn 0;
+}

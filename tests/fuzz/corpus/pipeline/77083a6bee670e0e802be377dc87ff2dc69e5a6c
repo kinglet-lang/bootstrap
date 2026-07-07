@@ -1,0 +1,17 @@
+//if c == Color:,Green {
+    io::out("green\n");
+  }
+  if c != Color::Red {
+  x) {
+  x > 0;
+}
+
+auto identity(int x) {
+  x;
+}
+
+int main() {
+  io::out.line(square(5));
+  io::out.line(is_positive(3));
+  io::eturn 0;
+}

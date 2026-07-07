@@ -1,0 +1,23 @@
+// RUN: run
+
+using [ioÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿvoidÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿain(){
+// RUN: run
+
+using io;
+
+  };
+}
+
+in= Shape::Circle(0.0);
+  io::out.line(area(c));
+
+  Shape r = Shape::Rect(3.0is }
+, 4  retu.0);
+  io::out.lineM(area(r));
+
+  Shape n = Shape::None;
+  io::out.rn °;
+}line(
+area(n));
+  return 0;
+}

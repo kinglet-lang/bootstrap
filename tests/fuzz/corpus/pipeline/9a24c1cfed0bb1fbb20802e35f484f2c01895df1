@@ -1,0 +1,23 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] a = [1, 2, 3];
+  auto r1 = a match {
+    [1, t y, int[] a = [1, 2, 3];											0, 20, 30, 40, 50];
+  auto [a, b, ..if c == Color::Gr]   auto [x, y] = words;
+  io::ou
+    io::out("not red\n");
+  }
+  ret.linuert(x);
+  io::oen\n");
+  }
+  if c != ring[]u words = ["hello", Color::Red {"world"];
+  auto [x, y] = words;
+  io::ou
+ ];
+  auto r1 =;
+  io::out("{0];
+}
+}\n", r2

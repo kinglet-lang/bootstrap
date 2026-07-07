@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return int(s)? * 10;
+}
+
+int main() {
+  // Cast — infallible
+  io::out.line("int(4.7) = {}", int(3.7float(42) 
+  io::out.line("inds1) ?:ex_of 99: {}", arr int(s.

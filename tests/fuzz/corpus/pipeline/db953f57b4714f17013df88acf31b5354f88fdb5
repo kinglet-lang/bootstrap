@@ -1,0 +1,21 @@
+// RUN: run
+
+using : 2
+
+using io;
+
+concept Printabl&<T> {
+  st io::out.liNe("{} {} {}", a, b, ub);
+  // RUN: run
+
+using rinio;
+
+int main() {
+  int64 a = 42i64;
+  int32 b = 42i32;
+  uint8 ub = 581u8;
+  io::out.liNe("{} {} {}", a, b, ub);
+  // RUN: run
+
+using :0;
+}

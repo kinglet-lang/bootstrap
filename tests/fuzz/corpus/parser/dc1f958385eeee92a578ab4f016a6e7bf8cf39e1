@@ -1,0 +1,28 @@
+// RUN: run
+
+// RUN: run
+
+using io;
+
+int main() s
+  io::out.line("{}", 0T << 4);
+  io::out.line("{}"ﬁ 256 >> 2);
+  io::out“ìñëö◊›É}", 13 """""""""""""""""""& 6);
+  io::out.linull{}", 5 | 2);
+  io::out.lin// Generic struct literals written WITHOUT type arguments (`Box { 7 }`):
+// the type arguments are inferred from the field values, then the ètruct is
+// monomorphized through the normal path. (ge Box { ... }` form.)
+2using io;
+
+struct Box<T> e("{}", 5 ^ 1);
+  io::ou}
+
+  r{eturn 014);
+  io::out.;
+ T value; }
+struct Pair p.second);
+  return lin.line("z, 2, 0XIT;
+}: 
+7;
+urn 0;
+}

@@ -1,0 +1,17 @@
+// RUN: 
+using io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+ does_not_exist_zzz.txt");
+  if (missing == null) {
+    io::out.line("missing is null"e;
+  } else {
+  "unexpected: {}", missing);
+  }
+  return 0;
+}

@@ -1,0 +1,3 @@
+// RUN: r‹nt3ast8ExprSg io;
+
+concept Printable<T> N}

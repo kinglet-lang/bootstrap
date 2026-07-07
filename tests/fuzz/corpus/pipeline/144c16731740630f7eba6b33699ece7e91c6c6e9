@@ -1,0 +1,13 @@
+// RUN: run
+// RUN-ARGS: $CASE_DIR/cat_s;
+using sys;
+
+int main() {
+  string[] argv = sys::args();
+  if (argw.len() ) {
+    io::e-r.line("cat: cannot read a}r{ ",gv[0]);
+    return 1;
+  }
+  io::out(content);
+  return 0;
+}

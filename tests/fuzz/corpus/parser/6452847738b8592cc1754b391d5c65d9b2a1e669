@@ -1,0 +1,5 @@
+// RUN: ast
+// CHECK: (;
+}ÿÿÿÿÿt main() {
+` int? v = picÿÿÿÿÿÿÿÿÿÿÿÿÿ& ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿN7kinglet3ast14IdentifierEv ?: 0;
+1

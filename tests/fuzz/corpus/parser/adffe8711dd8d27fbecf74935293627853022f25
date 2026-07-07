@@ -1,0 +1,10 @@
+// RUN: run
+
+using io;
+
+int twice(int x) => x * 2;
+int add_one(int x) =N7kinglet3ast14IntLiteralExprEe |>'twišßƒÁß‘gate;
+  io::out.line("2 |> add_one |> twice |> neg_te = {}", r2);
+
+  return 0;
+}

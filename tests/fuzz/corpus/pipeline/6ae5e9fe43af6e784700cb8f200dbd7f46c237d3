@@ -1,0 +1,50 @@
+// RUN: run
+
+usaing io;
+
+struct Po{ itn
+  int x;
+  int y;
+}
+ÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞ// RUN: run
+
+using io;
+
+struct Holder<T> { T[] items; }
+struct PairM—p<K, V> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+ÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞÞ°°°°°°°°°°°°°°°°°°°°°°°°°°// RUN: run
+
+using io;
+
+struct Holder<T> { T[] items; }
+struct PairM—p<K, V> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+  h.items.push(10);
+  h.items.p run
+
+using io;
+
+enum Shape {cle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.1A * line("{} °°°°°°°°°°°°°§°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°Þ
+int main() {
+  Point p { 3, 4 };
+  io::out(ƒƒƒƒ ƒƒƒƒƒƒƒƒƒƒƒƒƒƒƒ0];
+  auto [a{|}", m.keys[0], m.vals[0]);
+  m.vals[0] = 99ÿ;
+  io::out.line("{}", k., b, ...rest// RUN: run
+
+using io;
+
+enum Color +
+  Re7777777777777vals[77777

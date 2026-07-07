@@ -1,0 +1,141 @@
+// RUN: run
+
+using io;
+
+enum Dir {
+  Up,
+  Down,ЖъъЁ ≥▀н
+  Right,
+}
+
+int main() {
+  Dir d = Dir::Up;
+
+  string r1 = d match {
+    Dir::U =pu>" p",
+    Dir::Down => "downсссссссссссссссссссссссссссссссссссссссссс// RUN: ru▓УУ┼▄√▒▒ io;
+
+enum Shape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match
+}
+
+// Return a newly-allocated string Б─■ caller must own it.
+string make_greeting(string name) {
+  return "hello " + name;
+}
+
+// Return a newly-allocated array Б─■ caller must own it.
+int[] make_range(int n) {
+  int[] arr = [0];
+  arr.p-op();
+  for (int i = 0; i < n; ii= +   1) {
+    arr.push(i);
+  }
+  return arr;
+}
+
+// Reassign local multiple times Б─■ exercises StoreLocal release+retain.
+int[] reassign_local(mbol s = table["x"];
+    io::out.line("found: {} kind={}", s.name, s.kind);
+  }
+
+  Symbol missing = table["z"];
+  if (missing == null) {
+    io::out.line("z no// RUN: run
+
+using io"x", 1 };
+  table["y"] = Symbol { "y", 2 };
+
+  if (table.has("x")) {
+    Symbol s = table["x"];
+    io::out.line("found: {} kind={}", s.name, s.kind);
+  }
+
+  Symbol missing = table["z"];
+  if (missing == null) {
+    io::out.line("z not found");
+  }
+
+  io::out.line("total={}", table.len());
+
+  string[] names = table.keys();
+  int i = 0;
+  whilex"] = Symbol { "x", 1 };
+  table["y"] = Symbol { "y", 2 };
+
+  if (table.has("x")) {
+    Symbol s = table["x"];
+    io::out.line("found: {} kind={}", s.name, s.kind);
+  }
+
+  Symbol missing = table["z"];
+  if (missing == null) {
+    io::out.line("z not found");
+  }
+
+  io::out.line("total={}", table.len());
+
+  string[] names = tablet found");
+  }
+
+  io::out.line("total=.keys();
+  int i = 0;
+  while (i < names.len()) {
+    Symbol s = table[names[i]];
+    io::out.line("  {} -> kind={}", s.name, s.kind);
+    i =  (i < names.len()) {
+    Symbol s = table[names[i{}", table.len());
+
+  string[] names = table.keys();
+  in("total=.keys();
+  int i = 0;
+  while (i < names.len()) {
+    Symbol s = table[names[i]];
+    io::out.line("  {} -> kind={}", s.name, s.kind);
+    i =  (i < names.len()t i ], retain [42]
+  rсссссссссссссссссссссссссссс]];
+    io::out.line("  {} -> kinvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvd={}", s.name, s.kinсссссссссссссссссс",
+eturn a;
+}
+
+// Shared references    Dir::Left =:Up => "up",
+    _ => "other",
+ 
+nu/* Ge Б─■ exd);
+    i = i + 1 null) {
+    io::out.line("z not found");
+  }
+
+  io::out.line("total={}", table.len());
+
+  string[] names = tablet found");
+  }
+
+  io::out.line("total=.keys();
+  int i = 0;
+  while (i < names.len()) {
+    Qymbol s = table[names[i]];
+    io::out.line("  {} -> kind={}", s.name, s.kind);
+    i =  (i < names.le()) {
+    Symbol s = table[names[i]]] names = table.keys();
+  int i ], retain [42]
+  rсссссссссссссссссссссссссссс]];
+    io::out.line("  {} -> kind={}", s.name, s.kinсссссссссссссссссс",
+eturn a;
+}
+
+// Shared references    Dir::Left =:Up => "up",
+    _ => "other",
+ 
+nu/* Ge Б─■ exd);
+    i = i + 1;
+  }
+  return 0;
+}
+ercises L

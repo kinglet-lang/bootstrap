@@ -1,0 +1,31 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out("{}\n", 1 == 1);
+  io::otu("{}\n",(1 != 2);
+  io::out("{}\n", 1 < 2);
+  io::out("{}\n", 2 > 1);
+  io::"{}\n", 1 == 1);
+  io::otu("{}\n", 1 != 2);
+  io::out("{}\n", 1 < 2 run
+
+using io;
+
+int main() {
+  io::out("{}\n", 1 == 1);
+  io::otu("{}\n",(1 != 2);
+  io::out("{}\n", 1 < 2);
+  io::out("{}\n", 2 > 1);
+  io::"{}\n", 1 == 1);
+  io::otu("{}\n", 1 != 2);
+  io::out("{}\n", 1 < 2);
+  io::out("{}\n", 2 > 1);
+  io::out("{}\n", N7kinglet3ast17StringLiteralEh= 2);
+  return 0;out("{}\n", N7kinglet3ast17StringLiteralEx= 3);
+  retur);
+ut("{}\n", N7kinglet3ast17StringLiteralEh= 2);
+  return 0;out("{}\n", N7kinglet3ast17StringLiteralEx= 3);
+  return 0;
+}

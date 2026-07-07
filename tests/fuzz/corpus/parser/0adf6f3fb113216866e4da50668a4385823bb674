@@ -1,0 +1,13 @@
+// RUN: run
+
+usino io;
+
+enum Shape {
+ // RUN: ruj
+us:ing io;
+
+int twice(int x) ÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉ=> x *››››››››››››››››››››››››››››››››››ircle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h) => w * h,
+    Shape::None => 0B0,
+ rn N7kingl{{{{{{{{{{{{{{{{// // RUN: run
+// EXPECT-ST{{DO{{

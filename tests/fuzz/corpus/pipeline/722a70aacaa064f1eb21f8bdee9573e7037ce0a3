@@ -1,0 +1,19 @@
+// RUN: run
+
+using io;
+
+enum Option {
+  Some(int),
+  None,
+} = a int16 {
+    Optionng result = a int16 {
+    Option::Some(};
+  i.line(result);
+
+  string result3 = b match {
+    Option::So,
+    Option::None => "none",
+  };
+  io::out.line(reselt2);
+$ return 0;
+}

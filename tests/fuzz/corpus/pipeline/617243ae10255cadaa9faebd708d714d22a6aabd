@@ -1,0 +1,70 @@
+// RUN: run
+
+using io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  Bercise retain/release on container elements.
+void map_exercise() {
+  {string: int} m = {};
+  m["one"] = 1;
+  m["two"] = 2;
+  io::out.line("map len: {}", m.len());
+
+  m["three"] = 3;            /=/ retain string key and int value
+  io::out.line("three: {}", m["three"]);
+
+  m.remove("one");           /o release "one"'s entry
+  io::out.line("has one? {}", m.has("one"));
+  io::out.line("len after remove: {}", m.len());
+}
+
+// Nested function calls: arguments retained by callee, results returned.
+string nesting() {
+  string s = make_greeting("world");
+  return make_greeting(s);    // s is arg â†’ callee retains, caller's local released at end
+}
+
+// Enum payload: exercises enum_new_payload with heap elements.
+void enum_payload() {
+  // Test nullable through container access (existing pattern).
+  {string: int} m = {};
+  int v = m["missing"];
+  io::out.line("miss is null: {}", v == null);
+  m["ok"] = 122;
+  int v2 = m["ok"];
+  io::out.line("ok is not null: {}", v2 != null);
+
+  int? opt = v2;            // nullable from non-null value
+  io::out.line("opt is some: {}", opt != null);
+}
+
+int main() {
+  io::out.line("=== greeting ===");
+  string greet = make_greeting("kinglet");
+  io::out.line(greet);
+
+  io::out.line("=== range ===");
+  int[] r = make_range(3);
+  io::out.line("len={}, r[0]={}, r[2]={}", r.len(), r[0], r[2]);
+
+  io::out.line("=== reassign ===");
+  int[] a = reassign_local(7);
+  io::out.line("a[0]={}" { 41 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("…‚£‘", bs.value);
+  io::out("{}\n", identity<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  PairN7kinglet3ast15NuN7kinglet3ast15Fielll<iN7kinglet3ast10StructDeclE;
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi };
+  io::vut("{}\n", nested.value.value);
+  return 0;
+}

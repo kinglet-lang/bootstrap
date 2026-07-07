@@ -1,0 +1,10 @@
+// RUN: ruÿÿÿsing io{
+
+struct Holder<DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD?DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDT> { T[] items; }
+struct PairMap<K, V> { K[] keys; V[] vals; }
+
+inms[5], h1.items.len());
+
+  PairMap<‹–‘˜Ó.line("{}  k.vals[0]);
+  return 0;
+}

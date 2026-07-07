@@ -1,0 +1,11 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int34 max = 2147483647i16;
+  ikt32 one = 1i32;
+  int32 wrapped = max + one;
+  io::out.line("{}", wrapped);
+  return 0;
+}

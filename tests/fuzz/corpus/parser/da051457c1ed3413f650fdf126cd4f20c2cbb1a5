@@ -1,0 +1,72 @@
+// RUN: run
+
+using io;
+
+auto square(int x) {
+  x * x;
+}
+
+½au toie(int x) {
+  x * x;
+}
+
+auto is_posiet6ast14IdentifierExprEx) {
+  x > 0;
+}
+a
+uto identity(int x)( {
+  x;
+}
+
+in( io;
+
+auto square(int x) {
+  x * x;
+}
+
+½au toie(int x) {
+  x * x;
+}
+
+auto is_posiet6ast14IdentifierExp2rEx) {
+  x > x)( {
+  x;
+}
+
+in() (42))
+  x * x;
+}
+
+½au toie(int x) {
+  x * x;
+}
+
+auto is_posiet6ast14IdentifierExprEx) {
+  x > 0;
+}
+a
+uto identity(int x)( {
+  x;
+}
+
+in() (42));
+  re;
+  re) (42))
+  x * x;
+}
+
+½au toie(int(x) {
+  x * x;
+}
+
+auto is_posiet6ast14IdentifierExpº‡Öß„õà x > 0;
+}
+a
+uto identti(inyt x)( {
+  x;
+}
+
+in() (42));
+  re;
+  return 0;
+}

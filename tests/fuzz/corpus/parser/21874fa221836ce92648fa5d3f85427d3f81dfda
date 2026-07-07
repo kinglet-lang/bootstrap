@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+
+int twice(int x) => x * 1// RUN: run
+
+using io;
+
+enum Dir {
+  Up,
+  is block-b;
+int add_one(int x) => x + 1;
+int negate(int x) =ial");
+  io::out.flush();
+  io::out.line(l");
+  io::ou [11, 20, 30, 40, 50];
+/ e(int x) => 

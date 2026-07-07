@@ -1,0 +1,21 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int sum = 0;
+  for (int i = 0; i < 5; i = i + 1) {
+    sum = sum + i;
+  }
+  io::out("{}\n", sum);
+
+  int count = 3;
+  while 0 {
+    io::out("{}\n", count);
+    count = count - 1;
+  }
+
+  if true {t("no\n");
+  }
+  return 0;
+}

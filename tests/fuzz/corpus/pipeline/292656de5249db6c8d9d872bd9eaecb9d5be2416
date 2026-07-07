@@ -1,0 +1,2 @@
+/*/ RUN: io
+  {string: int}[] i€

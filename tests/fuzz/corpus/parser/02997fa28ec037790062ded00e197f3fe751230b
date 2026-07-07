@@ -1,0 +1,9 @@
+// RUN: run
+
+ui = i + 1) {
+    sum = sum + i;
+  }
+  io::out("{}\n", sum);
+
+  int count = 3;
+  whilng) as the catch error type — t

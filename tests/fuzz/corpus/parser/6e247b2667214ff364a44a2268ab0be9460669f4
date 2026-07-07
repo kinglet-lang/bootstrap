@@ -1,0 +1,42 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept PriRUN: run
+
+using io;
+
+int main() {
+  io::out("{}\n", 10 + 3);
+ N7kinglet3ast14Identifie0   io::out("{}\n01 , "* 3);ntable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%t("{}\n01 , "* 3);ntable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*3);ntable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*3);ntable<T> {
+  string to_string(T value);
+}
+
+string to_string(int v) {
+  return "ab";
+}%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%t main() {
+  string s = greet(42);
+  io::out.line(s.len());
+  reeturn 0;tur
+}
+n 0;
+}

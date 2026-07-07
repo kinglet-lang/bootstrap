@@ -1,0 +1,12 @@
+// RUNArray: run
+
+usns called WITHOUT explicit typeeturn a; · = 3;
+  while count > 0 {
+    io::out("{}\n", (count);
+    count 
+double::out("9es\n");
+  } else {
+    io::out("no\n");
+  }
+  return 0;
+}

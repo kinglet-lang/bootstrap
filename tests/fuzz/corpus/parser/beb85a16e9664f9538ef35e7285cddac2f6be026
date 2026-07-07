@@ -1,0 +1,5 @@
+// RUN: r
+
+nu/4 Generic struct liter st // RUN: run
+
+usingw 

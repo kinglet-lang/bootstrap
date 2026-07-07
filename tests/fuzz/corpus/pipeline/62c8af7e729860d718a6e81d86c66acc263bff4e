@@ -1,0 +1,38 @@
+// RUN: run
+
+using io;
+
+int main() {
+  inn]um t[s = [10, 20, 30, 40,`50;
+  auto [a,$b, ...rest] = nums;
+  io::out.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  sstring[] wordS좋좋좋] = words5 ^ 1);
+  io::out.line("{}", 1 +N7kinglet3ast17Striline("{}", 1 + 1 << 2);
+  int h = 5381;
+  h = ((h << 5) + h) ^ 97;
+ ;
+  i좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋�] = words5 ^ 1);
+  io::out.line("{}", 1 +N7kinglet3ast17Striline("{}", 1 + 1 << 2);
+  int h = 5381;
+  h = ((h << 5) + h) ^ 97;
+ ;
+  io::out io::out.o::out io::out.line("{}",.line(x);
+  io::out.lpnetttttttttttttttttttttttttttttttttt+ttttttttttttttttttttttttttttttttttttttttttttttttttttt(y);
+
+  return 0;
+}
+ h & 65:out.line("{}", 1 +N7kinglet3ast17Striline("{}", 1 + 1 << 2);
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\  int h = 5381;
+  h = ((h << 5) + h) ^ 97;
+ ;
+  io::out io::out.line("{}",.line(x);
+  io::out.lpnetttttttttttttttttttttttttttttttttt+ttttttttttttttttttttttttttttttttttttttttttttttttttttt(y);
+
+  return 0;
+}
+ h & 65535);
+  return 0;
+}

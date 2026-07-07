@@ -1,0 +1,122 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] buckets = [];
+  b// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return int(s)? * 10;
+}
+
+iat(42) = {}", float(42));
+  io::out.line("string(99) = {}", string(99));
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = N7kinglet3ast9IndexExprE"") ?:ruct Box<T> { T value; }
+struct Pair<A,e_int("5") ?: 0;
+  io::out.line("f = {}", f);
+  int? g = parse_int("bad") ?uckets.resize -1;
+  io::out.line("c = {}", c);
+
+  // Chained ?:
+  string s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?: int(s2) ?: -1;
+  io::out.line("d = {}", d);
+
+  // Postfix ? in T?-returning function
+  int? f = pars// RU#N: run
+
+// Generic struct literals writteÿÿÿTHOUT type arguments (`Box { 7 }`):
+// the type arguments are inferred from the field lues, then tuint64// RUN:, p.first, p.second);
+
+  Box<ox<int>> nested { bi };
+  io::out("{}\n", nes"{}"Þ 256 >
+  int h = 5381;
+  h = ((h < RUN: run
+
+using io;
+
+int main() {
+  int[] buckets = [];
+  b// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return int(s)? * 10;
+}
+
+iat(42) = {}", float(42));
+  io::out.line("string(99) = {}", string(99));
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("glet3ast9IndexExprE"") ?:ruct Box<T> { T value; }
+struct Pair<A,e_int("5") ?: 0;
+  io::out.line("f = {}", f);
+  int? g = parse_int("bad") ?uckets.resize -1;
+  io::out.line("c = {}", c);
+
+  // Chained ?:
+  string s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?: int(s2) ?: -1;
+  io::out.line("d = {}", d);
+
+  // Postfix ? in T?-returning function
+  int? f = pars// RU#N: run
+
+// Generic struct literals writteÿÿÿTHOUT type arguments (`Box { 7 }`):
+// the type arguments are inferred from the field lues, then tuint64// RUN:, p.first, p.second);
+
+  Box<ox<int>> nested { bi };
+  io::out("{}\n", nes"{}"Þ 256 >
+  int h = 5381;
+  h = ((h < RUN: run
+
+using io;
+
+int main() {
+  int[] buckets = [];
+  b// RUN: run
+
+using io;
+
+int? parse_int(string s) {
+  return int(s)? * 10;
+}
+
+iat(42) = {}", float(42));
+  io::out.line("string(99) = {}", string(99));
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = N7kinglet3ast9IndexExprE"") ?:ruct Box<T> { T value; }
+struct Pair<A,e_int("5") ?: 0;
+  io::out.line("f = {}", f);
+  int? g = parse_int("bad") ?uckets.resize -1;
+  io::out.line("c = {}", c);
+
+  // Chained ?:
+  string s1 = "bad";
+  string s2 = "7";
+  int? d = int(s1) ?: int(s2) ?: -1;
+  io::out.line("d = {}", d);
+
+  // Postfix ? in T?-returni0;
+  io::out.line("f = {}", f);
+  int? g = parse_intàÝbad") ?uc35);
+  returkn 0;
+}
+ets.resize(8, -1);
+  io::out.line("{} {} {

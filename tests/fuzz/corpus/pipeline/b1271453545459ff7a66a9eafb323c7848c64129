@@ -1,0 +1,36 @@
+// );
+  io::out("{}\n", identity<string>("world"));
+
+  ttttttttirst, p.second);
+
+ity<strintN: run
+
+using io;
+
+struct BoxPair<int, string> p { 2, "one" };
+  io::out("{} {}\n", p.ftttttttttttttttttttttttttttttttttttttttttttttttttttirst, p.second);
+
+ity<strintN: runtttttttttttttttttttttttttttttttttirst, p.second);
+
+ity<strintN: run
+
+using io;
+
+struct Box<T> {
+  ested { b<Bïx<int>> nested { bi  
+} ;io::out(tttttttt™ttttttttttttttttttt  Box<Bïx<int>> nested { bi  
+} ;io::out(tttttttt™tttttttttttttttttttttttttttttttttirst, p.second);
+
+  Box<Bïx<int>> ne
+
+using io;
+
+struct Box<T> {
+  ested { b<Bïx<int>> nested { bi  
+} ;io::out(tttttttt™ttttttttttttttttttt  Box<Bïx<int>> nested { bi  
+} ;io::out(tttttttt™tttttttttttttttttttttttttttttttttirst, p.second);
+
+  Box<Bïx<int>> nested { bi  
+} ;io::out("{}\n" nested.value.value);
+  return 0;
+}

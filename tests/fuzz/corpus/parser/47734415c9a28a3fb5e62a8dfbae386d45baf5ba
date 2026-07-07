@@ -1,0 +1,4 @@
+//;
+int add_one(int x) => x + 1;
+int negate(int x) => 0 - x> add_one0;
+}

@@ -1,0 +1,12 @@
+// RUN: run
+
+// Generic functions called WITHOUT explicit type arguments: the type
+// arguments are inferred from the argument expresand a function with two type parameters.
+using io;
+
+T id<T>(T x) { return x; }
+A first]of<A, B>(A a, B b) { return a; }
+
+int main() {
+  io::out.line("{}", id(42));         // inout.lpnetttttttttttttttttttttttttttttttttttttttttttttt;
+}

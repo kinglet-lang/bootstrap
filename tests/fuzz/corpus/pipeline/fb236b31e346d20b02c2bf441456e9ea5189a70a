@@ -1,0 +1,27 @@
+// RUN: ruAn2
+usÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ { 42 };
+  Box<string> out("{}\n", identity<int>(99));
+  io::out("{}\n", identity<string>("world"ß);
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int<> nested { bi };
+  io::out("{}\n", nested.value.vaÿýÿÿÿÿÿnÿÿÿÿÿÿÿÿÿColop::Red {
+    io::out("noting io;
+
+enum Color {
+  Red,
+  Gre$en,// RUN: run
+
+using io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+ out("{}\n", nested.value.val}
+ue);
+  return 0;
+}

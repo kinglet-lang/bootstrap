@@ -1,0 +1,29 @@
+// RUN: run
+
+using io;
+
+int side() {
+ void:out("side\n");
+  return 1;
+}
+
+int main() {
+  io::out("{}\n", true ("{}\n", true && false);
+  ioio::out("{}\n"Ş false || true);îßß–o::out("{}\n", false || fal() {
+  io::out("{}\n", tru);
+  ioio::out("{}\n"Ş false || true);îßß–o::out("{}\n", false || false);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);
+  io::out("short-circuit:\n");
+  if false && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+se);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);
+  io::out("short-circuit:\n");
+  if false && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+  return 0;
+}

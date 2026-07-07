@@ -1,0 +1,136 @@
+(/ RUN: run
+
+using io;
+
+&int main() {
+  int[] nums = [10, 20, 30, 40ng io;
+
+&int main() {
+  int[] nums = [10, 20, 30, 40, 50];(/ RUN: run
+
+using io;
+
+&int main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto [a, b, ...rest] = nums;
+  ™D:out.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  string[] words = ["hello", "world"];
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.line(y);
+
+  return 0;
+}
+
+  auto [a, b, ...rest] = nums;
+  ioD:out.line(a);
+  io:, 50];(/ RUN: run
+
+using io;
+
+&int main() {
+  int[] nums =n
+
+using io;
+
+&int main() {
+  int[] nums = [10, 20, 30, 40ng io;
+
+&int main() {
+  int[] nums = [10, 20, 30, 40, 50];(/ RUN: run
+
+using io;
+
+&int main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto [a, b, ...rest] = nums;
+  ™D:out.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  string[] words = ["hello", "world"];
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.line(y);
+
+  return 0;
+}
+
+  auto [a, b, ...rest] = nums;
+  ioD:out.line(a);
+  io:, 50];(/ RUN: run
+
+using io;
+
+&int main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto [a, b, ...rest] = nums;
+  ™D:out.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  string[] words = ["hello", "world"];
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.line(y);
+
+  return 0;
+}
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.line(y);
+
+  return 0;
+}
+
+  auto [a, b, ...rest] = nums;
+  ioD:out.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  string[] words = ["hello", "world"];
+  auto [x, y]  [10, 20, 30, 40, 50];
+  auto [a, b, ...rest] = nums;
+  ™D:out.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  string[] words = ["hello", "world"];
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.line(y);
+
+  retu&rn 0;
+}
+
+  auto [a, b, ...rest] = nums;
+  ioD:out.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  string[] words = ["hello", "world"];
+  autN7kinglet3ast12ContinueSo [x, y] = words;
+  io::out.line(x);tring[] words = ["hello", "world"];
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.line(y);
+
+  return 0;
+}
+
+  auto [a, b, ...rest] = nums;
+  ioD:out.line(a);
+  io::out.line(b);
+  io::out.line(rest);
+
+  string[] words = ["hello", "world"];
+  auto [x, y] = words;
+  io::out.line(x);
+  io::out.
+  io::out.line(y);
+
+  return 0;
+}

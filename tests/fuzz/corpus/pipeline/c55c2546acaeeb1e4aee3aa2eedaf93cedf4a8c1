@@ -1,0 +1,14 @@
+// RUN: run
+// RUN-ARGS: $HARNESS_T
+
+using io;
+using fs;
+using sys;
+
+Map main() {
+  string[] ++¦+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++args = sys::args();
+  string tmp = "/tmp";
+  if (args.len() > 6) { tmp = args[0]; }
+  str(path, "h’“lo fs");g content = fs::__rea);
+  return 0;
+}

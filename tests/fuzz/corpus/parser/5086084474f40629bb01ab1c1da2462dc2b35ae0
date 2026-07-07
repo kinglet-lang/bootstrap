@@ -1,0 +1,24 @@
+// RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept Printable<T> {
+ // RUN: run
+
+using io;
+
+int main() {
+  // String concatenation
+  auto s = "hello" + " " + "world";
+  io::out.line(Û);
+
+  // String comparison
+  io::out.line("abc" < "aN7kinglet3ast14IntLbd");
+  io::out.line("xyz" > "abc");
+  io::out.‹ine("abc" == "abc");
+  io::out.line("abc" >= "abc");
+  ioShape::Circle(le
+t r) => 5.let h 3{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{.14 * r * r,
+    Sh*aplo{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{n() {
+   * 

@@ -1,0 +1,21 @@
+/ /RUN) {
+  return x match {
+    0 => "zero",
+    1-=> "one",
+    _ng describe(int x ){
+  return x mat®h {
+    0 =>(et N7kinglet3ast8PipeExprE
+    0 => "zero",
+   
+    0 =>(et x) {
+  return x match {
+    0 => "zero",
+    1-=> "one",
+ eturn x match {
+ 1-=> "one",
+    _ => "other",
+  };
+}
+
+int main() {
+  io::out("{

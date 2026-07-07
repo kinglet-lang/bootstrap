@@ -1,0 +1,21 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+  Circle(float),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(le, let h) => w * h,
+    Shape::None => 0.0,
+  };
+}
+
+int main() {
+  Shape c = Shape::Circle(1);
+  return 0;
+}

@@ -1,0 +1,47 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+usiMa io;
+
+concept PriRUN: run
+// RUN: run
+
+using io;
+
+auto square(intRect(l[t w, let x) {
+  x * x;
+}
+
+autÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ'ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ x) {
+  x * x;
+}
+
+auto is_positive(in& x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££:£££££££££££( {
+  x;
+}
+
+int mArrayain() {
+ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ x) {
+  x * x;
+}
+
+auto is_positive(int x) {
+  x > 0;
+}
+
+auto identity(int x)££££££££££££££££££££££££££( {
+  x;
+}
+
+int mArrayain() {
+  io:s_positive(int x) {
+  x > 0;
+}
+
+auh) => w * h,
+    Shape::None => 0.0,
+  }to identline(squareut.(

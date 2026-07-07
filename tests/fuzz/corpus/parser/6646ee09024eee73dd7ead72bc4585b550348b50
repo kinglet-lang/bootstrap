@@ -1,0 +1,71 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+ // RUN: ruj
+
+using io;
+
+int twice(int x) ÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉ=> x *››››››››››››››››››››››››››››››››››››››{{{{{{SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS{{{{{{{{{{{{{{{{{{{),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 2.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    ShaprnNone,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{ }{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float area(Shape s) {
+  retu at, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3SSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  No };
+}
+
+int main() {loat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{ }{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  No };
+}
+
+int main() {
+   * 

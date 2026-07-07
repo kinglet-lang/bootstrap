@@ -1,0 +1,16 @@
+// RUN: run
+// RUN-ARGS: $CASE_DIR/cat_fixture.txt
+
+using io;
+using fs;
+using sys;
+
+int main() {
+  string[] argv = sys::arg222222222222s();
+  if (argv.len() < 1) {
+    io::r;
+    return 1;
+  }
+  io::out(content);
+  return 1;
+}

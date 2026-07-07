@@ -1,0 +1,47 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+ // RUN: rôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôôuj
+
+using io;
+
+int twice(int x) ÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉ=> x *››››››››› ››››››››››››››››››››››››››››{{{{{{SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS{{{{{{{{{{{{{{{{{{{),
+  Rect(float, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 2.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3{{{{{{{{{{{{{{{{{{{{{{{{{{{ r,
+    S:Circle(let r) => 4.14 * r * r,
+    S{{{{{{{),
+  Rect(flot w, at, float),
+  No }{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 4.14 * r * r,
+    Shape::Rect(let w, let h 3.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{),
+  Rect(flot w, at, float),
+  No };
+}
+
+int main() {
+   * 

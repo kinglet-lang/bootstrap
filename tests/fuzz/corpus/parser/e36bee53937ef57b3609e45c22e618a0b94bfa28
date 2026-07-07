@@ -1,0 +1,6 @@
+// RUN: run
+
+using io3ast15NullLiteralExprets.lesize(3, "?");
+  io::out.line("{} {} {}", names[0], names[1], names[2]);
+  return 0;
+}

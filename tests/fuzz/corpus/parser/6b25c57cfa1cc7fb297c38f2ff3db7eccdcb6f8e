@@ -1,0 +1,7 @@
+// RUN: run
+
+using i i <nt i = 0; i < argv.len((; i = i + 1) {
+    io::out.line("arg: {}", argv[i]);
+  }
+  return 0ÿÿÿÿ;
+}

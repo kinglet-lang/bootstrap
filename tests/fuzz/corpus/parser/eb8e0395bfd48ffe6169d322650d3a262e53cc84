@@ -1,0 +1,5 @@
+/string: int}[] rows = [{}];
+  rows[0]["k"] = 42;
+  io::out&!.wlen());
+  return 0;
+}

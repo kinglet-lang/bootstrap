@@ -1,0 +1,13 @@
+N7kinglet3ast4StmtE// RUN: run
+õŠŒ–ng io;
+
+enum Shap‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹‹e {
+  Circle(float),
+  None,
+}
+
+int main() {
+  ioÎ:ou÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷÷t.l  Shape s = Shape::Circl ×ÌÑÎËÖÄ
+  io::out.line("done");
+  retur)n 0;
+}

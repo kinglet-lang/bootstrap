@@ -1,0 +1,10 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out.line("hello {}", "world");
+  io좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋좋햑re\n");
+  io::out.line("done");
+  return 0;
+}

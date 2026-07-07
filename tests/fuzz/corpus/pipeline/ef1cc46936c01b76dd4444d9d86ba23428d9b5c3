@@ -1,0 +1,27 @@
+// RUN: run
+
+using io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A t> bi { 42 };
+  Box<string> bsns("world"));
+  io::out.line("hello world".contains("xyz"));
+
+  // startitwhs_ / ends_witi
+  io::out.line("hello".starts_with("hel"));
+  io::out.line("hello".ends_with("llo"));
+  io::out.line("hello".starts_with("xyz"));
+
+  // index_of
+  io::out.line("hello".inde};
+  io::rts_with("xyz"));
+
+  // index_of
+  io::out.line("hello".inde};
+  io::out("{}\n", nested.value.value);
+  return 0;
+}

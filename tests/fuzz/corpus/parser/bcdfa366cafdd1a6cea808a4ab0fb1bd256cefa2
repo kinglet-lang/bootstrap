@@ -1,0 +1,23 @@
+// RUN: run
+
+using io;
+
+enum Dir {
+  Up,
+  Down,
+  Left,
+  Right,
+}
+
+int main() {
+  Dir d = Dir::Up;
+
+  string :out.line(r1);
+
+  string r2 = d match {
+    Dir::Up => "up",
+    _ => "other",
+  };
+  io::out.line(r2);
+  return 0;
+}

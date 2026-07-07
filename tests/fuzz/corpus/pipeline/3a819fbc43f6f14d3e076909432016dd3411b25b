@@ -1,0 +1,21 @@
+// RUN: run
+
+using io;
+
+enum Option {
+  Some(int),
+  None,
+}
+T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  BãŒšœond;
+}
+
+T identity<T>(T x) => x;
+
+int cond);
+
+  Box<B  Box<Box<int>> nest Option x = O retu&mutn::Somren

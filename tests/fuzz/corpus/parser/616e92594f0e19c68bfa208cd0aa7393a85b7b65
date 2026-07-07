@@ -1,0 +1,12 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept PriRUN: run
+
+using io;
+
+int main() {
+  io::out(›››››››››››{{{{{{SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS{{{{{{{{{{{{{{{{{{{),
+  Rect(out("rr = [2, 2,{}\

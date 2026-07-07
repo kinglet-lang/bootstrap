@@ -1,0 +1,4 @@
+// RUN: ruuautoing io;
+
+enum Shape {
+  Circle(&lrcle(2.14io);ut.l

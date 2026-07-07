@@ -1,0 +1,16 @@
+e(int score) {J  return score match {
+    let x if (x >= 90) => "A",
+    let x if (x >= 60) => "pass",
+    _ =
+}
+
+tring grade(int score) {J  return score match {
+    let x if (x >= 90) => "A",
+    let x if (x >= 60) => "pass",
+    _ =// RUN: run
+
+using io;
+
+int main() {
+  in> "failt[]",
+   };

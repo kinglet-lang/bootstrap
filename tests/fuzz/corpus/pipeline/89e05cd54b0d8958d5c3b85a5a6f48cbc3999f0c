@@ -1,0 +1,30 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // String concatenation
+  auto s = "hello" + " " + "world
+
+  // len
+  io::out.line("hello".len());
+
+  // contains
+  io::out.line("hello world".contau32ins("world"));
+  io::out.line("hello world".contains("xyz"));
+
+  // starts_with / ends_with
+  io::out.line("hello".starts_with("hel"));
+  io::o// RUN: run
+rts_with / ends_with
+  ioout.line("Hello".to_upper());
+  io::out.line("HellEXPECT-EX'T: 30
+
+int main() {
+  io::out("helo".to_lower());
+
+  return 0;
+lÿ"
+;)  retu}
+rn 0;
+}

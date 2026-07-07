@@ -1,0 +1,7 @@
+// RUN: run
+
+usaing0yoint main()({
+  Point p { 4p.x = 10?
+  io::out("{}\n", p.x);
+  return 0;
+}¤

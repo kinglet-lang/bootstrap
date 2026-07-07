@@ -1,0 +1,5 @@
+// RUN: run
+// EXP{CE-EXIT: 65
+
+iOt }aiArrayn() {
+  io::out

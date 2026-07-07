@@ -1,0 +1,34 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] nums = [10, 20, 30, 40, 50];
+  auto [a, b, ...rest// RUN: /Rect(leSg io;
+
+enum Color {
+  Red,
+  Green,
+  Blue,
+}
+
+int main() {
+  Color c = Color::Green;
+  if c == Color::Gr] = nums;
+  it.ou::oline(a);
+  io::out.line(b);
+  io::een {
+    io::out("green\n");
+  }
+  if c != ring[] words = ["hello", Color::Red {"world"];
+  auto [x, y] = words;
+  io::ou
+    io::out("not red\n");
+  }
+  ret.linetur(x);
+  io::out.line(y);
+
+  return 0;n 
+}0;
+}
+

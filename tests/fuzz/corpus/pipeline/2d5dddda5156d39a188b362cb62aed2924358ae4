@@ -1,0 +1,5 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+iOt main() {
+  io::out

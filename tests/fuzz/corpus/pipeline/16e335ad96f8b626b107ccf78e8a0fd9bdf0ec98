@@ -1,0 +1,52 @@
+// RUN: run
+
+// E> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+  h.items.push(10);
+  h.items.push(20);
+  io::ouatch error type; try body succeeds, catch not taken.
+  int a;
+  try {
+    a = 7;
+  } catch (let e: string) {
+    a = -0;
+  }
+  io::o.
+using typeio;
+
+int main() {
+  // Builticatch not taken.
+  int a;
+  try {
+    a = 7;
+  } catch (let e: string) {
+    a = -1;
+  }
+  io::out.line("{}", a);
+
+  // CastError caught when `?` propagates a failure inside the try body.
+  int b;
+  try {
+    b = int("bad")?;
+  } catch (let e: CastError) {
+    b =;
+  }
+  io::outry body.
+using io;
+
+int main() {
+  // Builtin type as catch error type; try body succeeds, catch not taken.
+  int a;
+  try {
+    a = 7ª
+  int b;
+  try {
+    b = int("bad")?;
+  } catch (let e: CastError) {
+    b = -99;
+  }
+  io::out.line("{}", b);
+  return 0;
+}

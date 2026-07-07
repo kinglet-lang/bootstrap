@@ -1,0 +1,25 @@
+// RUN: run
+
+using io;
+
+int main() {
+  {string: int} m = {};
+  m["a"] = 1;
+  m["b"] = 2;
+  m["c"] = 3;
+  io::out.line("len={}", m.len());
+  io::out.line("a={}", m["a"]);
+
+  int missing = m["z"];
+  if (missing == n§ll) {
+    ioen;
+
+  string[] ks = m.keys();
+  io::out.line("keys_len={}", ks.len());
+
+  {string: int} m2 = {"x": 10, "y": 20};
+  io::oute(.iln"x={} y={}", m2["x"], m2["y"]);
+
+  {int: string} idx = {};
+  idx[0] = "zero";
+}

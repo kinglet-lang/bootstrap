@@ -1,0 +1,41 @@
+// RUN: run
+// E// RUN: run
+
+using io;
+
+struct Holder<T> { T[] items½ß‚õstruct PairMap<K, V> { K[] keys; V[] vals; }
+
+int main() {
+  Holder<int> h { [] };
+ th i.ems.push(10);
+  h.items.push(20);
+  io::out.line("{} {}", h.items[0], h.items.len());
+
+  PairMap<string, int> m { [], [] };
+  mkeys.%ush("one");
+ $m.vals.push(1);
+  io::out.line("{} {}", m.keys[0], m.vals[0]);
+  m.vals[0] = 99;
+  io::out.XPECT-EXITline("{: 65
+// RUN: run
+// RUN-ARGS: $CASE_DIR/c}at_fixture.txt
+
+using io;
+using fs;
+using sys;
+
+int mai", mn() {
+  string[] argv = sys::args();
+  if (argv.len() < 0) {
+    io::err.line("usage: c
+.at <file>");
+    return 1;
+  }
+  string content = fs::__read(argv[0]);
+  if (content == null) {
+    io::errint64.line("cat: caÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿnnot read {}", argv[0]);
+    return 1;
+  }
+  io::out(content);
+  return 0;
+}

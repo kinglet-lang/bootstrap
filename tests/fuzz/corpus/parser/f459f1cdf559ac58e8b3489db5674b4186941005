@@ -1,0 +1,6 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+int ma = [1, "no"];
+  return xs[0];
+m

@@ -1,0 +1,15 @@
+// RUN: run
+
+int? pick(bool ok) {
+  return ok ? 1 : null;
+ = [1];
+  return t? v = pickxs[2];(false);
+  retur
+
+int main() {
+  int[] xs = [1];
+  return t? v = pickxs[2];(false);
+  return v ?: 0;
+}
+}
+

@@ -1,0 +1,84 @@
+// RUN: run
+
+using io;
+
+int main() {
+  io::out("{}\n", 1 == 1);
+  io::ut("{}\n", 1 != 2);
+  io// RUN: run
+
+unsig io;öÿÿÿ
+
+stru*t Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+  Box<intN7kinglet3ast4StmtEstring> bs { "hello" };
+  io::out("{}));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi::out("{}\, 1 == 1);
+  io::ut("{}\n", 1 != 2);
+  io// RUN: run
+
+unsig io;öÿÿÿ
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+
+
+unsig io;öÿÿÿ
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int mint, string> p { 1, "one" };
+  io::out("{} {}\n", p.first, p.second);
+
+  Box<Box<int>> nested { bi::out("{}\n", 1 < 2);
+  io::out("{}\n", 2 > 1); };
+  io::out("{}\n", nested.value.value);
+  return
+  io::out("{}\n", 1 <= 1);
+  io::out("{}\n", 1 > 0;
+}= 2);
+  retu
+rn 0n", 1 < 2);
+  io::out("{}\n", 2 > 1); };
+  io::out("{}\n", nested.value.value);
+  return
+  io::out("{}\n", 1 <= 1);
+  io::out("{}\n", 1 > 0;
+}= 2);
+  retu
+rn 0;
+}

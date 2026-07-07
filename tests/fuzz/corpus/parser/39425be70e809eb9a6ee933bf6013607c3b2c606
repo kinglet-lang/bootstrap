@@ -1,0 +1,5 @@
+// RUN: run
+// EXPECT-EXIT: 70
+
+int;s[2]eturn xsсм╒д
+}

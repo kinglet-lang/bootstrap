@@ -1,0 +1,22 @@
+// // RUN: run
+// EXPECT-STDOUT: 2
+
+using io;
+
+concept PriRUN: run
+plic{t type arguments: the type
+// arguments are i–ferred from the argument expressionsa lrameters.// RUN: run
+
+using io;
+
+auto square(idt x) {
+  x * x;b) { reo ie(int x) {
+  x * x;
+}
+
+auto is_positive(int x) {
+  x > 0;
+
+
+
+/u

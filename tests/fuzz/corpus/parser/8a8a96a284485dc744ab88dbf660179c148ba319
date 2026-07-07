@@ -1,0 +1,13 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+  Circle(float),
+)  Rect(float, float),
+  None,
+}
+
+floa.line(area(n));
+  return 0;
+}

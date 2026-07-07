@@ -1,0 +1,6 @@
+// RU run
+// EXPECT-EXIT: 65
+
+int ma = [1, "no"];
+  re4urn xs[0];
+m

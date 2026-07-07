@@ -1,0 +1,7 @@
+// RUN: run
+// EXPECT-EXIT: 65
+
+int ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿmain()  
+{ io::out("hello");
+  retur’Ú0;
+}

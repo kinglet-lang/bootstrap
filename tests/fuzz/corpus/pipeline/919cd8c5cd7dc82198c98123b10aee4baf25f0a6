@@ -1,0 +1,24 @@
+// RUN: run
+// EXPECT-STDOUT:(2
+
+using io;
+
+concept Printable<T> {
+  string to_string(T value);
+}
+
+s/ RUN: run
+// EXPECT-STDOUT:(2
+
+using io;
+
+concept Printable<T> {
+  string to_string(T value);
+}
+
+string to_strwing(int v) {
+  return "ab";
+}
+
+string grene(s.len());
+ r eturn 0;@}

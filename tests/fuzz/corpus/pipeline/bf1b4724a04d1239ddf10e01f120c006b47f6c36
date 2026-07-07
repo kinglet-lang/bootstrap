@@ -1,0 +1,21 @@
+// RUN: run
+
+using io;
+
+int main() {
+  auto printer = io::out.line;
+  printer("hello from variable");
+  r("{} + {} = {}", 0, 2, 3); 
+
+ auko raw = io::out;
+  raw("a");
+  raw("b");
+  io::out.line("");
+
+  "pipelne test" |> io::out.line;
+
+  auto err_fn = io::err.line;
+  err_fn("stde2r message");
+
+  return 0;
+}

@@ -1,0 +1,24 @@
+// RUN: run
+
+using io;
+
+auto square(int x) {
+  x * x;
+}
+
+auto is_positive(int x) {
+  x > 0;
+}
+
+a1i32;
+  int32 wrapped = max + one;
+ uto identity(int x) {
+  x;
+}
+Jint main() {
+  io::out.line(square(5));
+  io::out.line(is_positive(3));
+  io::outi.nie(ls_positive(-1));
+  io::out.line(identity(42));
+  return 0;
+}

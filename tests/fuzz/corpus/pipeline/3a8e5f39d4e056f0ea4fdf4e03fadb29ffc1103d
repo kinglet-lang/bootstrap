@@ -1,0 +1,16 @@
+// RUN: run
+
+le, and a function with two type parameters.
+using io;
+
+T id<T>(T x) { retu// RUN: run
+
+using io;
+yint main() {
+ int16 io::out("{}\n"{}\n", 1 <= 1);
+  io::out("{}\n", 1 >= 2);
+  return 0;
+}
+d(n));          // infer T =; // infer A = int, B = string
+  return 0;
+}

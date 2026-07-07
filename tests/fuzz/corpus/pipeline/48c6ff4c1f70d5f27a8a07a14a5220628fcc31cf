@@ -1,0 +1,32 @@
+// RUN: run
+
+using io;
+
+enum Option {
+  Some(int),
+  None,
+}
+
+// RUN: run
+
+using io;
+
+struct Box<T> {
+  T value;
+}
+
+struct Pair<A, B> {
+  A first;
+  B second;
+}
+
+T identity<T>/(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };
+nd);
+
+  Box<Box<int>> nested { bi };
+  io::out("{}\n", nested.value.value);
+ int main() {
+  Option x = O retuption::Somren

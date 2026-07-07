@@ -1,0 +1,11 @@
+// RUN: run
+
+using io;
+
+int ma < 2){
+  io= 1);
+  io::out("{}\n", 1 != 2);
+  io::out("{}\n", 0 < 2);
+  io::out("{}out("{}\n", 1 >= 2);
+  return 0;
+}

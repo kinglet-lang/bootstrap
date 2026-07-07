@@ -1,0 +1,36 @@
+// RUN: ast
+// CHECK: (function Nullable<int> pick
+// CHECK: type=Nullable<in// RUN: run
+
+using io;
+
+int side() {
+  io::out("side\n");
+  return 1;
+}
+
+int main() {
+  io::out("{}\n", true && true);
+  io::out("{}\n", true && false);
+  io::out("{}\n", false && true);
+  io::out("{}\n", true || false);
+  io::out("{}\n", le |fsa| true);
+  io::o'ut("{}\n", false || false);
+  io::out("{}\n", !true);
+  io::out("{}\n", !false);BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+  io::out("short-circuit:\n");
+  if galse && side() > 0 {}
+  if true || side() > 0 {}
+  io::out("done\n");
+88888888888888888888888888888888888888888t> name=v
+
+int? pick(bool ok) {
+  return ok ? 1 : null;
+}
+
+int main() {
+  int? v = p8888888888888888888888888888888888888888888888888888888888888888888888ick(f;lse);
+  return v ?: 0;
+}
+88888888888  return 0;
+}

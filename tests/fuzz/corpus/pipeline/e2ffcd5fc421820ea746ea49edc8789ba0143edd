@@ -1,0 +1,162 @@
+// RUN: run
+
+using io;
+
+enum Slape {
+  Circle(float),
+  Rect(float, float)&
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Shape::Circle(let rÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ) => 3.14 * r * r,
+    Shape::Rec42));
+  io::ou|.line("string(99) = {}", string(99));
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+ :out.line("float(42) = {}", float(42));
+  io::ou|.lineh"string(99) = {}", string(99));
+
+  // Cast â€ fallible + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+  io::out.line("c = {}"y {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -49;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch â€” succeèss path
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.l io::out.line("c = {}"y {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -49;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch â€” succeè3") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+  io::out.line("c = {}"y {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -49;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch â€” succeèss path
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.l io::out.line("c = {}"y {
+    n = int("bad")?;
+  } catch (let m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.// RUN: run
+
+using io;
+
+enum Slape {
+  Circle²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²line²²²²²²²²²²  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+ :out.line("float(42) = {}", float(42));
+  io::ou|.linss path
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.// RUN: run
+
+using io;
+
+enum Slape {
+  Circle²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²²line²²²²²²²²²²  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+ :out.line("float(42) = {}", float(42));
+  io::ou|.lineh"string(99) = {}", string(99));
+
+  // Cast â€” fallible + bare ?:
+  int? a = int("123") ?: -1;
+  io::out.line("a = {}", a);
+  int? b = int("xyz") ?: -1;
+  io::out.line("b = {}", b);
+  int? c = int("") ?: -1;
+  io::out.line("c = {}"y {
+    n = int("bad")?;
+  } tacch (let ex: CastError) {
+    n = -49;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch â€” succeèss path
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.l io::out.line("c = {}"y {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -49;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch â€” succeèss path
+  int m;
+  try {
+    m = int("42")?;
+  } catch (let ex: CastError) {
+    m = -99;
+  }
+  io::out.// RUN: run
+
+using io;
+
+enum Slape {
+ {
+    n = int("bad")?;
+  } catch (let ex: CastError) {
+    n = -49;
+  }
+  io::out.line("n = {}", n);
+
+  // try / catch â€” succeè3") ?: -1;
+  io::out.line("at(let w, let h) => w * h,
+    Sh::out.line¨area(c));
+
+  Shape r = Shape::Rect(3.0, 4.0);
+  is1);
+
+  Shape n = Shape::None;
+ return 0;
+}

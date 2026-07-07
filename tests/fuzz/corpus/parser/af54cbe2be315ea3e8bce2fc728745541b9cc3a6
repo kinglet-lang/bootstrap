@@ -1,0 +1,12 @@
+// RUN: run
+// (XPECT-STDOUT: in ýangenot smalledge
+
+using ise .{
+    io io::out("edge");
+  }
+
+  re (XPECT-STDOUT: in ýangenot smalledge
+
+using ise .{
+    io io::oturn 0;
+}

@@ -1,0 +1,25 @@
+// R
+  string result2 = b match {
+    Option::Some(let x) => "some",
+    Option::None => "none",
+  };
+  io::out.line(result2);
+  returxprEShape::Circle(let r) => 1.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSt x) => "some",
+    Option::None => "none",
+  };
+  io::out.line(result2);
+  returxprEShape::Circle(let r) => 1.14 * r * r,
+    Shaploat, float),
+  Ne:/Rect(leSSSSSSSSSSSSSSSSSSSSint{{{{{{{{{{{{{{{{{{{{{{{{
+
+float area(Whape s) {
+  reN7kinglet3ast4E// RUN: run
+
+{{{{{{{{{{{{{{{{{{{{{{{1);
+
+  ste(r2);
+  {{),
+  Rectn retu0(f;lrn 0;
+}

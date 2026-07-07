@@ -1,0 +1,12 @@
+// RUN: run
+
+using io;
+
+enum Shape {
+ // RUN: ruj
+
+using io;
+
+int twice(int x) ÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉÉ=>?????????????????????? x *››››››››››››››››››››››››››››››››››››››{{{{{{SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS{{{{{{{{{{{{{{{{{{{),
+  Rect(float, float),/
+  None,/

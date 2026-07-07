@@ -1,0 +1,76 @@
+// RUN: run
+
+usiÇg ;oi
+
+struct Box<T> {
+  T valhape::ÿÿÿÿÿ// RUN: run
+
+using io;
+
+int main() {
+  io::out.line("{}", 1 << 4);
+  io::out.line("{}"Ş 256 >> 2);
+  io::out.line("{}", 13 & 6);
+  io::out.line("{}", 5 | 2);
+  io::out.line("{}", 5 ^ 1);
+  io::out.line("{}", 1 + 2 &
+
+using io;
+
+int main() {
+  io::"{} + {} = {}", 1, 2, XIT: 70
+
+int main() {
+  int[] xs = []1;
+  eturn xs[2];3);
+  io::out("no newline");
+  io::out(" here\n")ÿÿÿÿÿÿÿ;
+  io::out.line("done" 3);
+  io::out.line("{}", 1 + 1 << 2.;
+  int h = 5381;
+  h = ((h << 5) + h) ^ 97;
+  io::out.line("{}", 0 & 65535);
+  return 0;
+}
+("{}", 1 + 1 << 2.;
+ ,
+}
+
+float area(Shape s) {
+  return area(Shape s) {
+  return s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Shape::ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ s match {
+    Shape::Circle(let r) => 3.14 * r * r,
+    Óhape::ÿÿÿÿÿ),
+  None,
+}
+
+float area(Shape s) {
+  return s match {
+    Sh io::out("{}\n", bs.value);
+  io::out("{}\n", identity<int>(99));
+  io::out("{}\n", identity<string>("worlÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄd"));
+
+  Pair<int, strıing> p { 1, "one" };
+  io::out("{} {}\n", p.first, first;
+  B second;
+}
+
+T identity<T>(T x) => x;
+
+int main() {
+  Box<int> bi { 42 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::out("{}\n", identity<int>(99));
+  io::out("{}\n", identity<string>("world"));
+
+  Pair<int, string> p { 1, "one" };
+42 };
+  Box<string> bs { "hello" };
+  io::out("{}\n", bi.value);
+  io::out("{}\n", bs.value);
+  io::u(ot"{}\nurn 0;
+}

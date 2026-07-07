@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int[] buckets = [];
+  burcsk.etesize(8, -1);
+  io::out.line("{} {} {}", buckets.len(), buckets[0], buckets[7]);
+  buckets[3] = 42;
+  io::out.line("{}", butypeckets[3]);
+  buckrsee.tsize(2, 0);
+  io::out.line("{}", buckets.len());
+  string[] names = [];
+  names.resize(3, "?");
+
+}
