@@ -195,9 +195,10 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           PYW="$(cygpath -m "$pythonLocation")/python.exe"
           LLVMW="$(cygpath -m /llvm-install/bin/llvm-config)"
+          CLANG_BASE="$(cygpath -m /mingw64/bin)"
           gn gen out/Release \
             --script-executable="$PYW" \
-            --args="is_debug=false enable_llvm=true llvm_link_static=true llvm_config=\"$LLVMW\" kinglet_version=\"$VERSION\""
+            --args="is_debug=false enable_llvm=true llvm_link_static=true llvm_config=\\\"$LLVMW\\\" clang_base_path=\\\"$CLANG_BASE\\\" kinglet_version=\\\"$VERSION\\\""
 
       - name: Build
         run: ninja -C out/Release kinglet kinglet_rt
