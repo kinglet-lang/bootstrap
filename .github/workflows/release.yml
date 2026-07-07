@@ -80,9 +80,12 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}.tar.gz
 
-  # Windows uses the MSYS2/mingw64 clang toolchain, which (unlike the official
-  # LLVM installer) ships clang++, llvm-ar, and llvm-config + dev libs together —
-  # matching build/toolchain/BUILD.gn's win toolchain.
+  # Windows builds kinglet with LLVM statically linked to avoid bundling the
+  # 140 MB libLLVM.dll.  Because MSYS2's LLVM package is a shared-library build
+  # whose .a files lack -ffunction-sections, we compile LLVM from source here
+  # with dead-code-elimination flags.  The build is cached so only the first
+  # release after a cache miss pays the full compile cost (~40 min).  Cache-hit
+  # builds restore the install tree instantly.
   build-windows:
     runs-on: windows-latest
     defaults:
@@ -92,9 +95,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # gn ships as a native Windows binary that emits drive-letter paths, which
-      # MSYS2's python cannot open. Use a native Windows python for gn's
-      # exec_script (--script-executable) instead.
       - name: Set up native Python
         uses: actions/setup-python@v5
         with:
@@ -108,12 +108,48 @@ jobs:
           install: >-
             unzip
             mingw-w64-x86_64-clang
-            mingw-w64-x86_64-llvm
+            mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
 
+      - name: Cache LLVM
+        uses: actions/cache@v4
+        id: cache-llvm
+        with:
+          path: /llvm-install
+          key: llvm-22.1.0-x86-ffs-v1
+
+      - name: Build LLVM from source
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        run: |
+          LLVM_VER=22.1.0
+          echo "Building LLVM $LLVM_VER (X86 only, -ffunction-sections)..."
+          curl -fsSLo llvm.tar.xz \
+            "https://github.com/llvm/llvm-project/releases/download/llvmorg-$LLVM_VER/llvm-project-$LLVM_VER.src.tar.xz"
+          mkdir -p /llvm-src /llvm-build /llvm-install
+          tar xf llvm.tar.xz -C /llvm-src --strip-components=1
+          cd /llvm-build
+          cmake /llvm-src/llvm \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--strip-all" \
+            -DLLVM_TARGETS_TO_BUILD=X86 \
+            -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_BUILD_TESTS=OFF \
+            -DLLVM_BUILD_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_INSTALL_PREFIX=/llvm-install
+          ninja install-llvm-libraries install-llvm-headers llvm-config
+
       - name: Install GN
-        # Extract into /usr/bin (always on the MSYS2 PATH); GITHUB_PATH does not
-        # reliably cross into the msys2 shell environment.
         run: |
           curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
           unzip -o gn.zip -d /usr/bin
@@ -121,9 +157,8 @@ jobs:
       - name: Generate build files
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          # Native gn + native python need Windows-style paths; convert with cygpath.
           PYW="$(cygpath -m "$pythonLocation")/python.exe"
-          LLVMW="$(cygpath -m /mingw64/bin/llvm-config.exe)"
+          LLVMW="$(cygpath -m /llvm-install/bin/llvm-config)"
           gn gen out/Release \
             --script-executable="$PYW" \
             --args="is_debug=false enable_llvm=true llvm_link_static=true llvm_config=\"$LLVMW\" kinglet_version=\"$VERSION\""
@@ -135,11 +170,8 @@ jobs:
         run: |
           mkdir -p dist
           cp out/Release/kinglet.exe dist/
-          # Windows runtime archive is kinglet_rt.lib (see win alink in build/toolchain).
           cp out/Release/obj/runtime/kinglet_rt.lib dist/
           bash scripts/stage-klet-alias.sh dist
-          # Bundle the MinGW runtime + libLLVM DLLs kinglet.exe transitively
-          # imports, so the archive runs without MSYS2 on PATH.
           bash scripts/stage-runtime-dlls.sh dist
           cd dist && tar czf "../kinglet-windows-x64.tar.gz" *
 
