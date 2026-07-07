@@ -54,6 +54,7 @@ if (enable_llvm) {
   # transitive system deps of libLLVMSupport explicitly.  They must go
   # into libs (not ldflags) so they appear after the .a archives in the
   # link command — static linking resolves left-to-right.
+  _extra_llvm_libs = []
   if (llvm_link_static && host_os == "win") {
     llvm_ldflags += [
       "-lzstd",
@@ -63,7 +64,7 @@ if (enable_llvm) {
       "-luuid",
       "-loleaut32",
     ]
-    llvm_libs += [
+    _extra_llvm_libs += [
       "ntdll",
       "ole32",
       "shell32",
@@ -80,5 +81,5 @@ if (enable_llvm) {
   _libs_args += [ "libs" ]
   llvm_libs = exec_script("//build/scripts/llvm_config.py",
                           _libs_args,
-                          "list lines")
+                          "list lines") + _extra_llvm_libs
 }
