@@ -144,6 +144,10 @@ jobs:
           # The tarball includes clang/lld/flang/etc. with symlinks in test
           # directories that fail on Windows.  We don't need any of that.
           tar xf llvm.tar.xz -C /llvm-src --strip-components=1 \
+            --exclude='*/test' \
+            --exclude='*/mlgo-utils' \
+            --exclude='*/benchmarks' \
+            --exclude='*/examples' \
             "llvm-project-${LLVM_VER}.src/llvm" \
             "llvm-project-${LLVM_VER}.src/cmake" \
             "llvm-project-${LLVM_VER}.src/CMakeLists.txt"
