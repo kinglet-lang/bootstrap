@@ -9,8 +9,8 @@ declare_args() {
   llvm_config = ""
   # When true, pass --link-static to llvm-config --libs so the linker gets
   # individual .a archives instead of a monolithic shared library.  With LTO
-  # and --gc-sections, dead code is dropped — useful on Windows where bundling
-  # the full libLLVM.dll balloons the release archive to ~45 MB.
+  # and dead-code elimination, unreferenced code is dropped — shrinking the
+  # binary from ~45 MB (dynamic) to ~15 MB or less.
   llvm_link_static = false
 }
 
@@ -42,8 +42,7 @@ if (enable_llvm) {
   # System libraries from llvm-config --system-libs.  These must appear
   # AFTER the LLVM .a archives for static linking — the linker resolves
   # left-to-right and the .a files have forward references to system
-  # symbols (ntdll, psapi, etc.).  We route them through _extra_llvm_libs
-  # so they land in llvm_libs, which GN places after the archives.
+  # symbols.
   _system_libs = []
   _syslibs_args = [ llvm_config_bin ]
   if (llvm_link_static) {
@@ -54,20 +53,28 @@ if (enable_llvm) {
                               _syslibs_args,
                               "list lines")
 
-  # --gc-sections drops unreferenced sections from the LLVM static
-  # archives.  Paired with the -ffunction-sections LLVM build, this
-  # eliminates dead code from the final kinglet binary.
+  # Dead-code elimination: drop unreferenced sections from LLVM static
+  # archives.  Paired with -ffunction-sections -fdata-sections during the
+  # LLVM build, this strips out ~70% of the .a content at link time.
   _extra_llvm_libs = []
-  if (llvm_link_static && host_os == "win") {
-    llvm_ldflags += [
-      "-Wl,--gc-sections",
-      "-Wl,-s",
-    ]
+  if (llvm_link_static) {
+    if (host_os == "mac") {
+      llvm_ldflags += [
+        "-Wl,-dead_strip",
+        "-Wl,-S",
+      ]
+    } else {
+      llvm_ldflags += [
+        "-Wl,--gc-sections",
+        "-Wl,-s",
+      ]
+    }
     # System libraries go AFTER LLVM .a archives.  The self-built LLVM
     # is configured with -DLLVM_ENABLE_ZLIB=OFF and -DLLVM_ENABLE_ZSTD=OFF,
     # so z / zstd are intentionally absent.
     _extra_llvm_libs += _system_libs
   }
+
   _libs_args = [ llvm_config_bin ]
   if (llvm_link_static) {
     _libs_args += [ "--link-static" ]
