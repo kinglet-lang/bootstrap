@@ -1,0 +1,147 @@
+name: Prime LLVM Cache
+
+# Build LLVM from source on the default branch (canon) and cache the
+# install tree.  Because GitHub Actions scopes caches to the branch/tag
+# that created them, tag-triggered release workflows cannot restore a
+# cache saved by a different tag.  Caches saved on the default branch,
+# however, are accessible from ANY workflow run — including releases.
+#
+# This workflow is triggered manually after LLVM build configuration
+# changes (version bumps, cmake flags, target additions).  Once primed,
+# every subsequent release restores the install tree instantly, skipping
+# the ~40-minute LLVM source build.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  prime:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: X86
+            cache-key: llvm-22.1.0-linux-x64-ffs-v1
+          - os: macos-latest
+            target: AArch64
+            cache-key: llvm-22.1.0-macos-arm64-ffs-v1
+          - os: windows-latest
+            target: X86
+            cache-key: llvm-22.1.0-x86-ffs-v3
+            msys2: true
+
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.msys2 && 'msys2 {0}' || 'bash' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (Windows)
+        if: matrix.msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-ca-certificates
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+
+      - name: Install build deps (Unix)
+        if: ${{ !matrix.msys2 }}
+        run: |
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            brew install cmake ninja 2>/dev/null || true
+          else
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq clang cmake ninja-build
+          fi
+
+      - name: Cache LLVM
+        uses: actions/cache@v4
+        id: cache-llvm
+        with:
+          path: ${{ matrix.msys2 && format('{0}/msys64/llvm-install', runner.temp) || '~/llvm-install' }}
+          key: ${{ matrix.cache-key }}
+          save-always: true
+
+      - name: Build LLVM from source
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        run: |
+          LLVM_VER=22.1.0
+          LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/llvm-project-${LLVM_VER}.src.tar.xz"
+          echo "Building LLVM $LLVM_VER (${{ matrix.target }} only, -ffunction-sections)..."
+
+          echo "Downloading $LLVM_URL"
+          curl -fSL --retry 5 --retry-delay 15 --retry-max-time 300 \
+            -o llvm.tar.xz "$LLVM_URL"
+          echo "Downloaded $(du -h llvm.tar.xz | cut -f1)"
+
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            LLVM_SRC=/llvm-src
+            LLVM_BUILD=/llvm-build
+            LLVM_INSTALL=/llvm-install
+            mkdir -p "$LLVM_SRC" "$LLVM_BUILD" "$LLVM_INSTALL"
+
+            tar xf llvm.tar.xz -C "$LLVM_SRC" --strip-components=1 \
+              --exclude='*/test' \
+              --exclude='*/mlgo-utils' \
+              --exclude='*/benchmarks' \
+              --exclude='*/examples' \
+              "llvm-project-${LLVM_VER}.src/llvm" \
+              "llvm-project-${LLVM_VER}.src/cmake" \
+              "llvm-project-${LLVM_VER}.src/third-party"
+
+            # Stub out mlgo-utils (symlinks fail on Windows).
+            mkdir -p "$LLVM_SRC/llvm/utils/mlgo-utils"
+            : > "$LLVM_SRC/llvm/utils/mlgo-utils/CMakeLists.txt"
+          else
+            LLVM_SRC=/tmp/llvm-src
+            LLVM_BUILD=/tmp/llvm-build
+            LLVM_INSTALL=$HOME/llvm-install
+            mkdir -p "$LLVM_SRC" "$LLVM_BUILD" "$LLVM_INSTALL"
+
+            tar xf llvm.tar.xz -C "$LLVM_SRC" --strip-components=1 \
+              "llvm-project-${LLVM_VER}.src/llvm" \
+              "llvm-project-${LLVM_VER}.src/cmake" \
+              "llvm-project-${LLVM_VER}.src/third-party"
+          fi
+
+          cd "$LLVM_BUILD"
+          cmake "$LLVM_SRC/llvm" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--strip-all" \
+            -DLLVM_TARGETS_TO_BUILD=${{ matrix.target }} \
+            -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_BUILD_TESTS=OFF \
+            -DLLVM_BUILD_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_INSTALL_PREFIX="$LLVM_INSTALL"
+          ninja install-llvm-libraries install-llvm-headers llvm-config
+
+          # llvm-config lives in the build tree, not installed by the
+          # install-llvm-* targets.  Copy it manually.
+          cp "$LLVM_BUILD/bin/llvm-config" "$LLVM_INSTALL/bin/" 2>/dev/null || \
+            cp "$LLVM_BUILD/bin/llvm-config.exe" "$LLVM_INSTALL/bin/"
+
+          # Clean up source/build trees (cache only the install tree).
+          rm -rf "$LLVM_SRC" "$LLVM_BUILD" llvm.tar.xz
+          echo "LLVM build complete ($(du -sh "$LLVM_INSTALL" | cut -f1))"
