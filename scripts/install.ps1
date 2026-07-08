@@ -50,13 +50,39 @@ function Resolve-Version {
   }
 
   # GitHub's releases/latest is, by definition, the most recent non-prerelease
-  # release — so it already excludes rc/alpha/beta tags. It 404s when no stable
-  # release has been published yet.
+  # release — so it already excludes rc/alpha/beta tags. It returns 404 when no
+  # stable release has been published yet.
   $api = "https://api.github.com/repos/$Script:Repo/releases/latest"
-  $release = Invoke-RestMethod -Uri $api -ErrorAction SilentlyContinue
+  $release = $null
+  try {
+    $release = Invoke-RestMethod -Uri $api -ErrorAction Stop
+  } catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    if (-not $statusCode) {
+      Warn "cannot reach $api"
+      Fail @"
+Network error — if you are behind a firewall or proxy, set the proxy before running:
+
+  `$env:HTTPS_PROXY = 'http://127.0.0.1:7890'; irm https://kinglet-lang.org/install.ps1 | iex
+
+Or skip the API call by specifying a version directly:
+
+  `$env:KINGLET_VERSION = 'v0.1.4'; irm https://kinglet-lang.org/install.ps1 | iex
+"@
+    }
+    if ($statusCode -eq 404) {
+      Warn "No stable (non-prerelease) release found on $Script:Repo yet."
+      Fail "Set `$env:KINGLET_VERSION = 'v0.1.0-rc.3' to install a prerelease, or 'v0.1.4' for the latest."
+    }
+    if ($statusCode -eq 403) {
+      Warn "GitHub API rate-limited — wait a minute and retry, or set `$env:KINGLET_VERSION = 'v0.1.4'"
+      Fail "Set `$env:KINGLET_VERSION=<tag> to install a specific version without hitting the API."
+    }
+    Fail "unexpected HTTP $statusCode from $api — retry or set KINGLET_VERSION=v0.1.4"
+  }
+
   if (-not $release -or -not $release.tag_name) {
-    Warn "No stable (non-prerelease) release found on $Script:Repo yet."
-    Fail "Set `$env:KINGLET_VERSION = 'v0.1.0-rc.3' to install a prerelease, or 'v0.1.1' for the latest."
+    Fail "API returned 200 but no tag_name — this is a bug, please report it."
   }
   $tag = $release.tag_name
 
