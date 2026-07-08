@@ -82,6 +82,18 @@ http_get() {
   fi
 }
 
+# http_get_status <url> <out-file> — returns the HTTP status code on stdout.
+# 000 means a transport-level failure (DNS, connection refused, timeout, …).
+http_get_status() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -sS -o "$2" -w '%{http_code}' "$1"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -S -O "$2" "$1" 2>&1 | sed -n 's/.*HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | tail -n1
+  else
+    err "need curl or wget to download"
+  fi
+}
+
 # A published tag counts as a prerelease if it carries a pre-release suffix.
 is_prerelease_tag() {
   case "$1" in
@@ -102,11 +114,40 @@ resolve_version() {
   # stable release has been published yet.
   api="${KINGLET_API_URL:-https://api.github.com/repos/$REPO/releases/latest}"
   tmp="$(mktemp)"
-  if ! http_get "$api" "$tmp" 2>/dev/null || [ ! -s "$tmp" ]; then
-    rm -f "$tmp"
-    note "No stable (non-prerelease) release found on $REPO yet."
-    err "Set KINGLET_VERSION=<tag> to install a specific version, e.g. KINGLET_VERSION=v0.1.0-rc.3"
-  fi
+  http_code="$(http_get_status "$api" "$tmp" 2>/dev/null)"
+  case "$http_code" in
+    200)
+      if [ ! -s "$tmp" ]; then
+        rm -f "$tmp"
+        err "API returned 200 but body is empty — this is a bug, please report it"
+      fi
+      ;;
+    000)
+      rm -f "$tmp"
+      warn "cannot reach $api"
+      err "Network error — if you are behind a firewall or proxy, try:
+
+  HTTPS_PROXY=http://127.0.0.1:7890 curl -fsSL https://kinglet-lang.org/install.sh | sh
+
+Or skip the API call by specifying a version directly:
+
+  KINGLET_VERSION=v0.1.4 curl -fsSL https://kinglet-lang.org/install.sh | sh"
+      ;;
+    403)
+      rm -f "$tmp"
+      warn "GitHub API rate-limited — wait a minute and retry, or set KINGLET_VERSION=v0.1.4"
+      err "Set KINGLET_VERSION=<tag> to install a specific version without hitting the API."
+      ;;
+    404)
+      rm -f "$tmp"
+      note "No stable (non-prerelease) release found on $REPO yet."
+      err "Set KINGLET_VERSION=<tag> to install a prerelease, e.g. KINGLET_VERSION=v0.1.0-rc.3"
+      ;;
+    *)
+      rm -f "$tmp"
+      err "unexpected HTTP $http_code from $api — retry or set KINGLET_VERSION=v0.1.4"
+      ;;
+  esac
   tag="$(sed -n 's/.*"tag_name"[ ]*:[ ]*"\([^"]*\)".*/\1/p' "$tmp" | head -n1)"
   rm -f "$tmp"
   [ -n "$tag" ] || err "could not determine latest release tag (set KINGLET_VERSION)"
