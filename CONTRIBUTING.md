@@ -300,6 +300,31 @@ pass.
 Prefer **small, focused PRs** that address one concern. If a change is large,
 split it into a stack of reviewable PRs or land preparatory refactors first.
 
+Each PR must contain **exactly one commit**. CI rejects multi-commit PRs.
+Squash merge always creates a brand-new commit object regardless of how
+many commits the PR had, so a multi-commit PR gets flattened anyway — the
+requirement exists so the commit you review is the commit that lands,
+with no surprise reshaping at merge time.
+
+### Tagging a release
+
+Release tags (`vX.Y.Z`) must point at a commit that is already an ancestor
+of `origin/canon` — i.e. only tag *after* the relevant PR has merged, never
+on a local commit you're about to submit for review:
+
+```bash
+git fetch origin canon
+git tag -a vX.Y.Z origin/canon -m "..."
+git push origin vX.Y.Z
+```
+
+Tagging a pre-merge local commit is a common trap: squash merge mints a new
+commit SHA for the same content, so the tag you already pushed becomes an
+orphaned branch in the history graph. `git merge-base --is-ancestor <tag>
+origin/canon` then fails, and GitHub's auto-generated "Full Changelog" link
+on the release silently skips back past that tag (and any older tag with
+the same problem) to the last tag that's still a real ancestor.
+
 ## Licensing
 
 All contributions are licensed under the [MIT License](LICENSE) — the same

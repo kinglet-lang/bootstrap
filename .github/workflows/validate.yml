@@ -89,6 +89,29 @@ jobs:
 
           echo "✓ PR body is valid ($body_len chars, all sections present)."
 
+      - name: Validate single commit
+        run: |
+          base_ref="${{ github.event.pull_request.base.sha }}"
+          count=$(git rev-list --count --no-merges "$base_ref..HEAD")
+
+          if [ "$count" -ne 1 ]; then
+            echo "✗ PR has $count commits; exactly 1 is required."
+            echo ""
+            echo "  Squash merge produces a brand-new commit object, so a"
+            echo "  multi-commit PR gets flattened anyway — but the merge"
+            echo "  commit then has no ancestor relationship with any of"
+            echo "  your original commits. If you tag one of them before"
+            echo "  merging, that tag silently falls off canon's history."
+            echo ""
+            echo "  Squash your branch into one commit before pushing:"
+            echo "    git reset --soft \$(git merge-base HEAD $base_ref)"
+            echo "    git commit -m 'type(scope): description'"
+            echo "    git push --force-with-lease"
+            exit 1
+          fi
+
+          echo "✓ PR has exactly 1 commit."
+
       - name: Validate commit messages
         run: |
           base_ref="${{ github.event.pull_request.base.sha }}"
