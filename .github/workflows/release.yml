@@ -9,8 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  # macOS + Linux: LLVM-enabled native build. The VM-only configuration is no
-  # longer published — every release archive ships the LLVM backend.
+  # macOS + Linux: LLVM-enabled native build with statically-linked LLVM.
+  # LLVM is compiled from source with -ffunction-sections so dead-code
+  # elimination drops unreferenced symbols at link time, producing a
+  # self-contained binary under 15 MB — no shared library bundling needed.
   build-unix:
     strategy:
       fail-fast: false
@@ -18,8 +20,12 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact: kinglet-linux-x64
+            llvm_target: X86
+            llvm_cache_key: llvm-22.1.0-linux-x64-ffs-v1
           - os: macos-latest
             artifact: kinglet-macos-arm64
+            llvm_target: AArch64
+            llvm_cache_key: llvm-22.1.0-macos-arm64-ffs-v1
 
     runs-on: ${{ matrix.os }}
 
@@ -40,24 +46,86 @@ jobs:
       - name: Install Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
-      - name: Install LLVM
+      - name: Cache LLVM
+        uses: actions/cache@v4
+        id: cache-llvm
+        with:
+          path: ~/llvm-install
+          key: ${{ matrix.llvm_cache_key }}
+          save-always: true
+
+      - name: Build LLVM from source
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
         shell: bash
         run: |
+          LLVM_VER=22.1.0
+          LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/llvm-project-${LLVM_VER}.src.tar.xz"
+          echo "Building LLVM $LLVM_VER (${{ matrix.llvm_target }} only, -ffunction-sections)..."
+
+          # Install build deps
           if [ "$RUNNER_OS" == "macOS" ]; then
-            brew install llvm
-            echo "LLVM_CONFIG=$(brew --prefix llvm)/bin/llvm-config" >> "$GITHUB_ENV"
+            brew install cmake 2>/dev/null || true
           else
-            sudo apt-get update
-            sudo apt-get install -y llvm-dev clang patchelf
-            # llvm-dev installs a versioned llvm-config under /usr/lib/llvm-*/bin.
-            echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq clang cmake
           fi
+
+          echo "Downloading $LLVM_URL"
+          curl -fSL --retry 5 --retry-delay 15 --retry-max-time 300 \
+            -o llvm.tar.xz "$LLVM_URL"
+          echo "Downloaded $(du -h llvm.tar.xz | cut -f1)"
+
+          mkdir -p /tmp/llvm-src /tmp/llvm-build
+          mkdir -p ~/llvm-install
+
+          # Extract only what we need: llvm/, cmake/, third-party/ (for siphash).
+          tar xf llvm.tar.xz -C /tmp/llvm-src --strip-components=1 \
+            "llvm-project-${LLVM_VER}.src/llvm" \
+            "llvm-project-${LLVM_VER}.src/cmake" \
+            "llvm-project-${LLVM_VER}.src/third-party"
+
+          cd /tmp/llvm-build
+          cmake /tmp/llvm-src/llvm \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--strip-all" \
+            -DLLVM_TARGETS_TO_BUILD=${{ matrix.llvm_target }} \
+            -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_BUILD_TESTS=OFF \
+            -DLLVM_BUILD_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_ENABLE_TERMINFO=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF \
+            -DLLVM_ENABLE_ZSTD=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_INSTALL_PREFIX=$HOME/llvm-install
+          ninja install-llvm-libraries install-llvm-headers llvm-config
+
+          # install-llvm-libraries + install-llvm-headers don't install
+          # llvm-config itself — the binary lives in the build tree.
+          # Copy it manually.
+          cp /tmp/llvm-build/bin/llvm-config ~/llvm-install/bin/
+
+          # Clean up source/build trees to save space (cache only the install).
+          rm -rf /tmp/llvm-src /tmp/llvm-build llvm.tar.xz
+
+          echo "LLVM build complete ($(du -sh ~/llvm-install | cut -f1))"
+
+      - name: Set LLVM config path
+        shell: bash
+        run: |
+          echo "LLVM_CONFIG=$HOME/llvm-install/bin/llvm-config" >> "$GITHUB_ENV"
 
       - name: Generate build files
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gn gen out/Release --args="is_debug=false enable_llvm=true llvm_config=\"$LLVM_CONFIG\" kinglet_version=\"$VERSION\""
+          gn gen out/Release --args="is_debug=false enable_llvm=true llvm_link_static=true llvm_config=\"$LLVM_CONFIG\" kinglet_version=\"$VERSION\""
 
       - name: Build
         shell: bash
@@ -71,11 +139,6 @@ jobs:
           # Native backend links user programs against the static runtime; it must
           # sit beside the kinglet binary (see resolve_rt_lib in compiler/driver/kinglet/main.cc).
           cp out/Release/obj/runtime/libkinglet_rt.a dist/
-          # On Linux, bundle the LLVM shared library and set rpath so the binary
-          # runs without a system-wide LLVM installation (e.g. on openSUSE, Arch).
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            bash scripts/stage-llvm-libs.sh dist "$LLVM_CONFIG"
-          fi
           bash scripts/stage-klet-alias.sh dist
           cd dist && tar czf "../${{ matrix.artifact }}.tar.gz" *
 
