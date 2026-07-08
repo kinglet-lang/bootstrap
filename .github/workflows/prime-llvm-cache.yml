@@ -116,25 +116,30 @@ jobs:
           fi
 
           cd "$LLVM_BUILD"
-          cmake "$LLVM_SRC/llvm" \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--strip-all" \
-            -DLLVM_TARGETS_TO_BUILD=${{ matrix.target }} \
-            -DLLVM_BUILD_TOOLS=OFF \
-            -DLLVM_BUILD_TESTS=OFF \
-            -DLLVM_BUILD_EXAMPLES=OFF \
-            -DLLVM_INCLUDE_TESTS=OFF \
-            -DLLVM_INCLUDE_EXAMPLES=OFF \
-            -DLLVM_INCLUDE_BENCHMARKS=OFF \
-            -DLLVM_ENABLE_TERMINFO=OFF \
-            -DLLVM_ENABLE_ZLIB=OFF \
-            -DLLVM_ENABLE_ZSTD=OFF \
-            -DBUILD_SHARED_LIBS=OFF \
+          CMAKE_ARGS=(
+            -G Ninja
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_C_COMPILER=clang
+            -DCMAKE_CXX_COMPILER=clang++
+            -DCMAKE_CXX_FLAGS="-ffunction-sections -fdata-sections"
+            -DLLVM_TARGETS_TO_BUILD=${{ matrix.target }}
+            -DLLVM_BUILD_TOOLS=OFF
+            -DLLVM_BUILD_TESTS=OFF
+            -DLLVM_BUILD_EXAMPLES=OFF
+            -DLLVM_INCLUDE_TESTS=OFF
+            -DLLVM_INCLUDE_EXAMPLES=OFF
+            -DLLVM_INCLUDE_BENCHMARKS=OFF
+            -DLLVM_ENABLE_TERMINFO=OFF
+            -DLLVM_ENABLE_ZLIB=OFF
+            -DLLVM_ENABLE_ZSTD=OFF
+            -DBUILD_SHARED_LIBS=OFF
             -DCMAKE_INSTALL_PREFIX="$LLVM_INSTALL"
+          )
+          # GNU-only linker flags; Apple's ld64 rejects --gc-sections/--strip-all.
+          if [ "$RUNNER_OS" != "macOS" ]; then
+            CMAKE_ARGS+=(-DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--strip-all")
+          fi
+          cmake "$LLVM_SRC/llvm" "${CMAKE_ARGS[@]}"
           ninja install-llvm-libraries install-llvm-headers llvm-config
 
           # llvm-config lives in the build tree, not installed by the
