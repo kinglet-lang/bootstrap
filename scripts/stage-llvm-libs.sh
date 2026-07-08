@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Copy the LLVM shared library that kinglet needs into the dist directory and
-# set rpath so the loader finds it alongside the binary without requiring a
-# system-wide LLVM installation.
+# Copy the LLVM shared library and its transitive runtime dependencies into
+# the dist directory so kinglet runs without a system-wide LLVM installation.
 #
 #   bash scripts/stage-llvm-libs.sh <dist-dir> <llvm-config>
 #
@@ -31,3 +30,43 @@ if [ -f "$BIN" ] && command -v patchelf >/dev/null 2>&1; then
 else
   echo "stage-llvm-libs: patchelf not available, rpath not set" >&2
 fi
+
+# ---------- transitive dependency bundling ----------
+# libLLVM pulls in libedit, libffi, libzstd, libtinfo, libxml2, and others
+# depending on the CMake configuration.  Copy every NEEDED library that is
+# not part of glibc / libstdc++ / libgcc so the binary is self-contained.
+
+# System libraries we never bundle (the loader and libc are always present;
+# libstdc++ / libgcc are ABI-stable enough that the system copy works).
+SKIP_PATTERNS='/(ld-linux|libc\.so|libm\.so|libdl\.so|libpthread\.so|librt\.so|libresolv\.so|libstdc\+\+\.so|libgcc_s\.so)'
+
+copy_transitive_libs() {
+  local lib="$1"
+  local dest="$2"
+  local visited_file="$3"
+
+  # Already processed?
+  grep -qxF "$lib" "$visited_file" 2>/dev/null && return 0
+  echo "$lib" >> "$visited_file"
+
+  ldd "$lib" 2>/dev/null | grep '=> /' | awk '{print $3}' | while IFS= read -r dep; do
+    # Skip system libraries.
+    echo "$dep" | grep -qE "$SKIP_PATTERNS" && continue
+
+    local name
+    name="$(basename "$dep")"
+    if [ ! -f "$dest/$name" ]; then
+      cp -a "$dep" "$dest/"
+      echo "  staged $name (dep of $(basename "$lib"))"
+      copy_transitive_libs "$dep" "$dest" "$visited_file"
+    fi
+  done
+}
+
+VISITED="$(mktemp)"
+trap 'rm -f "$VISITED"' EXIT
+
+echo "bundling transitive dependencies of libLLVM..."
+copy_transitive_libs "$LLVM_SHARED" "$DIST" "$VISITED"
+
+echo "llvm staging complete"
