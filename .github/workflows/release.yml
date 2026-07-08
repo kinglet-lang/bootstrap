@@ -121,8 +121,12 @@ jobs:
         uses: actions/cache@v4
         id: cache-llvm
         with:
-          path: /llvm-install
+          # /llvm-install in MSYS2 maps to $RUNNER_TEMP/msys64/llvm-install on
+          # the host filesystem.  The cache action runs outside MSYS2, so the
+          # path must be a Windows host path.
+          path: ${{ runner.temp }}/msys64/llvm-install
           key: llvm-22.1.0-x86-ffs-v3
+          save-always: true
 
       - name: Build LLVM from source
         if: steps.cache-llvm.outputs.cache-hit != 'true'
