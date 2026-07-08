@@ -189,8 +189,13 @@ int run_native_executable(const kinglet::KirModule &kir,
 #ifdef KINGLET_HAVE_LLVM
 std::string resolve_rt_lib(const char *argv0) {
   const std::filesystem::path dir = std::filesystem::absolute(argv0).parent_path();
-  for (const char *rel : {"libkinglet_rt.a", "obj/runtime/libkinglet_rt.a", "kinglet_rt.lib",
-                          "obj/runtime/kinglet_rt.lib"}) {
+  // "../lib/..." is the packaged release layout (bin/kinglet next to
+  // lib/libkinglet_rt.a). The flat and obj/runtime/ candidates cover local
+  // dev builds (scripts/build.sh stages everything flat into tools/bin/)
+  // and running straight out of the GN output directory, respectively.
+  for (const char *rel :
+       {"../lib/libkinglet_rt.a", "libkinglet_rt.a", "obj/runtime/libkinglet_rt.a",
+        "../lib/kinglet_rt.lib", "kinglet_rt.lib", "obj/runtime/kinglet_rt.lib"}) {
     const std::filesystem::path candidate = dir / rel;
     if (std::filesystem::exists(candidate)) {
       return candidate.string();

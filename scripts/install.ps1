@@ -135,8 +135,10 @@ function Install-Kinglet {
       Warn "SHA256SUMS not published for $version; skipping verification"
     }
 
-    Info "installing to $Script:BinDir"
-    New-Item -ItemType Directory -Force -Path $Script:BinDir | Out-Null
+    # The archive contains bin\ and lib\ at its root; extract straight into
+    # InstallDir so they land at $InstallDir\bin and $InstallDir\lib.
+    Info "installing to $Script:InstallDir"
+    New-Item -ItemType Directory -Force -Path $Script:InstallDir | Out-Null
 
     $kinglet = Join-Path $Script:BinDir "kinglet.exe"
 
@@ -144,7 +146,7 @@ function Install-Kinglet {
     if (-not (Get-Command tar.exe -ErrorAction SilentlyContinue)) {
       Fail "tar.exe not found. Windows 10 version 1803 or later is required."
     }
-    tar xzf $archive -C $Script:BinDir 2>&1 | Out-Null
+    tar xzf $archive -C $Script:InstallDir 2>&1 | Out-Null
     if (-not (Test-Path $kinglet)) { Fail "extraction failed (kinglet.exe not found)" }
 
     # klet.exe as a hard link to kinglet.exe (mirrors stage-klet-alias.ps1).
