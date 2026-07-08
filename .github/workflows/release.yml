@@ -48,7 +48,7 @@ jobs:
             echo "LLVM_CONFIG=$(brew --prefix llvm)/bin/llvm-config" >> "$GITHUB_ENV"
           else
             sudo apt-get update
-            sudo apt-get install -y llvm-dev clang
+            sudo apt-get install -y llvm-dev clang patchelf
             # llvm-dev installs a versioned llvm-config under /usr/lib/llvm-*/bin.
             echo "LLVM_CONFIG=$(ls /usr/lib/llvm-*/bin/llvm-config | sort -V | tail -1)" >> "$GITHUB_ENV"
           fi
@@ -71,6 +71,11 @@ jobs:
           # Native backend links user programs against the static runtime; it must
           # sit beside the kinglet binary (see resolve_rt_lib in compiler/driver/kinglet/main.cc).
           cp out/Release/obj/runtime/libkinglet_rt.a dist/
+          # On Linux, bundle the LLVM shared library and set rpath so the binary
+          # runs without a system-wide LLVM installation (e.g. on openSUSE, Arch).
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            bash scripts/stage-llvm-libs.sh dist "$LLVM_CONFIG"
+          fi
           bash scripts/stage-klet-alias.sh dist
           cd dist && tar czf "../${{ matrix.artifact }}.tar.gz" *
 
@@ -116,8 +121,12 @@ jobs:
         uses: actions/cache@v4
         id: cache-llvm
         with:
-          path: /llvm-install
+          # /llvm-install in MSYS2 maps to $RUNNER_TEMP/msys64/llvm-install on
+          # the host filesystem.  The cache action runs outside MSYS2, so the
+          # path must be a Windows host path.
+          path: ${{ runner.temp }}/msys64/llvm-install
           key: llvm-22.1.0-x86-ffs-v3
+          save-always: true
 
       - name: Build LLVM from source
         if: steps.cache-llvm.outputs.cache-hit != 'true'
