@@ -143,7 +143,11 @@ jobs:
           ninja install-llvm-libraries install-llvm-headers llvm-config
 
           # llvm-config lives in the build tree, not installed by the
-          # install-llvm-* targets.  Copy it manually.
+          # install-llvm-* targets.  Copy it manually.  On Windows,
+          # install-llvm-libraries already creates $LLVM_INSTALL/bin (DLLs
+          # are installed there); on Unix, shared libs go to lib/ instead,
+          # so bin/ is never created and the copy needs it explicitly.
+          mkdir -p "$LLVM_INSTALL/bin"
           cp "$LLVM_BUILD/bin/llvm-config" "$LLVM_INSTALL/bin/" 2>/dev/null || \
             cp "$LLVM_BUILD/bin/llvm-config.exe" "$LLVM_INSTALL/bin/"
 

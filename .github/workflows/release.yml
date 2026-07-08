@@ -113,7 +113,9 @@ jobs:
 
           # install-llvm-libraries + install-llvm-headers don't install
           # llvm-config itself — the binary lives in the build tree.
-          # Copy it manually.
+          # Copy it manually.  bin/ isn't created by those targets on
+          # Unix (shared libs go to lib/ instead), so create it first.
+          mkdir -p ~/llvm-install/bin
           cp /tmp/llvm-build/bin/llvm-config ~/llvm-install/bin/
 
           # Clean up source/build trees to save space (cache only the install).
