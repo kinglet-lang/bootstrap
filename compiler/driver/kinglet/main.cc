@@ -188,7 +188,15 @@ int run_native_executable(const kinglet::KirModule &kir,
 
 #ifdef KINGLET_HAVE_LLVM
 std::string resolve_rt_lib(const char *argv0) {
-  const std::filesystem::path dir = std::filesystem::absolute(argv0).parent_path();
+  // argv0 is not reliable here: when invoked via PATH (the normal case for
+  // an installed binary — e.g. `kinglet file.kl`), argv[0] is whatever the
+  // shell passed, typically just "kinglet" with no path at all. Resolving
+  // that against the current working directory (not the binary's real
+  // location) silently points at the wrong place. resolve_self_executable
+  // uses /proc/self/exe (Linux) / _NSGetExecutablePath (macOS) /
+  // GetModuleFileNameW (Windows) to find the actual running binary.
+  const std::string self = kinglet::resolve_self_executable(argv0);
+  const std::filesystem::path dir = std::filesystem::absolute(self).parent_path();
   // "../lib/..." is the packaged release layout (bin/kinglet next to
   // lib/libkinglet_rt.a). The flat and obj/runtime/ candidates cover local
   // dev builds (scripts/build.sh stages everything flat into tools/bin/)
