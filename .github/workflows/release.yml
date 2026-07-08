@@ -21,11 +21,11 @@ jobs:
           - os: ubuntu-latest
             artifact: kinglet-linux-x64
             llvm_target: X86
-            llvm_cache_key: llvm-22.1.0-linux-x64-ffs-v1
+            llvm_cache_key: llvm-22.1.0-linux-x64-ffs-v2
           - os: macos-latest
             artifact: kinglet-macos-arm64
             llvm_target: AArch64
-            llvm_cache_key: llvm-22.1.0-macos-arm64-ffs-v1
+            llvm_cache_key: llvm-22.1.0-macos-arm64-ffs-v2
 
     runs-on: ${{ matrix.os }}
 
@@ -101,6 +101,7 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF
             -DLLVM_ENABLE_ZLIB=OFF
             -DLLVM_ENABLE_ZSTD=OFF
+            -DLLVM_ENABLE_LIBXML2=OFF
             -DBUILD_SHARED_LIBS=OFF
             -DCMAKE_INSTALL_PREFIX=$HOME/llvm-install
           )
@@ -141,13 +142,14 @@ jobs:
       - name: Package binaries
         shell: bash
         run: |
-          mkdir -p dist
-          cp out/Release/kinglet dist/
-          # Native backend links user programs against the static runtime; it must
-          # sit beside the kinglet binary (see resolve_rt_lib in compiler/driver/kinglet/main.cc).
-          cp out/Release/obj/runtime/libkinglet_rt.a dist/
-          bash scripts/stage-klet-alias.sh dist
-          cd dist && tar czf "../${{ matrix.artifact }}.tar.gz" *
+          mkdir -p dist/bin dist/lib
+          cp out/Release/kinglet dist/bin/
+          # Native backend links user programs against the static runtime.
+          # It lives in lib/, one level up from the kinglet binary — see
+          # resolve_rt_lib in compiler/driver/kinglet/main.cc.
+          cp out/Release/obj/runtime/libkinglet_rt.a dist/lib/
+          bash scripts/stage-klet-alias.sh dist/bin
+          cd dist && tar czf "../${{ matrix.artifact }}.tar.gz" bin lib
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -255,6 +257,7 @@ jobs:
             -DLLVM_ENABLE_TERMINFO=OFF \
             -DLLVM_ENABLE_ZLIB=OFF \
             -DLLVM_ENABLE_ZSTD=OFF \
+            -DLLVM_ENABLE_LIBXML2=OFF \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_INSTALL_PREFIX=/llvm-install
           ninja install-llvm-libraries install-llvm-headers llvm-config
@@ -283,12 +286,16 @@ jobs:
 
       - name: Package binaries
         run: |
-          mkdir -p dist
-          cp out/Release/kinglet.exe dist/
-          cp out/Release/obj/runtime/kinglet_rt.lib dist/
-          bash scripts/stage-klet-alias.sh dist
-          bash scripts/stage-runtime-dlls.sh dist
-          cd dist && tar czf "../kinglet-windows-x64.tar.gz" *
+          mkdir -p dist/bin dist/lib
+          cp out/Release/kinglet.exe dist/bin/
+          # kinglet_rt.lib lives in lib/, mirroring the Unix layout (see
+          # resolve_rt_lib in compiler/driver/kinglet/main.cc). Runtime DLLs
+          # stay in bin/ alongside kinglet.exe — Windows resolves DLL imports
+          # relative to the executable's own directory first.
+          cp out/Release/obj/runtime/kinglet_rt.lib dist/lib/
+          bash scripts/stage-klet-alias.sh dist/bin
+          bash scripts/stage-runtime-dlls.sh dist/bin
+          cd dist && tar czf "../kinglet-windows-x64.tar.gz" bin lib
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

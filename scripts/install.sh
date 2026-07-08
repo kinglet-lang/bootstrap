@@ -237,9 +237,11 @@ main() {
     warn "SHA256SUMS not published for $version; skipping verification"
   fi
 
-  info "extracting to $BIN_DIR"
-  mkdir -p "$BIN_DIR"
-  tar -xzf "$archive" -C "$BIN_DIR"
+  # The archive contains bin/ and lib/ at its root; extract straight into
+  # INSTALL_DIR so they land at $INSTALL_DIR/bin and $INSTALL_DIR/lib.
+  info "extracting to $INSTALL_DIR"
+  mkdir -p "$INSTALL_DIR"
+  tar -xzf "$archive" -C "$INSTALL_DIR"
   chmod +x "$BIN_DIR/kinglet" 2>/dev/null || true
   [ -e "$BIN_DIR/klet" ] && chmod +x "$BIN_DIR/klet" 2>/dev/null || true
 
