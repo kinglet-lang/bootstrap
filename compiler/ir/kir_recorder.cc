@@ -401,6 +401,9 @@ void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation locat
   case OpCode::NativeFsWrite:
     bb_.instrs.push_back(rec(KirOpcode::NativeFsWrite, {static_cast<int32_t>(operand)}, location));
     break;
+  case OpCode::NativeFsListdir:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFsListdir, {static_cast<int32_t>(operand)}, location));
+    break;
   case OpCode::NativeSysArgs:
     bb_.instrs.push_back(rec(KirOpcode::NativeSysArgs, {static_cast<int32_t>(operand)}, location));
     break;
