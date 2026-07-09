@@ -19,17 +19,6 @@ class ModuleLoader;
 // Holds the program-scope name tables that both passes must agree on:
 // using/namespace tracking, module alias mapping, generic and concept
 // declaration registries, and imported-namespace sets.
-
-// ── Function overloading support ─────────────────────────────────────
-
-struct OverloadEntry {
-  Type func_type;
-  std::string mangled_name;
-  int arity; // cached for fast filtering
-};
-
-using OverloadSet = std::vector<OverloadEntry>;
-
 class SemanticContext {
 public:
   bool function_uses_concept_params(const ast::FunctionDecl &function) const;
@@ -44,9 +33,6 @@ public:
   std::unordered_map<std::string, const ast::FunctionDecl *> generic_functions_;
   std::unordered_map<std::string, const ast::FunctionDecl *> concept_generic_functions_;
   std::unordered_map<std::string, const ast::ConceptDecl *> concept_registry_;
-  // Function overload sets keyed by plain name. The checker registers each
-  // function here during pass 1 for overload resolution in pass 2.
-  std::unordered_map<std::string, OverloadSet> function_overloads_;
 };
 
 } // namespace kinglet

@@ -78,7 +78,9 @@ std::string shard_fingerprint_text(const KirModule &shard, const KirModule &full
     out << '\n';
   }
   for (const KirFunction &fn : shard.functions) {
-    out << "fn:" << mangled_native_symbol(fn.name, fn.source_path) << ':' << fn.param_count << '\n';
+    const std::string &native_name = fn.mangled_name.empty() ? fn.name : fn.mangled_name;
+    out << "fn:" << mangled_native_symbol(native_name, fn.source_path) << ':' << fn.param_count
+        << '\n';
     for (const KirBasicBlock &bb : fn.blocks) {
       for (const KirInstr &instr : bb.instrs) {
         out << kir_opcode_name(instr.op);

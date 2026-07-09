@@ -40,9 +40,10 @@ std::vector<int32_t> encode_f64_operands(double value) {
 } // namespace
 
 void KirRecorder::begin_function(const std::string &name, int param_count,
-                                 const std::string &source_path) {
+                                 const std::string &source_path, const std::string &mangled_name) {
   fn_ = KirFunction{};
   fn_.name = name;
+  fn_.mangled_name = mangled_name;
   fn_.source_path = source_path;
   fn_.param_count = param_count;
   bb_ = KirBasicBlock{};

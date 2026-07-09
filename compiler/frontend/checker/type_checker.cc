@@ -415,30 +415,43 @@ bool types_assignable(const Type &from, const Type &to) {
   return from.is_compatible_with(to);
 }
 
-// Exact type equality — same type_id() for scalars, same name for named types,
-// recursive element-type equality for containers.
+// Exact type equality — structurally compares all available Type fields.
+//
+// For integer and float types, the comparison relies on TypeId encoding
+// because width and signedness are not stored as separate fields on the
+// Type struct (Type::type_id() packs kind + width + signedness into one
+// value). When typedefs or type aliases are added, both Type and this
+// function will need updating to support structural identity that is
+// independent of the TypeId encoding.
 bool types_equal(const Type &a, const Type &b) {
   if (a.nullable != b.nullable)
     return false;
-  const TypeId aid = a.type_id();
-  const TypeId bid = b.type_id();
-  if (aid != bid)
+  if (a.kind != b.kind)
     return false;
-  // Named types: same struct/enum name
-  if (aid == TypeId::Struct || aid == TypeId::Enum)
+
+  switch (a.kind) {
+  case TypeKind::Int:
+  case TypeKind::Float:
+    // Width and signedness are only available through TypeId encoding.
+    return a.type_id() == b.type_id();
+  case TypeKind::Struct:
+  case TypeKind::Enum:
     return a.name == b.name;
-  // Containers: recursive element-type equality
-  if (aid == TypeId::Array) {
+  case TypeKind::Array: {
     if (!a.element_type || !b.element_type)
       return !a.element_type && !b.element_type;
     return types_equal(*a.element_type, *b.element_type);
   }
-  if (aid == TypeId::Map) {
+  case TypeKind::Map: {
     if (!a.key_type || !b.key_type || !a.element_type || !b.element_type)
       return !a.key_type && !b.key_type && !a.element_type && !b.element_type;
     return types_equal(*a.key_type, *b.key_type) && types_equal(*a.element_type, *b.element_type);
   }
-  return true; // scalars: type_id() match is sufficient
+  default:
+    // Bool, Char, String, Void, Null, Function, Ref, MutRef, Concept:
+    // kind alone is sufficient to distinguish them.
+    return true;
+  }
 }
 
 // Build the mangled function name: zero params → plain name, else name$T1$T2$...
@@ -615,10 +628,10 @@ static bool is_better_match(const std::vector<ConversionRank> &r1,
   return any_better;
 }
 
-static const OverloadEntry *resolve_overload(const OverloadSet &candidates,
-                                             const std::vector<Type> &arg_types,
-                                             std::vector<std::string> &errors_out) {
-  std::vector<std::pair<const OverloadEntry *, std::vector<ConversionRank>>> viable;
+static const TypeChecker::OverloadEntry *resolve_overload(const TypeChecker::OverloadSet &candidates,
+                                                          const std::vector<Type> &arg_types,
+                                                          std::vector<std::string> &errors_out) {
+  std::vector<std::pair<const TypeChecker::OverloadEntry *, std::vector<ConversionRank>>> viable;
   for (const auto &c : candidates) {
     if (c.arity != static_cast<int>(arg_types.size()))
       continue;
@@ -1055,7 +1068,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
       std::string mangled = mangle_function_name(func->name, param_types);
       const_cast<ast::FunctionDecl *>(func)->mangled_name = mangled;
-      sema_.function_overloads_[func->name].push_back(
+      function_overloads_[func->name].push_back(
           {func_type, mangled, static_cast<int>(param_types.size())});
       declare_var(func->name, func_type, false);
       kir_function_sigs_[mangled] = kir_sig_from(func_type);
@@ -3140,14 +3153,15 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   // Overload resolution: if multiple functions share this name, pick the
   // best match by C++-style conversion ranking.
   if (const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get())) {
-    auto ov_it = sema_.function_overloads_.find(callee_id->name);
-    if (ov_it != sema_.function_overloads_.end() && ov_it->second.size() > 1) {
+    auto ov_it = function_overloads_.find(callee_id->name);
+    if (ov_it != function_overloads_.end() && ov_it->second.size() > 1) {
       std::vector<Type> arg_types;
       arg_types.reserve(call_expr.args.size());
       for (const auto &arg : call_expr.args)
         arg_types.push_back(check_expr(*arg));
       std::vector<std::string> errors;
-      const OverloadEntry *selected = resolve_overload(ov_it->second, arg_types, errors);
+      const TypeChecker::OverloadEntry *selected =
+          resolve_overload(ov_it->second, arg_types, errors);
       if (!selected) {
         for (const auto &e : errors)
           error_at(call_expr.location, e);

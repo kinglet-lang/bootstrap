@@ -42,6 +42,8 @@ public:
   TypeCheckResult check(const ast::Program &program);
   void set_module_loader(ModuleLoader *loader) { module_loader_ = loader; }
   void populate_kir_types(KirModule *module) const;
+  SemanticContext &sema() { return sema_; }
+  const SemanticContext &sema() const { return sema_; }
 
   struct VarInfo {
     Type type;
@@ -49,6 +51,16 @@ public:
     bool used = false;
     ast::SourceLocation location;
   };
+
+  // ── Function overloading support ───────────────────────────────────
+
+  struct OverloadEntry {
+    Type func_type;
+    std::string mangled_name;
+    int arity; // cached for fast filtering
+  };
+
+  using OverloadSet = std::vector<OverloadEntry>;
 
   struct MethodInfo {
     const ast::FunctionDecl *decl;
@@ -215,6 +227,9 @@ private:
   std::vector<std::unordered_map<std::string, VarInfo>> scopes_;
   std::unordered_map<std::string, Type> type_registry_;
   SemanticContext sema_;
+  // Function overload sets keyed by plain name, registered during pass 1
+  // for overload resolution in pass 2.
+  std::unordered_map<std::string, OverloadSet> function_overloads_;
   std::vector<const ast::FunctionDecl *> free_functions_;
   std::unordered_set<std::string> instantiated_;
 

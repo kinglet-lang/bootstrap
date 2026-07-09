@@ -510,6 +510,7 @@ int main(int argc, char **argv) {
 
   kinglet::Compiler compiler;
   compiler.set_module_loader(&module_loader);
+  compiler.set_semantic_context(checker.sema());
   if (!input_path.empty()) {
     const std::filesystem::path entry_path = std::filesystem::path(input_path).is_absolute()
                                                  ? std::filesystem::path(input_path)
