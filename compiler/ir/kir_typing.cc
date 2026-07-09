@@ -860,6 +860,11 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       result = KirType::String;
       push_typed(&state, result);
       break;
+    case KirOpcode::NativeFsListdir:
+      pop_type(&state);
+      result = KirType::Array;
+      push_typed(&state, result);
+      break;
     case KirOpcode::NativeFsWrite:
       pop_type(&state);
       pop_type(&state);

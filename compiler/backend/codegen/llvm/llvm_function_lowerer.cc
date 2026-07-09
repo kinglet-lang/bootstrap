@@ -145,6 +145,7 @@ struct RtFns {
   llvm::Function *native_in = nullptr;
   llvm::Function *native_fs_read = nullptr;
   llvm::Function *native_fs_write = nullptr;
+  llvm::Function *native_fs_listdir = nullptr;
   llvm::Function *native_sys_args = nullptr;
   llvm::Function *invoke_native = nullptr;
   llvm::Function *value_eq = nullptr;
@@ -270,6 +271,9 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.native_fs_write =
       llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
                              llvm::Function::ExternalLinkage, "kl_native_fs_write", module);
+  rt.native_fs_listdir =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_listdir", module);
   rt.native_sys_args =
       llvm::Function::Create(llvm::FunctionType::get(i64, false), llvm::Function::ExternalLinkage,
                              "kl_native_sys_args", module);
@@ -2214,6 +2218,21 @@ public:
         builder.CreateCall(rt_.native_fs_write, {path, content});
         push(llvm::ConstantInt::get(i64, 0));
         temps[i] = stack.back();
+        break;
+      }
+      case KirOpcode::NativeFsListdir: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_fs_listdir expects exactly one argument";
+          return false;
+        }
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
+        if (path == nullptr) {
+          return false;
+        }
+        llvm::Value *contents = builder.CreateCall(rt_.native_fs_listdir, {path});
+        push(contents);
+        temps[i] = contents;
         break;
       }
       case KirOpcode::NativeSysArgs: {

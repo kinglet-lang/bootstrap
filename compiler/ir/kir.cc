@@ -221,6 +221,8 @@ const char *kir_opcode_name(KirOpcode op) {
     return "native_fs_read";
   case KirOpcode::NativeFsWrite:
     return "native_fs_write";
+  case KirOpcode::NativeFsListdir:
+    return "native_fs_listdir";
   case KirOpcode::NativeSysArgs:
     return "native_sys_args";
   case KirOpcode::INeg:

@@ -166,6 +166,7 @@ enum class KirOpcode : std::uint8_t {
   NativeInSecret,
   NativeFsRead,
   NativeFsWrite,
+  NativeFsListdir,
   NativeSysArgs,
   INeg,
   Unreachable,

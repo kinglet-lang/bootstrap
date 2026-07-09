@@ -131,10 +131,11 @@ private:
   // to a 1 MiB main-thread stack (Linux/macOS give 8 MiB). Each nesting level
   // descends the full ~17-function expression precedence chain, costing a few
   // KiB of stack per level, so the Windows ceiling is a few hundred levels.
-  // 48 keeps total recursive frame count under 50 even when ASan inflates
-  // per-frame stack consumption 3-4×, leaving ample margin on the Windows
-  // 1 MiB default stack while still far exceeding any realistic nesting.
-  static constexpr int kMaxRecursionDepth = 48;
+  // 16 keeps total recursive frame count under 320 (~17 funcs/level × 16 levels),
+  // leaving ample margin on the Windows 1 MiB default stack even when ASan
+  // inflates per-frame stack consumption 3-4×, while still far exceeding any
+  // realistic source-code nesting depth.
+  static constexpr int kMaxRecursionDepth = 16;
 
   // RAII counter for recursion depth, constructed at the top of each recursive
   // production. Increments the depth on entry, restores it on scope exit.
