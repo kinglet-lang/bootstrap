@@ -40,6 +40,7 @@ public:
   CompileResult compile_module(const ast::Program &program);
   void set_module_loader(ModuleLoader *loader) { module_loader_ = loader; }
   void set_entry_source_path(std::string path) { entry_source_path_ = std::move(path); }
+  void set_semantic_context(SemanticContext &sema) { sema_ = &sema; }
 
 private:
   struct Local {
@@ -171,7 +172,7 @@ private:
   std::vector<CompileError> errors_;
   std::vector<CompileWarning> warnings_;
   std::vector<LoopInfo> loop_stack_;
-  SemanticContext sema_;
+  SemanticContext *sema_ = nullptr;
   std::unordered_map<std::string, int> function_indices_;
   std::unordered_map<std::string, int> struct_indices_;
   std::unordered_map<std::string, int> enum_indices_;

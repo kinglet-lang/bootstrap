@@ -200,6 +200,7 @@ struct KirBasicBlock {
 
 struct KirFunction {
   std::string name;
+  std::string mangled_name; // Empty if no overload — native symbols use name instead
   std::string source_path;
   int param_count = 0;
   std::vector<std::string> param_names;

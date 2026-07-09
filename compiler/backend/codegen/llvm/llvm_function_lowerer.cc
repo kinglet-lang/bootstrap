@@ -2407,13 +2407,16 @@ bool lower_user_functions(llvm::Module *module, const KirModule &functions,
 
   for (const KirFunction &fn : functions.functions) {
     std::vector<llvm::Type *> param_types(static_cast<std::size_t>(fn.param_count), i64);
+    const std::string &native_name = fn.mangled_name.empty() ? fn.name : fn.mangled_name;
     auto *fn_type = llvm::FunctionType::get(i64, param_types, false);
     llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage,
-                           mangled_native_symbol(fn.name, fn.source_path), module);
+                           mangled_native_symbol(native_name, fn.source_path), module);
   }
 
   for (const KirFunction &fn : functions.functions) {
-    llvm::Function *llvm_fn = module->getFunction(mangled_native_symbol(fn.name, fn.source_path));
+    const std::string &native_name = fn.mangled_name.empty() ? fn.name : fn.mangled_name;
+    llvm::Function *llvm_fn =
+        module->getFunction(mangled_native_symbol(native_name, fn.source_path));
     FunctionLowerer lowerer(&context, metadata, llvm_fn, rt);
     if (di) {
       const std::filesystem::path src_path(fn.source_path.empty() ? "<entry>" : fn.source_path);
