@@ -85,4 +85,8 @@ executable("kinglet") {
   include_dirs = [
     "//compiler",
   ]
+
+  if (host_os == "linux") {
+    ldflags = [ "-static-libstdc++", "-static-libgcc" ]
+  }
 }

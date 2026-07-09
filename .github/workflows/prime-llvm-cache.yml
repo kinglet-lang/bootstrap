@@ -24,12 +24,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             target: X86
-            cache-key: llvm-22.1.0-linux-x64-ffs-v2
+            cache-key: llvm-22.1.0-linux-x64-ffs-v3
           - os: macos-latest
             target: AArch64
-            cache-key: llvm-22.1.0-macos-arm64-ffs-v2
+            cache-key: llvm-22.1.0-macos-arm64-ffs-v3
           - os: windows-latest
             target: X86
             cache-key: llvm-22.1.0-x86-ffs-v3
