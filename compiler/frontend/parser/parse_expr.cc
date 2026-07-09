@@ -747,7 +747,14 @@ ast::ExprPtr Parser::match_expression(ast::ExprPtr value) {
       consume(TokenType::RIGHT_PAREN, "Expected ')' after guard condition.");
     }
     consume(TokenType::FAT_ARROW, "Expected '=>' after match pattern.");
-    ast::ExprPtr body = expression();
+    ast::ExprPtr body;
+    if (check(TokenType::LEFT_BRACE)) {
+      const Token &left_brace = peek();
+      advance(); // consume '{'
+      body = std::make_unique<ast::BlockExpr>(location_of(left_brace), block_statement());
+    } else {
+      body = expression();
+    }
     arms.push_back(ast::MatchArm{std::move(pattern), std::move(guard), std::move(body)});
     if (!check(TokenType::RIGHT_BRACE)) {
       consume(TokenType::COMMA, "Expected ',' after match arm.");

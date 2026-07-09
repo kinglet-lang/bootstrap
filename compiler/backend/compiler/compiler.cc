@@ -2768,6 +2768,10 @@ void Compiler::visit(const ast::CastExpr &x) {
 void Compiler::visit(const ast::TernaryExpr &x) {
   compile_ternary(x);
 }
+
+void Compiler::visit(const ast::BlockExpr &x) {
+  compile_block_expr(x);
+}
 void Compiler::visit(const ast::NullCoalesceExpr &x) {
   compile_null_coalesce(x);
 }
@@ -2781,4 +2785,38 @@ void Compiler::visit(const ast::CompletionMarkerExpr &) {
   assert(false && "CompletionMarkerExpr reached codegen — LSP-only node leaked into build path");
   std::abort();
 }
+
+void Compiler::compile_block_expr(const ast::BlockExpr &block) {
+  if (!block.body) {
+    emit(OpCode::Null, block.location);
+    return;
+  }
+  const auto *body_block = dynamic_cast<const ast::BlockStmt *>(block.body.get());
+  if (!body_block) {
+    emit(OpCode::Null, block.location);
+    return;
+  }
+  push_scope();
+  const std::size_t count = body_block->statements.size();
+  bool yielded_value = false;
+  for (std::size_t i = 0; i < count; ++i) {
+    const auto &stmt = body_block->statements[i];
+    // The trailing ExprStmt is this block's value: compile the expression
+    // directly and leave it on the stack instead of routing through
+    // compile_stmt(), which would Pop it like any other discarded statement.
+    if (i + 1 == count) {
+      if (const auto *expr_stmt = dynamic_cast<const ast::ExprStmt *>(stmt.get())) {
+        compile_expr(*expr_stmt->expr);
+        yielded_value = true;
+        continue;
+      }
+    }
+    compile_stmt(*stmt);
+  }
+  pop_scope();
+  if (!yielded_value) {
+    emit(OpCode::Null, block.location);
+  }
+}
+
 } // namespace kinglet

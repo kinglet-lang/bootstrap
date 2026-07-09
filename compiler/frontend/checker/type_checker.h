@@ -120,6 +120,7 @@ private:
   void visit(const ast::PipeExpr &x) override;
   void visit(const ast::CastExpr &x) override;
   void visit(const ast::TernaryExpr &x) override;
+  void visit(const ast::BlockExpr &x) override;
   void visit(const ast::NullCoalesceExpr &x) override;
   void visit(const ast::PropagateExpr &x) override;
   void visit(const ast::BindingPattern &x) override;
@@ -164,6 +165,7 @@ private:
   Type check_index(const ast::IndexExpr &idx);
   Type check_cast(const ast::CastExpr &cast);
   Type check_ternary(const ast::TernaryExpr &ternary);
+  Type check_block_expr(const ast::BlockExpr &block);
   Type check_null_coalesce(const ast::NullCoalesceExpr &nc);
   Type check_propagate(const ast::PropagateExpr &prop);
   Type check_index_assign(const ast::IndexAssignExpr &idx);

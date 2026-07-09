@@ -1,0 +1,23 @@
+// RUN: run
+// CHECK: zero
+// CHECK: 10
+// CHECK: nonzero
+
+using io;
+
+string classify(int n) {
+  return n match {
+    0 => "zero",
+    _ => {
+      int doubled = n * 2;
+      io::out.line(doubled);
+      "nonzero";
+    },
+  };
+}
+
+int main() {
+  io::out.line(classify(0));
+  io::out.line(classify(5));
+  return 0;
+}

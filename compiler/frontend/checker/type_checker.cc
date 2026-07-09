@@ -3722,6 +3722,10 @@ void TypeChecker::visit(const ast::CastExpr &x) {
 void TypeChecker::visit(const ast::TernaryExpr &x) {
   expr_result_ = check_ternary(x);
 }
+
+void TypeChecker::visit(const ast::BlockExpr &x) {
+  expr_result_ = check_block_expr(x);
+}
 void TypeChecker::visit(const ast::NullCoalesceExpr &x) {
   expr_result_ = check_null_coalesce(x);
 }
@@ -4201,6 +4205,30 @@ std::optional<Type> TypeChecker::lookup_ufcs_free_method(const std::string &meth
     }
   }
   return resolve_type_expr(impl->return_type);
+}
+
+Type TypeChecker::check_block_expr(const ast::BlockExpr &block) {
+  if (!block.body)
+    return void_type();
+  const auto *body_block = dynamic_cast<const ast::BlockStmt *>(block.body.get());
+  if (!body_block)
+    return void_type();
+  Type result = void_type();
+  const std::size_t count = body_block->statements.size();
+  for (std::size_t i = 0; i < count; ++i) {
+    const auto &stmt = body_block->statements[i];
+    // The trailing ExprStmt is this block's value, not a discarded statement:
+    // check its expression directly so it isn't flagged as "unused" and isn't
+    // type-checked twice.
+    if (i + 1 == count) {
+      if (const auto *expr_stmt = dynamic_cast<const ast::ExprStmt *>(stmt.get())) {
+        result = check_expr(*expr_stmt->expr);
+        continue;
+      }
+    }
+    check_stmt(*stmt, stmt_expected_return_);
+  }
+  return result;
 }
 
 } // namespace kinglet
