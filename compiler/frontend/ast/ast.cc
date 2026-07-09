@@ -311,6 +311,20 @@ void PropagateExpr::print(std::ostream &out, int indent) const {
   out << ")";
 }
 
+BlockExpr::BlockExpr(SourceLocation location, StmtPtr body)
+    : Expr(location), body(std::move(body)) {}
+
+BlockExpr::~BlockExpr() = default;
+
+void BlockExpr::print(std::ostream &out, int indent) const {
+  write_indent(out, indent);
+  out << "(block\n";
+  if (body)
+    body->print(out, indent + 2);
+  write_indent(out, indent);
+  out << ")\n";
+}
+
 BindingPattern::BindingPattern(SourceLocation location, std::string name)
     : Expr(location), name(std::move(name)) {}
 

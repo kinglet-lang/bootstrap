@@ -85,6 +85,7 @@ private:
   void compile_index_assign(const ast::IndexAssignExpr &idx);
   void compile_cast(const ast::CastExpr &cast);
   void compile_ternary(const ast::TernaryExpr &ternary);
+  void compile_block_expr(const ast::BlockExpr &block);
   void compile_null_coalesce(const ast::NullCoalesceExpr &nc);
   void compile_propagate(const ast::PropagateExpr &prop);
 
@@ -110,6 +111,7 @@ private:
   void visit(const ast::IndexAssignExpr &x) override;
   void visit(const ast::CastExpr &x) override;
   void visit(const ast::TernaryExpr &x) override;
+  void visit(const ast::BlockExpr &x) override;
   void visit(const ast::NullCoalesceExpr &x) override;
   void visit(const ast::PropagateExpr &x) override;
   // Fallbacks for types compile_expr never sees at the top level.

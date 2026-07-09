@@ -88,6 +88,7 @@ struct BoolLiteralExpr;
 struct NullLiteralExpr;
 struct ArrayLiteralExpr;
 struct MapLiteralExpr;
+struct BlockExpr;
 struct IdentifierExpr;
 struct UnaryExpr;
 struct BinaryExpr;
@@ -146,6 +147,7 @@ struct ExprVisitor {
   virtual void visit(const NullLiteralExpr &) = 0;
   virtual void visit(const ArrayLiteralExpr &) = 0;
   virtual void visit(const MapLiteralExpr &) = 0;
+  virtual void visit(const BlockExpr &) = 0;
   virtual void visit(const IdentifierExpr &) = 0;
   virtual void visit(const UnaryExpr &) = 0;
   virtual void visit(const BinaryExpr &) = 0;
@@ -392,6 +394,16 @@ struct PropagateExpr final : Expr {
   void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr value;
+};
+
+struct BlockExpr final : Expr {
+  BlockExpr(SourceLocation location, StmtPtr body);
+  ~BlockExpr() override;
+
+  void print(std::ostream &out, int indent = 0) const override;
+  void accept(ExprVisitor &v) const override { v.visit(*this); }
+
+  StmtPtr body;
 };
 
 struct BindingPattern final : Expr {
