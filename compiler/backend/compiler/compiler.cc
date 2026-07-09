@@ -1428,7 +1428,16 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     }
     const std::string receiver_ty = infer_arg_type_name(*field_callee->object);
     if (!receiver_ty.empty()) {
-      const int free_idx = resolve_free_function_for_type(field_callee->field_name, receiver_ty);
+      int free_idx = -1;
+      // Try resolved overload mangled name first (set by TypeChecker).
+      if (!call_expr.resolved_mangled.empty()) {
+        auto fit = function_indices_.find(call_expr.resolved_mangled);
+        if (fit != function_indices_.end())
+          free_idx = fit->second;
+      }
+      if (free_idx < 0) {
+        free_idx = resolve_free_function_for_type(field_callee->field_name, receiver_ty);
+      }
       if (free_idx >= 0) {
         compile_expr(*field_callee->object);
         for (const ast::ExprPtr &arg : call_expr.args) {
