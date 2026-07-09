@@ -1,4 +1,4 @@
-static_library("vm") {
+static_library("bytecode") {
   sources = [
     "chunk.cc",
     "chunk.h",

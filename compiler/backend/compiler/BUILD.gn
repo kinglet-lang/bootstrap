@@ -14,7 +14,7 @@ static_library("compiler") {
     "//compiler/frontend/module",
     "//compiler/frontend/types",
     "//compiler/frontend/sema",
-    "//compiler/backend/vm",
+    "//compiler/backend/bytecode",
   ]
 
   include_dirs = [

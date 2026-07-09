@@ -8,7 +8,7 @@
 #include "ir/kir_recorder.h"
 #include "frontend/module/module_loader.h"
 #include "frontend/sema/semantic_context.h"
-#include "backend/vm/chunk.h"
+#include "backend/bytecode/chunk.h"
 
 #include <memory>
 #include <string>
