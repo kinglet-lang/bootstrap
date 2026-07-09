@@ -87,6 +87,16 @@ if [[ -n "$GN_EXTRA" ]]; then
   GN_ARGS="$GN_ARGS $GN_EXTRA"
 fi
 
+# Resolve version from the nearest git tag (v0.1.6 -> 0.1.6).
+# Respect an explicit kinglet_version= from --gn; if absent,
+# auto-detect so local dev builds show the correct version.
+if [[ "$GN_ARGS" != *kinglet_version=* ]]; then
+  if ver="$(git -C "$ROOT" describe --tags --abbrev=0 2>/dev/null)"; then
+    ver="${ver#v}"
+    GN_ARGS="$GN_ARGS kinglet_version=\"$ver\""
+  fi
+fi
+
 info "gn gen $OUT_DIR --args='$GN_ARGS'"
 eval gn gen "$OUT_DIR" --args="'$GN_ARGS'"
 
