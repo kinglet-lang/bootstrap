@@ -2999,6 +2999,11 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
     auto ufcs_ret = lookup_ufcs_free_method(field_callee->field_name, obj_type, call_expr.args,
                                             call_expr.location);
     if (ufcs_ret.has_value()) {
+      const std::string key = type_match_key(obj_type);
+      const ast::FunctionDecl *impl = find_free_function_for_type(field_callee->field_name, key);
+      if (impl && !impl->mangled_name.empty()) {
+        const_cast<ast::CallExpr &>(call_expr).resolved_mangled = impl->mangled_name;
+      }
       return *ufcs_ret;
     }
   }
