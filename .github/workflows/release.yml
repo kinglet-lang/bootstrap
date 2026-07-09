@@ -18,14 +18,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             artifact: kinglet-linux-x64
             llvm_target: X86
-            llvm_cache_key: llvm-22.1.0-linux-x64-ffs-v2
+            llvm_cache_key: llvm-22.1.0-linux-x64-ffs-v3
           - os: macos-latest
             artifact: kinglet-macos-arm64
             llvm_target: AArch64
-            llvm_cache_key: llvm-22.1.0-macos-arm64-ffs-v2
+            llvm_cache_key: llvm-22.1.0-macos-arm64-ffs-v3
 
     runs-on: ${{ matrix.os }}
 
@@ -128,6 +128,11 @@ jobs:
         shell: bash
         run: |
           echo "LLVM_CONFIG=$HOME/llvm-install/bin/llvm-config" >> "$GITHUB_ENV"
+
+      - name: Set macOS deployment target
+        shell: bash
+        if: runner.os == 'macOS'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=13.0" >> "$GITHUB_ENV"
 
       - name: Generate build files
         shell: bash
