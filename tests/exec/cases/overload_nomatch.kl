@@ -1,0 +1,10 @@
+// RUN: check
+// COMPILE-FAIL
+// CHECK-ERR: No matching overload
+
+int f(int x) { return x; }
+int f(string x) { return 0; }
+
+int main() {
+  return f(true);
+}

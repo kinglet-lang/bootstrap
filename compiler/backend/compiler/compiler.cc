@@ -158,6 +158,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
       int idx = static_cast<int>(function_infos_.size());
       function_infos_.push_back(FunctionInfo{
           .name = function->name,
+          .mangled_name = function->mangled_name,
           .entry = 0,
           .param_count = static_cast<int>(function->params.size()),
       });
@@ -170,6 +171,10 @@ CompileResult Compiler::compile(const ast::Program &program) {
         if (struct_indices_.count(receiver)) {
           function_indices_[receiver + "::" + function->name] = idx;
         }
+      }
+      // Register mangled overload name so dispatch finds the right entry.
+      if (!function->mangled_name.empty() && function->mangled_name != function->name) {
+        function_indices_[function->mangled_name] = idx;
       }
       functions.push_back(function);
       if (function->name == "main") {
@@ -377,7 +382,8 @@ void Compiler::attach_kir_metadata() {
     if (i < function_source_paths_.size()) {
       src = function_source_paths_[i];
     }
-    kir_module_.function_symbols.push_back(mangled_native_symbol(fn.name, src));
+    kir_module_.function_symbols.push_back(
+        mangled_native_symbol(fn.mangled_name.empty() ? fn.name : fn.mangled_name, src));
   }
   for (const EnumMeta &meta : enum_metas_) {
     KirEnumMeta km;
@@ -529,7 +535,9 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
     }
   }
 
-  const std::string &name = lookup_name.empty() ? function.name : lookup_name;
+  const std::string &name =
+      lookup_name.empty() ? (function.mangled_name.empty() ? function.name : function.mangled_name)
+                          : lookup_name;
   auto fn_it = function_indices_.find(name);
   const int func_idx = (fn_it != function_indices_.end()) ? fn_it->second : -1;
 
@@ -1536,7 +1544,11 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   // User-defined function call
   if (callee_id) {
     std::unordered_map<std::string, int>::const_iterator func_it = function_indices_.end();
-    if (!compiling_namespace_.empty()) {
+    // Try resolved overload mangled name (set by TypeChecker on the AST node).
+    if (!call_expr.resolved_mangled.empty()) {
+      func_it = function_indices_.find(call_expr.resolved_mangled);
+    }
+    if (func_it == function_indices_.end() && !compiling_namespace_.empty()) {
       func_it = function_indices_.find(compiling_namespace_ + "::" + callee_id->name);
     }
     if (func_it == function_indices_.end()) {

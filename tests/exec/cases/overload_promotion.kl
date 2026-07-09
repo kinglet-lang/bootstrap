@@ -1,0 +1,13 @@
+// RUN: run
+using io;
+
+int64 id(int64 x) { return x; }
+int64 id(int32 x) { return 100; }
+
+int main() {
+  int64 v64 = 42i64;
+  int32 v32 = 7i32;
+  io::out.line(id(v64));
+  io::out.line(id(v32));
+  return 0;
+}

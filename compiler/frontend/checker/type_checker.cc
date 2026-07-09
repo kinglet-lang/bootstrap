@@ -415,6 +415,37 @@ bool types_assignable(const Type &from, const Type &to) {
   return from.is_compatible_with(to);
 }
 
+// Exact type equality — same type_id() for scalars, same name for named types,
+// recursive element-type equality for containers.
+bool types_equal(const Type &a, const Type &b) {
+  if (a.nullable != b.nullable)
+    return false;
+  const TypeId aid = a.type_id();
+  const TypeId bid = b.type_id();
+  if (aid != bid)
+    return false;
+  // Named types: same struct/enum name
+  if (aid == TypeId::Struct || aid == TypeId::Enum)
+    return a.name == b.name;
+  // Containers: recursive element-type equality
+  if (aid == TypeId::Array) {
+    if (!a.element_type || !b.element_type)
+      return !a.element_type && !b.element_type;
+    return types_equal(*a.element_type, *b.element_type);
+  }
+  if (aid == TypeId::Map) {
+    if (!a.key_type || !b.key_type || !a.element_type || !b.element_type)
+      return !a.key_type && !b.key_type && !a.element_type && !b.element_type;
+    return types_equal(*a.key_type, *b.key_type) && types_equal(*a.element_type, *b.element_type);
+  }
+  return true; // scalars: type_id() match is sufficient
+}
+
+// Build the mangled function name: zero params → plain name, else name$T1$T2$...
+// Placed after type_to_string because it calls type_to_string.
+static std::string mangle_function_name(const std::string &name,
+                                        const std::vector<Type> &param_types);
+
 std::string type_to_string(const Type &type) {
   Type display = type;
   const bool nullable = display.nullable;
@@ -527,6 +558,103 @@ KirFunctionSig kir_sig_from(const Type &func_type) {
     sig.return_container = kir_container_from_surface_type(*func_type.return_type);
   }
   return sig;
+}
+
+// ── mangle_function_name (implementation — after type_to_string) ──────
+
+static std::string mangle_function_name(const std::string &name,
+                                        const std::vector<Type> &param_types) {
+  if (param_types.empty())
+    return name;
+  std::string result = name;
+  for (const auto &pt : param_types) {
+    result += "$" + type_to_string(pt);
+  }
+  return result;
+}
+
+// ── Overload resolution ─────────────────────────────────────────────────
+
+enum ConversionRank { Exact = 0, Promotion = 1, Conversion = 2, NotViable = 999 };
+
+static bool is_promotion(const Type &from, const Type &to) {
+  if (!types_assignable(from, to))
+    return false;
+  if (from.kind == TypeKind::Int && to.kind == TypeKind::Int) {
+    int fw = type_id_bit_width(from.type_id());
+    int tw = type_id_bit_width(to.type_id());
+    return fw > 0 && tw > fw;
+  }
+  if (from.kind == TypeKind::Float && to.kind == TypeKind::Float) {
+    int fw = type_id_bit_width(from.type_id());
+    int tw = type_id_bit_width(to.type_id());
+    return fw > 0 && tw > fw;
+  }
+  return false;
+}
+
+static ConversionRank compute_conversion_rank(const Type &from, const Type &to) {
+  if (types_equal(from, to))
+    return Exact;
+  if (is_promotion(from, to))
+    return Promotion;
+  if (types_assignable(from, to))
+    return Conversion;
+  return NotViable;
+}
+
+static bool is_better_match(const std::vector<ConversionRank> &r1,
+                            const std::vector<ConversionRank> &r2) {
+  bool any_better = false;
+  for (size_t i = 0; i < r1.size(); ++i) {
+    if (r1[i] > r2[i])
+      return false;
+    if (r1[i] < r2[i])
+      any_better = true;
+  }
+  return any_better;
+}
+
+static const OverloadEntry *resolve_overload(const OverloadSet &candidates,
+                                             const std::vector<Type> &arg_types,
+                                             std::vector<std::string> &errors_out) {
+  std::vector<std::pair<const OverloadEntry *, std::vector<ConversionRank>>> viable;
+  for (const auto &c : candidates) {
+    if (c.arity != static_cast<int>(arg_types.size()))
+      continue;
+    std::vector<ConversionRank> ranks(arg_types.size());
+    bool all_viable = true;
+    for (size_t i = 0; i < arg_types.size(); ++i) {
+      ranks[i] = compute_conversion_rank(arg_types[i], c.func_type.param_types[i]);
+      if (ranks[i] == NotViable) {
+        all_viable = false;
+        break;
+      }
+    }
+    if (all_viable)
+      viable.emplace_back(&c, std::move(ranks));
+  }
+  if (viable.empty()) {
+    errors_out.push_back("No matching overload.");
+    return nullptr;
+  }
+  if (viable.size() == 1)
+    return viable[0].first;
+  size_t best_idx = 0;
+  bool ambiguous = false;
+  for (size_t i = 1; i < viable.size(); ++i) {
+    if (is_better_match(viable[i].second, viable[best_idx].second)) {
+      best_idx = i;
+      ambiguous = false;
+    } else if (!is_better_match(viable[best_idx].second, viable[i].second)) {
+      ambiguous = true;
+    }
+  }
+  if (ambiguous) {
+    errors_out.push_back("Ambiguous call.");
+    return nullptr;
+  }
+  return viable[best_idx].first;
 }
 
 } // namespace
@@ -922,10 +1050,18 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         param_types.push_back(resolve_type_expr(param.type));
       }
       Type func_type(TypeKind::Function);
-      func_type.param_types = std::move(param_types);
+      func_type.param_types = param_types;
       func_type.return_type = std::make_unique<Type>(return_type);
+
+      std::string mangled = mangle_function_name(func->name, param_types);
+      const_cast<ast::FunctionDecl *>(func)->mangled_name = mangled;
+      sema_.function_overloads_[func->name].push_back(
+          {func_type, mangled, static_cast<int>(param_types.size())});
       declare_var(func->name, func_type, false);
-      kir_function_sigs_[func->name] = kir_sig_from(func_type);
+      kir_function_sigs_[mangled] = kir_sig_from(func_type);
+      if (mangled != func->name) {
+        kir_function_sigs_[func->name] = kir_function_sigs_[mangled];
+      }
       if (!func->params.empty()) {
         const std::string &receiver = func->params[0].type.name;
         auto st = type_registry_.find(receiver);
@@ -1304,7 +1440,12 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       bool changed = false;
       for (const ast::FunctionDecl *fn : auto_funcs) {
         Type inferred = infer_auto_return_type(*fn);
-        auto sig_it = kir_function_sigs_.find(fn->name);
+        std::vector<Type> fn_param_types;
+        for (const auto &param : fn->params) {
+          fn_param_types.push_back(resolve_type_expr(param.type));
+        }
+        std::string mangled = mangle_function_name(fn->name, fn_param_types);
+        auto sig_it = kir_function_sigs_.find(mangled);
         KirType new_kir = kir_type_from(inferred);
         if (sig_it != kir_function_sigs_.end() && sig_it->second.return_type == new_kir) {
           continue; // already stable
@@ -1529,7 +1670,12 @@ void TypeChecker::check_function(const ast::FunctionDecl &function) {
     }
     check_stmt(*function.body, return_type);
     if (function.return_type.name == "auto" && implicit_return_value_type_.kind != TypeKind::Void) {
-      kir_function_sigs_[function.name].return_type = kir_type_from(implicit_return_value_type_);
+      std::vector<Type> fn_params;
+      for (const auto &param : function.params) {
+        fn_params.push_back(resolve_type_expr(param.type));
+      }
+      kir_function_sigs_[mangle_function_name(function.name, fn_params)].return_type =
+          kir_type_from(implicit_return_value_type_);
     }
     implicit_return_stmt_ = nullptr;
     implicit_return_value_type_ = Type(TypeKind::Void);
@@ -2991,6 +3137,40 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
     }
   }
 
+  // Overload resolution: if multiple functions share this name, pick the
+  // best match by C++-style conversion ranking.
+  if (const auto *callee_id = dynamic_cast<const ast::IdentifierExpr *>(call_expr.callee.get())) {
+    auto ov_it = sema_.function_overloads_.find(callee_id->name);
+    if (ov_it != sema_.function_overloads_.end() && ov_it->second.size() > 1) {
+      std::vector<Type> arg_types;
+      arg_types.reserve(call_expr.args.size());
+      for (const auto &arg : call_expr.args)
+        arg_types.push_back(check_expr(*arg));
+      std::vector<std::string> errors;
+      const OverloadEntry *selected = resolve_overload(ov_it->second, arg_types, errors);
+      if (!selected) {
+        for (const auto &e : errors)
+          error_at(call_expr.location, e);
+        return int_type();
+      }
+      // Store the resolved mangled name on the AST node so the compiler
+      // can find the right function index without its own resolution pass.
+      const_cast<ast::CallExpr &>(call_expr).resolved_mangled = selected->mangled_name;
+      // Update the scope entry so the compiler sees the correct
+      // function type at this call site (the scope initially stores the
+      // first overload's type).
+      for (auto &scope : scopes_) {
+        auto vi = scope.find(callee_id->name);
+        if (vi != scope.end() && vi->second.type.kind == TypeKind::Function) {
+          vi->second.type = selected->func_type;
+          break;
+        }
+      }
+      release_call_argument_borrows(call_expr.args);
+      return selected->func_type.return_type ? *selected->func_type.return_type : void_type();
+    }
+  }
+
   Type callee_type = check_expr(*call_expr.callee);
   if (callee_type.kind != TypeKind::Function) {
     if (const auto *ns = dynamic_cast<const ast::NamespaceAccessExpr *>(call_expr.callee.get());
@@ -3709,7 +3889,13 @@ void TypeChecker::declare_var(const std::string &name, const Type &type, bool is
     return;
   }
   auto &scope = scopes_.back();
-  if (scope.find(name) != scope.end()) {
+  auto it = scope.find(name);
+  if (it != scope.end()) {
+    // Allow function overloads — the checker's call resolution will
+    // select the best match at each call site.
+    if (type.kind == TypeKind::Function && it->second.type.kind == TypeKind::Function) {
+      return; // silently accept; overload set already has both entries
+    }
     error_at(loc, "Variable '" + name + "' already declared.");
     return;
   }
