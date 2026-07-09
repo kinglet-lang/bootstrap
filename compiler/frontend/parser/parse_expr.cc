@@ -267,6 +267,9 @@ ast::ExprPtr Parser::unary() {
 
 ast::ExprPtr Parser::call() {
   ast::ExprPtr expr = primary();
+  if (!expr) {
+    return std::make_unique<ast::NullLiteralExpr>(location_of(previous()));
+  }
   if (has_completion())
     return expr;
   while (true) {

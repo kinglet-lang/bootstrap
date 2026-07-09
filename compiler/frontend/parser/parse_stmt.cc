@@ -162,7 +162,9 @@ ast::StmtPtr Parser::for_statement() {
     // var_declaration already consumes its own trailing semicolon
   } else if (!check(TokenType::SEMICOLON)) {
     ast::ExprPtr expr = expression();
-    init = std::make_unique<ast::ExprStmt>(expr->location, std::move(expr));
+    if (expr) {
+      init = std::make_unique<ast::ExprStmt>(expr->location, std::move(expr));
+    }
     consume(TokenType::SEMICOLON, "Expected ';' after for init.");
   } else {
     consume(TokenType::SEMICOLON, "Expected ';' after for init.");
@@ -179,7 +181,9 @@ ast::StmtPtr Parser::for_statement() {
   ast::StmtPtr step;
   if (!check(TokenType::RIGHT_PAREN)) {
     ast::ExprPtr step_expr = expression();
-    step = std::make_unique<ast::ExprStmt>(step_expr->location, std::move(step_expr));
+    if (step_expr) {
+      step = std::make_unique<ast::ExprStmt>(step_expr->location, std::move(step_expr));
+    }
   }
   consume(TokenType::RIGHT_PAREN, "Expected ')' after for clauses.");
 

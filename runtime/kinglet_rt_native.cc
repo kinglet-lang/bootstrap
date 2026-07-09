@@ -12,6 +12,8 @@
 #include <dirent.h>
 #include <termios.h>
 #include <unistd.h>
+#elif defined(_WIN32)
+#include <windows.h>
 #endif
 
 namespace {
@@ -230,6 +232,29 @@ kl_h kl_native_fs_listdir(kl_h path) {
     entries.push_back(kl_string_new(name, static_cast<int32_t>(std::strlen(name))));
   }
   closedir(handle);
+#elif defined(_WIN32)
+  // FindFirstFile requires a wildcard suffix to enumerate a directory.
+  std::string pattern = dir;
+  if (!pattern.empty() && pattern.back() != '\\' && pattern.back() != '/') {
+    pattern += '\\';
+  }
+  pattern += '*';
+
+  WIN32_FIND_DATAA ffd;
+  HANDLE hFind = FindFirstFileA(pattern.c_str(), &ffd);
+  if (hFind == INVALID_HANDLE_VALUE) {
+    return 0;
+  }
+  do {
+    const char *name = ffd.cFileName;
+    // Skip "." and ".." (same semantics as the POSIX implementation).
+    if (name[0] == '.' && name[1] == '\0')
+      continue;
+    if (name[0] == '.' && name[1] == '.' && name[2] == '\0')
+      continue;
+    entries.push_back(kl_string_new(name, static_cast<int32_t>(std::strlen(name))));
+  } while (FindNextFileA(hFind, &ffd));
+  FindClose(hFind);
 #endif
   return kl_array_new(static_cast<int32_t>(entries.size()), entries.data());
 }

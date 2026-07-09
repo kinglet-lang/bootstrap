@@ -85,6 +85,9 @@ ast::StmtPtr Parser::function_body() {
     if (has_completion())
       return nullptr;
     consume(TokenType::SEMICOLON, "Expected ';' after expression body.");
+    if (!value) {
+      return std::make_unique<ast::ReturnStmt>(location_of(previous()), nullptr);
+    }
     const ast::SourceLocation location = value->location;
     return std::make_unique<ast::ReturnStmt>(location, std::move(value));
   }
