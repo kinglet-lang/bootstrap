@@ -336,6 +336,10 @@ struct CallExpr final : Expr {
   ExprPtr callee;
   std::vector<TypeExpr> type_args;
   std::vector<ExprPtr> args;
+  // Set by TypeChecker during overload resolution; empty when the callee
+  // is not overloaded. The Compiler uses this to pick the right function
+  // index without needing its own resolution pass.
+  std::string resolved_mangled;
 };
 
 // Pipeline operator: `left |> right` (right is invoked with left as the first argument).
@@ -577,6 +581,10 @@ struct FunctionDecl final : Decl {
   std::vector<Parameter> params;
   StmtPtr body;
   bool is_public = false;
+  // Mangled name for overloaded functions (populated by TypeChecker pass 1).
+  // Empty until the checker assigns it; the compiler falls back to plain name
+  // when empty.
+  std::string mangled_name;
 };
 
 struct ImportDecl final : Decl {

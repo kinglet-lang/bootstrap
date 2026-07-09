@@ -130,6 +130,7 @@ struct Instruction {
 
 struct FunctionInfo {
   std::string name;
+  std::string mangled_name;
   std::size_t entry = 0;
   int param_count = 0;
 };

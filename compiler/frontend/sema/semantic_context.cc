@@ -23,6 +23,7 @@ void SemanticContext::clear() {
   generic_functions_.clear();
   concept_generic_functions_.clear();
   concept_registry_.clear();
+  function_overloads_.clear();
 }
 
 } // namespace kinglet

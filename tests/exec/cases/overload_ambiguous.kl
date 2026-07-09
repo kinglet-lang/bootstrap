@@ -1,0 +1,10 @@
+// RUN: check
+// COMPILE-FAIL
+// CHECK-ERR: Ambiguous call
+
+int f(int x) { return x; }
+int f(int y) { return y + 1; }
+
+int main() {
+  return f(1);
+}
