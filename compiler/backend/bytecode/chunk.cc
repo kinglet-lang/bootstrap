@@ -1,4 +1,4 @@
-#include "backend/vm/chunk.h"
+#include "backend/bytecode/chunk.h"
 
 #include <cstring>
 #include <ostream>

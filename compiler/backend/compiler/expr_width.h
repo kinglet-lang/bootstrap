@@ -4,7 +4,7 @@
 #pragma once
 
 #include "frontend/ast/ast.h"
-#include "backend/vm/chunk.h"
+#include "backend/bytecode/chunk.h"
 
 #include <string>
 #include <unordered_map>

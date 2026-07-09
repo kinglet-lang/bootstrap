@@ -21,7 +21,7 @@ static_library("ir") {
   deps = [
     "//compiler/frontend/ast",
     "//compiler/frontend/types",
-    "//compiler/backend/vm",
+    "//compiler/backend/bytecode",
   ]
 
   include_dirs = [

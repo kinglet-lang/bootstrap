@@ -1,6 +1,6 @@
 #pragma once
 
-#include "backend/vm/value.h"
+#include "backend/bytecode/value.h"
 
 #include <cstdint>
 #include <ostream>

@@ -38,7 +38,7 @@ User-facing CLI: `driver/kinglet/` — `cli_driver` dispatches subcommands to
 | `driver/preen/` | driver | `kinglet::preen` formatter (`format_string`, extensions, `[fmt]` config) |
 | `ir/` | ir | KIR structs, recorder, typing/specialize passes |
 | `backend/compiler/` | backend | AST→KIR compiler, split into per-concern files (`compile_call`, `compile_binary`, …) |
-| `backend/vm/` | backend | `Chunk` opcode/metadata types, RC/COW `Value` (execution backend removed) |
+| `backend/bytecode/` | backend | bytecode IR types — `Chunk`, `OpCode`, RC/COW `Value` (execution backend removed) |
 | `backend/codegen/llvm/` | backend | `KirToLlvm` — optional (`enable_llvm=true`), split into `llvm_function_lowerer` + helpers |
 | `driver/kinglet/` | driver | `main.cc`, `cli_driver` (dispatch), `cli_ui`, `cli_spawn`, `cmd_{init,build,run,prune,fmt}` |
 
@@ -53,20 +53,19 @@ frontend/lexer → frontend/parser
 frontend/ast + frontend/lexer + frontend/parser → frontend/module
 frontend/ast + frontend/lexer + frontend/parser + frontend/module → driver/preen
 frontend/ast + frontend/types + frontend/sema + frontend/module + ir → frontend/checker
-frontend/ast + frontend/types + frontend/sema + backend/vm + frontend/module + ir → backend/compiler
-frontend/ast + frontend/types + backend/vm → ir
+frontend/ast + frontend/types + frontend/sema + backend/bytecode + frontend/module + ir → backend/compiler
+frontend/ast + frontend/types + backend/bytecode → ir
 ir → backend/codegen/llvm (optional)
 ```
 
-Note: `backend/vm/` retains type and opcode definitions used during bootstrap
+Note: `backend/bytecode/` retains type and opcode definitions used during bootstrap
 (RC/COW `Value`, `Chunk` metadata); the execution backend has been removed.
 
 ## Binaries (`//BUILD.gn`)
 
 | Target | Output | Deps (summary) |
 |--------|--------|----------------|
-| `kinglet` | `kinglet` | Full frontend + compiler + vm; + llvm + rt when enabled |
-| `kinglet-vm` | `kinglet-vm` | `backend/vm` only |
+| `kinglet` | `kinglet` | Full frontend + compiler + bytecode; + llvm + rt when enabled |
 | `kinglet_rt` | `libkinglet_rt.a` | `runtime/` |
 
 ## Tests
