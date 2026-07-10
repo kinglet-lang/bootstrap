@@ -4,7 +4,6 @@
 #pragma once
 
 #include "frontend/ast/ast.h"
-#include "backend/bytecode/chunk.h"
 
 namespace kinglet {
 

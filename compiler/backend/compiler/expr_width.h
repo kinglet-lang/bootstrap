@@ -4,7 +4,7 @@
 #pragma once
 
 #include "frontend/ast/ast.h"
-#include "backend/bytecode/chunk.h"
+#include "ir/lowering_opcode.h"
 
 #include <string>
 #include <unordered_map>

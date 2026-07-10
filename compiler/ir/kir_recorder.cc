@@ -4,7 +4,7 @@
 #include "ir/kir_recorder.h"
 
 #include "ir/kir_numeric.h"
-#include "backend/bytecode/chunk.h"
+#include "ir/lowering_opcode.h"
 
 #include <cstring>
 

@@ -5,8 +5,8 @@
 
 #include "frontend/ast/ast.h"
 #include "ir/kir.h"
-#include "backend/bytecode/chunk.h"
-#include "backend/bytecode/value.h"
+#include "ir/lowering_opcode.h"
+#include "ir/lowering_value.h"
 
 namespace kinglet {
 
