@@ -67,36 +67,36 @@ std::string infer_expr_type_name(const ast::Expr &expr,
   return {};
 }
 
-OpCode width_arithmetic_opcode(ast::BinaryOp op, const std::string &width_name) {
+LoweringOp width_arithmetic_opcode(ast::BinaryOp op, const std::string &width_name) {
   if (width_name == "int32") {
     switch (op) {
     case ast::BinaryOp::Add:
-      return OpCode::AddI32;
+      return LoweringOp::AddI32;
     case ast::BinaryOp::Sub:
-      return OpCode::SubtractI32;
+      return LoweringOp::SubtractI32;
     case ast::BinaryOp::Mul:
-      return OpCode::MultiplyI32;
+      return LoweringOp::MultiplyI32;
     case ast::BinaryOp::Div:
-      return OpCode::DivideI32;
+      return LoweringOp::DivideI32;
     case ast::BinaryOp::Mod:
-      return OpCode::ModuloI32;
+      return LoweringOp::ModuloI32;
     default:
       break;
     }
   }
   switch (op) {
   case ast::BinaryOp::Add:
-    return OpCode::Add;
+    return LoweringOp::Add;
   case ast::BinaryOp::Sub:
-    return OpCode::Subtract;
+    return LoweringOp::Subtract;
   case ast::BinaryOp::Mul:
-    return OpCode::Multiply;
+    return LoweringOp::Multiply;
   case ast::BinaryOp::Div:
-    return OpCode::Divide;
+    return LoweringOp::Divide;
   case ast::BinaryOp::Mod:
-    return OpCode::Modulo;
+    return LoweringOp::Modulo;
   default:
-    return OpCode::Add;
+    return LoweringOp::Add;
   }
 }
 

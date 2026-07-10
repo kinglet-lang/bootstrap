@@ -13,7 +13,7 @@ namespace kinglet {
 
 // Builds structured KIR from a narrow AST subset (literals and int arithmetic).
 // Used as a fast path for simple single-expression functions, bypassing the
-// full OpCode → KirRecorder → KirModule pipeline.
+// full LoweringOp → KirRecorder → KirModule pipeline.
 class IrBuilder {
 public:
   std::optional<KirFunction> build_expr_function(const std::string &name,

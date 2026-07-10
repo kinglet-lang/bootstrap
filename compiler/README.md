@@ -57,8 +57,8 @@ frontend/ast + frontend/types → ir
 ir → backend/codegen/llvm (optional)
 ```
 
-Note: the lowering vocabulary (`OpCode`, RC/COW `Value`, `FunctionInfo`/`StructMeta`/`EnumMeta`)
-lives in `ir/lowering_opcode.h` / `ir/lowering_value.h` / `ir/lowering_metadata.h`. It originated
+Note: the lowering vocabulary (`LoweringOp`, RC/COW `Value`, `FunctionInfo`/`StructMeta`/`EnumMeta`)
+lives in `ir/lowering_op.h` / `ir/lowering_value.h` / `ir/lowering_metadata.h`. It originated
 as bytecode-VM types but is now load-bearing for AST→KIR lowering (`Compiler::emit`,
 `KirRecorder::on_emit`/`on_constant`). The bytecode execution backend has been removed.
 

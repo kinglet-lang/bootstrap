@@ -5,12 +5,12 @@
 
 #include "frontend/ast/ast.h"
 #include "ir/kir.h"
-#include "ir/lowering_opcode.h"
+#include "ir/lowering_op.h"
 #include "ir/lowering_value.h"
 
 namespace kinglet {
 
-// Translates OpCode emission events into structured KIR during compilation.
+// Translates LoweringOp emission events into structured KIR during compilation.
 // Compiler calls on_emit() / on_constant() / record_jump() as it walks the AST;
 // KirRecorder accumulates KirInstr nodes and finalises a KirFunction on end_function().
 class KirRecorder {
@@ -19,11 +19,11 @@ public:
                       const std::string &mangled_name = "");
   void end_function(KirModule *module);
 
-  void on_emit(OpCode op, uint32_t operand, ast::SourceLocation location);
+  void on_emit(LoweringOp op, uint32_t operand, ast::SourceLocation location);
   void on_constant(const Value &value, uint32_t pool_index, ast::SourceLocation location,
                    KirType numeric_type = KirType::Any);
 
-  std::size_t record_jump(OpCode op, ast::SourceLocation location);
+  std::size_t record_jump(LoweringOp op, ast::SourceLocation location);
   void patch_jump(std::size_t jump_instr_index, int32_t relative_offset);
   void patch_operand(std::size_t instr_index, int32_t operand);
   std::size_t instr_count() const;
