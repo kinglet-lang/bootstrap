@@ -1,6 +1,8 @@
 #pragma once
 
-#include "backend/bytecode/value.h"
+#include "ir/lowering_opcode.h"
+#include "ir/lowering_value.h"
+#include "ir/lowering_metadata.h"
 
 #include <cstdint>
 #include <ostream>
@@ -9,141 +11,11 @@
 
 namespace kinglet {
 
-inline uint32_t pack_dense2d_shape(int rows, int cols) {
-  return (static_cast<uint32_t>(rows) << 16) | (static_cast<uint32_t>(cols) & 0xFFFFu);
-}
-
-inline void unpack_dense2d_shape(uint32_t packed, int *rows, int *cols) {
-  *rows = static_cast<int>(packed >> 16);
-  *cols = static_cast<int>(packed & 0xFFFFu);
-}
-
-enum class OpCode : uint8_t {
-  Constant,
-  Null,
-  True,
-  False,
-  Add,
-  Subtract,
-  Multiply,
-  Divide,
-  Modulo,
-  Negate,
-  Not,
-  BitNot,
-  BitAnd,
-  BitOr,
-  BitXor,
-  Shl,
-  Shr,
-  LoadLocal,
-  LoadLocalAddr,
-  DerefLoad,
-  DerefStore,
-  StoreLocal,
-  Pop,
-  Dup,
-  CastTo,
-  FloatToBits,
-  BitsToFloat,
-  Call,
-  Return,
-  Jmp,
-  JmpFalse,
-  JmpIfErr,
-  Eq,
-  Neq,
-  Lt,
-  Gt,
-  Le,
-  Ge,
-  NativeOut,
-  NativeOutLn,
-  NativeErr,
-  NativeErrLn,
-  NativeIn,
-  NativeInSecret,
-  NativeFsRead,
-  NativeFsWrite,
-  NativeFsListdir,
-  NativeSysArgs,
-  StructNew,
-  BorrowFieldMut,
-  FieldGet,
-  FieldSet,
-  EnumVariant,
-  ArrayNew,
-  IndexGet,
-  IndexSet,
-  ArrayLen,
-  ArrayPush,
-  ArrayResize,
-  ArrayPop,
-  ArrayRemove,
-  ArrayContains,
-  ArrayClear,
-  ArrayInsert,
-  ArrayIndexOf,
-  ArraySlice,
-  ArrayReverse,
-  StringStartsWith,
-  StringEndsWith,
-  StringReplace,
-  StringSplit,
-  StringTrim,
-  StringToUpper,
-  StringToLower,
-  EnumVariantPayload,
-  EnumPayloadGet,
-  MapNew,
-  MapGet,
-  MapSet,
-  MapHas,
-  MapRemove,
-  MapKeys,
-  MapLen,
-  PushHandler,
-  PopHandler,
-  PropagateErr,
-  IsNull,
-  // New opcodes must be appended here, never inserted mid-enum: KirRecorder's
-  // on_emit() switch maps OpCode ordinals to KirOpcode, so a mid-enum insert
-  // would silently mismap every opcode that follows.
-  StringToInt,
-  StringToFloat,
-  StringCode,
-  StringCodeAt,
-  AddI32,
-  SubtractI32,
-  MultiplyI32,
-  DivideI32,
-  ModuloI32,
-  DenseArrayNew,
-};
-
 struct Instruction {
   OpCode op;
   int32_t operand = 0;
   int line = 0;
   int column = 0;
-};
-
-struct FunctionInfo {
-  std::string name;
-  std::string mangled_name;
-  std::size_t entry = 0;
-  int param_count = 0;
-};
-
-struct StructMeta {
-  std::string name;
-  std::vector<std::string> field_names;
-};
-
-struct EnumMeta {
-  std::string name;
-  std::vector<std::string> variants;
-  std::vector<int> variant_param_counts;
 };
 
 class Chunk {
@@ -172,7 +44,5 @@ private:
   std::vector<StructMeta> struct_metas_;
   std::vector<EnumMeta> enum_metas_;
 };
-
-const char *opcode_name(OpCode op);
 
 } // namespace kinglet

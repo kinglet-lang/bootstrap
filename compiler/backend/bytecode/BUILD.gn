@@ -6,6 +6,10 @@ static_library("bytecode") {
     "value.h",
   ]
 
+  deps = [
+    "//compiler/ir",
+  ]
+
   include_dirs = [
     "//compiler",
   ]

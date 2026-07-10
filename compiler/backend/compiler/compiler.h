@@ -8,7 +8,9 @@
 #include "ir/kir_recorder.h"
 #include "frontend/module/module_loader.h"
 #include "frontend/sema/semantic_context.h"
-#include "backend/bytecode/chunk.h"
+#include "ir/lowering_opcode.h"
+#include "ir/lowering_value.h"
+#include "ir/lowering_metadata.h"
 
 #include <memory>
 #include <string>

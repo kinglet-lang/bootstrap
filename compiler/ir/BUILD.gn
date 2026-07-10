@@ -16,12 +16,16 @@ static_library("ir") {
     "kir_specialize.h",
     "kir_field_resolve.cc",
     "kir_field_resolve.h",
+    "lowering_opcode.cc",
+    "lowering_opcode.h",
+    "lowering_value.cc",
+    "lowering_value.h",
+    "lowering_metadata.h",
   ]
 
   deps = [
     "//compiler/frontend/ast",
     "//compiler/frontend/types",
-    "//compiler/backend/bytecode",
   ]
 
   include_dirs = [
