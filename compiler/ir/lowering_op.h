@@ -16,7 +16,7 @@ inline void unpack_dense2d_shape(uint32_t packed, int *rows, int *cols) {
   *cols = static_cast<int>(packed & 0xFFFFu);
 }
 
-enum class OpCode : uint8_t {
+enum class LoweringOp : uint8_t {
   Constant,
   Null,
   True,
@@ -104,9 +104,9 @@ enum class OpCode : uint8_t {
   PopHandler,
   PropagateErr,
   IsNull,
-  // New opcodes must be appended here, never inserted mid-enum: KirRecorder's
-  // on_emit() switch maps OpCode ordinals to KirOpcode, so a mid-enum insert
-  // would silently mismap every opcode that follows.
+  // New lowering ops must be appended here, never inserted mid-enum: KirRecorder's
+  // on_emit() switch maps LoweringOp ordinals to KirOpcode, so a mid-enum insert
+  // would silently mismap every lowering op that follows.
   StringToInt,
   StringToFloat,
   StringCode,
@@ -119,6 +119,6 @@ enum class OpCode : uint8_t {
   DenseArrayNew,
 };
 
-const char *opcode_name(OpCode op);
+const char *lowering_op_name(LoweringOp op);
 
 } // namespace kinglet

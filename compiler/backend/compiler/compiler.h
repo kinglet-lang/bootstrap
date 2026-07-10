@@ -8,7 +8,7 @@
 #include "ir/kir_recorder.h"
 #include "frontend/module/module_loader.h"
 #include "frontend/sema/semantic_context.h"
-#include "ir/lowering_opcode.h"
+#include "ir/lowering_op.h"
 #include "ir/lowering_value.h"
 #include "ir/lowering_metadata.h"
 
@@ -130,10 +130,10 @@ private:
   // silently no-oping like the fallbacks above.
   void visit(const ast::CompletionMarkerExpr &) override;
 
-  void emit(OpCode op, ast::SourceLocation location);
-  void emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location);
+  void emit(LoweringOp op, ast::SourceLocation location);
+  void emit_operand(LoweringOp op, uint32_t operand, ast::SourceLocation location);
   void emit_constant(Value value, ast::SourceLocation location, KirType numeric_type = KirType::Any);
-  std::size_t emit_jump(OpCode op, ast::SourceLocation location);
+  std::size_t emit_jump(LoweringOp op, ast::SourceLocation location);
   void patch_jump(std::size_t offset);
   void patch_jump_to(std::size_t offset, std::size_t target);
   int resolve_local(const std::string &name) const;

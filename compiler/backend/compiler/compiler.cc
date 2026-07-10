@@ -192,8 +192,8 @@ CompileResult Compiler::compile(const ast::Program &program) {
   // Emit preamble: call main, then return its result
   ast::SourceLocation preamble_loc{1, 0};
   emit_constant(Value::function_value(main_index), preamble_loc);
-  emit_operand(OpCode::Call, 0, preamble_loc);
-  emit(OpCode::Return, preamble_loc);
+  emit_operand(LoweringOp::Call, 0, preamble_loc);
+  emit(LoweringOp::Return, preamble_loc);
 
   // Pass 2: compile each function body
   for (const auto *function : functions) {
@@ -595,8 +595,8 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
 
   // Fallthrough safety: implicit null return
   if (errors_.empty() && !body_returned) {
-    emit(OpCode::Null, function.location);
-    emit(OpCode::Return, function.location);
+    emit(LoweringOp::Null, function.location);
+    emit(LoweringOp::Return, function.location);
   }
   kir_recorder_.end_function(&kir_module_);
   compiling_namespace_ = prev_compiling_ns;
@@ -625,9 +625,9 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     if (return_stmt->value) {
       compile_expr(*return_stmt->value);
     } else {
-      emit(OpCode::Null, return_stmt->location);
+      emit(LoweringOp::Null, return_stmt->location);
     }
-    emit(OpCode::Return, return_stmt->location);
+    emit(LoweringOp::Return, return_stmt->location);
     return;
   }
 
@@ -652,10 +652,10 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     if (var_decl->init) {
       compile_expr(*var_decl->init);
     } else {
-      emit(OpCode::Null, var_decl->location);
+      emit(LoweringOp::Null, var_decl->location);
     }
-    emit_operand(OpCode::StoreLocal, slot, var_decl->location);
-    emit(OpCode::Pop, var_decl->location);
+    emit_operand(LoweringOp::StoreLocal, slot, var_decl->location);
+    emit(LoweringOp::Pop, var_decl->location);
     return;
   }
 
@@ -663,29 +663,29 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     compile_expr(*unpack->init);
     uint32_t arr_slot = static_cast<uint32_t>(locals_.size());
     locals_.push_back(Local{.name = "$unpack_tmp", .is_mutable = false});
-    emit_operand(OpCode::StoreLocal, arr_slot, unpack->location);
-    emit(OpCode::Pop, unpack->location);
+    emit_operand(LoweringOp::StoreLocal, arr_slot, unpack->location);
+    emit(LoweringOp::Pop, unpack->location);
 
     for (std::size_t i = 0; i < unpack->names.size(); ++i) {
       uint32_t slot = static_cast<uint32_t>(locals_.size());
       locals_.push_back(Local{.name = unpack->names[i], .is_mutable = true});
-      emit_operand(OpCode::LoadLocal, arr_slot, unpack->location);
+      emit_operand(LoweringOp::LoadLocal, arr_slot, unpack->location);
       emit_constant(Value::int_value(static_cast<int64_t>(i)), unpack->location);
-      emit(OpCode::IndexGet, unpack->location);
-      emit_operand(OpCode::StoreLocal, slot, unpack->location);
-      emit(OpCode::Pop, unpack->location);
+      emit(LoweringOp::IndexGet, unpack->location);
+      emit_operand(LoweringOp::StoreLocal, slot, unpack->location);
+      emit(LoweringOp::Pop, unpack->location);
     }
 
     if (!unpack->rest_name.empty()) {
       uint32_t slot = static_cast<uint32_t>(locals_.size());
       locals_.push_back(Local{.name = unpack->rest_name, .is_mutable = true});
-      emit_operand(OpCode::LoadLocal, arr_slot, unpack->location);
+      emit_operand(LoweringOp::LoadLocal, arr_slot, unpack->location);
       emit_constant(Value::int_value(static_cast<int64_t>(unpack->names.size())), unpack->location);
-      emit_operand(OpCode::LoadLocal, arr_slot, unpack->location);
-      emit(OpCode::ArrayLen, unpack->location);
-      emit(OpCode::ArraySlice, unpack->location);
-      emit_operand(OpCode::StoreLocal, slot, unpack->location);
-      emit(OpCode::Pop, unpack->location);
+      emit_operand(LoweringOp::LoadLocal, arr_slot, unpack->location);
+      emit(LoweringOp::ArrayLen, unpack->location);
+      emit(LoweringOp::ArraySlice, unpack->location);
+      emit_operand(LoweringOp::StoreLocal, slot, unpack->location);
+      emit(LoweringOp::Pop, unpack->location);
     }
     return;
   }
@@ -693,19 +693,19 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
   if (const auto *expr_stmt = dynamic_cast<const ast::ExprStmt *>(&stmt)) {
     compile_expr(*expr_stmt->expr);
     if (expr_stmt == implicit_return_stmt_) {
-      emit(OpCode::Return, expr_stmt->location);
+      emit(LoweringOp::Return, expr_stmt->location);
     } else {
-      emit(OpCode::Pop, expr_stmt->location);
+      emit(LoweringOp::Pop, expr_stmt->location);
     }
     return;
   }
 
   if (const auto *if_stmt = dynamic_cast<const ast::IfStmt *>(&stmt)) {
     compile_expr(*if_stmt->condition);
-    const std::size_t then_jump = emit_jump(OpCode::JmpFalse, if_stmt->location);
+    const std::size_t then_jump = emit_jump(LoweringOp::JmpFalse, if_stmt->location);
     compile_stmt(*if_stmt->then_branch);
     if (if_stmt->else_branch) {
-      const std::size_t else_jump = emit_jump(OpCode::Jmp, if_stmt->location);
+      const std::size_t else_jump = emit_jump(LoweringOp::Jmp, if_stmt->location);
       patch_jump(then_jump);
       compile_stmt(*if_stmt->else_branch);
       patch_jump(else_jump);
@@ -717,8 +717,8 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
 
   if (const auto *guard_stmt = dynamic_cast<const ast::GuardStmt *>(&stmt)) {
     compile_expr(*guard_stmt->condition);
-    const std::size_t else_jump = emit_jump(OpCode::JmpFalse, guard_stmt->location);
-    const std::size_t skip_jump = emit_jump(OpCode::Jmp, guard_stmt->location);
+    const std::size_t else_jump = emit_jump(LoweringOp::JmpFalse, guard_stmt->location);
+    const std::size_t skip_jump = emit_jump(LoweringOp::Jmp, guard_stmt->location);
     patch_jump(else_jump);
     compile_stmt(*guard_stmt->else_body);
     patch_jump(skip_jump);
@@ -730,9 +730,9 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
 
     const std::size_t loop_start = kir_recorder_.instr_count();
     compile_expr(*while_stmt->condition);
-    loop_stack_.back().break_jumps.push_back(emit_jump(OpCode::JmpFalse, while_stmt->location));
+    loop_stack_.back().break_jumps.push_back(emit_jump(LoweringOp::JmpFalse, while_stmt->location));
     compile_stmt(*while_stmt->body);
-    const std::size_t loop_jump = emit_jump(OpCode::Jmp, while_stmt->location);
+    const std::size_t loop_jump = emit_jump(LoweringOp::Jmp, while_stmt->location);
     patch_jump_to(loop_jump, loop_start);
 
     for (std::size_t jump : loop_stack_.back().break_jumps) {
@@ -756,7 +756,7 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     const std::size_t loop_start = kir_recorder_.instr_count();
     if (for_stmt->condition) {
       compile_expr(*for_stmt->condition);
-      loop_stack_.back().break_jumps.push_back(emit_jump(OpCode::JmpFalse, for_stmt->location));
+      loop_stack_.back().break_jumps.push_back(emit_jump(LoweringOp::JmpFalse, for_stmt->location));
     }
     compile_stmt(*for_stmt->body);
 
@@ -769,7 +769,7 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       compile_stmt(*for_stmt->step);
     }
 
-    const std::size_t loop_jump = emit_jump(OpCode::Jmp, for_stmt->location);
+    const std::size_t loop_jump = emit_jump(LoweringOp::Jmp, for_stmt->location);
     patch_jump_to(loop_jump, loop_start);
 
     for (std::size_t jump : loop_stack_.back().break_jumps) {
@@ -785,7 +785,7 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       error_at(stmt.location, "break must be inside a loop.");
       return;
     }
-    const std::size_t jump = emit_jump(OpCode::Jmp, stmt.location);
+    const std::size_t jump = emit_jump(LoweringOp::Jmp, stmt.location);
     loop_stack_.back().break_jumps.push_back(jump);
     return;
   }
@@ -795,7 +795,7 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       error_at(stmt.location, "continue must be inside a loop.");
       return;
     }
-    const std::size_t jump = emit_jump(OpCode::Jmp, stmt.location);
+    const std::size_t jump = emit_jump(LoweringOp::Jmp, stmt.location);
     loop_stack_.back().continue_jumps.push_back(jump);
     return;
   }
@@ -816,7 +816,7 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
 
     // Placeholder PushHandler — patch operand after we know catch_pc.
     const std::size_t handler_idx = kir_recorder_.instr_count();
-    emit_operand(OpCode::PushHandler, 0, stmt.location);
+    emit_operand(LoweringOp::PushHandler, 0, stmt.location);
 
     // Compile try body — `?` inside will generate JmpIfErr whose target
     // is the catch stub (see PropagateExpr).
@@ -825,8 +825,8 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     compile_stmt(*try_catch->body);
     in_try_ = prev_in_try;
 
-    emit(OpCode::PopHandler, stmt.location);
-    const std::size_t end_jump = emit_jump(OpCode::Jmp, stmt.location);
+    emit(LoweringOp::PopHandler, stmt.location);
+    const std::size_t end_jump = emit_jump(LoweringOp::Jmp, stmt.location);
 
     // --- catch landing pad ---
     const std::size_t catch_pc = kir_recorder_.instr_count();
@@ -846,7 +846,7 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       const ast::CatchArm &arm = try_catch->catches[0];
       const uint32_t err_slot = static_cast<uint32_t>(locals_.size());
       locals_.push_back(Local{.name = arm.binding_name, .is_mutable = false});
-      emit_operand(OpCode::StoreLocal, err_slot, stmt.location);
+      emit_operand(LoweringOp::StoreLocal, err_slot, stmt.location);
       compile_stmt(*arm.body);
       locals_.pop_back();
     }
@@ -923,11 +923,11 @@ void Compiler::compile_string_literal(const ast::StringLiteralExpr &string_lit) 
 
 void Compiler::compile_bool_literal(const ast::BoolLiteralExpr &bool_lit) {
 
-  emit(bool_lit.value ? OpCode::True : OpCode::False, bool_lit.location);
+  emit(bool_lit.value ? LoweringOp::True : LoweringOp::False, bool_lit.location);
   return;
 }
 void Compiler::compile_null_literal(const ast::NullLiteralExpr &null_lit) {
-  emit(OpCode::Null, null_lit.location);
+  emit(LoweringOp::Null, null_lit.location);
 }
 
 void Compiler::compile_unary(const ast::UnaryExpr &unary) {
@@ -935,13 +935,13 @@ void Compiler::compile_unary(const ast::UnaryExpr &unary) {
   compile_expr(*unary.right);
   switch (unary.op) {
   case ast::UnaryOp::Neg:
-    emit(OpCode::Negate, unary.location);
+    emit(LoweringOp::Negate, unary.location);
     break;
   case ast::UnaryOp::Not:
-    emit(OpCode::Not, unary.location);
+    emit(LoweringOp::Not, unary.location);
     break;
   case ast::UnaryOp::BitNot:
-    emit(OpCode::BitNot, unary.location);
+    emit(LoweringOp::BitNot, unary.location);
     break;
   case ast::UnaryOp::Ref:
   case ast::UnaryOp::MutRef:
@@ -966,9 +966,9 @@ void Compiler::compile_identifier(const ast::IdentifierExpr &identifier) {
     error_at(identifier.location, "Use of undeclared variable '" + identifier.name + "'.");
     return;
   }
-  emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), identifier.location);
+  emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(slot), identifier.location);
   if (local_is_ref(slot)) {
-    emit(OpCode::DerefLoad, identifier.location);
+    emit(LoweringOp::DerefLoad, identifier.location);
   }
   return;
 }
@@ -983,19 +983,19 @@ void Compiler::compile_binary(const ast::BinaryExpr &binary) {
 
   if (binary.op == ast::BinaryOp::And) {
     compile_expr(*binary.left);
-    std::size_t false_jump = emit_jump(OpCode::JmpFalse, binary.location);
+    std::size_t false_jump = emit_jump(LoweringOp::JmpFalse, binary.location);
     compile_expr(*binary.right);
-    std::size_t end_jump = emit_jump(OpCode::Jmp, binary.location);
+    std::size_t end_jump = emit_jump(LoweringOp::Jmp, binary.location);
     patch_jump(false_jump);
-    emit(OpCode::False, binary.location);
+    emit(LoweringOp::False, binary.location);
     patch_jump(end_jump);
     return;
   }
   if (binary.op == ast::BinaryOp::Or) {
     compile_expr(*binary.left);
-    std::size_t false_jump = emit_jump(OpCode::JmpFalse, binary.location);
-    emit(OpCode::True, binary.location);
-    std::size_t end_jump = emit_jump(OpCode::Jmp, binary.location);
+    std::size_t false_jump = emit_jump(LoweringOp::JmpFalse, binary.location);
+    emit(LoweringOp::True, binary.location);
+    std::size_t end_jump = emit_jump(LoweringOp::Jmp, binary.location);
     patch_jump(false_jump);
     compile_expr(*binary.right);
     patch_jump(end_jump);
@@ -1013,37 +1013,37 @@ void Compiler::compile_binary(const ast::BinaryExpr &binary) {
     emit(width_arithmetic_opcode(binary.op, width), binary.location);
     break;
   case ast::BinaryOp::Eq:
-    emit(OpCode::Eq, binary.location);
+    emit(LoweringOp::Eq, binary.location);
     break;
   case ast::BinaryOp::Neq:
-    emit(OpCode::Neq, binary.location);
+    emit(LoweringOp::Neq, binary.location);
     break;
   case ast::BinaryOp::Lt:
-    emit(OpCode::Lt, binary.location);
+    emit(LoweringOp::Lt, binary.location);
     break;
   case ast::BinaryOp::Gt:
-    emit(OpCode::Gt, binary.location);
+    emit(LoweringOp::Gt, binary.location);
     break;
   case ast::BinaryOp::Le:
-    emit(OpCode::Le, binary.location);
+    emit(LoweringOp::Le, binary.location);
     break;
   case ast::BinaryOp::Ge:
-    emit(OpCode::Ge, binary.location);
+    emit(LoweringOp::Ge, binary.location);
     break;
   case ast::BinaryOp::BitAnd:
-    emit(OpCode::BitAnd, binary.location);
+    emit(LoweringOp::BitAnd, binary.location);
     break;
   case ast::BinaryOp::BitOr:
-    emit(OpCode::BitOr, binary.location);
+    emit(LoweringOp::BitOr, binary.location);
     break;
   case ast::BinaryOp::BitXor:
-    emit(OpCode::BitXor, binary.location);
+    emit(LoweringOp::BitXor, binary.location);
     break;
   case ast::BinaryOp::Shl:
-    emit(OpCode::Shl, binary.location);
+    emit(LoweringOp::Shl, binary.location);
     break;
   case ast::BinaryOp::Shr:
-    emit(OpCode::Shr, binary.location);
+    emit(LoweringOp::Shr, binary.location);
     break;
   default:
     error_at(binary.location, "Unsupported binary operator.");
@@ -1061,7 +1061,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeOut, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1069,7 +1069,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeErr, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeErr, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1077,7 +1077,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeIn, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1087,7 +1087,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   // Type-qualified methods: int::bits(float) -> uint64; float::from_bits(uint64) -> float
   if (ns_callee && ns_callee->namespace_name == "int" && ns_callee->member_name == "bits") {
     compile_expr(*call_expr.args[0]);
-    emit(OpCode::FloatToBits, call_expr.location);
+    emit(LoweringOp::FloatToBits, call_expr.location);
     return;
   }
   if (ns_callee && ns_callee->namespace_name == "float" && ns_callee->member_name == "from_bits") {
@@ -1096,7 +1096,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       return;
     }
     compile_expr(*call_expr.args[0]);
-    emit(OpCode::BitsToFloat, call_expr.location);
+    emit(LoweringOp::BitsToFloat, call_expr.location);
     return;
   }
   if (ns_callee && sema_->used_.count(ns_callee->namespace_name) != 0 &&
@@ -1105,7 +1105,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeOut, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeOut, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1114,7 +1114,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeErr, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeErr, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1123,7 +1123,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeIn, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeIn, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1143,7 +1143,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
                  "rt::enum_payload_at index must be a non-negative int literal.");
         return;
       }
-      emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(idx_lit->value),
+      emit_operand(LoweringOp::EnumPayloadGet, static_cast<uint32_t>(idx_lit->value),
                    call_expr.location);
       return;
     }
@@ -1155,7 +1155,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeFsRead, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeFsRead, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1163,7 +1163,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeFsWrite, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeFsWrite, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1171,7 +1171,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeFsListdir, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeFsListdir, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1183,7 +1183,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);
       }
-      emit_operand(OpCode::NativeSysArgs, static_cast<uint32_t>(call_expr.args.size()),
+      emit_operand(LoweringOp::NativeSysArgs, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
       return;
     }
@@ -1211,7 +1211,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       }
       uint32_t operand =
           (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
-      emit_operand(OpCode::EnumVariantPayload, operand, call_expr.location);
+      emit_operand(LoweringOp::EnumVariantPayload, operand, call_expr.location);
       return;
     }
   }
@@ -1233,7 +1233,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       compile_expr(*arg);
     }
     emit_constant(Value::function_value(func_idx), call_expr.location);
-    emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
+    emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
     return;
   }
 
@@ -1246,7 +1246,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr.args.size()),
+        emit_operand(LoweringOp::NativeOutLn, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
         return;
       }
@@ -1254,7 +1254,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr.args.size()),
+        emit_operand(LoweringOp::NativeErrLn, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
         return;
       }
@@ -1262,7 +1262,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr.args.size()),
+        emit_operand(LoweringOp::NativeInSecret, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
         return;
       }
@@ -1277,7 +1277,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_operand(OpCode::NativeOutLn, static_cast<uint32_t>(call_expr.args.size()),
+        emit_operand(LoweringOp::NativeOutLn, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
         return;
       }
@@ -1285,7 +1285,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_operand(OpCode::NativeErrLn, static_cast<uint32_t>(call_expr.args.size()),
+        emit_operand(LoweringOp::NativeErrLn, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
         return;
       }
@@ -1293,7 +1293,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         for (const ast::ExprPtr &arg : call_expr.args) {
           compile_expr(*arg);
         }
-        emit_operand(OpCode::NativeInSecret, static_cast<uint32_t>(call_expr.args.size()),
+        emit_operand(LoweringOp::NativeInSecret, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
         return;
       }
@@ -1311,99 +1311,99 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         method == "to_lower") {
       compile_expr(*field_callee->object);
       if (method == "len") {
-        emit(OpCode::ArrayLen, call_expr.location);
+        emit(LoweringOp::ArrayLen, call_expr.location);
         return;
       }
       if (method == "has") {
         compile_expr(*call_expr.args[0]);
-        emit(OpCode::MapHas, call_expr.location);
+        emit(LoweringOp::MapHas, call_expr.location);
         return;
       }
       if (method == "keys") {
-        emit(OpCode::MapKeys, call_expr.location);
+        emit(LoweringOp::MapKeys, call_expr.location);
         return;
       }
       if (method == "push") {
         compile_expr(*call_expr.args[0]);
-        emit(OpCode::ArrayPush, call_expr.location);
+        emit(LoweringOp::ArrayPush, call_expr.location);
         return;
       }
       if (method == "resize") {
         compile_expr(*call_expr.args[0]);
         compile_expr(*call_expr.args[1]);
-        emit(OpCode::ArrayResize, call_expr.location);
+        emit(LoweringOp::ArrayResize, call_expr.location);
         return;
       }
       if (method == "pop") {
-        emit(OpCode::ArrayPop, call_expr.location);
+        emit(LoweringOp::ArrayPop, call_expr.location);
         return;
       }
       if (method == "remove") {
         compile_expr(*call_expr.args[0]);
-        emit(OpCode::ArrayRemove, call_expr.location);
+        emit(LoweringOp::ArrayRemove, call_expr.location);
         return;
       }
       if (method == "contains") {
         compile_expr(*call_expr.args[0]);
-        emit(OpCode::ArrayContains, call_expr.location);
+        emit(LoweringOp::ArrayContains, call_expr.location);
         return;
       }
       if (method == "clear") {
-        emit(OpCode::ArrayClear, call_expr.location);
+        emit(LoweringOp::ArrayClear, call_expr.location);
         return;
       }
       if (method == "insert") {
         compile_expr(*call_expr.args[0]);
         compile_expr(*call_expr.args[1]);
-        emit(OpCode::ArrayInsert, call_expr.location);
+        emit(LoweringOp::ArrayInsert, call_expr.location);
         return;
       }
       if (method == "index_of") {
         compile_expr(*call_expr.args[0]);
-        emit(OpCode::ArrayIndexOf, call_expr.location);
+        emit(LoweringOp::ArrayIndexOf, call_expr.location);
         return;
       }
       if (method == "slice") {
         compile_expr(*call_expr.args[0]);
         compile_expr(*call_expr.args[1]);
-        emit(OpCode::ArraySlice, call_expr.location);
+        emit(LoweringOp::ArraySlice, call_expr.location);
         return;
       }
       if (method == "reverse") {
-        emit(OpCode::ArrayReverse, call_expr.location);
+        emit(LoweringOp::ArrayReverse, call_expr.location);
         return;
       }
       if (method == "starts_with") {
         compile_expr(*call_expr.args[0]);
-        emit(OpCode::StringStartsWith, call_expr.location);
+        emit(LoweringOp::StringStartsWith, call_expr.location);
         return;
       }
       if (method == "ends_with") {
         compile_expr(*call_expr.args[0]);
-        emit(OpCode::StringEndsWith, call_expr.location);
+        emit(LoweringOp::StringEndsWith, call_expr.location);
         return;
       }
       if (method == "replace") {
         compile_expr(*call_expr.args[0]);
         compile_expr(*call_expr.args[1]);
-        emit(OpCode::StringReplace, call_expr.location);
+        emit(LoweringOp::StringReplace, call_expr.location);
         return;
       }
       if (method == "split") {
         compile_expr(*call_expr.args[0]);
-        emit(OpCode::StringSplit, call_expr.location);
+        emit(LoweringOp::StringSplit, call_expr.location);
         return;
       }
       if (method == "trim") {
-        emit(OpCode::StringTrim, call_expr.location);
+        emit(LoweringOp::StringTrim, call_expr.location);
         return;
       }
       if (method == "to_upper") {
-        emit(OpCode::StringToUpper, call_expr.location);
+        emit(LoweringOp::StringToUpper, call_expr.location);
         return;
       }
       if (method == "to_lower") {
-        emit(OpCode::StringToLower, call_expr.location);
+        emit(LoweringOp::StringToLower, call_expr.location);
         return;
       }
     }
@@ -1421,7 +1421,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(func_it->second), call_expr.location);
-        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
+        emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
                      call_expr.location);
         return;
       }
@@ -1444,7 +1444,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(free_idx), call_expr.location);
-        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
+        emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
                      call_expr.location);
         return;
       }
@@ -1507,7 +1507,8 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(func_it->second), call_expr.location);
-        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
+        emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size()),
+                     call_expr.location);
         return;
       }
     }
@@ -1547,7 +1548,8 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
           compile_expr(*arg);
         }
         emit_constant(Value::function_value(func_it->second), call_expr.location);
-        emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
+        emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size()),
+                     call_expr.location);
         return;
       }
     }
@@ -1583,7 +1585,8 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         compile_expr(*arg);
       }
       emit_constant(Value::function_value(func_it->second), call_expr.location);
-      emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
+      emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
       return;
     }
   }
@@ -1592,7 +1595,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     compile_expr(*arg);
   }
   compile_expr(*call_expr.callee);
-  emit_operand(OpCode::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
+  emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
   return;
 }
 
@@ -1601,7 +1604,7 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
   compile_expr(*match_expr.value);
   const uint32_t temp_slot = static_cast<uint32_t>(locals_.size());
   locals_.push_back(Local{.name = "<match_value>", .is_mutable = false});
-  emit_operand(OpCode::StoreLocal, temp_slot, match_expr.location);
+  emit_operand(LoweringOp::StoreLocal, temp_slot, match_expr.location);
 
   std::vector<std::size_t> end_jumps;
   for (const ast::MatchArm &arm : match_expr.arms) {
@@ -1611,27 +1614,27 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
     if (identifier && identifier->name == "_") {
       if (arm.guard) {
         compile_expr(*arm.guard);
-        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr.location);
-        emit(OpCode::Pop, match_expr.location);
+        const std::size_t next_arm = emit_jump(LoweringOp::JmpFalse, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
         compile_expr(*arm.body);
-        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+        end_jumps.push_back(emit_jump(LoweringOp::Jmp, match_expr.location));
         patch_jump(next_arm);
       } else {
-        emit(OpCode::Pop, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
         compile_expr(*arm.body);
       }
     } else if (binding) {
       const uint32_t bind_slot = static_cast<uint32_t>(locals_.size());
       locals_.push_back(Local{.name = binding->name, .is_mutable = false});
-      emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
-      emit_operand(OpCode::StoreLocal, bind_slot, match_expr.location);
-      emit(OpCode::Pop, match_expr.location);
+      emit_operand(LoweringOp::LoadLocal, temp_slot, match_expr.location);
+      emit_operand(LoweringOp::StoreLocal, bind_slot, match_expr.location);
+      emit(LoweringOp::Pop, match_expr.location);
       if (arm.guard) {
         compile_expr(*arm.guard);
-        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr.location);
-        emit(OpCode::Pop, match_expr.location);
+        const std::size_t next_arm = emit_jump(LoweringOp::JmpFalse, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
         compile_expr(*arm.body);
-        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+        end_jumps.push_back(emit_jump(LoweringOp::Jmp, match_expr.location));
         patch_jump(next_arm);
       } else {
         compile_expr(*arm.body);
@@ -1647,30 +1650,30 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
         if (elem_binding) {
           const uint32_t slot = static_cast<uint32_t>(locals_.size());
           locals_.push_back(Local{.name = elem_binding->name, .is_mutable = false});
-          emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+          emit_operand(LoweringOp::LoadLocal, temp_slot, match_expr.location);
           emit_constant(Value::int_value(static_cast<int>(i)), match_expr.location);
-          emit(OpCode::IndexGet, match_expr.location);
-          emit_operand(OpCode::StoreLocal, slot, match_expr.location);
-          emit(OpCode::Pop, match_expr.location);
+          emit(LoweringOp::IndexGet, match_expr.location);
+          emit_operand(LoweringOp::StoreLocal, slot, match_expr.location);
+          emit(LoweringOp::Pop, match_expr.location);
           bind_slots.push_back(slot);
         } else if (elem_wildcard && elem_wildcard->name == "_") {
           // wildcard element, skip
         } else {
-          emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+          emit_operand(LoweringOp::LoadLocal, temp_slot, match_expr.location);
           emit_constant(Value::int_value(static_cast<int>(i)), match_expr.location);
-          emit(OpCode::IndexGet, match_expr.location);
+          emit(LoweringOp::IndexGet, match_expr.location);
           compile_expr(*elem);
-          emit(OpCode::Eq, match_expr.location);
-          fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr.location));
+          emit(LoweringOp::Eq, match_expr.location);
+          fail_jumps.push_back(emit_jump(LoweringOp::JmpFalse, match_expr.location));
         }
       }
       if (arm.guard) {
         compile_expr(*arm.guard);
-        fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr.location));
-        emit(OpCode::Pop, match_expr.location);
+        fail_jumps.push_back(emit_jump(LoweringOp::JmpFalse, match_expr.location));
+        emit(LoweringOp::Pop, match_expr.location);
       }
       compile_expr(*arm.body);
-      end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+      end_jumps.push_back(emit_jump(LoweringOp::Jmp, match_expr.location));
       for (std::size_t fj : fail_jumps) {
         patch_jump(fj);
       }
@@ -1703,12 +1706,12 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
 
       // Check if value matches this enum type and variant
       // Stack: [initial_val]
-      emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+      emit_operand(LoweringOp::LoadLocal, temp_slot, match_expr.location);
       uint32_t operand =
           (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
-      emit_operand(OpCode::EnumVariant, operand, enum_pat->location);
-      emit(OpCode::Eq, enum_pat->location);
-      fail_jumps.push_back(emit_jump(OpCode::JmpFalse, enum_pat->location));
+      emit_operand(LoweringOp::EnumVariant, operand, enum_pat->location);
+      emit(LoweringOp::Eq, enum_pat->location);
+      fail_jumps.push_back(emit_jump(LoweringOp::JmpFalse, enum_pat->location));
       // JmpFalse popped the Eq result; initial_val still on stack.
 
       // Extract payload bindings — these push/pop around initial_val.
@@ -1718,26 +1721,26 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
         if (field_binding) {
           const uint32_t slot = static_cast<uint32_t>(locals_.size());
           locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
-          emit_operand(OpCode::LoadLocal, temp_slot, enum_pat->location);
-          emit_operand(OpCode::EnumPayloadGet, static_cast<uint32_t>(i), enum_pat->location);
-          emit_operand(OpCode::StoreLocal, slot, enum_pat->location);
-          emit(OpCode::Pop, enum_pat->location);
+          emit_operand(LoweringOp::LoadLocal, temp_slot, enum_pat->location);
+          emit_operand(LoweringOp::EnumPayloadGet, static_cast<uint32_t>(i), enum_pat->location);
+          emit_operand(LoweringOp::StoreLocal, slot, enum_pat->location);
+          emit(LoweringOp::Pop, enum_pat->location);
           bind_slots.push_back(slot);
         }
       }
 
       if (arm.guard) {
         compile_expr(*arm.guard);
-        fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr.location));
+        fail_jumps.push_back(emit_jump(LoweringOp::JmpFalse, match_expr.location));
         // Pop initial_val so body result is clean on stack.
-        emit(OpCode::Pop, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
       } else {
         // No guard: pop initial_val before body.
-        emit(OpCode::Pop, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
       }
 
       compile_expr(*arm.body);
-      end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+      end_jumps.push_back(emit_jump(LoweringOp::Jmp, match_expr.location));
 
       for (std::size_t fj : fail_jumps) {
         patch_jump(fj);
@@ -1771,32 +1774,32 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
         if (field_binding) {
           const uint32_t slot = static_cast<uint32_t>(locals_.size());
           locals_.push_back(Local{.name = field_binding->name, .is_mutable = false});
-          emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
+          emit_operand(LoweringOp::LoadLocal, temp_slot, struct_pat->location);
           uint32_t field_const = add_constant_(Value::string_value(field_name));
-          emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
-          emit_operand(OpCode::StoreLocal, slot, struct_pat->location);
-          emit(OpCode::Pop, struct_pat->location);
+          emit_operand(LoweringOp::FieldGet, field_const, struct_pat->location);
+          emit_operand(LoweringOp::StoreLocal, slot, struct_pat->location);
+          emit(LoweringOp::Pop, struct_pat->location);
           bind_slots.push_back(slot);
         } else if (field_wildcard && field_wildcard->name == "_") {
           continue;
         } else {
-          emit_operand(OpCode::LoadLocal, temp_slot, struct_pat->location);
+          emit_operand(LoweringOp::LoadLocal, temp_slot, struct_pat->location);
           uint32_t field_const = add_constant_(Value::string_value(field_name));
-          emit_operand(OpCode::FieldGet, field_const, struct_pat->location);
+          emit_operand(LoweringOp::FieldGet, field_const, struct_pat->location);
           compile_expr(*pf.pattern);
-          emit(OpCode::Eq, struct_pat->location);
-          fail_jumps.push_back(emit_jump(OpCode::JmpFalse, struct_pat->location));
+          emit(LoweringOp::Eq, struct_pat->location);
+          fail_jumps.push_back(emit_jump(LoweringOp::JmpFalse, struct_pat->location));
         }
       }
       if (arm.guard) {
         compile_expr(*arm.guard);
-        fail_jumps.push_back(emit_jump(OpCode::JmpFalse, match_expr.location));
-        emit(OpCode::Pop, match_expr.location);
+        fail_jumps.push_back(emit_jump(LoweringOp::JmpFalse, match_expr.location));
+        emit(LoweringOp::Pop, match_expr.location);
       } else {
-        emit(OpCode::Pop, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
       }
       compile_expr(*arm.body);
-      end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+      end_jumps.push_back(emit_jump(LoweringOp::Jmp, match_expr.location));
       for (std::size_t fj : fail_jumps) {
         patch_jump(fj);
       }
@@ -1804,24 +1807,24 @@ void Compiler::compile_match(const ast::MatchExpr &match_expr) {
         locals_.pop_back();
       }
     } else {
-      emit_operand(OpCode::LoadLocal, temp_slot, match_expr.location);
+      emit_operand(LoweringOp::LoadLocal, temp_slot, match_expr.location);
       compile_expr(*arm.pattern);
-      emit(OpCode::Eq, match_expr.location);
+      emit(LoweringOp::Eq, match_expr.location);
       if (arm.guard) {
-        const std::size_t skip_guard = emit_jump(OpCode::JmpFalse, match_expr.location);
-        emit(OpCode::Pop, match_expr.location);
+        const std::size_t skip_guard = emit_jump(LoweringOp::JmpFalse, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
         compile_expr(*arm.guard);
-        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr.location);
-        emit(OpCode::Pop, match_expr.location);
+        const std::size_t next_arm = emit_jump(LoweringOp::JmpFalse, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
         compile_expr(*arm.body);
-        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+        end_jumps.push_back(emit_jump(LoweringOp::Jmp, match_expr.location));
         patch_jump(next_arm);
         patch_jump(skip_guard);
       } else {
-        const std::size_t next_arm = emit_jump(OpCode::JmpFalse, match_expr.location);
-        emit(OpCode::Pop, match_expr.location);
+        const std::size_t next_arm = emit_jump(LoweringOp::JmpFalse, match_expr.location);
+        emit(LoweringOp::Pop, match_expr.location);
         compile_expr(*arm.body);
-        end_jumps.push_back(emit_jump(OpCode::Jmp, match_expr.location));
+        end_jumps.push_back(emit_jump(LoweringOp::Jmp, match_expr.location));
         patch_jump(next_arm);
       }
     }
@@ -1859,7 +1862,7 @@ void Compiler::compile_namespace_access(const ast::NamespaceAccessExpr &ns_acces
       return;
     }
     uint32_t operand = (static_cast<uint32_t>(type_idx) << 16) | static_cast<uint32_t>(variant_idx);
-    emit_operand(OpCode::EnumVariant, operand, ns_access.location);
+    emit_operand(LoweringOp::EnumVariant, operand, ns_access.location);
     return;
   }
   if (ns_access.namespace_name == "io" && sema_->used_.count("io") != 0) {
@@ -1985,10 +1988,10 @@ void Compiler::compile_struct_literal(const ast::StructLiteralExpr &struct_lit) 
     if (i < struct_lit.fields.size()) {
       compile_expr(*struct_lit.fields[i].value);
     } else {
-      emit(OpCode::Null, struct_lit.location);
+      emit(LoweringOp::Null, struct_lit.location);
     }
   }
-  emit_operand(OpCode::StructNew,
+  emit_operand(LoweringOp::StructNew,
                static_cast<uint32_t>((type_idx << 16) | static_cast<int>(meta.field_names.size())),
                struct_lit.location);
   return;
@@ -2019,7 +2022,7 @@ void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
   }
   compile_expr(*field_access.object);
   uint32_t field_const = add_constant_(Value::string_value(field_access.field_name));
-  emit_operand(OpCode::FieldGet, field_const, field_access.location);
+  emit_operand(LoweringOp::FieldGet, field_const, field_access.location);
   return;
 }
 
@@ -2028,7 +2031,7 @@ void Compiler::compile_field_assign(const ast::FieldAssignExpr &field_assign) {
   compile_expr(*field_assign.object);
   compile_expr(*field_assign.value);
   uint32_t field_const = add_constant_(Value::string_value(field_assign.field_name));
-  emit_operand(OpCode::FieldSet, field_const, field_assign.location);
+  emit_operand(LoweringOp::FieldSet, field_const, field_assign.location);
   return;
 }
 
@@ -2042,14 +2045,14 @@ void Compiler::compile_array_literal(const ast::ArrayLiteralExpr &array_lit) {
         compile_expr(*cell);
       }
     }
-    emit_operand(OpCode::DenseArrayNew, pack_dense2d_shape(dense_shape.rows, dense_shape.cols),
+    emit_operand(LoweringOp::DenseArrayNew, pack_dense2d_shape(dense_shape.rows, dense_shape.cols),
                  array_lit.location);
     return;
   }
   for (const ast::ExprPtr &element : array_lit.elements) {
     compile_expr(*element);
   }
-  emit_operand(OpCode::ArrayNew, static_cast<uint32_t>(array_lit.elements.size()),
+  emit_operand(LoweringOp::ArrayNew, static_cast<uint32_t>(array_lit.elements.size()),
                array_lit.location);
   return;
 }
@@ -2060,7 +2063,7 @@ void Compiler::compile_map_literal(const ast::MapLiteralExpr &map_lit) {
     compile_expr(*map_lit.keys[i]);
     compile_expr(*map_lit.values[i]);
   }
-  emit_operand(OpCode::MapNew, static_cast<uint32_t>(map_lit.keys.size()), map_lit.location);
+  emit_operand(LoweringOp::MapNew, static_cast<uint32_t>(map_lit.keys.size()), map_lit.location);
   return;
 }
 
@@ -2068,7 +2071,7 @@ void Compiler::compile_index(const ast::IndexExpr &index_expr) {
 
   compile_expr(*index_expr.object);
   compile_expr(*index_expr.index);
-  emit(OpCode::IndexGet, index_expr.location);
+  emit(LoweringOp::IndexGet, index_expr.location);
   return;
 }
 
@@ -2077,7 +2080,7 @@ void Compiler::compile_index_assign(const ast::IndexAssignExpr &index_assign) {
   compile_expr(*index_assign.object);
   compile_expr(*index_assign.index);
   compile_expr(*index_assign.value);
-  emit(OpCode::IndexSet, index_assign.location);
+  emit(LoweringOp::IndexSet, index_assign.location);
   return;
 }
 
@@ -2098,16 +2101,16 @@ void Compiler::compile_cast(const ast::CastExpr &cast) {
     error_at(cast.location, "Cast target '" + t + "' is not supported in VM compiler.");
     return;
   }
-  emit_operand(OpCode::CastTo, static_cast<uint32_t>(target_kind), cast.location);
+  emit_operand(LoweringOp::CastTo, static_cast<uint32_t>(target_kind), cast.location);
   return;
 }
 
 void Compiler::compile_ternary(const ast::TernaryExpr &ternary) {
 
   compile_expr(*ternary.condition);
-  const std::size_t else_jump = emit_jump(OpCode::JmpFalse, ternary.location);
+  const std::size_t else_jump = emit_jump(LoweringOp::JmpFalse, ternary.location);
   compile_expr(*ternary.then_expr);
-  const std::size_t end_jump = emit_jump(OpCode::Jmp, ternary.location);
+  const std::size_t end_jump = emit_jump(LoweringOp::Jmp, ternary.location);
   patch_jump(else_jump);
   compile_expr(*ternary.else_expr);
   patch_jump(end_jump);
@@ -2119,16 +2122,16 @@ void Compiler::compile_null_coalesce(const ast::NullCoalesceExpr &null_coalesce)
   compile_expr(*null_coalesce.left);
   // Peek-and-branch on null / CastError. Success arm keeps the original LHS;
   // fallback arm sees the error value (Pop for bare ?:, or bind with let err =>).
-  const std::size_t fallback_jump = emit_jump(OpCode::JmpIfErr, null_coalesce.location);
-  const std::size_t end_jump = emit_jump(OpCode::Jmp, null_coalesce.location);
+  const std::size_t fallback_jump = emit_jump(LoweringOp::JmpIfErr, null_coalesce.location);
+  const std::size_t end_jump = emit_jump(LoweringOp::Jmp, null_coalesce.location);
   patch_jump(fallback_jump);
   if (null_coalesce.err_binding.empty()) {
-    emit(OpCode::Pop, null_coalesce.location);
+    emit(LoweringOp::Pop, null_coalesce.location);
     compile_expr(*null_coalesce.right);
   } else {
     const uint32_t err_slot = static_cast<uint32_t>(locals_.size());
     locals_.push_back(Local{.name = null_coalesce.err_binding, .is_mutable = false});
-    emit_operand(OpCode::StoreLocal, err_slot, null_coalesce.location);
+    emit_operand(LoweringOp::StoreLocal, err_slot, null_coalesce.location);
     compile_expr(*null_coalesce.right);
     locals_.pop_back();
   }
@@ -2142,15 +2145,15 @@ void Compiler::compile_propagate(const ast::PropagateExpr &prop) {
   if (in_try_) {
     // Inside a try block: use PropagateErr which peeks the stack and
     // either no-ops (success) or pops + jumps to catch via handler_stack_.
-    emit(OpCode::PropagateErr, prop.location);
+    emit(LoweringOp::PropagateErr, prop.location);
   } else {
     // Function-level: JmpIfErr → Pop + Null + Return.
-    const std::size_t err_jump = emit_jump(OpCode::JmpIfErr, prop.location);
-    const std::size_t end_jump = emit_jump(OpCode::Jmp, prop.location);
+    const std::size_t err_jump = emit_jump(LoweringOp::JmpIfErr, prop.location);
+    const std::size_t end_jump = emit_jump(LoweringOp::Jmp, prop.location);
     patch_jump(err_jump);
-    emit(OpCode::Pop, prop.location);
-    emit(OpCode::Null, prop.location);
-    emit(OpCode::Return, prop.location);
+    emit(LoweringOp::Pop, prop.location);
+    emit(LoweringOp::Null, prop.location);
+    emit(LoweringOp::Return, prop.location);
     patch_jump(end_jump);
   }
   return;
@@ -2182,29 +2185,29 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
       return;
     }
     compile_expr(*assign.value);
-    emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), assign.location);
-    emit(OpCode::DerefStore, assign.location);
-    emit(OpCode::Null, assign.location);
+    emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(slot), assign.location);
+    emit(LoweringOp::DerefStore, assign.location);
+    emit(LoweringOp::Null, assign.location);
     return;
   }
 
   if (assign.op == ast::AssignOp::Assign) {
     compile_expr(*assign.value);
   } else {
-    emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), assign.location);
+    emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(slot), assign.location);
     compile_expr(*assign.value);
     switch (assign.op) {
     case ast::AssignOp::AddAssign:
-      emit(OpCode::Add, assign.location);
+      emit(LoweringOp::Add, assign.location);
       break;
     case ast::AssignOp::SubAssign:
-      emit(OpCode::Subtract, assign.location);
+      emit(LoweringOp::Subtract, assign.location);
       break;
     case ast::AssignOp::MulAssign:
-      emit(OpCode::Multiply, assign.location);
+      emit(LoweringOp::Multiply, assign.location);
       break;
     case ast::AssignOp::DivAssign:
-      emit(OpCode::Divide, assign.location);
+      emit(LoweringOp::Divide, assign.location);
       break;
     default:
       error_at(assign.location, "Unsupported assignment operator.");
@@ -2212,14 +2215,14 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
     }
   }
 
-  emit_operand(OpCode::StoreLocal, static_cast<uint32_t>(slot), assign.location);
+  emit_operand(LoweringOp::StoreLocal, static_cast<uint32_t>(slot), assign.location);
 }
 
-void Compiler::emit(OpCode op, ast::SourceLocation location) {
+void Compiler::emit(LoweringOp op, ast::SourceLocation location) {
   kir_recorder_.on_emit(op, 0, location);
 }
 
-void Compiler::emit_operand(OpCode op, uint32_t operand, ast::SourceLocation location) {
+void Compiler::emit_operand(LoweringOp op, uint32_t operand, ast::SourceLocation location) {
   kir_recorder_.on_emit(op, operand, location);
 }
 
@@ -2228,7 +2231,7 @@ void Compiler::emit_constant(Value value, ast::SourceLocation location, KirType 
   kir_recorder_.on_constant(value, pool_index, location, numeric_type);
 }
 
-std::size_t Compiler::emit_jump(OpCode op, ast::SourceLocation location) {
+std::size_t Compiler::emit_jump(LoweringOp op, ast::SourceLocation location) {
   return kir_recorder_.record_jump(op, location);
 }
 
@@ -2281,16 +2284,16 @@ void Compiler::compile_lvalue_addr(const ast::Expr &expr) {
       return;
     }
     if (local_is_ref(slot)) {
-      emit_operand(OpCode::LoadLocal, static_cast<uint32_t>(slot), identifier->location);
+      emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(slot), identifier->location);
       return;
     }
-    emit_operand(OpCode::LoadLocalAddr, static_cast<uint32_t>(slot), identifier->location);
+    emit_operand(LoweringOp::LoadLocalAddr, static_cast<uint32_t>(slot), identifier->location);
     return;
   }
   if (const auto *field_access = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
     compile_expr(*field_access->object);
     uint32_t field_const = add_constant_(Value::string_value(field_access->field_name));
-    emit_operand(OpCode::BorrowFieldMut, field_const, field_access->location);
+    emit_operand(LoweringOp::BorrowFieldMut, field_const, field_access->location);
     return;
   }
   error_at(expr.location, "Cannot take the address of this expression.");
@@ -2788,12 +2791,12 @@ void Compiler::visit(const ast::CompletionMarkerExpr &) {
 
 void Compiler::compile_block_expr(const ast::BlockExpr &block) {
   if (!block.body) {
-    emit(OpCode::Null, block.location);
+    emit(LoweringOp::Null, block.location);
     return;
   }
   const auto *body_block = dynamic_cast<const ast::BlockStmt *>(block.body.get());
   if (!body_block) {
-    emit(OpCode::Null, block.location);
+    emit(LoweringOp::Null, block.location);
     return;
   }
   push_scope();
@@ -2815,7 +2818,7 @@ void Compiler::compile_block_expr(const ast::BlockExpr &block) {
   }
   pop_scope();
   if (!yielded_value) {
-    emit(OpCode::Null, block.location);
+    emit(LoweringOp::Null, block.location);
   }
 }
 

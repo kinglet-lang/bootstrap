@@ -4,7 +4,7 @@
 #include "ir/kir_recorder.h"
 
 #include "ir/kir_numeric.h"
-#include "ir/lowering_opcode.h"
+#include "ir/lowering_op.h"
 
 #include <cstring>
 
@@ -64,14 +64,14 @@ std::size_t KirRecorder::instr_count() const {
   return bb_.instrs.size();
 }
 
-std::size_t KirRecorder::record_jump(OpCode op, ast::SourceLocation location) {
+std::size_t KirRecorder::record_jump(LoweringOp op, ast::SourceLocation location) {
   if (!active_) {
     return 0;
   }
   KirOpcode kir_op = KirOpcode::Br;
-  if (op == OpCode::JmpFalse) {
+  if (op == LoweringOp::JmpFalse) {
     kir_op = KirOpcode::CondBr;
-  } else if (op == OpCode::JmpIfErr) {
+  } else if (op == LoweringOp::JmpIfErr) {
     kir_op = KirOpcode::JmpIfErr;
   }
   bb_.instrs.push_back(rec(kir_op, {0}, location));
@@ -152,263 +152,263 @@ void KirRecorder::on_constant(const Value &value, uint32_t pool_index, ast::Sour
   }
 }
 
-void KirRecorder::on_emit(OpCode op, uint32_t operand, ast::SourceLocation location) {
+void KirRecorder::on_emit(LoweringOp op, uint32_t operand, ast::SourceLocation location) {
   if (!active_) {
     return;
   }
   switch (op) {
-  case OpCode::True:
+  case LoweringOp::True:
     bb_.instrs.push_back(rec(KirOpcode::ConstBool, {1}, location));
     break;
-  case OpCode::False:
+  case LoweringOp::False:
     bb_.instrs.push_back(rec(KirOpcode::ConstBool, {0}, location));
     break;
-  case OpCode::Add:
+  case LoweringOp::Add:
     bb_.instrs.push_back(rec(KirOpcode::IAdd, {}, location));
     break;
-  case OpCode::AddI32:
+  case LoweringOp::AddI32:
     bb_.instrs.push_back(rec(KirOpcode::IAdd32, {}, location));
     break;
-  case OpCode::Subtract:
+  case LoweringOp::Subtract:
     bb_.instrs.push_back(rec(KirOpcode::ISub, {}, location));
     break;
-  case OpCode::SubtractI32:
+  case LoweringOp::SubtractI32:
     bb_.instrs.push_back(rec(KirOpcode::ISub32, {}, location));
     break;
-  case OpCode::Multiply:
+  case LoweringOp::Multiply:
     bb_.instrs.push_back(rec(KirOpcode::IMul, {}, location));
     break;
-  case OpCode::MultiplyI32:
+  case LoweringOp::MultiplyI32:
     bb_.instrs.push_back(rec(KirOpcode::IMul32, {}, location));
     break;
-  case OpCode::Divide:
+  case LoweringOp::Divide:
     bb_.instrs.push_back(rec(KirOpcode::IDiv, {}, location));
     break;
-  case OpCode::DivideI32:
+  case LoweringOp::DivideI32:
     bb_.instrs.push_back(rec(KirOpcode::IDiv32, {}, location));
     break;
-  case OpCode::Modulo:
+  case LoweringOp::Modulo:
     bb_.instrs.push_back(rec(KirOpcode::IMod, {}, location));
     break;
-  case OpCode::ModuloI32:
+  case LoweringOp::ModuloI32:
     bb_.instrs.push_back(rec(KirOpcode::IMod32, {}, location));
     break;
-  case OpCode::Not:
+  case LoweringOp::Not:
     bb_.instrs.push_back(rec(KirOpcode::Not, {}, location));
     break;
-  case OpCode::BitNot:
+  case LoweringOp::BitNot:
     bb_.instrs.push_back(rec(KirOpcode::BitNot, {}, location));
     break;
-  case OpCode::BitAnd:
+  case LoweringOp::BitAnd:
     bb_.instrs.push_back(rec(KirOpcode::BitAnd, {}, location));
     break;
-  case OpCode::BitOr:
+  case LoweringOp::BitOr:
     bb_.instrs.push_back(rec(KirOpcode::BitOr, {}, location));
     break;
-  case OpCode::BitXor:
+  case LoweringOp::BitXor:
     bb_.instrs.push_back(rec(KirOpcode::BitXor, {}, location));
     break;
-  case OpCode::Shl:
+  case LoweringOp::Shl:
     bb_.instrs.push_back(rec(KirOpcode::Shl, {}, location));
     break;
-  case OpCode::Shr:
+  case LoweringOp::Shr:
     bb_.instrs.push_back(rec(KirOpcode::Shr, {}, location));
     break;
-  case OpCode::Eq:
+  case LoweringOp::Eq:
     bb_.instrs.push_back(rec(KirOpcode::ICmpEq, {}, location));
     break;
-  case OpCode::Neq:
+  case LoweringOp::Neq:
     bb_.instrs.push_back(rec(KirOpcode::ICmpNeq, {}, location));
     break;
-  case OpCode::Lt:
+  case LoweringOp::Lt:
     bb_.instrs.push_back(rec(KirOpcode::ICmpLt, {}, location));
     break;
-  case OpCode::Gt:
+  case LoweringOp::Gt:
     bb_.instrs.push_back(rec(KirOpcode::ICmpGt, {}, location));
     break;
-  case OpCode::Le:
+  case LoweringOp::Le:
     bb_.instrs.push_back(rec(KirOpcode::ICmpLe, {}, location));
     break;
-  case OpCode::Ge:
+  case LoweringOp::Ge:
     bb_.instrs.push_back(rec(KirOpcode::ICmpGe, {}, location));
     break;
-  case OpCode::LoadLocal:
+  case LoweringOp::LoadLocal:
     bb_.instrs.push_back(rec(KirOpcode::LoadLocal, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::LoadLocalAddr:
+  case LoweringOp::LoadLocalAddr:
     bb_.instrs.push_back(rec(KirOpcode::LoadLocalAddr, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::DerefLoad:
+  case LoweringOp::DerefLoad:
     bb_.instrs.push_back(rec(KirOpcode::DerefLoad, {}, location));
     break;
-  case OpCode::DerefStore:
+  case LoweringOp::DerefStore:
     bb_.instrs.push_back(rec(KirOpcode::DerefStore, {}, location));
     break;
-  case OpCode::StoreLocal:
+  case LoweringOp::StoreLocal:
     bb_.instrs.push_back(rec(KirOpcode::StoreLocal, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::Null:
+  case LoweringOp::Null:
     bb_.instrs.push_back(rec(KirOpcode::ConstNull, {}, location));
     break;
-  case OpCode::Pop:
+  case LoweringOp::Pop:
     bb_.instrs.push_back(rec(KirOpcode::Pop, {}, location));
     break;
-  case OpCode::Call:
+  case LoweringOp::Call:
     bb_.instrs.push_back(rec(KirOpcode::Call, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::Return:
+  case LoweringOp::Return:
     bb_.instrs.push_back(rec(KirOpcode::Ret, {}, location));
     break;
-  case OpCode::PushHandler:
+  case LoweringOp::PushHandler:
     bb_.instrs.push_back(rec(KirOpcode::PushHandler, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::PopHandler:
+  case LoweringOp::PopHandler:
     bb_.instrs.push_back(rec(KirOpcode::PopHandler, {}, location));
     break;
-  case OpCode::PropagateErr:
+  case LoweringOp::PropagateErr:
     bb_.instrs.push_back(rec(KirOpcode::PropagateErr, {}, location));
     break;
-  case OpCode::StructNew:
+  case LoweringOp::StructNew:
     bb_.instrs.push_back(rec(KirOpcode::StructNew, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::BorrowFieldMut:
+  case LoweringOp::BorrowFieldMut:
     bb_.instrs.push_back(rec(KirOpcode::BorrowFieldMut, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::FieldGet:
+  case LoweringOp::FieldGet:
     bb_.instrs.push_back(rec(KirOpcode::FieldGet, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::FieldSet:
+  case LoweringOp::FieldSet:
     bb_.instrs.push_back(rec(KirOpcode::FieldSet, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::ArrayNew:
+  case LoweringOp::ArrayNew:
     bb_.instrs.push_back(rec(KirOpcode::ArrayNew, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::DenseArrayNew: {
+  case LoweringOp::DenseArrayNew: {
     int rows = 0;
     int cols = 0;
     unpack_dense2d_shape(static_cast<uint32_t>(operand), &rows, &cols);
     bb_.instrs.push_back(rec(KirOpcode::DenseArrayNew, {rows, cols}, location));
     break;
   }
-  case OpCode::IndexGet:
+  case LoweringOp::IndexGet:
     bb_.instrs.push_back(rec(KirOpcode::IndexGet, {}, location));
     break;
-  case OpCode::IndexSet:
+  case LoweringOp::IndexSet:
     bb_.instrs.push_back(rec(KirOpcode::IndexSet, {}, location));
     break;
-  case OpCode::ArrayLen:
+  case LoweringOp::ArrayLen:
     bb_.instrs.push_back(rec(KirOpcode::ArrayLen, {}, location));
     break;
-  case OpCode::ArraySlice:
+  case LoweringOp::ArraySlice:
     bb_.instrs.push_back(rec(KirOpcode::ArraySlice, {}, location));
     break;
-  case OpCode::ArrayPush:
+  case LoweringOp::ArrayPush:
     bb_.instrs.push_back(rec(KirOpcode::ArrayPush, {}, location));
     break;
-  case OpCode::ArrayResize:
+  case LoweringOp::ArrayResize:
     bb_.instrs.push_back(rec(KirOpcode::ArrayResize, {}, location));
     break;
-  case OpCode::ArrayPop:
+  case LoweringOp::ArrayPop:
     bb_.instrs.push_back(rec(KirOpcode::ArrayPop, {}, location));
     break;
-  case OpCode::ArrayRemove:
+  case LoweringOp::ArrayRemove:
     bb_.instrs.push_back(rec(KirOpcode::ArrayRemove, {}, location));
     break;
-  case OpCode::ArrayContains:
+  case LoweringOp::ArrayContains:
     bb_.instrs.push_back(rec(KirOpcode::ArrayContains, {}, location));
     break;
-  case OpCode::ArrayClear:
+  case LoweringOp::ArrayClear:
     bb_.instrs.push_back(rec(KirOpcode::ArrayClear, {}, location));
     break;
-  case OpCode::ArrayInsert:
+  case LoweringOp::ArrayInsert:
     bb_.instrs.push_back(rec(KirOpcode::ArrayInsert, {}, location));
     break;
-  case OpCode::ArrayIndexOf:
+  case LoweringOp::ArrayIndexOf:
     bb_.instrs.push_back(rec(KirOpcode::ArrayIndexOf, {}, location));
     break;
-  case OpCode::ArrayReverse:
+  case LoweringOp::ArrayReverse:
     bb_.instrs.push_back(rec(KirOpcode::ArrayReverse, {}, location));
     break;
-  case OpCode::StringStartsWith:
+  case LoweringOp::StringStartsWith:
     bb_.instrs.push_back(rec(KirOpcode::StrStartsWith, {}, location));
     break;
-  case OpCode::StringEndsWith:
+  case LoweringOp::StringEndsWith:
     bb_.instrs.push_back(rec(KirOpcode::StrEndsWith, {}, location));
     break;
-  case OpCode::StringReplace:
+  case LoweringOp::StringReplace:
     bb_.instrs.push_back(rec(KirOpcode::StrReplace, {}, location));
     break;
-  case OpCode::StringSplit:
+  case LoweringOp::StringSplit:
     bb_.instrs.push_back(rec(KirOpcode::StrSplit, {}, location));
     break;
-  case OpCode::StringTrim:
+  case LoweringOp::StringTrim:
     bb_.instrs.push_back(rec(KirOpcode::StrTrim, {}, location));
     break;
-  case OpCode::StringToUpper:
+  case LoweringOp::StringToUpper:
     bb_.instrs.push_back(rec(KirOpcode::StrToUpper, {}, location));
     break;
-  case OpCode::StringToLower:
+  case LoweringOp::StringToLower:
     bb_.instrs.push_back(rec(KirOpcode::StrToLower, {}, location));
     break;
-  case OpCode::MapNew:
+  case LoweringOp::MapNew:
     bb_.instrs.push_back(rec(KirOpcode::MapNew, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::MapHas:
+  case LoweringOp::MapHas:
     bb_.instrs.push_back(rec(KirOpcode::MapHas, {}, location));
     break;
-  case OpCode::MapKeys:
+  case LoweringOp::MapKeys:
     bb_.instrs.push_back(rec(KirOpcode::MapKeys, {}, location));
     break;
-  case OpCode::EnumVariant:
+  case LoweringOp::EnumVariant:
     bb_.instrs.push_back(rec(KirOpcode::EnumVariant, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::EnumVariantPayload:
+  case LoweringOp::EnumVariantPayload:
     bb_.instrs.push_back(
         rec(KirOpcode::EnumVariantPayload, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::EnumPayloadGet:
+  case LoweringOp::EnumPayloadGet:
     bb_.instrs.push_back(rec(KirOpcode::EnumPayloadGet, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::CastTo:
+  case LoweringOp::CastTo:
     bb_.instrs.push_back(rec(KirOpcode::CastTo, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::FloatToBits:
+  case LoweringOp::FloatToBits:
     bb_.instrs.push_back(rec(KirOpcode::FloatToBits, {}, location));
     break;
-  case OpCode::BitsToFloat:
+  case LoweringOp::BitsToFloat:
     bb_.instrs.push_back(rec(KirOpcode::BitsToFloat, {}, location));
     break;
-  case OpCode::NativeOut:
+  case LoweringOp::NativeOut:
     bb_.instrs.push_back(rec(KirOpcode::NativeOut, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeOutLn:
+  case LoweringOp::NativeOutLn:
     bb_.instrs.push_back(rec(KirOpcode::NativeOutLn, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeErr:
+  case LoweringOp::NativeErr:
     bb_.instrs.push_back(rec(KirOpcode::NativeErr, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeErrLn:
+  case LoweringOp::NativeErrLn:
     bb_.instrs.push_back(rec(KirOpcode::NativeErrLn, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeIn:
+  case LoweringOp::NativeIn:
     bb_.instrs.push_back(rec(KirOpcode::NativeIn, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeInSecret:
+  case LoweringOp::NativeInSecret:
     bb_.instrs.push_back(rec(KirOpcode::NativeInSecret, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeFsRead:
+  case LoweringOp::NativeFsRead:
     bb_.instrs.push_back(rec(KirOpcode::NativeFsRead, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeFsWrite:
+  case LoweringOp::NativeFsWrite:
     bb_.instrs.push_back(rec(KirOpcode::NativeFsWrite, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeFsListdir:
+  case LoweringOp::NativeFsListdir:
     bb_.instrs.push_back(rec(KirOpcode::NativeFsListdir, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::NativeSysArgs:
+  case LoweringOp::NativeSysArgs:
     bb_.instrs.push_back(rec(KirOpcode::NativeSysArgs, {static_cast<int32_t>(operand)}, location));
     break;
-  case OpCode::Negate:
+  case LoweringOp::Negate:
     bb_.instrs.push_back(rec(KirOpcode::INeg, {}, location));
     break;
   default:
