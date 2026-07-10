@@ -35,9 +35,22 @@ It configures an `out/Fuzz` build with:
 gn gen out/Fuzz --args='is_debug=false use_libfuzzer=true sanitizer="address,undefined"'
 ```
 
-then runs each target against its seed corpus under `tests/fuzz/corpus/<target>`.
-Any defect halts the run and writes the offending input as
-`crash-*` / `oom-*` / `timeout-*` next to the corpus for triage.
+then seeds a scratch corpus under `out/Fuzz/corpus/<target>` from the
+committed seeds in `tests/fuzz/corpus/<target>` and runs libFuzzer against
+the scratch copy. `out/` is gitignored, so a fuzzing run's mutated/expanded
+inputs never touch the tracked corpus — the tracked directory stays exactly
+as committed unless a defect is found. Any defect still halts the run and
+writes the offending input as `crash-*` / `oom-*` / `timeout-*` next to the
+*tracked* corpus for triage, matching the "Adding a regression seed" workflow
+below.
+
+To run a deliberate campaign where you intend to hand-pick new seeds
+afterward, set `KINGLET_FUZZ_IN_PLACE=1` to skip the scratch corpus and let
+libFuzzer mutate `tests/fuzz/corpus/<target>` directly (the old default
+behavior). Don't use this for routine runs — pick and commit interesting
+inputs from `out/Fuzz/corpus/<target>` instead, then run
+`git status`/`git clean -fd tests/fuzz/corpus` if you ever run with
+`KINGLET_FUZZ_IN_PLACE=1` and want to discard the expanded corpus.
 
 To run a target directly (e.g. to reproduce a specific artifact):
 
@@ -58,9 +71,12 @@ ninja -C out/Fuzz fuzz_parser
   every CI run so a fixed bug cannot silently regress.
 
 The committed corpus is intentionally small. During a run libFuzzer expands
-its in-memory corpus with thousands of mutated inputs; those are working
-state, not committed. When a run uncovers a genuinely new and interesting
-input worth keeping as a permanent seed, add it deliberately.
+its corpus with thousands of mutated inputs under the `out/Fuzz/corpus`
+scratch directory; those are working state, not committed, and are wiped
+along with `out/` whenever the build directory is cleaned. When a run
+uncovers a genuinely new and interesting input worth keeping as a permanent
+seed, copy it from the scratch corpus into `tests/fuzz/corpus/<target>` and
+commit it deliberately.
 
 ## Adding a regression seed
 
