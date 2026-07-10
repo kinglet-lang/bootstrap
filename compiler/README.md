@@ -38,7 +38,6 @@ User-facing CLI: `driver/kinglet/` — `cli_driver` dispatches subcommands to
 | `driver/preen/` | driver | `kinglet::preen` formatter (`format_string`, extensions, `[fmt]` config) |
 | `ir/` | ir | KIR structs, recorder, lowering op/value metadata, typing/specialize passes |
 | `backend/compiler/` | backend | AST→KIR compiler, split into per-concern files (`compile_call`, `compile_binary`, …) |
-| `backend/bytecode/` | backend | legacy bytecode container (`Chunk`); execution backend removed |
 | `backend/codegen/llvm/` | backend | `KirToLlvm` — optional (`enable_llvm=true`), split into `llvm_function_lowerer` + helpers |
 | `driver/kinglet/` | driver | `main.cc`, `cli_driver` (dispatch), `cli_ui`, `cli_spawn`, `cmd_{init,build,run,prune,fmt}` |
 
@@ -55,21 +54,19 @@ frontend/ast + frontend/lexer + frontend/parser + frontend/module → driver/pre
 frontend/ast + frontend/types + frontend/sema + frontend/module + ir → frontend/checker
 frontend/ast + frontend/types + frontend/sema + frontend/module + ir → backend/compiler
 frontend/ast + frontend/types → ir
-ir → backend/bytecode
 ir → backend/codegen/llvm (optional)
 ```
 
 Note: the lowering vocabulary (`OpCode`, RC/COW `Value`, `FunctionInfo`/`StructMeta`/`EnumMeta`)
-lives in `ir/lowering_opcode.h` / `ir/lowering_value.h` / `ir/lowering_metadata.h` — it originated
+lives in `ir/lowering_opcode.h` / `ir/lowering_value.h` / `ir/lowering_metadata.h`. It originated
 as bytecode-VM types but is now load-bearing for AST→KIR lowering (`Compiler::emit`,
-`KirRecorder::on_emit`/`on_constant`). `backend/bytecode/` only keeps the now-unused `Chunk`
-container; the execution backend has been removed.
+`KirRecorder::on_emit`/`on_constant`). The bytecode execution backend has been removed.
 
 ## Binaries (`//BUILD.gn`)
 
 | Target | Output | Deps (summary) |
 |--------|--------|----------------|
-| `kinglet` | `kinglet` | Full frontend + ir + compiler + legacy bytecode container; + llvm + rt when enabled |
+| `kinglet` | `kinglet` | Full frontend + ir + compiler; + llvm + rt when enabled |
 | `kinglet_rt` | `libkinglet_rt.a` | `runtime/` |
 
 ## Tests
