@@ -129,6 +129,21 @@ jobs:
         run: |
           bash scripts/fuzz.sh all 60
 
+      # scripts/fuzz.sh writes crash-*/oom-*/timeout-* artifacts next to the
+      # tracked corpus (tests/fuzz/corpus/<target>/) on a defect. Upload them
+      # so a failing run can be triaged from the Actions UI without having to
+      # reproduce locally first.
+      - name: Upload fuzz artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: |
+            tests/fuzz/corpus/*/crash-*
+            tests/fuzz/corpus/*/oom-*
+            tests/fuzz/corpus/*/timeout-*
+          if-no-files-found: ignore
+
   benchmarks:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
