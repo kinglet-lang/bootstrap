@@ -65,7 +65,6 @@ executable("kinglet") {
     "//compiler/frontend/parser",
     "//compiler/driver/pipeline",
     "//compiler/driver/preen",
-    "//compiler/backend/bytecode",
   ]
 
   if (enable_llvm) {
