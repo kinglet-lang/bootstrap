@@ -2,12 +2,15 @@
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-if [[ -x "$ROOT/out/Debug/kinglet" ]]; then
-  KINGLET="$ROOT/out/Debug/kinglet"
-elif [[ -x "$ROOT/out/Default/kinglet" ]]; then
-  KINGLET="$ROOT/out/Default/kinglet"
-else
-  KINGLET="$ROOT/out/Debug/kinglet"
+KINGLET="${KINGLET:-${KINGLET_BOOTSTRAP:-}}"
+if [[ -z "$KINGLET" ]]; then
+  if [[ -x "$ROOT/out/Debug/kinglet" ]]; then
+    KINGLET="$ROOT/out/Debug/kinglet"
+  elif [[ -x "$ROOT/out/Default/kinglet" ]]; then
+    KINGLET="$ROOT/out/Default/kinglet"
+  else
+    KINGLET="$ROOT/out/Debug/kinglet"
+  fi
 fi
 
 CASES_DIR="$ROOT/tests/fmt/cases"
