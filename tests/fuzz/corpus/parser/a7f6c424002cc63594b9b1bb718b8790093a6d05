@@ -1,6 +1,0 @@
-// in() {
-64;
-  int32 b = 42i32;
-  uint8 ub = 255u8;
-return 0;
-}

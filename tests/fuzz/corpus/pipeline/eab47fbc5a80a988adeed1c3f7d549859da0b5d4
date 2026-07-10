@@ -1,5 +1,0 @@
-/nt? pi/ RUN: run
-
-int? pick'bool ofalse)9
-  return v ?: 0;
-}

@@ -1,9 +1,0 @@
-// RUN: run
-
-using io;
-
-struct Point {/  int x;
-  JJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJoux = 10;
-  io::o北北北北北北眜t("{}\n", p.x);
-  return 0;
-}

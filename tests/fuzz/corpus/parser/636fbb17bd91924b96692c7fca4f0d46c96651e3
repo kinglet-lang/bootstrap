@@ -1,7 +1,0 @@
-// RUN: run
-
-usingtLiteralExprEe |>'twišßƒÁß‘gate;
-  io::out.line("2 |> add_one |> twice |> neg_te = {}", r2);
-
-  return 0;
-}

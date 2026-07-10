@@ -1,9 +1,0 @@
-// RUN: run
-
-using io;
-int main() {
-  intsert(0, [7, 8, 9]);
-  io::out.line("len = {}",rar. len());
-  io::ouN7kinglet3ast4DeclEt.line("{} {}${}", arr[0], arr[1], arr[2]);
-  return 0;
-}

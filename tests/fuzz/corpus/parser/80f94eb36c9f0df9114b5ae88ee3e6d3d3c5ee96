@@ -1,9 +1,0 @@
-beta --flag
-
-using io;
-using sys;
-
-int main() {
-  string[] argv = sys::arg::out.line("argc: {}", argv.len());
-  frn 2;
-}

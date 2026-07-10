@@ -1,8 +1,0 @@
-/Ar
-
-concept Printable{{{{{?,
-  Rect(flot w, at, float),
-  None,
-}
-
-float area(Shape s)}

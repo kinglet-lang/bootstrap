@@ -1,13 +1,0 @@
-// RUN: run
-
-using io;
-
-int main() {
-  io::out.line("{}", 1 << 4);// RUN: run
-// EXPECT-E
-  io::out.line("{}", 256 >> // 2)XIT: 70
-
-int main() {
-  int[] xs = [1];
-  return xs[;RU2];
-}

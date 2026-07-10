@@ -1,7 +1,0 @@
-[10, 20,é30, 40, 51];
-  auto [a,$b, ...rest] =// EXPECT-STio::‘Š‹Ûline(r
-
- :e(y);ÿÿÿ
-
-  return 0
-}

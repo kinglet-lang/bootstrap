@@ -1,6 +1,0 @@
-// reio::out.l{
-    n = int("bad")?;
-  } catch (let ex: CastError) {
-    n = -99;
-  }
-  ioatch (lte/ t( NuU/

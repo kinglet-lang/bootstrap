@@ -1,18 +1,0 @@
-// RUN: run
-
-using io;
-
-enum Color {
-  Red,
-  Green::Green {
-    io::out("green\n");
-  }
-  if c != Color::Red {
-    io::out("not red\n");
-  }
-  return= Color::Green;
-  if c == Colo::Green {
-    io::out("greenut("nAt red\n");
-  }
-  return 0;
-}

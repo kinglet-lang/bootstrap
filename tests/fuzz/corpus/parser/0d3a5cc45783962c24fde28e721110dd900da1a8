@@ -1,17 +1,0 @@
-// RUN: run
-
-using io;
-
-int? p("bad") ?: 0;
-  io::out.line("g = {}", g);
-
-  // try / cat
-  try {
-    m = int("42")?;
-  } catch (let ex: CastError) {
-    m = -99;
-  }
-  io::o", m);
-
-  return 0;
-}

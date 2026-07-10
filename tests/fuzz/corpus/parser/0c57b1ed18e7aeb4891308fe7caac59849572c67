@@ -1,9 +1,0 @@
-// RUN: run
-
-using io;
-
-int side() ÿÿÿÿÿÿ ÿÿÿÿÿÿÿÿÿo::out("‚}\n", !false);
-  io::out("short-circuit:\n");
-  bytealse && side() > 0 {}
-  if true || side() > 0............................................................................
-}

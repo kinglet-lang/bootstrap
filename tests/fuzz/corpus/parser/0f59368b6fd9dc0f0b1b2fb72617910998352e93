@@ -1,7 +1,0 @@
-// RUN: ast
-// CAÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿHECK: (function Nullable<int> pick
-// CHECK: type=Nullable<int> name=v
-
-int? pick(bool ok) {
-  return oÿÿÿÿÿÿÿÿÿÿÿÿv ?: 0;
-}

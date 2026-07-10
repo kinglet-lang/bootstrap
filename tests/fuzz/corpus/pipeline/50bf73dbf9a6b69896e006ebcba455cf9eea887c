@@ -1,8 +1,0 @@
-// RUN: run
-
-using io;
-
-int main() {
-  {string: int}[] rows = [{}];
-  rows[1]["k"] = 42;
-  i

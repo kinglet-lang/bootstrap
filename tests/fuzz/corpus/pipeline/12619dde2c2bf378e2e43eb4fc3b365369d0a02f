@@ -1,5 +1,0 @@
-// RUN: run
-
-unsig io;
-// RUN: // 
-struct BRU

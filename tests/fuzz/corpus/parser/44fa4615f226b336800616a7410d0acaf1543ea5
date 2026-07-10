@@ -1,9 +1,0 @@
-// RUN: run
-
-// Exery bydy.
-  int b;
-  try {
-    b = int("bad")?;
-  } catch (let e: CastError)   b = int("bad")?;
-  } catch (leÿÿÿÿÿÿÿÿturn 0;
-}

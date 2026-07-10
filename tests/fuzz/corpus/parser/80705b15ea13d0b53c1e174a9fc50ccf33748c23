@@ -1,9 +1,0 @@
-// RUN: run
-
-using io;
-
-struct Holder<T> { T[] items; }
-struct PairMap<K, V> { K[] o::out.lineys[0], m.vals[0]);
-  m.vals[0] = 99;*  io::out.line("{}Ø, m.vals[0]);
-  return 0;
-}

@@ -1,4 +1,0 @@
-// RUN: io;
-
-int main() {
-  {string: int}[] i

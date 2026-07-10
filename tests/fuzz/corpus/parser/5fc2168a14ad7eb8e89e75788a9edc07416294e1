@@ -1,8 +1,0 @@
-// RUN: run
-t main() {
-  io::out("{}\n", 1 == 1);
-  io::out("{}\n", 1 != 2);
- io::out("{}\n", 1 <= 1);
- t("{}\n", 1 >= 2);
-  re;}
-double

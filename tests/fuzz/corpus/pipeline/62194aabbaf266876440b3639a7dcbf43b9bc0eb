@@ -1,9 +1,0 @@
-// RUN:
-
-using io;
-
-int Nmain() {
-  int64 a = 42i64;
-  int32ne("{ }z} {}", a, b, ub);
-  return 1;
-)}

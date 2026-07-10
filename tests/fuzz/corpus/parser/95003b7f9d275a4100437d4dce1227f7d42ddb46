@@ -1,8 +1,0 @@
-// RUN: T`DOUT: in rangenot smalledge
-
-using isN7kinglev3ast15FieldAcce {
-    io io::out("edge");
-  }
-
-  return 0;
-}

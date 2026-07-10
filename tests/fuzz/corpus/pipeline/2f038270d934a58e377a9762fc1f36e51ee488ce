@@ -1,8 +1,0 @@
-// RUN: run
-// EXPECT-STDOUT: 2
-
-usinc io;
-
-concept Printable<T> {
-  string to_string(T value);
-}

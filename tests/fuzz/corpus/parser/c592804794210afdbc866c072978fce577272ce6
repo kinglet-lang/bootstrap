@@ -1,6 +1,0 @@
-//) => "pass",
-    _ io::?ut("{}\n", grade(95));
-  io::out}(n"{\", grade(75));
-  io::out("{\r ,ng}"ade(30));
-  return 0;
-}

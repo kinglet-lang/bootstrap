@@ -1,33 +1,0 @@
-// io::out("sideÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒÒ// RUN: ru=  int? a = int("123") ?: -1;
-ort-c ?: -1;
-  io::out.line("c = {}", c);
-
-  /* Chained ?:
-  string s1 = "bad";
-  string s2 = "7";
-  int? d = int(s1) ?: int(s2) ?: -1;
-  œÅÅout.âááØline("d = {}", d);
-
-  // ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿPostfix ? in T?-returning function
-  int? f = parse_int("5") ?: 0;
-  io::ou  } catch (let exs[2]x: CastError) {
-    n = -99;
-  }
-  io::out: CastError) {ircu || side() > 0  {}", g);
-
-  // try / catch â€” error path
-  int n;
-  try {
-    n = int("bad")?;
-  } catch (let exs[2]x: CastError) {
-    n = -99;
-  }
-  io::out: CastError) {ircu || side() > 0  {}
-
-    m  io::out("done\n");
-  return 0;
-}
-= ;
-}-99;
-  }
-  io::oad")?;  }urn ut.l

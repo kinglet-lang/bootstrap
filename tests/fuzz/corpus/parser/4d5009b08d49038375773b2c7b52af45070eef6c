@@ -1,8 +1,0 @@
-// RUIIIIIIIN: ast
-;
-  string s2 = "7";
-  int? d = int(s1)?:  Mnt(s2) ÿÿÿÿÿÿÿÿ in T?-returning functiotring s2 = "7";
-  int? d = int(s1) () {
-  int? vAr pick(false);
-  return v ?: 0;
-}

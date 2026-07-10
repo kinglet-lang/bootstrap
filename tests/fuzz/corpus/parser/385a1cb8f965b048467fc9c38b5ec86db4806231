@@ -1,9 +1,0 @@
-// RUN: run
-
-using io;
-
-enum Shape {
-  Circle(flrcle(2.14);
-  io::out.line("done");
-  re:urn 0;
-}

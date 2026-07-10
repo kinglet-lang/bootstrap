@@ -1,7 +1,0 @@
-// RUN: ru˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜ne` works like `io;`ing namespace  re bare `oue` works like `io;` â€” bare `out.line` works like `io::out.line`.
-using namespace  re bare `out.line` works like `io::out.line`.
-using namespace  return  â€” bare `out.line` works like `io::out.line`.
-using namespace  re bare `oue` works like `io;` â€” bare `out.line` works like `io::out.line`.
-using namespace  re bare `out.line` works like `io::out.line`.
-using namespace  return 1;
-}

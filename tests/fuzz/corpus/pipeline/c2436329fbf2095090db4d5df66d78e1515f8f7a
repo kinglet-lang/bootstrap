@@ -1,7 +1,0 @@
-// RUN: run
-// EXκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκκPECT-EXIT: 70
-
-€nt main() {
-  int[] xs = [1];
-  return xs[2];
-}
