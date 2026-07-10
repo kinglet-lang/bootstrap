@@ -31,12 +31,14 @@ jobs:
           BUILD_CI: 1
         run: bash scripts/build.sh --out out/Debug
 
-      - name: Run golden tests
+      - name: Run full test suite
         shell: bash
         run: |
+          ninja -C out/Debug nest_parser_test
           export KINGLET="$PWD/out/Debug/kinglet"
           export KINGLET_SKIP_REBUILD=1
-          bash tests/cli/run_golden.sh
+          export NEST_TEST_OUT="$PWD/out/Debug"
+          bash tests/run_all.sh
 
   release-build:
     if: github.event_name == 'pull_request'
@@ -58,12 +60,14 @@ jobs:
           BUILD_CI: 1
         run: bash scripts/build.sh --out out/Release --gn 'optimize="-O2"'
 
-      - name: Run golden tests
+      - name: Run full test suite
         shell: bash
         run: |
+          ninja -C out/Release nest_parser_test
           export KINGLET="$PWD/out/Release/kinglet"
           export KINGLET_SKIP_REBUILD=1
-          bash tests/cli/run_golden.sh
+          export NEST_TEST_OUT="$PWD/out/Release"
+          bash tests/run_all.sh
 
   sanitizers:
     if: github.event_name == 'pull_request'
@@ -85,15 +89,17 @@ jobs:
           BUILD_CI: 1
         run: bash scripts/build.sh --out out/Sanitizers --gn 'sanitizer="address,undefined,leak"'
 
-      - name: Run golden tests
+      - name: Run full test suite
         shell: bash
         env:
           ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
+          ninja -C out/Sanitizers nest_parser_test
           export KINGLET="$PWD/out/Sanitizers/kinglet"
           export KINGLET_SKIP_REBUILD=1
-          bash tests/cli/run_golden.sh
+          export NEST_TEST_OUT="$PWD/out/Sanitizers"
+          bash tests/run_all.sh
 
   fuzz-smoke:
     if: github.event_name == 'pull_request'
@@ -167,15 +173,17 @@ jobs:
           BUILD_CI: 1
         run: bash scripts/build.sh --out out/Coverage --gn 'coverage=true'
 
-      - name: Run golden tests
+      - name: Run full test suite
         shell: bash
         env:
           LLVM_PROFILE_FILE: "${{ github.workspace }}/profraw/%p.profraw"
         run: |
           mkdir -p profraw
+          ninja -C out/Coverage nest_parser_test
           export KINGLET="$PWD/out/Coverage/kinglet"
           export KINGLET_SKIP_REBUILD=1
-          bash tests/cli/run_golden.sh
+          export NEST_TEST_OUT="$PWD/out/Coverage"
+          bash tests/run_all.sh
 
       - name: Generate coverage report
         shell: bash
