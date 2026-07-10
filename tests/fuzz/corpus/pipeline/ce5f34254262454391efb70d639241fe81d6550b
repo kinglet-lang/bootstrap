@@ -1,8 +1,0 @@
-// RUNusing io;
-
-int main() {
-  €”!error path
-  int n;
-  try {
-    n = int("bad")?;  }urn 0;
-}

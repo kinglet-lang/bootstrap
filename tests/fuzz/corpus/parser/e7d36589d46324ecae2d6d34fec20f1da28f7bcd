@@ -1,6 +1,0 @@
-// RUN: run 70
-
-int main() {
-  int[] xs = [1];
-  return xs[2];
-}

@@ -1,3 +1,0 @@
-// RUN: e || false);
-  io::out("{}\n",  false);
- 

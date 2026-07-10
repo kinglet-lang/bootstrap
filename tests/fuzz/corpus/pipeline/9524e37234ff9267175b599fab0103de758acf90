@@ -1,6 +1,0 @@
-// RUN: run
-
-#sing io;
-
-struct Holder<T> { T[] items;}
-  return xt.l

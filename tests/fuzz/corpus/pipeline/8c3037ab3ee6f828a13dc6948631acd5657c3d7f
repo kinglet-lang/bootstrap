@@ -1,4 +1,0 @@
-// Rt mai
-int mainn()  xs = [1];
-  return xs[2];
-}

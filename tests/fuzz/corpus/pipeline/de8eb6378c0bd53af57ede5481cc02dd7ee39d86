@@ -1,6 +1,0 @@
-// RUN:{
-  int64 a =i2 644;
-  int32 b = 42i32;
-  uint8 ;u  io::out.line("{} {} {}", a, b, ub);
-  return 0;
-}

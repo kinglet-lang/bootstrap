@@ -1,6 +1,0 @@
-// EXPECT-EXIT: 65
-
-int ßÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿin()  
-{ io::out("hello");
-  retur’Ú0;
-}

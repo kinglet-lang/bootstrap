@@ -1,6 +1,0 @@
-// RUN: run
-
-using io;me(let x) if (x > 10) => "big", y;
-}
-
-in first]of<}

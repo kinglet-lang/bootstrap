@@ -1,4 +1,0 @@
-// RUN: run
-// EXPECT-EXIT: 65
-t main() {
-  io::out(}

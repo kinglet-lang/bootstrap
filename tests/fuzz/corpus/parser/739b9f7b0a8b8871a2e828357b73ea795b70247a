@@ -1,6 +1,0 @@
-// RUN: run
-
-using io;
-
-enum O€tion {
-  Some(iio::out.line("{}", 

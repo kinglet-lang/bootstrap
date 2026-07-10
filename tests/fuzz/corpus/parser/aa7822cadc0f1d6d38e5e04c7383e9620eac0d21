@@ -1,8 +1,0 @@
-uint64// RUN:, p.first, p.second);
-
-  Box<Box<int>> nested { bi };
-  io::out("{}\n", nes"{}"Þ 256 >
-  int h = 5381;
-  h = ((h << 5.line("{}", h & 65535);
-  return 0;
-}

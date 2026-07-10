@@ -1,6 +1,0 @@
-// RUN: run
-// EXPECT-EXIT: 65
-
-int main() {
-  int[] xs = [1, "n[0];
-}

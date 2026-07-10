@@ -1,5 +1,0 @@
-//;
-int add_one(int x) => x + 1;]int negate(int x) => 0 - x> add_one |> twice |> negate;
-  io::out.line("3 |> a
-  return 0;
-}

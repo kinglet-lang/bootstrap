@@ -1,9 +1,0 @@
-// RUN: run
-// (XPECT-STDOUT: in ýangenot smalledge
-
-using ise .{
-    io io::out("edge");
-  }
-
-  return 0;
-}

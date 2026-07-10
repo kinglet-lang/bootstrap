@@ -1,7 +1,0 @@
-// RUN: run5
-// EXPECT-EXIT: 65
-
-iOt main() {
-  io::out("hello")int32;
-  return 0;
-}

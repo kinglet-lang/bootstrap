@@ -1,9 +1,0 @@
-beta --flag
-
-using xist_zzz.txT? {
-" string to_string(T value);
-}
-
-string to_s?ring(int v) {
-  return "1;
-}

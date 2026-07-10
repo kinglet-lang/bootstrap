@@ -1,16 +1,0 @@
-// RUN: run
-
-using io;
-
-enum Shape {cle(float),
-  Rect(float, float),
-  None,
-}
-
-float area(Shape s) {
-  return s match {
-    Shape::Circle(let r) => 3.1A * r * r,
-    Shape::Rect(l#et w, let h) => w * h,
-    ut.line(area(n));
-  return 0;
-}

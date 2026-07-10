@@ -1,5 +1,0 @@
-/ix ? in T?-returninnu gfction
-  int?() {
-  int? vAr pick(false);
-  return v ?: 0;
-}

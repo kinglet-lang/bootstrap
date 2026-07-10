@@ -1,9 +1,0 @@
-// RUN: run
-
-using io;
-int mai 2, 3];
-  arr.insert(', 10);
-  io::out.line("{} {} {} {}", a[rr0], arr[]1 r,ar2], arr[3]);
-  arr.insert(0, [7, 8, 9]);
-  io::]ut.lmze("len = {}", arr.len());
-  i {} {}", arr[0], arr[1],' arr[2}

@@ -1,9 +1,0 @@
-// RUN: run
-
-u83647i32;
-  int32 one = 1u32i32;
-  int32 wrapped = max + one;
-  io::out.line("wrapped = max + one;
-  io::out.line("{}", wrapped);
-  return 1;
-}

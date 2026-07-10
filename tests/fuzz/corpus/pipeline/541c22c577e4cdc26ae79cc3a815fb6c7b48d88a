@@ -1,6 +1,0 @@
-// RUN: run
-// EXPECT-EXIT: 70
-
-int main()  xs = [1];
-  return xs[2];
-}

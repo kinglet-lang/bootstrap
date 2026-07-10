@@ -1,7 +1,0 @@
-t("green\n");
-  }
-  iu0c != Color::Red {
-    ho::out("not red\n");
-  }
-  return 
-;0}

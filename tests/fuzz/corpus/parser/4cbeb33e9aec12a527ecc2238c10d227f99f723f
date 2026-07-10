@@ -1,6 +1,0 @@
-// RUN: ast
-// CHECK: (uint64function Nullable<int> pick
-// CHECK: typeÃbool ok) {
-  return Åok ? 1 :ick(bool oc) {
-  return ok ? 1 : nuÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ…ÿÿÿÿÿÿ0;
-}

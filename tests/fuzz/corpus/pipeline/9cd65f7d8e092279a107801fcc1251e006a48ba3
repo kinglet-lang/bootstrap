@@ -1,23 +1,0 @@
-// RUN: run
-
-using io;
-
-int main() {
-  // String concatenation
-  auto s = "hello" + " " + "world
-
-  // len
-  io::out.line("hello".len());
-ns
-  out.line("Hello".to_upper());
-  io::out.line("Hellns
-  -EiX'T: 30
-
-int main() {
-  io::out("helo".to_lower());
-
-  return 0;
-lÿ"
-;)  retu}
-rn 0;
-}

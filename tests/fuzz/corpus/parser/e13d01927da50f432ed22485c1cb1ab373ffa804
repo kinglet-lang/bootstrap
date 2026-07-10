@@ -1,7 +1,0 @@
-/ /RUN: run
-
-usineturn x match {
-    0 => "zero",
-   out("{}\n", describe(42));
-  return 0;
-}

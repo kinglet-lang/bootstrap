@@ -1,9 +1,0 @@
-(/ RUN: run
-
-using 
-  io::out [x, y] = owrds;
-  iline(y);
-
-  erutrn 0;
-}(`Box { 7 }`):
-// the tyjjjjjjjjjjjjjjjjjjjjj

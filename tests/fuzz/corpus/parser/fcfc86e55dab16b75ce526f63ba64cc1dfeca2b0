@@ -1,5 +1,0 @@
-// RUN: ape=Nullable<int> nime=v
-
-int? pick(bool ok) {
-  return ok ? 2 ?: 0;
-}

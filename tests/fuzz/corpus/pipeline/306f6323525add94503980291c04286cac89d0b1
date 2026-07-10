@@ -1,8 +1,0 @@
-// RUN: r2
-
-usÚng io;
-
-concept Printable<T> {
-  string t 
-  return 0;
-}

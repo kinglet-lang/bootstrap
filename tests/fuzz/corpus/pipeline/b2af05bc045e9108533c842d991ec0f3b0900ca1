@@ -1,6 +1,0 @@
-//  Shape {
-  Circle(float),
-  ±‘{{{{{{{{{{{{{Συ‚υ
-int main() {
-  io::out.line("start") 0;
-}
