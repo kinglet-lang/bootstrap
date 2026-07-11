@@ -1,0 +1,13 @@
+// ADR 0025: direct canonical qualified type name for an imported struct,
+// without an alias.
+
+import abi.qualified_type_name.pair;
+
+int main() {
+  abi::qualified_type_name::pair::Pair p =
+      abi::qualified_type_name::pair::make(3, 7);
+  if (p.hi != 3 || p.lo != 7) {
+    return 1;
+  }
+  return abi::qualified_type_name::pair::sum(p);
+}

@@ -285,23 +285,26 @@ ast::StmtPtr Parser::var_declaration() {
       }
       skip_array_and_nullable_suffix(tokens_, pos);
       has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
-    } else if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
-      int depth = 1;
-      ++pos;
-      while (pos < tokens_.size() && depth > 0) {
-        if (tokens_[pos].type == TokenType::LESS)
-          ++depth;
-        else if (tokens_[pos].type == TokenType::GREATER)
-          --depth;
-        else if (tokens_[pos].type == TokenType::GREATER_GREATER)
-          depth -= 2;
-        ++pos;
-      }
-      skip_array_and_nullable_suffix(tokens_, pos);
-      has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
     } else {
-      skip_array_and_nullable_suffix(tokens_, pos);
-      has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
+      skip_qualified_type_segments(tokens_, pos);
+      if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
+        int depth = 1;
+        ++pos;
+        while (pos < tokens_.size() && depth > 0) {
+          if (tokens_[pos].type == TokenType::LESS)
+            ++depth;
+          else if (tokens_[pos].type == TokenType::GREATER)
+            --depth;
+          else if (tokens_[pos].type == TokenType::GREATER_GREATER)
+            depth -= 2;
+          ++pos;
+        }
+        skip_array_and_nullable_suffix(tokens_, pos);
+        has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
+      } else {
+        skip_array_and_nullable_suffix(tokens_, pos);
+        has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
+      }
     }
   }
   if (has_type) {

@@ -1,0 +1,21 @@
+// RUN: ast
+// CHECK: type=module::Type name=a
+// CHECK: type=Nullable<module::Type> name=b
+// CHECK: type=module::Type[] name=c
+// CHECK: type=&<module::Type> name=d
+// CHECK: type=&mut<module::Type> name=e
+// CHECK: (function module::Box<int> make_box
+
+module::Box<int> make_box(module::Type a) {
+  module::Box<int> box;
+  return box;
+}
+
+int main() {
+  module::Type a;
+  module::Type? b = null;
+  module::Type[] c;
+  &module::Type d = &a;
+  &mut module::Type e = &mut a;
+  return 0;
+}

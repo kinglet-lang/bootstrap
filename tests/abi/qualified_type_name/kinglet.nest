@@ -1,0 +1,15 @@
+project "abi-qualified-type-name" version "0.1.0"
+
+target app {
+  kind    = "binary"
+  sources = ["main.kl", "pair.kl"]
+}
+
+target app_alias {
+  kind    = "binary"
+  sources = ["main_alias.kl", "pair.kl"]
+}
+
+build {
+  default = "app"
+}

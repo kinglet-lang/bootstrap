@@ -1,0 +1,17 @@
+// ADR 0025: struct exported by an imported module, addressed by its
+// namespace-qualified type name from the consumer.
+
+export module abi.qualified_type_name.pair;
+
+pub struct Pair {
+  int hi;
+  int lo;
+}
+
+pub Pair make(int hi, int lo) {
+  return Pair { hi, lo };
+}
+
+pub int sum(Pair p) {
+  return p.hi * 10 + p.lo;
+}

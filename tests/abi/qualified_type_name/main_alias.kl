@@ -1,0 +1,10 @@
+// ADR 0025: qualified type name resolved through a `using alias = module;`
+// module alias, not the canonical module id.
+
+import abi.qualified_type_name.pair;
+using pair = abi.qualified_type_name.pair;
+
+int main() {
+  pair::Pair p = pair::make(4, 2);
+  return pair::sum(p);
+}

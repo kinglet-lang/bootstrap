@@ -29,6 +29,16 @@ void skip_array_and_nullable_suffix(const std::vector<Token> &tokens, size_t &po
   }
 }
 
+// Advances `pos` past `(:: IDENTIFIER)*` following a type name's leading
+// identifier, so declaration-start lookahead recognizes namespace-qualified
+// type names (0025) the same way `parse_type_expr` does.
+void skip_qualified_type_segments(const std::vector<Token> &tokens, size_t &pos) {
+  while (pos + 1 < tokens.size() && tokens[pos].type == TokenType::COLON_COLON &&
+         tokens[pos + 1].type == TokenType::IDENTIFIER) {
+    pos += 2;
+  }
+}
+
 ast::AssignOp token_to_assign_op(TokenType type) {
   switch (type) {
   case TokenType::EQUAL:
@@ -328,6 +338,7 @@ bool Parser::is_declaration_start() const {
       peek().type == TokenType::AUTO) {
     return true;
   }
+  skip_qualified_type_segments(tokens_, pos);
   // Skip balanced <...> to find the identifier after the type
   if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
     int depth = 1;
@@ -382,6 +393,7 @@ bool Parser::is_function_declaration_start() const {
     return false;
   // Skip balanced <...> after the type name to find IDENTIFIER then '(' or '<'
   size_t pos = current_ + 1;
+  skip_qualified_type_segments(tokens_, pos);
   if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
     int depth = 1;
     ++pos;
