@@ -1,0 +1,36 @@
+// RUN: check
+
+// Regression: a concept-generic function must be able to forward its own
+// concept-typed parameter, unchanged, as an argument to another
+// concept-generic function parameterized over the same concept. Prior to
+// this fixture existing, the checker treated the abstract concept type of
+// the forwarded parameter as if it were a concrete type being checked for
+// concept satisfaction, and rejected the call with a bogus "Type 'reader'
+// does not satisfy concept 'reader': missing 'read'" error -- blocking the
+// exact layered-generic-algorithm shape this fixture exercises.
+
+concept reader<T> {
+  int read(T self);
+}
+
+struct file {
+  int fd;
+}
+
+int read(file self) {
+  return 7;
+}
+
+int inner_consume(reader input) {
+  return input.read();
+}
+
+int outer_consume(reader input) {
+  return inner_consume(input);
+}
+
+int main() {
+  file f;
+  f.fd = 1;
+  return outer_consume(f);
+}

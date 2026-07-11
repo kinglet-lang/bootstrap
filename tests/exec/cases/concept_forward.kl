@@ -1,0 +1,36 @@
+// RUN: run
+// EXPECT-STDOUT: 7
+
+// Regression: a concept-generic function forwarding its own concept-typed
+// parameter unchanged to another concept-generic function over the same
+// concept must actually monomorphize and dispatch correctly at runtime, not
+// just be accepted by the checker.
+
+using io;
+
+concept reader<T> {
+  int read(T self);
+}
+
+struct file {
+  int fd;
+}
+
+int read(file self) {
+  return 7;
+}
+
+int inner_consume(reader input) {
+  return input.read();
+}
+
+int outer_consume(reader input) {
+  return inner_consume(input);
+}
+
+int main() {
+  file f;
+  f.fd = 1;
+  io::out.line(outer_consume(f));
+  return 0;
+}

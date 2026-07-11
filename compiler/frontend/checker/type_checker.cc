@@ -409,6 +409,16 @@ bool types_assignable(const Type &from, const Type &to) {
     }
     return normalize_generic_mangle(from.name) == normalize_generic_mangle(to.name);
   }
+  if (from.kind == TypeKind::Concept && to.kind == TypeKind::Concept) {
+    // Both sides are still abstract (e.g. a concept-generic function
+    // forwarding its own concept-typed parameter to another
+    // concept-generic function over the same concept). There's no
+    // concrete type to check satisfaction against yet -- that happens
+    // when the enclosing function is monomorphized at its own call site.
+    // Matching concept names is all that can (and needs to) be verified
+    // here.
+    return from.name == to.name;
+  }
   if (to.kind == TypeKind::Concept) {
     return false; // handled at call sites with explicit satisfaction checks
   }
@@ -3195,6 +3205,19 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
             continue;
           }
           const std::string &concept_name = param_ty.name;
+          // If the argument's own static type is still an abstract concept
+          // (the enclosing function forwarding its own concept-typed
+          // parameter through unchanged), there's no concrete type to bind
+          // or satisfaction-check yet -- that only happens once the
+          // enclosing function itself is monomorphized at its call site.
+          // Just verify the concept names line up and move on.
+          if (arg_types[i].kind == TypeKind::Concept) {
+            if (arg_types[i].name != concept_name) {
+              error_at(call_expr.args[i]->location,
+                       "Expected " + concept_name + ", got " + arg_types[i].name + ".");
+            }
+            continue;
+          }
           auto binding_it = concept_bindings.find(concept_name);
           if (binding_it == concept_bindings.end()) {
             concept_bindings.insert_or_assign(concept_name, arg_types[i]);
