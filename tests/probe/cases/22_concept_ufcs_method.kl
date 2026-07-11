@@ -1,0 +1,32 @@
+// EXPECT_OUT: 7
+// Regression: a concept-typed parameter must be bound to its concrete
+// call-site type when the monomorphized function body dispatches a
+// method call via UFCS (obj.method()), not just when the callee itself is
+// a free function (concept_greet.kl / 26_concept_qualified.kl style). Prior
+// to this fixture existing, `input.read()` inside `consume` silently
+// compiled to a bogus field-access + call on the concept placeholder type
+// and returned 0 instead of 7 -- no parse/check/compile error, just a wrong
+// answer.
+using io;
+concept reader<T> {
+  int read(T self);
+}
+
+struct file {
+  int fd;
+}
+
+int read(file self) {
+  return 7;
+}
+
+int consume(reader input) {
+  return input.read();
+}
+
+int main() {
+  file f;
+  f.fd = 1;
+  io::out.line(consume(f));
+  return 0;
+}

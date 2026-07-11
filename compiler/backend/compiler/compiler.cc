@@ -225,8 +225,8 @@ CompileResult Compiler::compile(const ast::Program &program) {
   while (!pending_generic_funcs_.empty() && errors_.empty()) {
     auto pending = std::move(pending_generic_funcs_);
     pending_generic_funcs_.clear();
-    for (const auto &[name, decl] : pending) {
-      compile_function(*decl, name);
+    for (const auto &entry : pending) {
+      compile_function(*entry.decl, entry.mangled_name, entry.param_type_overrides);
       if (!errors_.empty())
         break;
     }
@@ -501,7 +501,9 @@ std::string Compiler::infer_arg_type_name(const ast::Expr &expr) const {
   return infer_struct_type(expr);
 }
 
-void Compiler::compile_function(const ast::FunctionDecl &function, const std::string &lookup_name) {
+void Compiler::compile_function(
+    const ast::FunctionDecl &function, const std::string &lookup_name,
+    const std::unordered_map<std::string, std::string> &param_type_overrides) {
   locals_.clear();
   scope_stack_.clear();
   local_types_.clear();
@@ -529,7 +531,17 @@ void Compiler::compile_function(const ast::FunctionDecl &function, const std::st
         local_types_["self"] = lookup_name.substr(0, sep);
       }
     } else if (!param.type.name.empty()) {
-      local_types_[param.name] = param.type.name;
+      // For a monomorphized instance of a generic or concept-generic
+      // function, bind the param to the concrete type substituted at the
+      // call site (e.g. "file") instead of the placeholder declared in the
+      // signature (e.g. "T" or the concept name "reader"). Without this,
+      // UFCS method calls inside the body (e.g. `input.read()`) can never
+      // resolve to the concrete type's free function, since
+      // infer_arg_type_name/resolve_free_function_for_type only match on
+      // concrete type names.
+      auto override_it = param_type_overrides.find(param.type.name);
+      local_types_[param.name] =
+          override_it != param_type_overrides.end() ? override_it->second : param.type.name;
     }
   }
 
@@ -1499,7 +1511,17 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         });
         record_function_source(idx, entry_source_path_);
         function_indices_[mangled] = idx;
-        pending_generic_funcs_.push_back({mangled, decl});
+        // Bind each type parameter (e.g. "T") to its concrete substitution
+        // (e.g. "file") for this instantiation. Without this, compiling the
+        // body binds locals to the placeholder type-param name instead of
+        // the concrete type, so UFCS method calls inside the body (e.g.
+        // `input.read()`) can never resolve to the concrete type's free
+        // function and silently compile to a bogus field-access + call.
+        std::unordered_map<std::string, std::string> overrides;
+        for (std::size_t i = 0; i < decl->type_params.size(); ++i) {
+          overrides[decl->type_params[i]] = type_arg_names[i];
+        }
+        pending_generic_funcs_.push_back({mangled, decl, std::move(overrides)});
       }
       func_it = function_indices_.find(mangled);
       if (func_it != function_indices_.end()) {
@@ -1518,13 +1540,23 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
   if (callee_id && sema_->concept_generic_functions_.count(callee_id->name)) {
     const ast::FunctionDecl *decl = sema_->concept_generic_functions_.at(callee_id->name);
     std::string concrete_ty;
+    // Bind every concept-typed parameter's declared type name (e.g.
+    // "reader") to the concrete type inferred from its call-site argument
+    // (e.g. "file"). Mangling below only uses the first one found (matching
+    // prior behavior), but all of them need a local_types_ override so
+    // UFCS calls on any concept-typed parameter resolve inside the compiled
+    // body. Keyed by declared type name, not param name, since
+    // compile_function looks up overrides by param.type.name.
+    std::unordered_map<std::string, std::string> overrides;
     for (std::size_t i = 0; i < decl->params.size() && i < call_expr.args.size(); ++i) {
       const ast::TypeExpr &pt = decl->params[i].type;
       if (pt.type_args.empty() && sema_->concept_registry_.count(pt.name)) {
         const std::string ty = infer_arg_type_name(*call_expr.args[i]);
         if (!ty.empty()) {
-          concrete_ty = ty;
-          break;
+          overrides[pt.name] = ty;
+          if (concrete_ty.empty()) {
+            concrete_ty = ty;
+          }
         }
       }
     }
@@ -1540,7 +1572,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         });
         record_function_source(idx, entry_source_path_);
         function_indices_[mangled] = idx;
-        pending_generic_funcs_.push_back({mangled, decl});
+        pending_generic_funcs_.push_back({mangled, decl, std::move(overrides)});
       }
       func_it = function_indices_.find(mangled);
       if (func_it != function_indices_.end()) {

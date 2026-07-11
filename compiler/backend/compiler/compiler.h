@@ -59,7 +59,9 @@ private:
   void push_scope();
   void pop_scope();
 
-  void compile_function(const ast::FunctionDecl &function, const std::string &lookup_name = "");
+  void
+  compile_function(const ast::FunctionDecl &function, const std::string &lookup_name = "",
+                   const std::unordered_map<std::string, std::string> &param_type_overrides = {});
   void compile_stmt(const ast::Stmt &stmt);
   void compile_expr(const ast::Expr &expr);
   void compile_assignment(const ast::AssignExpr &assign);
@@ -180,7 +182,18 @@ private:
   std::unordered_map<std::string, int> function_indices_;
   std::unordered_map<std::string, int> struct_indices_;
   std::unordered_map<std::string, int> enum_indices_;
-  std::vector<std::pair<std::string, const ast::FunctionDecl *>> pending_generic_funcs_;
+  struct PendingGenericFunc {
+    std::string mangled_name;
+    const ast::FunctionDecl *decl;
+    // Maps each type-parameter / concept-parameter name (as written in the
+    // declaration, e.g. "T" or the concept name "reader") to the concrete
+    // type substituted at this call site (e.g. "file"). Applied as
+    // local_types_ overrides when compiling this monomorphized instance, so
+    // UFCS method dispatch inside the body resolves against the concrete
+    // type instead of the placeholder name.
+    std::unordered_map<std::string, std::string> param_type_overrides;
+  };
+  std::vector<PendingGenericFunc> pending_generic_funcs_;
   const ast::ExprStmt *implicit_return_stmt_ = nullptr;
   ModuleLoader *module_loader_ = nullptr;
   std::unordered_map<std::string, std::string> namespace_aliases_;
