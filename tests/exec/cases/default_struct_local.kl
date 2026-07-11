@@ -1,0 +1,22 @@
+// RUN: run
+// EXPECT-STDOUT: 5
+
+// Regression: a struct local declared without an initializer (`Box b;`)
+// must allocate a real default-valued struct, not a null placeholder.
+// Before the fix, the bare declaration compiled to `const_null; store_local`,
+// so the subsequent `b.fd = 5` field-set silently no-op'd against null and
+// `b.fd` read back 0 instead of 5 -- no parse/check/compile error, just a
+// wrong answer.
+
+using io;
+
+struct Box {
+  int fd;
+}
+
+int main() {
+  Box b;
+  b.fd = 5;
+  io::out.line(b.fd);
+  return 0;
+}

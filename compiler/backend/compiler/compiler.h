@@ -144,6 +144,14 @@ private:
   void compile_lvalue_addr(const ast::Expr &expr);
   bool declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot);
   int resolve_struct(const ast::TypeExpr &type);
+  // Emits a real, type-appropriate default value for a local declared
+  // without an initializer (e.g. `Box b;`, `int[] buf;`) instead of a bare
+  // null placeholder. Structs get a StructNew with all-null fields (matching
+  // the existing "omitted trailing fields" literal semantics), arrays/maps
+  // get an empty ArrayNew/MapNew, strings get an empty string, and scalars
+  // keep their existing zero-value Null encoding. See declare_local callers
+  // in compile_stmt.
+  void emit_default_value(const ast::TypeExpr &type, ast::SourceLocation location);
   void error_at(ast::SourceLocation location, std::string message);
   void warning_at(ast::SourceLocation location, std::string message);
 

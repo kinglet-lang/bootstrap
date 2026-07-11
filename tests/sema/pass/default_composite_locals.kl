@@ -1,0 +1,22 @@
+// RUN: check
+
+// Regression: struct, array, and map locals declared without an
+// initializer must check successfully (they already did before this fix --
+// the checker never flagged the missing initializer). This fixture pins
+// that acceptance so the paired exec fixtures (default_struct_local.kl,
+// default_array_local.kl, default_map_local.kl) can focus purely on the
+// runtime allocation fix.
+
+struct Box {
+  int fd;
+}
+
+int main() {
+  Box b;
+  b.fd = 1;
+  int[] arr;
+  arr.push(1);
+  {int: int} m;
+  m[0] = 1;
+  return b.fd + arr.len() + m[0];
+}
