@@ -1,0 +1,37 @@
+// RUN: check
+// COMPILE-FAIL
+// CHECK-ERR: Argument type mismatch
+
+// Regression: a concept-typed parameter's UFCS method call
+// (`input.read(buffer)`) must be validated against the concept's own
+// declared method signature. Prior to this fixture existing, function
+// bodies whose parameters are typed by a bare concept name were never
+// type-checked at all (see check_function skip in the second declaration
+// pass), so arity, argument type, and return type mismatches in
+// concept-typed UFCS calls were silently accepted here and only surfaced
+// as an unexplained runtime abort at the call site's concrete type.
+
+struct file {
+  int fd;
+}
+
+uint64 read(file self, &mut byte[] buffer) {
+  buffer.push(1u8);
+  return 1u64;
+}
+
+concept reader<T> {
+  uint64 read(T self, &mut byte[] buffer);
+}
+
+uint64 consume(reader input, byte[] buffer) {
+  return input.read(buffer);
+}
+
+int main() {
+  file f;
+  f.fd = 1;
+  byte[] buf;
+  consume(f, buf);
+  return 0;
+}

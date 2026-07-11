@@ -1575,7 +1575,15 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       continue;
     }
     if (const auto *func = dynamic_cast<const ast::FunctionDecl *>(decl.get())) {
-      if (func->type_params.empty() && !function_uses_concept_params(*func)) {
+      // Concept-generic functions (params typed by a bare concept name, e.g.
+      // `reader input`) skip the plain-generic monomorphization path used for
+      // `<T>` functions, but their bodies still need to be walked here: this
+      // is the only place a concept-typed parameter's UFCS method calls
+      // (`input.read(...)`) get checked against the concept's declared
+      // method signatures (see check_field_access's TypeKind::Concept
+      // branch). Ordinary generic `<T>` functions remain unchecked at
+      // declaration site since `T` carries no signature to check against.
+      if (func->type_params.empty()) {
         check_function(*func);
       }
     }
@@ -3041,6 +3049,51 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
         return resolve_type_expr(decl->return_type);
       }
     }
+    // A concept-typed receiver (e.g. the `reader input` parameter inside a
+    // concept-generic function body) has no concrete type to key
+    // lookup_ufcs_free_method on -- the call site's real argument type only
+    // exists outside this function. Validate against the concept's own
+    // declared method signature instead, so arity/argument/return-type
+    // mismatches are caught here rather than silently skipped and left to
+    // fail at runtime with no diagnostic.
+    if (obj_type.kind == TypeKind::Concept) {
+      auto concept_it = sema_.concept_registry_.find(obj_type.name);
+      if (concept_it != sema_.concept_registry_.end()) {
+        const ast::ConceptDecl *concept_decl = concept_it->second;
+        const ast::ConceptMethodDecl *method = nullptr;
+        for (const auto &m : concept_decl->methods) {
+          if (m.name == field_callee->field_name) {
+            method = &m;
+            break;
+          }
+        }
+        if (method == nullptr) {
+          error_at(call_expr.location, "Concept '" + concept_decl->name + "' has no method '" +
+                                           field_callee->field_name + "'.");
+          return int_type();
+        }
+        if (call_expr.args.size() + 1 != method->params.size()) {
+          error_at(call_expr.location, "Expected " + std::to_string(method->params.size() - 1) +
+                                           " arguments, got " +
+                                           std::to_string(call_expr.args.size()) + ".");
+        }
+        std::unordered_map<std::string, ast::TypeExpr> subst;
+        if (concept_decl->type_params.size() == 1) {
+          subst[concept_decl->type_params[0]] = type_to_type_expr(obj_type);
+        }
+        for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
+          Type arg_type = check_expr(*call_expr.args[i]);
+          if (i + 1 < method->params.size()) {
+            Type param_type =
+                resolve_type_expr(substitute_type_params(method->params[i + 1].type, subst));
+            if (!types_assignable(arg_type, param_type)) {
+              error_at(call_expr.args[i]->location, "Argument type mismatch.");
+            }
+          }
+        }
+        return resolve_type_expr(substitute_type_params(method->return_type, subst));
+      }
+    }
     auto ufcs_ret = lookup_ufcs_free_method(field_callee->field_name, obj_type, call_expr.args,
                                             call_expr.location);
     if (ufcs_ret.has_value()) {
@@ -3196,6 +3249,68 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
           }
         }
         return ret;
+      }
+      // A bare identifier call whose first argument's static type is
+      // abstract (TypeKind::Concept) is invoking that concept's own
+      // declared method via ordinary call syntax -- e.g. `to_string(item)`
+      // inside a concept-generic function body where `item: Printable`,
+      // as opposed to the qualified `Printable::to_string(item)` or UFCS
+      // `item.to_string()` spellings. The concrete type behind `item` only
+      // exists at the call site outside this function, so this can't be
+      // resolved against a concrete free function here; validate against
+      // the concept's declared method signature instead, using the same
+      // technique as the qualified/UFCS paths (see lookup_concept_method
+      // and check_field_access's TypeKind::Concept branch).
+      //
+      // The peek below uses lookup_var directly instead of check_expr to
+      // avoid evaluating the argument expression twice: if this branch
+      // doesn't match, the general call path below still needs to run
+      // check_expr on every argument including this one, and check_expr can
+      // have side effects (borrow tracking, error reporting). A
+      // concept-typed value can only originate from a parameter bound by
+      // name in the current scope, so a plain identifier lookup is
+      // sufficient to detect it without touching more complex expressions.
+      if (!call_expr.args.empty()) {
+        std::optional<Type> first_arg_type;
+        if (const auto *first_id =
+                dynamic_cast<const ast::IdentifierExpr *>(call_expr.args[0].get())) {
+          first_arg_type = lookup_var(first_id->name);
+        }
+        if (first_arg_type.has_value() && first_arg_type->kind == TypeKind::Concept) {
+          auto concept_it = sema_.concept_registry_.find(first_arg_type->name);
+          if (concept_it != sema_.concept_registry_.end()) {
+            const ast::ConceptDecl *concept_decl = concept_it->second;
+            const ast::ConceptMethodDecl *method = nullptr;
+            for (const auto &m : concept_decl->methods) {
+              if (m.name == callee_id->name) {
+                method = &m;
+                break;
+              }
+            }
+            if (method != nullptr) {
+              if (call_expr.args.size() != method->params.size()) {
+                error_at(call_expr.location, "Expected " + std::to_string(method->params.size()) +
+                                                 " arguments, got " +
+                                                 std::to_string(call_expr.args.size()) + ".");
+              }
+              std::unordered_map<std::string, ast::TypeExpr> subst;
+              if (concept_decl->type_params.size() == 1) {
+                subst[concept_decl->type_params[0]] = type_to_type_expr(*first_arg_type);
+              }
+              for (std::size_t i = 1; i < call_expr.args.size(); ++i) {
+                Type arg_type = check_expr(*call_expr.args[i]);
+                if (i < method->params.size()) {
+                  Type param_type =
+                      resolve_type_expr(substitute_type_params(method->params[i].type, subst));
+                  if (!types_assignable(arg_type, param_type)) {
+                    error_at(call_expr.args[i]->location, "Argument type mismatch.");
+                  }
+                }
+              }
+              return resolve_type_expr(substitute_type_params(method->return_type, subst));
+            }
+          }
+        }
       }
     }
   }
