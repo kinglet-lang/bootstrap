@@ -1,0 +1,15 @@
+// RUN: run
+// EXPECT-STDOUT: 5
+
+// Regression: same null-placeholder bug as default_array_local.kl and
+// default_struct_local.kl, but for map locals ({K: V} m;). A bare map
+// declaration must allocate a real empty map, not a null placeholder.
+
+using io;
+
+int main() {
+  {int: int} m;
+  m[0] = 5;
+  io::out.line(m[0]);
+  return 0;
+}

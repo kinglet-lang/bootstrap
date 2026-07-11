@@ -1,0 +1,17 @@
+// RUN: run
+// EXPECT-STDOUT: 1
+
+// Regression: an array local declared without an initializer (`int[] buf;`)
+// must allocate a real empty array, not a null placeholder. Before the fix
+// the bare declaration compiled to `const_null; store_local`, so the
+// subsequent `buf.push(1)` silently no-op'd against null and `buf.len()`
+// read back 0 instead of 1.
+
+using io;
+
+int main() {
+  int[] buf;
+  buf.push(1);
+  io::out.line(buf.len());
+  return 0;
+}

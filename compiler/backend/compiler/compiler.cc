@@ -664,7 +664,7 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     if (var_decl->init) {
       compile_expr(*var_decl->init);
     } else {
-      emit(LoweringOp::Null, var_decl->location);
+      emit_default_value(var_decl->type, var_decl->location);
     }
     emit_operand(LoweringOp::StoreLocal, slot, var_decl->location);
     emit(LoweringOp::Pop, var_decl->location);
@@ -2343,6 +2343,48 @@ bool Compiler::declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot) {
   });
   *slot = static_cast<uint32_t>(locals_.size() - 1);
   return true;
+}
+
+void Compiler::emit_default_value(const ast::TypeExpr &type, ast::SourceLocation location) {
+  // `T?` (Nullable<T>) is explicitly opt-in nullability -- null is the
+  // correct, intentional default here, not a bug.
+  if (type.name == "Nullable") {
+    emit(LoweringOp::Null, location);
+    return;
+  }
+  if (type.name == "Array") {
+    emit_operand(LoweringOp::ArrayNew, 0, location);
+    return;
+  }
+  if (type.name == "Map") {
+    emit_operand(LoweringOp::MapNew, 0, location);
+    return;
+  }
+  if (type.name == "string") {
+    emit_constant(Value::string_value(""), location);
+    return;
+  }
+  const int struct_idx = resolve_struct(type);
+  if (struct_idx >= 0) {
+    // Mirrors compile_struct_literal's handling of a literal that omits
+    // trailing fields: every field slot gets a Null placeholder, so scalar
+    // fields read back as their zero value and nested heap-typed fields
+    // read back as null (avoiding unbounded recursion through
+    // self-referential or mutually-referential struct fields).
+    const auto &meta = struct_metas_[static_cast<std::size_t>(struct_idx)];
+    for (std::size_t i = 0; i < meta.field_names.size(); ++i) {
+      emit(LoweringOp::Null, location);
+    }
+    emit_operand(
+        LoweringOp::StructNew,
+        static_cast<uint32_t>((struct_idx << 16) | static_cast<int>(meta.field_names.size())),
+        location);
+    return;
+  }
+  // Scalars (int, float, bool, char) and any other type without a more
+  // specific default: the existing zero-value Null encoding already reads
+  // back correctly for these (see kir_typing.cc's ConstNull handling).
+  emit(LoweringOp::Null, location);
 }
 
 int Compiler::resolve_struct(const ast::TypeExpr &type) {
