@@ -1,0 +1,9 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: Unknown type 'bogus::Type'
+
+int main() {
+  bogus::Type v;
+  return 0;
+}

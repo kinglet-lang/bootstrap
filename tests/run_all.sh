@@ -37,6 +37,7 @@ run_suite "Module hierarchical" "$ROOT/tests/module/hierarchical/run.sh"
 run_suite "Nest manifest" "$ROOT/tests/nest/run_golden.sh"
 run_suite "Formatter" "$ROOT/tests/fmt/run_golden.sh"
 run_suite "ABI cross-module struct" "$ROOT/tests/abi/cross_module_struct/run.sh"
+run_suite "ABI qualified type name" "$ROOT/tests/abi/qualified_type_name/run.sh"
 
 bash "$ROOT/tests/probe/run_matrix.sh"
 TOTAL=$((TOTAL + 1))

@@ -16,6 +16,7 @@ namespace kinglet {
 
 bool is_assignment_operator(TokenType type);
 void skip_array_and_nullable_suffix(const std::vector<Token> &tokens, size_t &pos);
+void skip_qualified_type_segments(const std::vector<Token> &tokens, size_t &pos);
 ast::AssignOp token_to_assign_op(TokenType type);
 ast::BinaryOp token_to_binary_op(TokenType type);
 ast::UnaryOp token_to_unary_op(TokenType type);

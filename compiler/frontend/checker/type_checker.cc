@@ -778,18 +778,20 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
       concept_type.name = expr.name;
       return concept_type;
     }
-    Type t = resolve_type_name(expr.name);
+    const std::string resolved_name = resolve_qualified_type_name(expr.name);
+    Type t = resolve_type_name(resolved_name);
     if (t.name.find("<unknown:") == 0 && loc.line > 0) {
       error_at(loc, "Unknown type '" + expr.name + "'.");
     }
     return t;
   }
-  std::string mangled = mangle_name(expr.name, expr.type_args);
+  const std::string resolved_base = resolve_qualified_type_name(expr.name);
+  std::string mangled = mangle_name(resolved_base, expr.type_args);
   auto it = type_registry_.find(mangled);
   if (it != type_registry_.end()) {
     return it->second;
   }
-  auto gen_it = sema_.generic_structs_.find(expr.name);
+  auto gen_it = sema_.generic_structs_.find(resolved_base);
   if (gen_it != sema_.generic_structs_.end()) {
     instantiate_generic_struct(gen_it->second, expr.type_args);
     auto inst_it = type_registry_.find(mangled);
@@ -848,13 +850,29 @@ void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl,
 // module exports, so that recursive variant payloads and cross-type references
 // resolve to the type rather than Void when the body is processed later. This
 // mirrors the local forward-declaration pass for imported modules.
-void TypeChecker::forward_declare_imported_types(const ParsedModule &mod) {
+//
+// Each placeholder is registered under both its bare name (existing behavior,
+// relied on by callers that reference the imported type unqualified after
+// `using namespace`) and its namespace-qualified name (ADR 0025), e.g. both
+// `Pair` and `abi::pair::Pair` when `qualifier` is `abi::pair`. `qualifier`
+// may be empty when no module-id-derived prefix is available, in which case
+// only the bare name is registered.
+void TypeChecker::forward_declare_imported_types(const ParsedModule &mod,
+                                                 const std::string &qualifier) {
+  auto qualified = [&](const std::string &name) {
+    return qualifier.empty() ? name : qualifier + "::" + name;
+  };
   for (const ast::StructDecl *sd : mod.public_structs) {
     if (!sd->type_params.empty())
       continue;
     Type fwd(TypeKind::Struct);
     fwd.name = sd->name;
     type_registry_.insert_or_assign(sd->name, fwd);
+    if (!qualifier.empty()) {
+      Type qfwd(TypeKind::Struct);
+      qfwd.name = qualified(sd->name);
+      type_registry_.insert_or_assign(qfwd.name, qfwd);
+    }
   }
   for (const ast::StructDecl *sd : mod.private_structs) {
     if (!sd->type_params.empty())
@@ -862,16 +880,31 @@ void TypeChecker::forward_declare_imported_types(const ParsedModule &mod) {
     Type fwd(TypeKind::Struct);
     fwd.name = sd->name;
     type_registry_.insert_or_assign(sd->name, fwd);
+    if (!qualifier.empty()) {
+      Type qfwd(TypeKind::Struct);
+      qfwd.name = qualified(sd->name);
+      type_registry_.insert_or_assign(qfwd.name, qfwd);
+    }
   }
   for (const ast::EnumDecl *ed : mod.public_enums) {
     Type fwd(TypeKind::Enum);
     fwd.name = ed->name;
     type_registry_.insert_or_assign(ed->name, fwd);
+    if (!qualifier.empty()) {
+      Type qfwd(TypeKind::Enum);
+      qfwd.name = qualified(ed->name);
+      type_registry_.insert_or_assign(qfwd.name, qfwd);
+    }
   }
   for (const ast::EnumDecl *ed : mod.private_enums) {
     Type fwd(TypeKind::Enum);
     fwd.name = ed->name;
     type_registry_.insert_or_assign(ed->name, fwd);
+    if (!qualifier.empty()) {
+      Type qfwd(TypeKind::Enum);
+      qfwd.name = qualified(ed->name);
+      type_registry_.insert_or_assign(qfwd.name, qfwd);
+    }
   }
 }
 
@@ -943,7 +976,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       auto result = module_loader_->load(id->path);
       if (!result.module)
         continue;
-      forward_declare_imported_types(*result.module);
+      forward_declare_imported_types(*result.module,
+                                     module_id_to_qualifier(result.module->namespace_name));
       // One level of transitive deps: a module's pub type may reference a type
       // that module itself imports.
       if (result.module->program) {
@@ -956,14 +990,16 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         for (const ast::ImportDecl *iid : inner_imports) {
           auto inner_result = module_loader_->load_from(iid->path, mod_dir);
           if (inner_result.module) {
-            forward_declare_imported_types(*inner_result.module);
+            forward_declare_imported_types(
+                *inner_result.module, module_id_to_qualifier(inner_result.module->namespace_name));
           }
         }
         for (const auto &inner : result.module->program->declarations) {
           if (const auto *logical = dynamic_cast<const ast::LogicalImportDecl *>(inner.get())) {
             auto inner_result = module_loader_->resolve_logical(logical->module_id);
             for (const ParsedModule *inner_mod : inner_result.modules) {
-              forward_declare_imported_types(*inner_mod);
+              forward_declare_imported_types(*inner_mod,
+                                             module_id_to_qualifier(inner_mod->namespace_name));
             }
           }
         }
@@ -974,7 +1010,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       if (const auto *logical = dynamic_cast<const ast::LogicalImportDecl *>(decl.get())) {
         auto result = module_loader_->resolve_logical(logical->module_id);
         for (const ParsedModule *mod : result.modules) {
-          forward_declare_imported_types(*mod);
+          forward_declare_imported_types(*mod, module_id_to_qualifier(mod->namespace_name));
         }
       }
     }
@@ -1318,21 +1354,29 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           }
           for (const auto *sd : mod.public_structs) {
             if (sd->type_params.empty()) {
+              // Canonical name is always the namespace-qualified form (ADR
+              // 0025). Both the bare key (existing leak, relied on by
+              // `using namespace`) and the qualified key map to a Type
+              // sharing this one name, so `Pair` and `abi::pair::Pair`
+              // referring to the same struct compare equal in
+              // types_assignable (which compares Type::name).
               Type struct_type(TypeKind::Struct);
-              struct_type.name = sd->name;
+              struct_type.name = qual + "::" + sd->name;
               for (const auto &field : sd->fields) {
                 Type ft = resolve_type_expr(field.type);
                 struct_type.fields.push_back(
                     FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft)});
               }
               type_registry_.insert_or_assign(sd->name, struct_type);
+              type_registry_.insert_or_assign(struct_type.name, struct_type);
             } else {
               sema_.generic_structs_[sd->name] = sd;
+              sema_.generic_structs_[qual + "::" + sd->name] = sd;
             }
           }
           for (const auto *ed : mod.public_enums) {
             Type enum_type(TypeKind::Enum);
-            enum_type.name = ed->name;
+            enum_type.name = qual + "::" + ed->name;
             for (const auto &v : ed->variants) {
               enum_type.variants.push_back(v.name);
               std::vector<Type> ptypes;
@@ -1341,6 +1385,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
               enum_type.variant_param_types.push_back(std::move(ptypes));
             }
             type_registry_.insert_or_assign(ed->name, enum_type);
+            type_registry_.insert_or_assign(enum_type.name, enum_type);
           }
           for (const auto *fn : mod.public_functions) {
             Type return_type = resolve_type_expr(fn->return_type);
@@ -4058,6 +4103,26 @@ std::string TypeChecker::resolve_module_qualified(const std::string &ns,
   auto it = sema_.module_aliases_.find(ns);
   const std::string prefix = it != sema_.module_aliases_.end() ? it->second : ns;
   return prefix + "::" + member;
+}
+
+// Canonicalizes a namespace-qualified type name (ADR 0025) by resolving its
+// leftmost segment through the same module alias state used by qualified
+// value access (`using alias = module.path;`). Only the first segment is
+// rewritten: `pair::Pair` with alias `pair = abi.pair` becomes
+// `abi::pair::Pair`; already-canonical or unqualified names pass through
+// unchanged. Import validity is not checked here — that stays a lookup-time
+// diagnostic in the caller so error messages preserve the source spelling.
+std::string TypeChecker::resolve_qualified_type_name(const std::string &name) const {
+  const std::string sep = "::";
+  const std::size_t first = name.find(sep);
+  if (first == std::string::npos) {
+    return name;
+  }
+  const std::string head = name.substr(0, first);
+  const std::string tail = name.substr(first + sep.size());
+  auto it = sema_.module_aliases_.find(head);
+  const std::string prefix = it != sema_.module_aliases_.end() ? it->second : head;
+  return prefix + sep + tail;
 }
 
 void TypeChecker::open_imported_namespace(const std::string &module_id) {

@@ -206,8 +206,9 @@ private:
   void error_at(ast::SourceLocation location, std::string message);
   void warn_at(ast::SourceLocation location, std::string message);
   void check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::SourceLocation location);
-  void forward_declare_imported_types(const ParsedModule &mod);
+  void forward_declare_imported_types(const ParsedModule &mod, const std::string &qualifier = "");
   std::string resolve_module_qualified(const std::string &ns, const std::string &member) const;
+  std::string resolve_qualified_type_name(const std::string &name) const;
   void open_imported_namespace(const std::string &module_id);
 
   struct ActiveBorrow {

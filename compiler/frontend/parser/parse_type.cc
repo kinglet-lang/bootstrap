@@ -153,6 +153,12 @@ ast::TypeExpr Parser::parse_type_expr() {
     return result;
   }
   std::string name = token_text(advance());
+  while (match(TokenType::COLON_COLON)) {
+    const Token &part =
+        consume(TokenType::IDENTIFIER, "Expected identifier after '::' in type name.");
+    name += "::";
+    name += token_text(part);
+  }
   std::vector<ast::TypeExpr> type_args;
   if (check(TokenType::LESS) && !pending_greater_) {
     advance(); // consume '<'
