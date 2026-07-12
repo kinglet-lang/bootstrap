@@ -247,14 +247,13 @@ ast::ExprPtr Parser::factor() {
 
 ast::ExprPtr Parser::unary() {
   if (match(TokenType::AMP)) {
+    // `&expr` is now purely an explicit "this is a borrow" marker (ADR 0028
+    // D3) — it no longer commits to shared vs. exclusive on its own, so
+    // there is no `mut` to consume here anymore (that distinction now lives
+    // only in type position: `T&` vs. `const T&`).
     const Token &amp = previous();
-    const bool mut = check(TokenType::IDENTIFIER) && token_text(peek()) == "mut";
-    if (mut) {
-      advance();
-    }
     ast::ExprPtr inner = unary();
-    return std::make_unique<ast::UnaryExpr>(
-        location_of(amp), mut ? ast::UnaryOp::MutRef : ast::UnaryOp::Ref, std::move(inner));
+    return std::make_unique<ast::UnaryExpr>(location_of(amp), ast::UnaryOp::Ref, std::move(inner));
   }
   if (match_any({TokenType::BANG, TokenType::MINUS, TokenType::TILDE})) {
     const Token &op = previous();

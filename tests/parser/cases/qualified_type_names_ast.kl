@@ -15,7 +15,7 @@ int main() {
   module::Type a;
   module::Type? b = null;
   module::Type[] c;
-  &module::Type d = &a;
-  &mut module::Type e = &mut a;
+  const module::Type& d = a;
+  module::Type& e = a;
   return 0;
 }

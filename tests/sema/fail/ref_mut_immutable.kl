@@ -2,8 +2,12 @@
 // COMPILE-FAIL
 // EXPECT-EXIT: 65
 
+// A local reference declaration's exclusive form (T&) cannot bind a
+// const-storage variable, since the whole point of an exclusive borrow is
+// permitting mutation through it.
+
 int main() {
   const int a = 1;
-  &mut a;
+  int& r = a;
   return 0;
 }

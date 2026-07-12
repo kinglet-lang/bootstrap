@@ -163,6 +163,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
       });
       record_function_source(idx, entry_source_path_);
       function_indices_[function->name] = idx;
+      function_decl_by_index_[idx] = function;
       method_return_types_[function->name] = function->return_type.name;
       if (!function->params.empty()) {
         const std::string &receiver = function->params[0].type.name;
@@ -333,6 +334,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
       });
       record_function_source(idx, entry_source_path_);
       function_indices_[function->name] = idx;
+      function_decl_by_index_[idx] = function;
       functions.push_back(function);
     }
   }
@@ -944,6 +946,14 @@ void Compiler::compile_null_literal(const ast::NullLiteralExpr &null_lit) {
 
 void Compiler::compile_unary(const ast::UnaryExpr &unary) {
 
+  // `&expr` (ADR 0028 D3) takes the referent's address instead of its value,
+  // so it must NOT go through the shared compile_expr(*unary.right) below --
+  // doing both would push the value and then the address onto the stack
+  // without ever popping the value, corrupting the operand stack.
+  if (unary.op == ast::UnaryOp::Ref) {
+    compile_lvalue_addr(*unary.right);
+    return;
+  }
   compile_expr(*unary.right);
   switch (unary.op) {
   case ast::UnaryOp::Neg:
@@ -954,10 +964,6 @@ void Compiler::compile_unary(const ast::UnaryExpr &unary) {
     break;
   case ast::UnaryOp::BitNot:
     emit(LoweringOp::BitNot, unary.location);
-    break;
-  case ast::UnaryOp::Ref:
-  case ast::UnaryOp::MutRef:
-    compile_lvalue_addr(*unary.right);
     break;
   default:
     error_at(unary.location, "Unsupported unary operator.");
@@ -1429,9 +1435,14 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       auto func_it = function_indices_.find(method_key);
       if (func_it != function_indices_.end()) {
         compile_expr(*field_callee->object);
-        for (const ast::ExprPtr &arg : call_expr.args) {
-          compile_expr(*arg);
+        const ast::FunctionDecl *resolved_decl = nullptr;
+        if (auto decl_it = function_decl_by_index_.find(func_it->second);
+            decl_it != function_decl_by_index_.end()) {
+          resolved_decl = decl_it->second;
         }
+        // Receiver (params[0]) was already compiled above via compile_expr on
+        // field_callee->object directly; call_expr.args maps to params[1..].
+        compile_call_arguments(call_expr.args, resolved_decl, /*param_offset=*/1);
         emit_constant(Value::function_value(func_it->second), call_expr.location);
         emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
                      call_expr.location);
@@ -1452,9 +1463,12 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       }
       if (free_idx >= 0) {
         compile_expr(*field_callee->object);
-        for (const ast::ExprPtr &arg : call_expr.args) {
-          compile_expr(*arg);
+        const ast::FunctionDecl *resolved_decl = nullptr;
+        if (auto decl_it = function_decl_by_index_.find(free_idx);
+            decl_it != function_decl_by_index_.end()) {
+          resolved_decl = decl_it->second;
         }
+        compile_call_arguments(call_expr.args, resolved_decl, /*param_offset=*/1);
         emit_constant(Value::function_value(free_idx), call_expr.location);
         emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
                      call_expr.location);
@@ -1511,6 +1525,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         });
         record_function_source(idx, entry_source_path_);
         function_indices_[mangled] = idx;
+        function_decl_by_index_[idx] = decl;
         // Bind each type parameter (e.g. "T") to its concrete substitution
         // (e.g. "file") for this instantiation. Without this, compiling the
         // body binds locals to the placeholder type-param name instead of
@@ -1525,9 +1540,7 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       }
       func_it = function_indices_.find(mangled);
       if (func_it != function_indices_.end()) {
-        for (const ast::ExprPtr &arg : call_expr.args) {
-          compile_expr(*arg);
-        }
+        compile_call_arguments(call_expr.args, decl);
         emit_constant(Value::function_value(func_it->second), call_expr.location);
         emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
@@ -1572,13 +1585,12 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         });
         record_function_source(idx, entry_source_path_);
         function_indices_[mangled] = idx;
+        function_decl_by_index_[idx] = decl;
         pending_generic_funcs_.push_back({mangled, decl, std::move(overrides)});
       }
       func_it = function_indices_.find(mangled);
       if (func_it != function_indices_.end()) {
-        for (const ast::ExprPtr &arg : call_expr.args) {
-          compile_expr(*arg);
-        }
+        compile_call_arguments(call_expr.args, decl);
         emit_constant(Value::function_value(func_it->second), call_expr.location);
         emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
@@ -1613,9 +1625,12 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       }
     }
     if (func_it != function_indices_.end()) {
-      for (const ast::ExprPtr &arg : call_expr.args) {
-        compile_expr(*arg);
+      const ast::FunctionDecl *resolved_decl = nullptr;
+      if (auto decl_it = function_decl_by_index_.find(func_it->second);
+          decl_it != function_decl_by_index_.end()) {
+        resolved_decl = decl_it->second;
       }
+      compile_call_arguments(call_expr.args, resolved_decl);
       emit_constant(Value::function_value(func_it->second), call_expr.location);
       emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size()),
                    call_expr.location);
@@ -1623,6 +1638,10 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     }
   }
 
+  // Indirect call through a function-typed value (function pointer/closure):
+  // no FunctionDecl is resolvable at compile time, so there is no declared
+  // parameter type to check for a reference marker. This path is unaffected
+  // by ADR 0028 D3's postfix reference syntax.
   for (const ast::ExprPtr &arg : call_expr.args) {
     compile_expr(*arg);
   }
@@ -2308,6 +2327,33 @@ bool Compiler::local_is_mut_ref(int slot) const {
   return locals_[static_cast<std::size_t>(slot)].slot_kind == Local::SlotKind::MutRef;
 }
 
+void Compiler::compile_call_arguments(const std::vector<ast::ExprPtr> &args,
+                                      const ast::FunctionDecl *decl, std::size_t param_offset) {
+  // An explicit `&expr` marker (ADR 0028 D3) contributes nothing extra at
+  // this stage: whether the target expects a reference is entirely decided
+  // by decl's declared parameter type, exactly as for a bare identifier, so
+  // strip the marker down to the referent before deciding value vs. address.
+  auto strip_marker = [](const ast::Expr &expr) -> const ast::Expr & {
+    if (const auto *unary = dynamic_cast<const ast::UnaryExpr *>(&expr);
+        unary && unary->op == ast::UnaryOp::Ref) {
+      return *unary->right;
+    }
+    return expr;
+  };
+  for (std::size_t i = 0; i < args.size(); ++i) {
+    const ast::Expr &referent = strip_marker(*args[i]);
+    const std::size_t param_index = i + param_offset;
+    const bool wants_ref = decl && param_index < decl->params.size() &&
+                           (decl->params[param_index].type.name == "&" ||
+                            decl->params[param_index].type.name == "&mut");
+    if (wants_ref) {
+      compile_lvalue_addr(referent);
+    } else {
+      compile_expr(referent);
+    }
+  }
+}
+
 void Compiler::compile_lvalue_addr(const ast::Expr &expr) {
   if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
     const int slot = resolve_local(identifier->name);
@@ -2328,7 +2374,26 @@ void Compiler::compile_lvalue_addr(const ast::Expr &expr) {
     emit_operand(LoweringOp::BorrowFieldMut, field_const, field_access->location);
     return;
   }
-  error_at(expr.location, "Cannot take the address of this expression.");
+  if (const auto *index = dynamic_cast<const ast::IndexExpr *>(&expr)) {
+    compile_expr(*index->object);
+    compile_expr(*index->index);
+    emit(LoweringOp::BorrowIndexMut, index->location);
+    return;
+  }
+  // Binding a temporary (`&(1 + 2)`, ADR 0028 D3): the checker already
+  // confirmed this is a shared borrow (exclusive borrows of a temporary are
+  // a checker error before codegen ever sees them), so materialize the
+  // value into a fresh local slot and take that slot's address -- there is
+  // no existing storage to point into otherwise. The slot lives in the
+  // current scope and is cleaned up at the next pop_scope() like any other
+  // local, which is exactly the temporary's lifetime extension the shared
+  // borrow needs (alive at least as long as the enclosing block/call).
+  compile_expr(expr);
+  const uint32_t temp_slot = static_cast<uint32_t>(locals_.size());
+  locals_.push_back(Local{.name = "$borrow_tmp", .is_mutable = false});
+  emit_operand(LoweringOp::StoreLocal, temp_slot, expr.location);
+  emit(LoweringOp::Pop, expr.location);
+  emit_operand(LoweringOp::LoadLocalAddr, temp_slot, expr.location);
 }
 
 bool Compiler::declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot) {
@@ -2337,10 +2402,21 @@ bool Compiler::declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot) {
     return false;
   }
   const bool is_mutable = var_decl.storage != "const";
-  locals_.push_back(Local{
+  Local local{
       .name = var_decl.name,
       .is_mutable = is_mutable,
-  });
+  };
+  // A reference-typed local (`const T& r = &x;` / `T& r = &x;`, ADR 0028 D3)
+  // is initialized from compile_lvalue_addr's address, not a plain value --
+  // mirrors compile_function()'s identical check for reference parameters,
+  // so later loads of this local go through DerefLoad instead of treating
+  // the stored address as the referent's raw value.
+  if (var_decl.type.name == "&") {
+    local.slot_kind = Local::SlotKind::Ref;
+  } else if (var_decl.type.name == "&mut") {
+    local.slot_kind = Local::SlotKind::MutRef;
+  }
+  locals_.push_back(local);
   *slot = static_cast<uint32_t>(locals_.size() - 1);
   return true;
 }
@@ -2516,6 +2592,7 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl,
 
     std::string qualified = ns + "::" + func->name;
     function_indices_[qualified] = idx;
+    function_decl_by_index_[idx] = func;
 
     if (!import_decl.selected_symbols.empty()) {
       function_indices_[func->name] = idx;
@@ -2536,6 +2613,7 @@ void Compiler::process_import_from(const ast::ImportDecl &import_decl,
     });
     record_function_source(idx, mod.resolved_path);
     function_indices_[ns + "::" + func->name] = idx;
+    function_decl_by_index_[idx] = func;
     imported_function_decls_[ns].push_back(func);
   }
 
@@ -2677,6 +2755,7 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
     });
     record_function_source(idx, mod.resolved_path);
     function_indices_[qual + "::" + func->name] = idx;
+    function_decl_by_index_[idx] = func;
     imported_function_decls_[ns].push_back(func);
   }
 
@@ -2691,6 +2770,7 @@ void Compiler::register_imported_module(const ParsedModule &mod) {
     });
     record_function_source(idx, mod.resolved_path);
     function_indices_[qual + "::" + func->name] = idx;
+    function_decl_by_index_[idx] = func;
     imported_function_decls_[ns].push_back(func);
   }
 

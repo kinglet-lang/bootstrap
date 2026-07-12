@@ -188,6 +188,31 @@ private:
   std::vector<LoopInfo> loop_stack_;
   SemanticContext *sema_ = nullptr;
   std::unordered_map<std::string, int> function_indices_;
+  // Maps a function_infos_ index back to its declaration, wherever one is
+  // known at registration time (user-defined, imported, or a monomorphized
+  // generic/concept-generic instance). Lets compile_call() look up a
+  // resolved callee's *declared* parameter types (specifically which ones
+  // are reference-typed, ADR 0028 D3) without re-deriving them, so it knows
+  // which arguments need compile_lvalue_addr() instead of a plain
+  // compile_expr(). Absent entries (native_fn, indirect calls through a
+  // function-typed value) fall back to compile_expr for every argument,
+  // matching pre-0028 behavior for those paths, which never declare
+  // reference-typed parameters.
+  std::unordered_map<int, const ast::FunctionDecl *> function_decl_by_index_;
+  // Compiles each call argument, taking its address instead of its value
+  // wherever `decl`'s declared parameter type at that position is
+  // reference-typed (`T&` / `const T&`, ADR 0028 D3) -- mirrors
+  // compile_function()'s own param.type.name == "&"/"&mut" check for the
+  // callee side of the same call. When `decl` is null, every argument
+  // compiles as a plain value (native_fn / indirect calls: see
+  // function_decl_by_index_'s comment for why that's always correct there).
+  // `param_offset` shifts which of decl's params each args[i] is checked
+  // against -- UFCS/impl-method call sites compile the receiver separately
+  // and pass only the remaining call_expr.args here, so args[i] corresponds
+  // to decl->params[i + param_offset] (offset 1, skipping the receiver
+  // param), not decl->params[i].
+  void compile_call_arguments(const std::vector<ast::ExprPtr> &args, const ast::FunctionDecl *decl,
+                              std::size_t param_offset = 0);
   std::unordered_map<std::string, int> struct_indices_;
   std::unordered_map<std::string, int> enum_indices_;
   struct PendingGenericFunc {

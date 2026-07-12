@@ -172,6 +172,7 @@ enum class KirOpcode : std::uint8_t {
   Unreachable,
   Nop,
   DenseArrayNew,
+  BorrowIndexMut,
 };
 
 struct KirStructMeta {

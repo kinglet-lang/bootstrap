@@ -1,6 +1,6 @@
-// P0-5: &expr must reject rvalues.
+// P0-5: an exclusive borrow (T&) must reject rvalues.
 
-void take_ref(&int x) { return; }
+void take_ref(int& x) { return; }
 
 int main() {
   take_ref(&(1 + 2));

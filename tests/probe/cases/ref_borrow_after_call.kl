@@ -1,11 +1,16 @@
 // EXPECT_OUT: ok
+// ADR 0028 D10: an exclusive borrow (T&) passed as a call argument is
+// released once the call returns (check_call_argument_borrows), so a plain
+// read of the same variable afterward must type-check cleanly.
 using io;
 
-void take_ref(&int x) { return; }
+void set_one(int& x) {
+  x = 1;
+}
 
 int main() {
-  int a = 1;
-  take_ref(&a);
-  io::out.line("ok");
+  int a = 0;
+  set_one(a);
+  io::out.line(a == 1 ? "ok" : "bad");
   return 0;
 }

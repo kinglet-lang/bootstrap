@@ -100,6 +100,13 @@ private:
   bool is_decl_keyword(TokenType type) const;
   bool is_declaration_start() const;
   bool is_function_declaration_start() const;
+  // Assumes the current token is CONST. Looks ahead past a base type's full
+  // spelling (name, qualified segments, generic arguments, array/nullable
+  // suffix) to check whether a trailing '&' reference marker follows --
+  // i.e. whether this 'const' belongs to the type itself (`const T&`, a
+  // shared borrow, ADR 0028 D3) rather than to variable storage
+  // (`const T x`, disallows reassigning x). Pure lookahead, consumes nothing.
+  bool const_prefix_is_reference_type() const;
   // True when a leading '{' begins a map variable declaration `{K: V} name`
   // rather than a block statement. Pure lookahead, consumes nothing.
   bool looks_like_map_var_decl() const;

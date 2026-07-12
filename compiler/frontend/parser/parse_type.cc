@@ -97,9 +97,9 @@ ast::StmtPtr Parser::function_body() {
 }
 
 ast::TypeExpr Parser::parse_type_expr() {
-  // Depth guard: type syntax recurses through references (&T), map types
-  // ({K: V}), and generic arguments (List<List<...>>). Deep nesting would
-  // otherwise overflow the native stack.
+  // Depth guard: type syntax recurses through generic arguments
+  // (List<List<...>>) and map types ({K: V}). Deep nesting would otherwise
+  // overflow the native stack.
   RecursionGuard guard(*this);
   if (!guard.ok()) {
     note_recursion_limit();
@@ -109,21 +109,19 @@ ast::TypeExpr Parser::parse_type_expr() {
     set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}, active_type_params_});
     return ast::TypeExpr{"<error>", {}};
   }
-  if (match(TokenType::AMP)) {
-    const bool mut = check(TokenType::IDENTIFIER) && token_text(peek()) == "mut";
-    if (mut) {
-      advance();
-    }
-    ast::TypeExpr inner = parse_type_expr();
-    if (mut) {
-      return ast::TypeExpr{"&mut", {std::move(inner)}};
-    }
-    return ast::TypeExpr{"&", {std::move(inner)}};
-  }
+  // `const` here belongs to the type itself, not variable storage: it marks
+  // a shared borrow (`const T&`) as opposed to an exclusive one (`T&`).
+  // Callers that need to disambiguate `const` at the *start* of a variable
+  // declaration (where it could instead mean "non-reassignable binding")
+  // use const_prefix_is_reference_type() before reaching here; by the time
+  // parse_type_expr() itself sees CONST, it is always the type-level shared
+  // borrow marker (ADR 0028 D3).
+  const bool shared = match(TokenType::CONST);
   if (!is_type_start(peek().type)) {
     error_at(peek(), "Expected type name.");
     return ast::TypeExpr{"<error>", {}};
   }
+  ast::TypeExpr result;
   // Map type: {K: V} — encoded as Map<K, V> (name="Map", type_args=[K, V]).
   if (check(TokenType::LEFT_BRACE)) {
     advance(); // consume '{'
@@ -143,50 +141,55 @@ ast::TypeExpr Parser::parse_type_expr() {
       name = "Array";
       type_args = std::move(array_arg);
     }
-    ast::TypeExpr result{std::move(name), std::move(type_args)};
-    if (check(TokenType::QUESTION)) {
-      advance();
-      std::vector<ast::TypeExpr> inner;
-      inner.push_back(std::move(result));
-      return ast::TypeExpr{"Nullable", std::move(inner)};
+    result = ast::TypeExpr{std::move(name), std::move(type_args)};
+  } else {
+    std::string name = token_text(advance());
+    while (match(TokenType::COLON_COLON)) {
+      const Token &part =
+          consume(TokenType::IDENTIFIER, "Expected identifier after '::' in type name.");
+      name += "::";
+      name += token_text(part);
     }
-    return result;
-  }
-  std::string name = token_text(advance());
-  while (match(TokenType::COLON_COLON)) {
-    const Token &part =
-        consume(TokenType::IDENTIFIER, "Expected identifier after '::' in type name.");
-    name += "::";
-    name += token_text(part);
-  }
-  std::vector<ast::TypeExpr> type_args;
-  if (check(TokenType::LESS) && !pending_greater_) {
-    advance(); // consume '<'
-    do {
-      type_args.push_back(parse_type_expr());
-    } while (match(TokenType::COMMA));
-    if (peek().type == TokenType::GREATER_GREATER && !pending_greater_) {
-      advance(); // consume '>>'
-      pending_greater_ = true;
-    } else {
-      if (!match(TokenType::GREATER)) {
-        error_at(peek(), "Expected '>' after type arguments.");
+    std::vector<ast::TypeExpr> type_args;
+    if (check(TokenType::LESS) && !pending_greater_) {
+      advance(); // consume '<'
+      do {
+        type_args.push_back(parse_type_expr());
+      } while (match(TokenType::COMMA));
+      if (peek().type == TokenType::GREATER_GREATER && !pending_greater_) {
+        advance(); // consume '>>'
+        pending_greater_ = true;
+      } else {
+        if (!match(TokenType::GREATER)) {
+          error_at(peek(), "Expected '>' after type arguments.");
+        }
       }
     }
+    while (match(TokenType::LEFT_BRACKET)) {
+      consume(TokenType::RIGHT_BRACKET, "Expected ']' after array type suffix.");
+      std::vector<ast::TypeExpr> array_arg;
+      array_arg.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
+      name = "Array";
+      type_args = std::move(array_arg);
+    }
+    result = ast::TypeExpr{std::move(name), std::move(type_args)};
   }
-  while (match(TokenType::LEFT_BRACKET)) {
-    consume(TokenType::RIGHT_BRACKET, "Expected ']' after array type suffix.");
-    std::vector<ast::TypeExpr> array_arg;
-    array_arg.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
-    name = "Array";
-    type_args = std::move(array_arg);
-  }
-  ast::TypeExpr result{std::move(name), std::move(type_args)};
   if (check(TokenType::QUESTION)) {
     advance();
     std::vector<ast::TypeExpr> inner;
     inner.push_back(std::move(result));
-    return ast::TypeExpr{"Nullable", std::move(inner)};
+    result = ast::TypeExpr{"Nullable", std::move(inner)};
+  }
+  // Postfix reference marker: `T&` (exclusive) / `const T&` (shared,
+  // `shared` captured above). ADR 0028 D3 replaces 0022's prefix `&T` /
+  // `&mut T` with this postfix form; `mut` is gone entirely.
+  if (match(TokenType::AMP)) {
+    std::vector<ast::TypeExpr> inner;
+    inner.push_back(std::move(result));
+    return ast::TypeExpr{shared ? "&" : "&mut", std::move(inner)};
+  }
+  if (shared) {
+    error_at(peek(), "Expected '&' after 'const' in type position.");
   }
   return result;
 }

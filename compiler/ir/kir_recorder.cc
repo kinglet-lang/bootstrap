@@ -296,6 +296,9 @@ void KirRecorder::on_emit(LoweringOp op, uint32_t operand, ast::SourceLocation l
   case LoweringOp::IndexSet:
     bb_.instrs.push_back(rec(KirOpcode::IndexSet, {}, location));
     break;
+  case LoweringOp::BorrowIndexMut:
+    bb_.instrs.push_back(rec(KirOpcode::BorrowIndexMut, {}, location));
+    break;
   case LoweringOp::ArrayLen:
     bb_.instrs.push_back(rec(KirOpcode::ArrayLen, {}, location));
     break;

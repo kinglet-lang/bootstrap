@@ -36,8 +36,12 @@ enum class UnaryOp : std::uint8_t {
   Neg,
   Not,
   BitNot,
+  // `&expr`: an explicit borrow marker. Unlike the removed `&mut` prefix,
+  // this single op no longer commits to shared vs. exclusive on its own —
+  // the kind is read off the target type at the use site (a call argument's
+  // declared parameter type, or a reference-typed local's declared type),
+  // the same way a bare identifier's borrow kind is. See ADR 0028 D3.
   Ref,
-  MutRef,
 };
 
 enum class AssignOp : std::uint8_t {

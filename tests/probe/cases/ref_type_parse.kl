@@ -1,7 +1,7 @@
-// P0-5: &T / &mut T in parameter types (parser + checker slice).
+// P0-5: T& / const T& in parameter types (parser + checker slice).
 
-void read_ref(&int x) { return; }
-void write_ref(&mut string s) { return; }
+void read_ref(const int& x) { return; }
+void write_ref(string& s) { return; }
 
 int main() {
   return 0;

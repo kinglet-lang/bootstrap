@@ -382,9 +382,52 @@ kl_h kl_field_mut_ref_store(kl_h reference, kl_h value) {
   return value;
 }
 
+int32_t kl_index_mut_ref_is(kl_h value) {
+  return kl_is_kind(value, KlKind::IndexMutRef) ? 1 : 0;
+}
+
+kl_h kl_index_mut_ref_new(kl_h object, kl_h index) {
+  // Only plain (non-dense) arrays support element-level mutable borrows --
+  // dense N-D arrays index into flattened storage and don't have a single
+  // element slot to point at, and non-array/non-heap targets can't be
+  // indexed at all.
+  const int64_t idx = kl_to_int(index);
+  if (!kl_is_kind(object, KlKind::Array) || idx < 0) {
+    return kl_from_int(0);
+  }
+  auto *obj = static_cast<KlArray *>(kl_unbox_ptr(object));
+  if (!obj->dense_dims.empty() || static_cast<std::size_t>(idx) >= obj->elements.size()) {
+    return kl_from_int(0);
+  }
+  auto *ref = new KlIndexMutRef();
+  ref->array_obj = object;
+  ref->index = static_cast<int32_t>(idx);
+  return kl_box_ptr(ref);
+}
+
+kl_h kl_index_mut_ref_load(kl_h reference) {
+  if (!kl_is_kind(reference, KlKind::IndexMutRef)) {
+    return kl_from_int(0);
+  }
+  auto *ref = static_cast<KlIndexMutRef *>(kl_unbox_ptr(reference));
+  return kl_array_get(ref->array_obj, ref->index);
+}
+
+kl_h kl_index_mut_ref_store(kl_h reference, kl_h value) {
+  if (!kl_is_kind(reference, KlKind::IndexMutRef)) {
+    return value;
+  }
+  auto *ref = static_cast<KlIndexMutRef *>(kl_unbox_ptr(reference));
+  (void)kl_index_set(ref->array_obj, kl_from_int(ref->index), value);
+  return value;
+}
+
 kl_h kl_ref_load(kl_h reference) {
   if (kl_field_mut_ref_is(reference)) {
     return kl_field_mut_ref_load(reference);
+  }
+  if (kl_index_mut_ref_is(reference)) {
+    return kl_index_mut_ref_load(reference);
   }
   auto *slot = reinterpret_cast<kl_h *>(static_cast<intptr_t>(reference));
   return *slot;
@@ -393,6 +436,10 @@ kl_h kl_ref_load(kl_h reference) {
 void kl_ref_store(kl_h reference, kl_h value) {
   if (kl_field_mut_ref_is(reference)) {
     (void)kl_field_mut_ref_store(reference, value);
+    return;
+  }
+  if (kl_index_mut_ref_is(reference)) {
+    (void)kl_index_mut_ref_store(reference, value);
     return;
   }
   auto *slot = reinterpret_cast<kl_h *>(static_cast<intptr_t>(reference));
