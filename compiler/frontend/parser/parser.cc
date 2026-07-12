@@ -334,6 +334,20 @@ bool Parser::is_declaration_start() const {
   if (!is_type_start(peek().type))
     return false;
   size_t pos = current_ + 1;
+  // A leading '&' (optionally '&mut') is a reference-type prefix, not a type
+  // name by itself. `&mut module::Type e` declares `e`, with a real base
+  // type sitting after the prefix. `&a;` / `&mut a;` have nothing left after
+  // the prefix but the borrowed expression itself (no second identifier for
+  // a variable name), so they must not be mistaken for a declaration and
+  // should fall through to an ordinary expression statement instead.
+  if (peek().type == TokenType::AMP) {
+    if (pos < tokens_.size() && token_text(tokens_[pos]) == "mut") {
+      ++pos;
+    }
+    if (pos >= tokens_.size() || !is_type_start(tokens_[pos].type))
+      return false;
+    ++pos; // move past the base type's leading token
+  }
   if (pos < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
       peek().type == TokenType::AUTO) {
     return true;
