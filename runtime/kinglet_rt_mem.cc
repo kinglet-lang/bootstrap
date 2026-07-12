@@ -106,6 +106,10 @@ void kl_release(kl_h value) {
       // Borrows the struct; does not own it — do not cascade into struct_obj.
       delete static_cast<KlFieldMutRef *>(kl_unbox_ptr(v));
       break;
+    case KlKind::IndexMutRef:
+      // Borrows the array; does not own it — do not cascade into array_obj.
+      delete static_cast<KlIndexMutRef *>(kl_unbox_ptr(v));
+      break;
     }
   }
 }

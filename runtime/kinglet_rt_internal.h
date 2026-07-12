@@ -19,6 +19,7 @@ enum class KlKind : uint8_t {
   Float = 4,
   Map = 5,
   FieldMutRef = 6,
+  IndexMutRef = 7,
 };
 
 struct KlHeader {
@@ -78,6 +79,12 @@ struct KlFieldMutRef {
   KlHeader hdr{KlKind::FieldMutRef};
   kl_h struct_obj = 0;
   int32_t field_index = -1;
+};
+
+struct KlIndexMutRef {
+  KlHeader hdr{KlKind::IndexMutRef};
+  kl_h array_obj = 0;
+  int32_t index = -1;
 };
 
 inline KlKind kl_heap_kind(kl_h value) {

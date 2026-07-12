@@ -87,6 +87,9 @@ std::string kl_value_text(kl_h value) {
     return "<struct>";
   case KlKind::Map:
     return "<map>";
+  case KlKind::FieldMutRef:
+  case KlKind::IndexMutRef:
+    return "<ref>";
   }
   return "?";
 }

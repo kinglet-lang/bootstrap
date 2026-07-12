@@ -2,9 +2,14 @@
 // COMPILE-FAIL
 // EXPECT-EXIT: 65
 
+// A local reference declaration (`int& r = a;`) establishes an exclusive
+// borrow that stays active for the rest of its scope (ADR 0028 D10). A
+// second borrow of the same variable, of either kind, started while that
+// exclusive borrow is still active must be rejected as a conflicting borrow.
+
 int main() {
   int a = 1;
-  &mut a;
-  &a;
+  int& r = a;
+  const int& s = a;
   return 0;
 }

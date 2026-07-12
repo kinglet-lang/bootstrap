@@ -1,15 +1,16 @@
 // RUN: check
 // EXPECT-EXIT: 0
 
-// A bare `&expr;` / `&mut expr;` as its own statement (not inside a call
-// argument or a declaration initializer) must parse as a borrow expression,
-// not be mistaken for the start of a reference-typed variable declaration.
+// A bare `&expr;` as its own statement (not inside a call argument or a
+// declaration initializer) must parse as an explicit borrow marker (ADR
+// 0028 D3). With no target-type context, it defaults to a shared borrow,
+// which imposes no exclusivity restriction here.
 
 int main() {
   int a = 1;
   &a;
 
   int b = 2;
-  &mut b;
+  &b;
   return 0;
 }

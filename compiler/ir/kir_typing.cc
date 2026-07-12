@@ -588,6 +588,13 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       push_typed(&state, result);
       break;
     }
+    case KirOpcode::BorrowIndexMut: {
+      pop_type(&state); // index
+      pop_type(&state); // object
+      result = KirType::Int64;
+      push_typed(&state, result);
+      break;
+    }
     case KirOpcode::FieldGet: {
       pop_type(&state);
       const int pool_idx = instr->operands[0];

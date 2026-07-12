@@ -178,6 +178,7 @@ struct RtFns {
   llvm::Function *map_keys = nullptr;
   llvm::Function *index_get = nullptr;
   llvm::Function *index_set = nullptr;
+  llvm::Function *index_mut_ref_new = nullptr;
   llvm::Function *remove = nullptr;
   llvm::Function *str_starts_with = nullptr;
   llvm::Function *str_ends_with = nullptr;
@@ -353,6 +354,7 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.map_keys = fn_1("kl_map_keys");
   rt.index_get = fn_2("kl_index_get");
   rt.index_set = fn_3("kl_index_set");
+  rt.index_mut_ref_new = fn_2("kl_index_mut_ref_new");
   rt.remove = fn_2("kl_remove");
   rt.str_starts_with = fn_2_i32("kl_str_starts_with");
   rt.str_ends_with = fn_2_i32("kl_str_ends_with");
@@ -1587,6 +1589,18 @@ public:
           field_idx = resolve_field_index(builder, type_idx, kir_module_, field_name);
         }
         llvm::Value *ref = builder.CreateCall(rt_.field_mut_ref_new, {obj, field_idx});
+        push(ref);
+        temps[i] = ref;
+        temp_types[i] = KirType::Int64;
+        break;
+      }
+      case KirOpcode::BorrowIndexMut: {
+        llvm::Value *index = pop_value(&stack, error, &type_stack);
+        llvm::Value *obj = pop_value(&stack, error, &type_stack);
+        if (index == nullptr || obj == nullptr) {
+          return false;
+        }
+        llvm::Value *ref = builder.CreateCall(rt_.index_mut_ref_new, {obj, index});
         push(ref);
         temps[i] = ref;
         temp_types[i] = KirType::Int64;

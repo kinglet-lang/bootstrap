@@ -2,9 +2,15 @@
 // COMPILE-FAIL
 // EXPECT-EXIT: 65
 
+// A local reference declaration (`int& r = a;`) establishes an exclusive
+// borrow that stays active until the end of the scope it was created in
+// (ADR 0028 D10) -- unlike a call-argument borrow, which releases as soon
+// as the call returns. A direct assignment to the borrowed variable while
+// that borrow is still active must be rejected.
+
 int main() {
   int a = 1;
-  &mut a;
+  int& r = a;
   a = 2;
   return 0;
 }

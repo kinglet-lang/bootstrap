@@ -117,6 +117,7 @@ enum class LoweringOp : uint8_t {
   DivideI32,
   ModuloI32,
   DenseArrayNew,
+  BorrowIndexMut,
 };
 
 const char *lowering_op_name(LoweringOp op);

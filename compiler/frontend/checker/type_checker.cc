@@ -361,6 +361,20 @@ std::string normalize_generic_mangle(std::string name) {
 }
 
 bool types_assignable(const Type &from, const Type &to) {
+  // A bare-typed value structurally matches a reference-typed target of the
+  // same element type. Under ADR 0028 D3, a plain identifier flows into a
+  // `const T&` / `T&` parameter (or reference-typed local) with no marker at
+  // the use site at all -- the argument's own checked type is just `T`, not
+  // `Ref<T>`/`MutRef<T>`, so this rule is what lets ordinary argument-type
+  // checking (including overload-candidate matching, which must compare
+  // types before any single candidate's parameter is chosen) accept it.
+  // This only governs structural type compatibility; the actual borrow
+  // classification, exclusivity checks, and registration happen in
+  // check_borrow_target(), not here.
+  if ((to.kind == TypeKind::Ref || to.kind == TypeKind::MutRef) && from.kind != TypeKind::Ref &&
+      from.kind != TypeKind::MutRef) {
+    return to.element_type ? types_assignable(from, *to.element_type) : true;
+  }
   if (to.nullable) {
     if (from.kind == TypeKind::Null) {
       return true;
@@ -1804,13 +1818,30 @@ void TypeChecker::visit(const ast::VarDeclStmt &var_decl) {
   }
   Type var_type = resolve_type_expr(var_decl.type, var_decl.location);
   if (var_decl.init) {
-    Type init_type = check_expr(*var_decl.init);
-    check_reference_escape(init_type, var_decl.location);
     if (var_decl.type.name == "auto") {
+      // `auto` has no target type to classify a borrow against yet -- the
+      // declared type IS the init expression's own type, so this goes
+      // through check_expr() as normal. For `auto v = &a;` specifically,
+      // check_unary's own default (shared borrow, ADR 0028 D3) is exactly
+      // the right answer here, since there genuinely is no target-type
+      // context, matching `const auto& v = a;`.
+      Type init_type = check_expr(*var_decl.init);
+      check_reference_escape(init_type, var_decl.location);
       var_type = init_type;
-    } else if (!types_assignable(init_type, var_type)) {
-      error_at(var_decl.location, "Cannot assign " + type_to_string(init_type) +
-                                      " to variable of type " + type_to_string(var_type) + ".");
+    } else {
+      // A declared (non-auto) type IS the target-type context a borrow
+      // classifies against -- use check_call_arg_type() to avoid
+      // check_unary's default running first, then classify against
+      // var_type once, exactly as a call argument does against its
+      // resolved parameter type.
+      Type init_type = check_call_arg_type(*var_decl.init);
+      check_reference_escape(init_type, var_decl.location);
+      if (!types_assignable(init_type, var_type)) {
+        error_at(var_decl.location, "Cannot assign " + type_to_string(init_type) +
+                                        " to variable of type " + type_to_string(var_type) + ".");
+      } else {
+        check_borrow_argument(*var_decl.init, var_type, var_decl.location);
+      }
     }
   }
   bool is_mutable = var_decl.storage != "const";
@@ -2126,24 +2157,35 @@ Type TypeChecker::check_unary(const ast::UnaryExpr &unary) {
       error_at(unary.location, "Bitwise NOT requires an integer operand.");
     }
     return right_type;
-  case ast::UnaryOp::Ref:
-  case ast::UnaryOp::MutRef: {
+  case ast::UnaryOp::Ref: {
+    // `&expr` no longer commits to shared vs. exclusive by itself (ADR 0028
+    // D3) -- classification is read off the target type at the use site.
+    // check_call/var_decl bypass this default path entirely via
+    // check_borrow_argument when a reference-typed target is known, calling
+    // check_expr() directly on the referent instead of dispatching through
+    // here. This path only runs when there is no such target-type context
+    // (a bare `&expr;` statement, or `auto v = &expr;`), so it always
+    // defaults to shared -- the lower-risk of the two.
     if (!is_lvalue_expr(*unary.right)) {
-      error_at(unary.location, "Cannot borrow a non-lvalue expression.");
-      return void_type();
-    }
-    const bool mut = unary.op == ast::UnaryOp::MutRef;
-    if (mut && !is_mutable_lvalue(*unary.right)) {
-      error_at(unary.location, "Cannot mutably borrow an immutable lvalue.");
-      return void_type();
+      // No target-type context and not an lvalue: nothing to register (a
+      // temporary has no named binding to track), and this is not an error
+      // at this level -- check_borrow_argument is the one that rejects an
+      // *exclusive* borrow of a temporary; a shared default has no such
+      // restriction.
+      Type inner = right_type;
+      Type ref{inner};
+      ref.kind = TypeKind::Ref;
+      ref.name = "&" + inner.name;
+      ref.element_type = std::make_shared<Type>(inner);
+      return ref;
     }
     if (auto referent = referent_name_from_lvalue(*unary.right)) {
-      register_borrow(*referent, mut, unary.location);
+      register_borrow(*referent, /*mut=*/false, unary.location);
     }
     Type inner = right_type;
     Type ref{inner};
-    ref.kind = mut ? TypeKind::MutRef : TypeKind::Ref;
-    ref.name = (mut ? "&mut " : "&") + inner.name;
+    ref.kind = TypeKind::Ref;
+    ref.name = "&" + inner.name;
     ref.element_type = std::make_shared<Type>(inner);
     return ref;
   }
@@ -3049,13 +3091,17 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
         if (!receiver_type.is_compatible_with(resolve_type_expr(decl->params[0].type))) {
           error_at(field_callee->object->location, "UFCS receiver type mismatch.");
         }
+        std::vector<Type> param_types;
+        param_types.reserve(call_expr.args.size());
         for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
-          Type arg_type = check_expr(*call_expr.args[i]);
+          Type arg_type = check_call_arg_type(*call_expr.args[i]);
           Type param_type = resolve_type_expr(decl->params[i + 1].type);
+          param_types.push_back(param_type);
           if (!types_assignable(arg_type, param_type)) {
             error_at(call_expr.args[i]->location, "Argument type mismatch.");
           }
         }
+        check_call_argument_borrows(call_expr.args, param_types);
         return resolve_type_expr(decl->return_type);
       }
     }
@@ -3091,16 +3137,22 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
         if (concept_decl->type_params.size() == 1) {
           subst[concept_decl->type_params[0]] = type_to_type_expr(obj_type);
         }
+        std::vector<Type> param_types;
+        param_types.reserve(call_expr.args.size());
         for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
-          Type arg_type = check_expr(*call_expr.args[i]);
+          Type arg_type = check_call_arg_type(*call_expr.args[i]);
           if (i + 1 < method->params.size()) {
             Type param_type =
                 resolve_type_expr(substitute_type_params(method->params[i + 1].type, subst));
+            param_types.push_back(param_type);
             if (!types_assignable(arg_type, param_type)) {
               error_at(call_expr.args[i]->location, "Argument type mismatch.");
             }
+          } else {
+            param_types.push_back(arg_type);
           }
         }
+        check_call_argument_borrows(call_expr.args, param_types);
         return resolve_type_expr(substitute_type_params(method->return_type, subst));
       }
     }
@@ -3125,11 +3177,13 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
 
         // Check arguments once: their types both drive inference (when no
         // explicit type arguments are written) and feed the compatibility
-        // check below.
+        // check below. Uses check_call_arg_type(), not check_expr(), so an
+        // explicit `&expr` marker isn't prematurely classified before the
+        // parameter type it binds to is resolved (ADR 0028 D3).
         std::vector<Type> arg_types;
         arg_types.reserve(call_expr.args.size());
         for (const auto &arg : call_expr.args) {
-          arg_types.push_back(check_expr(*arg));
+          arg_types.push_back(check_call_arg_type(*arg));
         }
 
         // Type arguments are explicit, or inferred by matching each argument
@@ -3187,6 +3241,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
                                                       ", got " + type_to_string(arg_types[i]) + ".");
           }
         }
+        check_call_argument_borrows(call_expr.args, param_types);
         return ret;
       }
       auto concept_gen_it = sema_.concept_generic_functions_.find(callee_id->name);
@@ -3195,7 +3250,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
         std::vector<Type> arg_types;
         arg_types.reserve(call_expr.args.size());
         for (const auto &arg : call_expr.args) {
-          arg_types.push_back(check_expr(*arg));
+          arg_types.push_back(check_call_arg_type(*arg));
         }
 
         std::unordered_map<std::string, Type> concept_bindings;
@@ -3271,6 +3326,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
                                                       ", got " + type_to_string(arg_types[i]) + ".");
           }
         }
+        check_call_argument_borrows(call_expr.args, param_types);
         return ret;
       }
       // A bare identifier call whose first argument's static type is
@@ -3320,16 +3376,26 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
               if (concept_decl->type_params.size() == 1) {
                 subst[concept_decl->type_params[0]] = type_to_type_expr(*first_arg_type);
               }
+              // The receiver (args[0], already consumed by first_arg_type
+              // above) is excluded from borrow classification here -- it
+              // was never re-checked as an ordinary argument, so pair the
+              // remaining args/param_types by slicing both from index 1.
+              std::vector<const ast::Expr *> remaining_args;
+              std::vector<Type> param_types;
               for (std::size_t i = 1; i < call_expr.args.size(); ++i) {
-                Type arg_type = check_expr(*call_expr.args[i]);
+                Type arg_type = check_call_arg_type(*call_expr.args[i]);
+                Type param_type = arg_type;
                 if (i < method->params.size()) {
-                  Type param_type =
+                  param_type =
                       resolve_type_expr(substitute_type_params(method->params[i].type, subst));
                   if (!types_assignable(arg_type, param_type)) {
                     error_at(call_expr.args[i]->location, "Argument type mismatch.");
                   }
                 }
+                remaining_args.push_back(call_expr.args[i].get());
+                param_types.push_back(param_type);
               }
+              check_call_argument_borrows(remaining_args, param_types);
               return resolve_type_expr(substitute_type_params(method->return_type, subst));
             }
           }
@@ -3346,7 +3412,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       std::vector<Type> arg_types;
       arg_types.reserve(call_expr.args.size());
       for (const auto &arg : call_expr.args)
-        arg_types.push_back(check_expr(*arg));
+        arg_types.push_back(check_call_arg_type(*arg));
       std::vector<std::string> errors;
       const TypeChecker::OverloadEntry *selected =
           resolve_overload(ov_it->second, arg_types, errors);
@@ -3368,7 +3434,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
           break;
         }
       }
-      release_call_argument_borrows(call_expr.args);
+      check_call_argument_borrows(call_expr.args, selected->func_type.param_types);
       return selected->func_type.return_type ? *selected->func_type.return_type : void_type();
     }
   }
@@ -3389,10 +3455,11 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
     return int_type();
   }
   if (callee_type.name == "native_fn") {
+    // Native intrinsics (io::out/err/in) never declare reference-typed
+    // parameters, so there is nothing to classify as a borrow here.
     for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
       check_expr(*call_expr.args[i]);
     }
-    release_call_argument_borrows(call_expr.args);
     return callee_type.return_type ? *callee_type.return_type : void_type();
   }
   if (call_expr.args.size() != callee_type.param_types.size()) {
@@ -3402,14 +3469,14 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
     return callee_type.return_type ? *callee_type.return_type : int_type();
   }
   for (std::size_t i = 0; i < call_expr.args.size(); ++i) {
-    Type arg_type = check_expr(*call_expr.args[i]);
+    Type arg_type = check_call_arg_type(*call_expr.args[i]);
     if (!types_assignable(arg_type, callee_type.param_types[i])) {
       error_at(call_expr.args[i]->location, "Expected " +
                                                 type_to_string(callee_type.param_types[i]) +
                                                 ", got " + type_to_string(arg_type) + ".");
     }
   }
-  release_call_argument_borrows(call_expr.args);
+  check_call_argument_borrows(call_expr.args, callee_type.param_types);
   return callee_type.return_type ? *callee_type.return_type : int_type();
 }
 
@@ -4039,18 +4106,100 @@ void TypeChecker::check_referent_access(const std::string &name, ast::SourceLoca
   }
 }
 
-void TypeChecker::release_call_argument_borrows(const std::vector<ast::ExprPtr> &args) {
-  for (const ast::ExprPtr &arg : args) {
-    const auto *unary = dynamic_cast<const ast::UnaryExpr *>(arg.get());
-    if (!unary || (unary->op != ast::UnaryOp::MutRef && unary->op != ast::UnaryOp::Ref)) {
-      continue;
+// Computes a call/init argument's type for parameter/candidate matching
+// *without* dispatching an explicit `&expr` through check_unary's default
+// classification. check_unary defaults `&expr` to a shared borrow when it
+// has no target-type context (ADR 0028 D3's rule for bare `auto v = &x;`),
+// but a call argument DOES have a target -- the parameter it will bind
+// to -- which is not known yet at this point (matching happens before a
+// candidate/overload is chosen). Registering a borrow here would be
+// premature and, once the real parameter type is known, wrong as often as
+// right; check_call_argument_borrows() is the single place classification
+// and registration actually happen, once, after the target is resolved.
+// This returns the *referent's* type (e.g. `string` for both `a` and `&a`),
+// matching what a bare identifier's argument type already is -- consistent
+// with types_assignable()'s Ref/MutRef structural rule.
+Type TypeChecker::check_call_arg_type(const ast::Expr &arg_expr) {
+  return check_expr(strip_borrow_marker(arg_expr));
+}
+
+// Peels an explicit `&expr` marker (ADR 0028 D3) down to the expression it
+// wraps, so borrow classification always operates on the actual referent
+// expression regardless of whether the caller wrote the marker.
+const ast::Expr &TypeChecker::strip_borrow_marker(const ast::Expr &expr) {
+  if (const auto *unary = dynamic_cast<const ast::UnaryExpr *>(&expr);
+      unary && unary->op == ast::UnaryOp::Ref) {
+    return *unary->right;
+  }
+  return expr;
+}
+
+bool TypeChecker::check_borrow_argument(const ast::Expr &arg_expr, const Type &param_type,
+                                        ast::SourceLocation loc) {
+  const bool has_marker = dynamic_cast<const ast::UnaryExpr *>(&arg_expr) != nullptr &&
+                          static_cast<const ast::UnaryExpr &>(arg_expr).op == ast::UnaryOp::Ref;
+  const ast::Expr &referent_expr = strip_borrow_marker(arg_expr);
+  const bool target_is_ref =
+      param_type.kind == TypeKind::Ref || param_type.kind == TypeKind::MutRef;
+  if (!target_is_ref) {
+    // `&expr` is an explicit request for a borrow; a non-reference target
+    // cannot satisfy it, and silently falling back to plain-value semantics
+    // would hide a likely mistake at the call site (ADR 0028 D3).
+    if (has_marker) {
+      error_at(loc, "'&' requires a reference-typed target, but the target here is not one.");
     }
-    if (auto referent = referent_name_from_lvalue(*unary->right)) {
-      if (unary->op == ast::UnaryOp::MutRef) {
-        release_mut_borrow(*referent);
+    return false;
+  }
+  const bool mut = param_type.kind == TypeKind::MutRef;
+  if (!is_lvalue_expr(referent_expr)) {
+    // Binding a temporary: shared borrows extend the temporary's lifetime
+    // and are fine (nothing to register -- an unnamed temporary has no
+    // referent to track); exclusive borrows have no named binding to
+    // observe a later mutation through, so they are rejected (ADR 0028 D10).
+    if (mut) {
+      error_at(loc, "Cannot take an exclusive borrow of a temporary value.");
+    }
+    return true;
+  }
+  if (mut && !is_mutable_lvalue(referent_expr)) {
+    error_at(loc, "Cannot mutably borrow an immutable lvalue.");
+    return true;
+  }
+  if (auto referent = referent_name_from_lvalue(referent_expr)) {
+    register_borrow(*referent, mut, loc);
+  }
+  return true;
+}
+
+void TypeChecker::check_call_argument_borrows(const std::vector<const ast::Expr *> &args,
+                                              const std::vector<Type> &param_types) {
+  // Registration and release both happen here, in a single pass run once the
+  // resolved parameter types are known (after overload resolution / generic
+  // instantiation), rather than while merely computing each argument's type
+  // for candidate matching -- see types_assignable()'s Ref/MutRef structural
+  // rule for why argument type computation itself must stay borrow-agnostic.
+  std::vector<std::string> mut_referents;
+  for (std::size_t i = 0; i < args.size() && i < param_types.size(); ++i) {
+    const bool registered = check_borrow_argument(*args[i], param_types[i], args[i]->location);
+    if (registered && param_types[i].kind == TypeKind::MutRef) {
+      if (auto referent = referent_name_from_lvalue(strip_borrow_marker(*args[i]))) {
+        mut_referents.push_back(*referent);
       }
     }
   }
+  for (const std::string &referent : mut_referents) {
+    release_mut_borrow(referent);
+  }
+}
+
+void TypeChecker::check_call_argument_borrows(const std::vector<ast::ExprPtr> &args,
+                                              const std::vector<Type> &param_types) {
+  std::vector<const ast::Expr *> raw_args;
+  raw_args.reserve(args.size());
+  for (const auto &arg : args) {
+    raw_args.push_back(arg.get());
+  }
+  check_call_argument_borrows(raw_args, param_types);
 }
 
 bool TypeChecker::is_mutable_lvalue(const ast::Expr &expr) const {

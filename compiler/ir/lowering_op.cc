@@ -201,6 +201,8 @@ const char *lowering_op_name(LoweringOp op) {
     return "ModuloI32";
   case LoweringOp::DenseArrayNew:
     return "DenseArrayNew";
+  case LoweringOp::BorrowIndexMut:
+    return "BorrowIndexMut";
   }
   return "Unknown";
 }

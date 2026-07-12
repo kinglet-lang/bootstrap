@@ -220,7 +220,33 @@ private:
   void register_borrow(const std::string &referent, bool mut, ast::SourceLocation loc);
   void release_mut_borrow(const std::string &referent);
   void check_referent_access(const std::string &name, ast::SourceLocation loc, bool mutating);
-  void release_call_argument_borrows(const std::vector<ast::ExprPtr> &args);
+  // Computes a call/init argument's type for parameter/candidate matching
+  // without prematurely classifying an explicit `&expr` marker as a borrow.
+  // See the .cc definition for why this must run before a target parameter
+  // type is chosen (overload resolution, generic instantiation).
+  Type check_call_arg_type(const ast::Expr &arg_expr);
+  // Strips an explicit `&expr` marker (ADR 0028 D3) down to the wrapped
+  // expression, so borrow classification runs against the actual referent
+  // whether or not the caller wrote the marker.
+  static const ast::Expr &strip_borrow_marker(const ast::Expr &expr);
+  // Classifies and (when appropriate) registers a borrow for a single call
+  // argument against its resolved parameter type. Returns true if the
+  // argument was accepted as a reference-typed target (shared or exclusive);
+  // false if the target was not reference-typed at all (a bare-T parameter),
+  // in which case no borrow classification applies (D4's transfer/copy path
+  // handles that argument instead).
+  bool check_borrow_argument(const ast::Expr &arg_expr, const Type &param_type,
+                             ast::SourceLocation loc);
+  // Runs check_borrow_argument() over every argument against its resolved
+  // parameter type, then releases any exclusive borrows taken for the
+  // duration of the call (ADR 0028 D10's reborrow-for-the-callee rule).
+  // Takes raw pointers (not ast::ExprPtr) so callers can pass a slice of a
+  // larger argument list (e.g. skipping a UFCS receiver at index 0) without
+  // needing to copy non-copyable unique_ptrs.
+  void check_call_argument_borrows(const std::vector<const ast::Expr *> &args,
+                                   const std::vector<Type> &param_types);
+  void check_call_argument_borrows(const std::vector<ast::ExprPtr> &args,
+                                   const std::vector<Type> &param_types);
   static std::optional<std::string> referent_name_from_lvalue(const ast::Expr &expr);
   bool is_mutable_lvalue(const ast::Expr &expr) const;
   static bool is_reference_type(const Type &type);

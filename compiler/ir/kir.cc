@@ -233,6 +233,8 @@ const char *kir_opcode_name(KirOpcode op) {
     return "nop";
   case KirOpcode::DenseArrayNew:
     return "dense_array_new";
+  case KirOpcode::BorrowIndexMut:
+    return "borrow_index_mut";
   }
   return "unknown";
 }

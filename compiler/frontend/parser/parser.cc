@@ -307,9 +307,11 @@ bool Parser::is_type_start(TokenType type) const {
   case TokenType::CHAR:
   case TokenType::IDENTIFIER:
   case TokenType::LEFT_BRACE: // map type {K: V}
-  case TokenType::AMP:
     return true;
   default:
+    // '&' is no longer a type-start token (ADR 0028 D3): references are
+    // written postfix (`T&`, `const T&`), so a type never begins with '&' —
+    // it only ever appears after a complete base type has been parsed.
     return false;
   }
 }
@@ -327,6 +329,47 @@ bool Parser::is_decl_keyword(TokenType type) const {
   }
 }
 
+bool Parser::const_prefix_is_reference_type() const {
+  // Caller has already checked CONST at current_. Walk past a base type's
+  // full shape starting at current_ + 1, then see if a '&' immediately
+  // follows -- that '&' is what makes this `const T&` (a shared borrow, the
+  // 'const' belongs to the type) as opposed to `const T x` (the 'const'
+  // belongs to variable storage; no '&' ever follows a complete type shape
+  // there because '&' is now purely a postfix reference marker, ADR 0028 D3).
+  size_t pos = current_ + 1;
+  if (pos >= tokens_.size() || !is_type_start(tokens_[pos].type))
+    return false;
+  if (tokens_[pos].type == TokenType::LEFT_BRACE) {
+    int depth = 1;
+    ++pos;
+    while (pos < tokens_.size() && depth > 0) {
+      if (tokens_[pos].type == TokenType::LEFT_BRACE)
+        ++depth;
+      else if (tokens_[pos].type == TokenType::RIGHT_BRACE)
+        --depth;
+      ++pos;
+    }
+  } else {
+    ++pos; // base type name
+    skip_qualified_type_segments(tokens_, pos);
+    if (pos < tokens_.size() && tokens_[pos].type == TokenType::LESS) {
+      int depth = 1;
+      ++pos;
+      while (pos < tokens_.size() && depth > 0) {
+        if (tokens_[pos].type == TokenType::LESS)
+          ++depth;
+        else if (tokens_[pos].type == TokenType::GREATER)
+          --depth;
+        else if (tokens_[pos].type == TokenType::GREATER_GREATER)
+          depth -= 2;
+        ++pos;
+      }
+    }
+  }
+  skip_array_and_nullable_suffix(tokens_, pos);
+  return pos < tokens_.size() && tokens_[pos].type == TokenType::AMP;
+}
+
 bool Parser::is_declaration_start() const {
   if (check(TokenType::CONST)) {
     return true;
@@ -334,20 +377,6 @@ bool Parser::is_declaration_start() const {
   if (!is_type_start(peek().type))
     return false;
   size_t pos = current_ + 1;
-  // A leading '&' (optionally '&mut') is a reference-type prefix, not a type
-  // name by itself. `&mut module::Type e` declares `e`, with a real base
-  // type sitting after the prefix. `&a;` / `&mut a;` have nothing left after
-  // the prefix but the borrowed expression itself (no second identifier for
-  // a variable name), so they must not be mistaken for a declaration and
-  // should fall through to an ordinary expression statement instead.
-  if (peek().type == TokenType::AMP) {
-    if (pos < tokens_.size() && token_text(tokens_[pos]) == "mut") {
-      ++pos;
-    }
-    if (pos >= tokens_.size() || !is_type_start(tokens_[pos].type))
-      return false;
-    ++pos; // move past the base type's leading token
-  }
   if (pos < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
       peek().type == TokenType::AUTO) {
     return true;
@@ -367,7 +396,15 @@ bool Parser::is_declaration_start() const {
       ++pos;
     }
   }
+  // A trailing '&' reference marker sits between the base type and the
+  // variable name (`string& x`, `Foo<T>& x`) -- skip over it (and consume
+  // an array/nullable suffix on either side of it, matching parse_type_expr's
+  // own postfix order) before looking for the declared name.
   skip_array_and_nullable_suffix(tokens_, pos);
+  if (pos < tokens_.size() && tokens_[pos].type == TokenType::AMP) {
+    ++pos;
+    skip_array_and_nullable_suffix(tokens_, pos);
+  }
   return pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
 }
 
@@ -422,6 +459,12 @@ bool Parser::is_function_declaration_start() const {
     }
   }
   skip_array_and_nullable_suffix(tokens_, pos);
+  // A reference-typed return (`string& foo(...)`) has a trailing '&' between
+  // the base type and the function name.
+  if (pos < tokens_.size() && tokens_[pos].type == TokenType::AMP) {
+    ++pos;
+    skip_array_and_nullable_suffix(tokens_, pos);
+  }
   if (pos >= tokens_.size() || tokens_[pos].type != TokenType::IDENTIFIER)
     return false;
   ++pos; // skip function name

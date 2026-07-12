@@ -1,18 +1,19 @@
 // EXPECT_OUT: ok
-// ADR 0022: &mut on struct scalar field with auto-deref through parameter.
+// ADR 0028: exclusive borrow (T&) on struct scalar field with auto-deref
+// through parameter.
 using io;
 
 struct Box {
   int v;
 }
 
-void bump(&mut int x) {
+void bump(int& x) {
   x = x + 1;
 }
 
 int main() {
   Box b = Box { 1 };
-  bump(&mut b.v);
+  bump(b.v);
   if (b.v != 2) {
     return 1;
   }

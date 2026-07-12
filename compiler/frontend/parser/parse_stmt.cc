@@ -235,15 +235,29 @@ ast::StmtPtr Parser::continue_statement() {
 ast::StmtPtr Parser::var_declaration() {
   const Token &start_token = peek();
   std::string storage;
-  if (match(TokenType::CONST)) {
+  // `const` here is ambiguous on its own: `const int y` means "y cannot be
+  // reassigned" (storage), while `const string& v` means "v is a shared
+  // borrow" (the const belongs to the reference type, ADR 0028 D3). Look
+  // ahead to see whether a '&' follows this type's full shape before
+  // deciding which one this is; a reference-typed local never needs the
+  // storage axis too, since Kinglet references cannot be rebound anyway.
+  if (check(TokenType::CONST) && !const_prefix_is_reference_type()) {
+    advance();
     storage = token_text(previous());
   }
 
   ast::TypeExpr type;
   Token name = peek();
   bool has_type = false;
+  // A CONST still sitting here (storage was NOT consumed above) means this
+  // is the type-level `const T&` shared-borrow marker -- const_prefix_is_
+  // reference_type() already confirmed a '&' follows, so this is
+  // unconditionally a typed declaration; skip straight to parsing it below
+  // rather than running it through is_type_start(), which does not (and
+  // should not) treat CONST as a type-start token on its own.
+  const bool const_ref_prefix = check(TokenType::CONST);
 
-  if (is_type_start(peek().type)) {
+  if (!const_ref_prefix && is_type_start(peek().type)) {
     size_t pos = current_ + 1;
     if (pos < tokens_.size() && tokens_[pos].type == TokenType::LEFT_BRACKET &&
         peek().type == TokenType::AUTO) {
@@ -271,7 +285,9 @@ ast::StmtPtr Parser::var_declaration() {
                                                    std::move(rest_name), std::move(init));
     }
   }
-  if (is_type_start(peek().type)) {
+  if (const_ref_prefix) {
+    has_type = true;
+  } else if (is_type_start(peek().type)) {
     size_t pos = current_ + 1;
     if (peek().type == TokenType::LEFT_BRACE) {
       // Map type {K: V}: scan to the matching '}', then expect an identifier.
@@ -284,6 +300,10 @@ ast::StmtPtr Parser::var_declaration() {
         ++pos;
       }
       skip_array_and_nullable_suffix(tokens_, pos);
+      if (pos < tokens_.size() && tokens_[pos].type == TokenType::AMP) {
+        ++pos;
+        skip_array_and_nullable_suffix(tokens_, pos);
+      }
       has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
     } else {
       skip_qualified_type_segments(tokens_, pos);
@@ -299,12 +319,13 @@ ast::StmtPtr Parser::var_declaration() {
             depth -= 2;
           ++pos;
         }
-        skip_array_and_nullable_suffix(tokens_, pos);
-        has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
-      } else {
-        skip_array_and_nullable_suffix(tokens_, pos);
-        has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
       }
+      skip_array_and_nullable_suffix(tokens_, pos);
+      if (pos < tokens_.size() && tokens_[pos].type == TokenType::AMP) {
+        ++pos;
+        skip_array_and_nullable_suffix(tokens_, pos);
+      }
+      has_type = pos < tokens_.size() && tokens_[pos].type == TokenType::IDENTIFIER;
     }
   }
   if (has_type) {

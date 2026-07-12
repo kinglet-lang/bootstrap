@@ -5,20 +5,18 @@
 // Regression: writing through a field path (`p.left = ...`) while `p` is
 // borrowed used to slip past the borrow checker entirely, because
 // check_field_assign never called check_referent_access on the base object.
-// The borrow is established through a `&Pair` call argument, which is the
-// only lvalue position where the parser currently accepts a bare `&expr`
-// (a standalone `&p;` statement does not parse as a borrow today).
+// The borrow is established through a local shared-reference declaration
+// (`const Pair& r = p;`, ADR 0028 D3), which stays active for the rest of
+// its scope.
 
 struct Pair {
   int left;
   int right;
 }
 
-void hold(&Pair x) { return; }
-
 int main() {
   Pair p = Pair { 1, 2 };
-  hold(&p);
+  const Pair& r = p;
   p.left = 3;
   return 0;
 }
