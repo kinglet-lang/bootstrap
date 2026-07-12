@@ -1,0 +1,20 @@
+// RUN: check
+// EXPECT-EXIT: 0
+
+// Plain field/index writes with no active borrow on the base object must
+// still type-check cleanly; this guards against the exclusivity check added
+// to check_field_assign / check_index_assign over-firing on ordinary code.
+
+struct Pair {
+  int left;
+  int right;
+}
+
+int main() {
+  Pair p = Pair { 1, 2 };
+  p.left = 3;
+
+  int[] arr = [1, 2, 3];
+  arr[0] = 9;
+  return 0;
+}

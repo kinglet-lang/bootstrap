@@ -1,0 +1,22 @@
+// RUN: check
+// EXPECT-EXIT: 0
+
+// A &mut borrow passed as a call argument is released once the call
+// returns (release_call_argument_borrows), so a field write on the same
+// object afterward must type-check cleanly -- this guards against the
+// exclusivity check added to check_field_assign holding the borrow open
+// past the call that created it.
+
+struct Pair {
+  int left;
+  int right;
+}
+
+void bump(&mut Pair x) { return; }
+
+int main() {
+  Pair p = Pair { 1, 2 };
+  bump(&mut p);
+  p.left = 3;
+  return 0;
+}

@@ -3597,6 +3597,13 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
 Type TypeChecker::check_field_assign(const ast::FieldAssignExpr &field_assign) {
 
   Type obj_type = check_expr(*field_assign.object);
+  // Writing through a field path (`obj.field = value`) mutates the referent
+  // that `obj` resolves to, so it needs the same exclusivity check as a
+  // direct `obj = value` assignment — otherwise a live borrow of `obj` would
+  // let a field write through it go unnoticed.
+  if (auto referent = referent_name_from_lvalue(*field_assign.object)) {
+    check_referent_access(*referent, field_assign.location, true);
+  }
   Type value_type = check_expr(*field_assign.value);
   check_reference_escape(value_type, field_assign.location);
   if (obj_type.kind != TypeKind::Struct) {
@@ -3830,6 +3837,13 @@ Type TypeChecker::check_propagate(const ast::PropagateExpr &prop) {
 Type TypeChecker::check_index_assign(const ast::IndexAssignExpr &index_assign) {
 
   Type object_type = check_expr(*index_assign.object);
+  // Writing through an index path (`obj[i] = value`) mutates the referent
+  // that `obj` resolves to, so it needs the same exclusivity check as a
+  // direct `obj = value` assignment — otherwise a live borrow of `obj` would
+  // let an index write through it go unnoticed.
+  if (auto referent = referent_name_from_lvalue(*index_assign.object)) {
+    check_referent_access(*referent, index_assign.location, true);
+  }
   Type index_type = check_expr(*index_assign.index);
   Type value_type = check_expr(*index_assign.value);
   // Map insert/update: key must match key type, value must match value type.

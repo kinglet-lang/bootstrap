@@ -1,0 +1,24 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+// Regression: writing through a field path (`p.left = ...`) while `p` is
+// borrowed used to slip past the borrow checker entirely, because
+// check_field_assign never called check_referent_access on the base object.
+// The borrow is established through a `&Pair` call argument, which is the
+// only lvalue position where the parser currently accepts a bare `&expr`
+// (a standalone `&p;` statement does not parse as a borrow today).
+
+struct Pair {
+  int left;
+  int right;
+}
+
+void hold(&Pair x) { return; }
+
+int main() {
+  Pair p = Pair { 1, 2 };
+  hold(&p);
+  p.left = 3;
+  return 0;
+}

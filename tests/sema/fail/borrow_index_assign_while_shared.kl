@@ -1,0 +1,19 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+// Regression: writing through an index path (`arr[i] = ...`) while `arr` is
+// borrowed used to slip past the borrow checker entirely, because
+// check_index_assign never called check_referent_access on the base object.
+// The borrow is established through a `&int[]` call argument, which is the
+// only lvalue position where the parser currently accepts a bare `&expr`
+// (a standalone `&arr;` statement does not parse as a borrow today).
+
+void hold(&int[] x) { return; }
+
+int main() {
+  int[] arr = [1, 2, 3];
+  hold(&arr);
+  arr[0] = 9;
+  return 0;
+}
