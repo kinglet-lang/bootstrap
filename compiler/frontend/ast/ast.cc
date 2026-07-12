@@ -782,7 +782,23 @@ void StructDecl::print(std::ostream &out, int indent) const {
   for (const FieldDef &f : fields) {
     out << '\n';
     write_indent(out, indent + 1);
+    if (f.is_private) {
+      out << "(private ";
+    }
     out << "(" << f.type.to_string() << ' ' << f.name << ")";
+    if (f.is_private) {
+      out << ")";
+    }
+  }
+  if (init_decl) {
+    out << '\n';
+    write_indent(out, indent + 1);
+    out << "(@init params=" << init_decl->params.size() << ")";
+  }
+  if (destroy_decl) {
+    out << '\n';
+    write_indent(out, indent + 1);
+    out << "(@destroy)";
   }
   out << ")";
 }
