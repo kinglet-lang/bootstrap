@@ -1,0 +1,15 @@
+// RUN: check
+// EXPECT-EXIT: 0
+
+// A bare `&expr;` / `&mut expr;` as its own statement (not inside a call
+// argument or a declaration initializer) must parse as a borrow expression,
+// not be mistaken for the start of a reference-typed variable declaration.
+
+int main() {
+  int a = 1;
+  &a;
+
+  int b = 2;
+  &mut b;
+  return 0;
+}
