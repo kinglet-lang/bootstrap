@@ -1,0 +1,22 @@
+// RUN: check
+// EXPECT-EXIT: 0
+
+// ADR 0028 D12-2: disjoint field borrows within the same struct must
+// not conflict — borrowing `p.left` and `p.right` simultaneously is
+// safe because the two fields do not overlap in memory.
+
+struct Pair {
+  int left;
+  int right;
+}
+
+int main() {
+  Pair p = Pair { 10, 20 };
+
+  // Shared borrow of `p.left` and exclusive borrow of `p.right`
+  // must coexist without error.
+  const int& l = p.left;
+  int& r = p.right;
+  r = 99;
+  return 0;
+}

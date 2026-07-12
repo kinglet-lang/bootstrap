@@ -250,6 +250,15 @@ private:
   void check_call_argument_borrows(const std::vector<ast::ExprPtr> &args,
                                    const std::vector<Type> &param_types);
   static std::optional<std::string> referent_name_from_lvalue(const ast::Expr &expr);
+  // Builds a place-based borrow path (e.g. "p.left", "arr[]") instead of
+  // stripping down to the root variable name, so disjoint field borrows
+  // within the same variable do not conflict (ADR 0028 D12-2).
+  static std::optional<std::string> borrow_path(const ast::Expr &expr);
+  // Returns true when two borrow paths conflict: equal paths always
+  // conflict; otherwise one path being a prefix of the other at a
+  // non-identifier boundary (dot or bracket) means the wider path
+  // covers the narrower one and they cannot coexist.
+  static bool paths_conflict(std::string_view a, std::string_view b);
   bool is_mutable_lvalue(const ast::Expr &expr) const;
   static bool is_reference_type(const Type &type);
   void check_reference_escape(const Type &value_type, ast::SourceLocation loc);
