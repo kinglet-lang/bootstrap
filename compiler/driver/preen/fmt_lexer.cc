@@ -257,6 +257,8 @@ Token FmtLexer::scan_token() {
     return make_token(TokenType::CARET);
   case '~':
     return make_token(TokenType::TILDE);
+  case '@':
+    return make_token(TokenType::AT);
   case '"':
     return string_literal();
   case '\'':

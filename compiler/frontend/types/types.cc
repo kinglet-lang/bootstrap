@@ -73,7 +73,8 @@ Type::Type(const Type &other)
       fields(other.fields),
       variants(other.variants),
       variant_param_types(other.variant_param_types),
-      nullable(other.nullable) {}
+      nullable(other.nullable),
+      is_resource(other.is_resource) {}
 
 Type &Type::operator=(const Type &other) {
   if (this != &other) {
@@ -87,6 +88,7 @@ Type &Type::operator=(const Type &other) {
     variants = other.variants;
     variant_param_types = other.variant_param_types;
     nullable = other.nullable;
+    is_resource = other.is_resource;
   }
   return *this;
 }

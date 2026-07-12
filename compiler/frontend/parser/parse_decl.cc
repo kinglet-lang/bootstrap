@@ -214,26 +214,69 @@ ast::DeclPtr Parser::struct_declaration() {
   consume(TokenType::LEFT_BRACE, "Expected '{' after struct name.");
 
   std::vector<ast::FieldDef> fields;
+  std::optional<ast::AnnotatedFn> init_decl;
+  std::optional<ast::AnnotatedFn> destroy_decl;
+
   while (!check(TokenType::RIGHT_BRACE) && !is_at_end()) {
     if (at_completion()) {
       set_completion({lsp::CompletionPosition::StructFieldDecl, {}, {}, {}, {}, {}});
       return nullptr;
     }
+
+    // @-annotation: @init(params) { body } or @destroy { body }
+    if (check(TokenType::AT)) {
+      advance(); // consume '@'
+      const Token &anno =
+          consume(TokenType::IDENTIFIER, "Expected annotation name (@init or @destroy).");
+      const std::string anno_name(token_text(anno));
+
+      if (anno_name == "init") {
+        if (init_decl) {
+          error_at(anno, "Duplicate @init annotation.");
+        }
+        consume(TokenType::LEFT_PAREN, "Expected '(' after @init.");
+        auto params = parameters();
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after @init parameters.");
+        auto body = function_body();
+        init_decl = ast::AnnotatedFn{std::move(params), std::move(body)};
+      } else if (anno_name == "destroy") {
+        if (destroy_decl) {
+          error_at(anno, "Duplicate @destroy annotation.");
+        }
+        auto body = function_body();
+        destroy_decl = ast::AnnotatedFn{{}, std::move(body)};
+      } else {
+        error_at(anno, "Unknown struct annotation: @" + anno_name);
+      }
+      continue;
+    }
+
     size_t start_pos = current_;
+
+    // Optional 'private' modifier on field
+    bool is_private = false;
+    if (check(TokenType::IDENTIFIER) && token_text(peek()) == "private") {
+      advance();
+      is_private = true;
+    }
+
     ast::TypeExpr type = parse_type_expr();
     if (has_completion())
       return nullptr;
     const Token &field_name = consume(TokenType::IDENTIFIER, "Expected field name.");
     consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
-    fields.push_back(ast::FieldDef{std::move(type), token_text(field_name)});
+    fields.push_back(ast::FieldDef{std::move(type), token_text(field_name), is_private});
     if (current_ == start_pos) {
       advance();
     }
   }
   consume(TokenType::RIGHT_BRACE, "Expected '}' after struct body.");
 
-  return std::make_unique<ast::StructDecl>(location_of(struct_token), token_text(name),
-                                           std::move(type_params), std::move(fields));
+  auto decl = std::make_unique<ast::StructDecl>(location_of(struct_token), token_text(name),
+                                                std::move(type_params), std::move(fields));
+  decl->init_decl = std::move(init_decl);
+  decl->destroy_decl = std::move(destroy_decl);
+  return decl;
 }
 
 ast::DeclPtr Parser::enum_declaration() {

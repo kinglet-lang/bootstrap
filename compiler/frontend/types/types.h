@@ -66,6 +66,7 @@ struct Type {
   std::vector<std::string> variants;
   std::vector<std::vector<Type>> variant_param_types;
   bool nullable = false;
+  bool is_resource = false;
 };
 
 const Type &int_type();

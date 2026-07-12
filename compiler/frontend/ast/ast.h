@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -727,6 +728,12 @@ struct IndexAssignExpr final : Expr {
 struct FieldDef {
   TypeExpr type;
   std::string name;
+  bool is_private = false;
+};
+
+struct AnnotatedFn {
+  std::vector<Parameter> params;
+  StmtPtr body;
 };
 
 struct StructLiteralExpr final : Expr {
@@ -752,6 +759,8 @@ struct StructDecl final : Decl {
   std::vector<std::string> type_params;
   std::vector<FieldDef> fields;
   bool is_public = false;
+  std::optional<AnnotatedFn> init_decl;
+  std::optional<AnnotatedFn> destroy_decl;
 };
 
 struct EnumVariantDecl {

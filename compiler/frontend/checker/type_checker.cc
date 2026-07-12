@@ -861,6 +861,7 @@ void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl,
 
   Type struct_type(TypeKind::Struct);
   struct_type.name = mangled;
+  struct_type.is_resource = decl->destroy_decl.has_value();
   for (const auto &field : decl->fields) {
     ast::TypeExpr resolved_field_type = substitute_type_params(field.type, subst);
     Type ft = resolve_type_expr(resolved_field_type);
@@ -1068,6 +1069,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
 
         Type struct_type(TypeKind::Struct);
         struct_type.name = struct_decl->name;
+        struct_type.is_resource = struct_decl->destroy_decl.has_value();
         for (const auto &field : struct_decl->fields) {
           Type ft = resolve_type_expr(field.type);
           struct_type.fields.push_back(
@@ -1253,6 +1255,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
             if (sd->type_params.empty()) {
               Type struct_type(TypeKind::Struct);
               struct_type.name = sd->name;
+              struct_type.is_resource = sd->destroy_decl.has_value();
               for (const auto &field : sd->fields) {
                 Type ft = resolve_type_expr(field.type);
                 struct_type.fields.push_back(
@@ -1841,6 +1844,16 @@ void TypeChecker::visit(const ast::VarDeclStmt &var_decl) {
                                         " to variable of type " + type_to_string(var_type) + ".");
       } else {
         check_borrow_argument(*var_decl.init, var_type, var_decl.location);
+        // Resource type init transfer (ADR 0028 D6): `T b = a;` where T is_resource
+        if (var_type.is_resource) {
+          const ast::Expr &ref_expr = strip_borrow_marker(*var_decl.init);
+          if (auto ref_name = referent_name_from_lvalue(ref_expr)) {
+            VarInfo *src_vi = find_var_info(*ref_name);
+            if (src_vi) {
+              src_vi->transferred = true;
+            }
+          }
+        }
       }
     }
   }
@@ -2138,6 +2151,11 @@ Type TypeChecker::check_identifier(const ast::IdentifierExpr &identifier) {
     error_at(identifier.location, "Undeclared variable '" + identifier.name + "'.");
     return int_type();
   }
+  VarInfo *vi = find_var_info(identifier.name);
+  if (vi && vi->transferred) {
+    error_at(identifier.location,
+             "Variable '" + identifier.name + "' was transferred and is no longer valid.");
+  }
   check_referent_access(identifier.name, identifier.location, false);
   return deref_ref_type(var_type.value());
 }
@@ -2357,6 +2375,11 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
     error_at(assign.location, "Assignment to undeclared variable '" + assign.name + "'.");
     return int_type();
   }
+  VarInfo *lhs_vi = find_var_info(assign.name);
+  if (lhs_vi && lhs_vi->transferred) {
+    error_at(assign.location,
+             "Variable '" + assign.name + "' was transferred and cannot be reassigned.");
+  }
   check_referent_access(assign.name, assign.location, true);
   Type slot_type = var_type.value();
   if (slot_type.kind == TypeKind::Ref) {
@@ -2370,6 +2393,14 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
   if (!types_assignable(value_type, target_type)) {
     error_at(assign.location, "Cannot assign " + type_to_string(value_type) + " to " +
                                   type_to_string(target_type) + ".");
+  }
+  // Resource type transfer: if the RHS is a bare identifier of a resource
+  // type, mark the source variable as transferred (ADR 0028 D6).
+  if (const auto *id_expr = dynamic_cast<const ast::IdentifierExpr *>(assign.value.get())) {
+    VarInfo *src_vi = find_var_info(id_expr->name);
+    if (src_vi && src_vi->type.is_resource) {
+      src_vi->transferred = true;
+    }
   }
   return target_type;
 }
@@ -4186,6 +4217,16 @@ void TypeChecker::check_call_argument_borrows(const std::vector<const ast::Expr 
         mut_referents.push_back(*referent);
       }
     }
+    // Bare-T parameter on a resource type: transfer the argument (ADR 0028 D4/D6).
+    if (!registered && !is_reference_type(param_types[i])) {
+      const ast::Expr &referent_expr = strip_borrow_marker(*args[i]);
+      if (auto referent = referent_name_from_lvalue(referent_expr)) {
+        VarInfo *vi = find_var_info(*referent);
+        if (vi && vi->type.is_resource) {
+          vi->transferred = true;
+        }
+      }
+    }
   }
   for (const std::string &referent : mut_referents) {
     release_mut_borrow(referent);
@@ -4277,10 +4318,23 @@ std::optional<Type> TypeChecker::lookup_var(const std::string &name) {
     auto found = it->find(name);
     if (found != it->end()) {
       found->second.used = true;
+      if (found->second.transferred) {
+        return found->second.type; // type still returned; error emitted by caller
+      }
       return found->second.type;
     }
   }
   return std::nullopt;
+}
+
+TypeChecker::VarInfo *TypeChecker::find_var_info(const std::string &name) {
+  for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
+    auto found = it->find(name);
+    if (found != it->end()) {
+      return &found->second;
+    }
+  }
+  return nullptr;
 }
 
 std::optional<Type> TypeChecker::lookup_type(const std::string &name) const {

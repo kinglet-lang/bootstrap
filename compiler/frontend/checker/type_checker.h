@@ -49,6 +49,7 @@ public:
     Type type;
     bool is_mutable;
     bool used = false;
+    bool transferred = false;
     ast::SourceLocation location;
   };
 
@@ -176,6 +177,7 @@ private:
   void declare_var(const std::string &name, const Type &type, bool is_mutable,
                    ast::SourceLocation loc = {});
   std::optional<Type> lookup_var(const std::string &name);
+  VarInfo *find_var_info(const std::string &name);
   std::optional<Type> lookup_type(const std::string &name) const;
   Type resolve_type_name(const std::string &name) const;
   Type resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocation loc = {});

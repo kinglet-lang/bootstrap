@@ -167,6 +167,8 @@ const char *token_type_name(TokenType type) {
     return "STAR_EQUAL";
   case TokenType::SLASH_EQUAL:
     return "SLASH_EQUAL";
+  case TokenType::AT:
+    return "AT";
   case TokenType::LEFT_PAREN:
     return "LEFT_PAREN";
   case TokenType::RIGHT_PAREN:
