@@ -1,0 +1,28 @@
+// RUN: ast
+// CHECK: (struct File
+// CHECK: (private (int fd))
+// CHECK: (@init params=1)
+// CHECK: (@destroy)
+// CHECK: (struct Fd
+// CHECK: (int value)
+
+// Struct with @init, @destroy, and private field.
+struct File {
+    private int fd;
+
+    @init(int fd) {
+        fd = fd;
+    }
+
+    @destroy {
+    }
+}
+
+// Plain struct with no annotations.
+struct Fd {
+    int value;
+}
+
+int main() {
+    return 0;
+}

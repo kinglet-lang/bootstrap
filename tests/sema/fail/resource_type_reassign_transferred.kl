@@ -1,0 +1,18 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: was transferred and cannot be reassigned
+
+// Reassigning to a transferred resource-type variable must be rejected.
+
+struct File {
+    int fd;
+
+    @destroy { }
+}
+
+void main() {
+    File a = File { 1 };
+    File b = a;          // a transferred
+    a = File { 2 };      // ERROR: a was transferred
+}

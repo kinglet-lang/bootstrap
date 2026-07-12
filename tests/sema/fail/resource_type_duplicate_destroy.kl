@@ -1,0 +1,16 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: Duplicate @destroy annotation
+
+// Duplicate @destroy must be rejected by the parser.
+
+struct File {
+    int fd;
+
+    @destroy { }
+
+    @destroy { }
+}
+
+void main() { }

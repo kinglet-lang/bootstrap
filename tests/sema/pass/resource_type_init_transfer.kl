@@ -1,0 +1,18 @@
+// RUN: check
+// EXPECT-EXIT: 0
+
+// VarDeclStmt `T b = a;` where T is a resource type transfers `a`.
+
+struct File {
+    int fd;
+
+    @destroy { }
+}
+
+void main() {
+    File a = File { 1 };
+    File b = a;          // transfer: a -> b via var init
+    sink(b);
+}
+
+void sink(File f) { }

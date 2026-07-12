@@ -1,0 +1,21 @@
+// RUN: check
+// EXPECT-EXIT: 0
+
+// const T& borrow on a resource type does not transfer ownership.
+// Only bare-T parameters and plain assignment transfer (ADR 0028 D6).
+
+struct File {
+    int fd;
+
+    @destroy { }
+}
+
+void inspect(const File& f) { }
+
+void main() {
+    File a = File { 1 };
+    inspect(a);          // shared borrow — no transfer
+    use(a);              // OK: a is still valid after shared borrow
+}
+
+void use(File f) { }
