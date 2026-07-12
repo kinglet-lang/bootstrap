@@ -54,6 +54,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
   namespace_source_paths_.clear();
   function_source_paths_.clear();
   func_first_param_.clear();
+  synthetic_functions_.clear();
   global_const_inits_.clear();
 
   // Pre-register the built-in CastError enum at chunk index 0 so the VM
@@ -109,6 +110,7 @@ CompileResult Compiler::compile(const ast::Program &program) {
       }
       StructMeta meta;
       meta.name = struct_decl->name;
+      meta.has_destroy = struct_decl->destroy_decl.has_value();
       for (const auto &field : struct_decl->fields) {
         meta.field_names.push_back(field.name);
       }
@@ -183,6 +185,55 @@ CompileResult Compiler::compile(const ast::Program &program) {
     }
   }
 
+  // Register @destroy bodies as synthetic functions. These are compiled
+  // like regular functions and called from the Drop instruction at scope
+  // exit to run user-defined cleanup logic.
+  for (const ast::DeclPtr &declaration : program.declarations) {
+    const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(declaration.get());
+    if (!struct_decl || !struct_decl->destroy_decl.has_value())
+      continue;
+    const auto &destroy = struct_decl->destroy_decl.value();
+    auto it = struct_indices_.find(struct_decl->name);
+    if (it == struct_indices_.end())
+      continue;
+    const int struct_idx = it->second;
+
+    // Create a synthetic FunctionDecl for the @destroy body.
+    // The implicit self: *mut Self parameter is added if the parsed
+    // AnnotatedFn didn't include one (the parser stores empty params for
+    // parameterless @destroy annotations).
+    std::vector<ast::Parameter> synth_params = destroy.params;
+    if (synth_params.empty()) {
+      synth_params.push_back(ast::Parameter{
+          .type = ast::TypeExpr{.name = "*mut"},
+          .name = "self",
+      });
+    }
+    auto synth = std::make_unique<ast::FunctionDecl>(
+        ast::SourceLocation{0, 0}, ast::TypeExpr{.name = "void"}, struct_decl->name + ".__destroy",
+        std::vector<std::string>{}, synth_params,
+        std::make_unique<ast::BlockStmt>(ast::SourceLocation{0, 0}, std::vector<ast::StmtPtr>{}));
+    const int fn_idx = static_cast<int>(function_infos_.size());
+    function_infos_.push_back(FunctionInfo{
+        .name = synth->name,
+        .mangled_name = "",
+        .entry = 0,
+        .param_count = static_cast<int>(synth_params.size()),
+    });
+    record_function_source(fn_idx, entry_source_path_);
+    function_indices_[synth->name] = fn_idx;
+    function_decl_by_index_[fn_idx] = synth.get();
+    if (!destroy.params.empty()) {
+      const std::string &receiver = destroy.params[0].type.name;
+      if (struct_indices_.count(receiver)) {
+        function_indices_[receiver + "::" + synth->name] = fn_idx;
+      }
+    }
+    functions.push_back(synth.get());
+    struct_metas_[static_cast<std::size_t>(struct_idx)].destroy_fn_index = fn_idx;
+    synthetic_functions_.push_back(std::move(synth));
+  }
+
   if (main_index < 0) {
     error_at(program.location, "Expected a main function.");
     return CompileResult{.kir = std::move(kir_module_),
@@ -252,6 +303,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
   struct_indices_.clear();
   enum_indices_.clear();
   processed_modules_.clear();
+  synthetic_functions_.clear();
 
   // Pre-register the built-in CastError enum at chunk index 0; see compile().
   {
@@ -288,6 +340,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
       }
       StructMeta meta;
       meta.name = struct_decl->name;
+      meta.has_destroy = struct_decl->destroy_decl.has_value();
       for (const auto &field : struct_decl->fields) {
         meta.field_names.push_back(field.name);
       }
@@ -339,6 +392,49 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
     }
   }
 
+  // Register @destroy bodies as synthetic functions.
+  for (const ast::DeclPtr &declaration : program.declarations) {
+    const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(declaration.get());
+    if (!struct_decl || !struct_decl->destroy_decl.has_value())
+      continue;
+    const auto &destroy = struct_decl->destroy_decl.value();
+    auto it = struct_indices_.find(struct_decl->name);
+    if (it == struct_indices_.end())
+      continue;
+    const int struct_idx = it->second;
+
+    std::vector<ast::Parameter> synth_params = destroy.params;
+    if (synth_params.empty()) {
+      synth_params.push_back(ast::Parameter{
+          .type = ast::TypeExpr{.name = "*mut"},
+          .name = "self",
+      });
+    }
+    auto synth = std::make_unique<ast::FunctionDecl>(
+        ast::SourceLocation{0, 0}, ast::TypeExpr{.name = "void"}, struct_decl->name + ".__destroy",
+        std::vector<std::string>{}, synth_params,
+        std::make_unique<ast::BlockStmt>(ast::SourceLocation{0, 0}, std::vector<ast::StmtPtr>{}));
+    const int fn_idx = static_cast<int>(function_infos_.size());
+    function_infos_.push_back(FunctionInfo{
+        .name = synth->name,
+        .mangled_name = "",
+        .entry = 0,
+        .param_count = static_cast<int>(synth_params.size()),
+    });
+    record_function_source(fn_idx, entry_source_path_);
+    function_indices_[synth->name] = fn_idx;
+    function_decl_by_index_[fn_idx] = synth.get();
+    if (!synth_params.empty()) {
+      const std::string &receiver = synth_params[0].type.name;
+      if (struct_indices_.count(receiver)) {
+        function_indices_[receiver + "::" + synth->name] = fn_idx;
+      }
+    }
+    functions.push_back(synth.get());
+    struct_metas_[static_cast<std::size_t>(struct_idx)].destroy_fn_index = fn_idx;
+    synthetic_functions_.push_back(std::move(synth));
+  }
+
   for (const auto *function : functions) {
     compile_function(*function);
     if (!errors_.empty())
@@ -368,6 +464,8 @@ void Compiler::attach_kir_metadata() {
     KirStructMeta km;
     km.name = meta.name;
     km.field_names = meta.field_names;
+    km.has_destroy = meta.has_destroy;
+    km.destroy_fn_index = meta.destroy_fn_index;
     kir_module_.struct_metas.push_back(std::move(km));
   }
   kir_module_.enum_metas.clear();
@@ -413,6 +511,29 @@ void Compiler::pop_scope() {
     return;
   const std::size_t target = scope_stack_.back();
   scope_stack_.pop_back();
+
+  // Emit destroy calls for resource-type locals in reverse declaration
+  // order. The emit calls push values and instructions into the current
+  // basic block; they are indistinguishable from user-authored code at
+  // the KIR level.
+  for (std::size_t i = locals_.size(); i > target; --i) {
+    const Local &local = locals_[i - 1];
+    if (local.slot_kind != Local::SlotKind::Value)
+      continue;
+    auto type_it = local_types_.find(local.name);
+    if (type_it == local_types_.end())
+      continue;
+    auto struct_it = struct_indices_.find(type_it->second);
+    if (struct_it == struct_indices_.end())
+      continue;
+    const auto &meta = struct_metas_[static_cast<std::size_t>(struct_it->second)];
+    if (!meta.has_destroy)
+      continue;
+    emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(i - 1), ast::SourceLocation{0, 0});
+    emit_operand(LoweringOp::Drop, static_cast<uint32_t>(struct_it->second),
+                 ast::SourceLocation{0, 0});
+  }
+
   while (locals_.size() > target) {
     locals_.pop_back();
   }

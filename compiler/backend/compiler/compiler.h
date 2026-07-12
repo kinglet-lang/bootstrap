@@ -48,6 +48,7 @@ private:
   struct Local {
     std::string name;
     bool is_mutable = true;
+    bool is_resource = false;
     enum class SlotKind { Value, Ref, MutRef } slot_kind = SlotKind::Value;
   };
 
@@ -243,6 +244,9 @@ private:
   std::unordered_map<std::string, std::string> method_return_types_;
   std::unordered_map<std::string, std::string> func_first_param_;
   std::unordered_map<std::string, const ast::Expr *> global_const_inits_;
+  // Synthetic FunctionDecl nodes created for @destroy bodies. These are
+  // owned by the compiler and must outlive the compilation pass.
+  std::vector<std::unique_ptr<ast::FunctionDecl>> synthetic_functions_;
   bool in_try_ = false;
 };
 
