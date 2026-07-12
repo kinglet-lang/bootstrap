@@ -1,0 +1,19 @@
+// RUN: run
+// EXPECT-EXIT: 0
+
+// A resource created in one function and passed to another via bare-T
+// parameter transfers ownership. The callee owns the resource and it is
+// destroyed at callee scope exit, not caller scope exit.
+
+struct Tag {
+    int id;
+
+    @destroy { }
+}
+
+void consume(Tag t) { }
+
+void main() {
+    Tag a = Tag { 1 };
+    consume(a);
+}

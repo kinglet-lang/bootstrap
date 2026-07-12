@@ -1,0 +1,19 @@
+// RUN: check
+// EXPECT-EXIT: 0
+
+// Passing a resource type as a bare-T argument transfers ownership.
+// The call itself is valid; the transfer is checked elsewhere (call
+// site and subsequent uses of the source variable).
+
+struct File {
+    int fd;
+
+    @destroy { }
+}
+
+void consume(File f) { }
+
+void main() {
+    File a = File { 1 };
+    consume(a);   // valid call-site transfer
+}

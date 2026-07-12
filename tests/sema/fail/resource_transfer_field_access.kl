@@ -1,0 +1,22 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: was transferred and is no longer valid
+
+// A resource-type local whose field is accessed after a bare-T call
+// that transferred it must be rejected. The transfer consumes the
+// whole variable, not just the value at the call site.
+
+struct File {
+    int fd;
+
+    @destroy { }
+}
+
+void consume(File f) { }
+
+void main() {
+    File a = File { 1 };
+    consume(a);          // a transferred
+    int fd = a.fd;       // ERROR: a was transferred
+}

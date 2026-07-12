@@ -1,0 +1,21 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: was transferred and is no longer valid
+
+// A resource-type local passed as a bare-T argument is transferred;
+// using it after the call must be rejected.
+
+struct File {
+    int fd;
+
+    @destroy { }
+}
+
+void consume(File f) { }
+
+void main() {
+    File a = File { 1 };
+    consume(a);          // a transferred to consume
+    consume(a);          // ERROR: a was already transferred
+}
