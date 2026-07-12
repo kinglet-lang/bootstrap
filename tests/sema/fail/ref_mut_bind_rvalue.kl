@@ -1,0 +1,17 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+// ADR 0028 D10: T& (exclusive) binding a temporary is ill-formed.
+// An exclusive borrow's purpose is to later observe a mutation
+// through the same named binding; a temporary has no such binding
+// to observe through.
+
+struct Data { int x; }
+
+Data make_data() { return Data { 42 }; }
+
+int main() {
+  int& bad = 42;
+  return 0;
+}

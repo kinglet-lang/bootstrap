@@ -1,0 +1,13 @@
+// RUN: check
+
+// ADR 0028 D10: const T& binding a temporary (rvalue) is allowed
+// — the temporary's lifetime is extended to the enclosing scope.
+
+struct Data { int x; }
+
+Data make_data() { return Data { 42 }; }
+
+int main() {
+  const Data& ok = make_data();
+  return 0;
+}

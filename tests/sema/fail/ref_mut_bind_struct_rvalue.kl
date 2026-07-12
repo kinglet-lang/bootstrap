@@ -1,0 +1,14 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+// ADR 0028 D10: T& binding a struct temporary (rvalue) is ill-formed.
+
+struct Data { int x; }
+
+Data make_data() { return Data { 42 }; }
+
+int main() {
+  Data& bad = make_data();
+  return 0;
+}
