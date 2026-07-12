@@ -414,6 +414,9 @@ void KirRecorder::on_emit(LoweringOp op, uint32_t operand, ast::SourceLocation l
   case LoweringOp::Negate:
     bb_.instrs.push_back(rec(KirOpcode::INeg, {}, location));
     break;
+  case LoweringOp::Drop:
+    bb_.instrs.push_back(rec(KirOpcode::Drop, {static_cast<int32_t>(operand)}, location));
+    break;
   default:
     bb_.instrs.push_back(rec(KirOpcode::Nop, {}, location));
     break;

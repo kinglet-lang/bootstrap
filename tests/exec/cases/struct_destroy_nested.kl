@@ -1,0 +1,25 @@
+// RUN: run
+// EXPECT-EXIT: 0
+
+// Regression: nested scopes with @destroy structs must still compile
+// and run correctly. Each scope exit emits Drop instructions in
+// reverse declaration order.
+
+struct Tag {
+  int id;
+
+  @destroy { }
+}
+
+int main() {
+  {
+    Tag a = Tag { 1 };
+    {
+      Tag b = Tag { 2 };
+      {
+        Tag c = Tag { 3 };
+      }
+    }
+  }
+  return 0;
+}

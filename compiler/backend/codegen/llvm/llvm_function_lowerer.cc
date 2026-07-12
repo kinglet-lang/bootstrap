@@ -2050,6 +2050,36 @@ public:
       }
       case KirOpcode::Nop:
         break;
+      case KirOpcode::Drop: {
+        llvm::Value *handle = pop_value(&stack, error, &type_stack);
+        if (handle == nullptr) {
+          return false;
+        }
+        // Call the @destroy body if one is registered for this struct type.
+        const int struct_idx = instr->operands.empty() ? -1 : instr->operands[0];
+        if (struct_idx >= 0 &&
+            static_cast<std::size_t>(struct_idx) < kir_module_.struct_metas.size()) {
+          const int destroy_fn =
+              kir_module_.struct_metas[static_cast<std::size_t>(struct_idx)].destroy_fn_index;
+          if (destroy_fn >= 0 &&
+              static_cast<std::size_t>(destroy_fn) < kir_module_.function_symbols.size()) {
+            const std::string &destroy_symbol =
+                kir_module_.function_symbols[static_cast<std::size_t>(destroy_fn)];
+            llvm::Module *llvm_module = llvm_fn_->getParent();
+            llvm::Function *destroy_llvm_fn = llvm_module->getFunction(destroy_symbol);
+            if (destroy_llvm_fn == nullptr) {
+              const int param_count =
+                  kir_module_.function_param_counts[static_cast<std::size_t>(destroy_fn)];
+              std::vector<llvm::Type *> param_types(static_cast<std::size_t>(param_count), i64);
+              auto *fn_type = llvm::FunctionType::get(i64, param_types, false);
+              destroy_llvm_fn = llvm::Function::Create(fn_type, llvm::Function::ExternalLinkage,
+                                                       destroy_symbol, llvm_module);
+            }
+            builder.CreateCall(destroy_llvm_fn, {handle});
+          }
+        }
+        break;
+      }
       case KirOpcode::EnumVariant: {
         const int packed = instr->operands[0];
         const int type_idx = packed >> 16;

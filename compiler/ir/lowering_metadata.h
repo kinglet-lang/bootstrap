@@ -18,6 +18,8 @@ struct FunctionInfo {
 struct StructMeta {
   std::string name;
   std::vector<std::string> field_names;
+  bool has_destroy = false;
+  int destroy_fn_index = -1;
 };
 
 struct EnumMeta {

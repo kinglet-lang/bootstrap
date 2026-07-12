@@ -895,6 +895,10 @@ void infer_function(KirFunction *fn, const KirModule &module) {
     case KirOpcode::Unreachable:
     case KirOpcode::Nop:
       break;
+    case KirOpcode::Drop:
+      pop_type(&state);
+      result = KirType::Void;
+      break;
     }
 
     fn->instr_types[i] = result;

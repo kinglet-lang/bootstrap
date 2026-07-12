@@ -203,6 +203,8 @@ const char *lowering_op_name(LoweringOp op) {
     return "DenseArrayNew";
   case LoweringOp::BorrowIndexMut:
     return "BorrowIndexMut";
+  case LoweringOp::Drop:
+    return "Drop";
   }
   return "Unknown";
 }

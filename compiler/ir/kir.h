@@ -173,12 +173,17 @@ enum class KirOpcode : std::uint8_t {
   Nop,
   DenseArrayNew,
   BorrowIndexMut,
+  Drop,
 };
 
 struct KirStructMeta {
   std::string name;
   std::vector<std::string> field_names;
   std::vector<KirType> field_types;
+  bool has_destroy = false;
+  // Index into the module's function list for the @destroy body.
+  // -1 means no destroy function registered.
+  int destroy_fn_index = -1;
 };
 
 struct KirEnumMeta {
