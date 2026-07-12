@@ -3696,11 +3696,11 @@ Type TypeChecker::check_field_assign(const ast::FieldAssignExpr &field_assign) {
 
   Type obj_type = check_expr(*field_assign.object);
   // Writing through a field path (`obj.field = value`) mutates the referent
-  // that `obj` resolves to, so it needs the same exclusivity check as a
-  // direct `obj = value` assignment — otherwise a live borrow of `obj` would
-  // let a field write through it go unnoticed.
-  if (auto referent = referent_name_from_lvalue(*field_assign.object)) {
-    check_referent_access(*referent, field_assign.location, true);
+  // that `obj.field` resolves to, so it needs a place-based exclusivity check
+  // — a borrow of `obj.right` should not conflict with `obj.left = value`
+  // (ADR 0028 D12-2).
+  if (auto path = borrow_path(*field_assign.object)) {
+    check_referent_access(*path, field_assign.location, true);
   }
   Type value_type = check_expr(*field_assign.value);
   check_reference_escape(value_type, field_assign.location);
@@ -3936,11 +3936,11 @@ Type TypeChecker::check_index_assign(const ast::IndexAssignExpr &index_assign) {
 
   Type object_type = check_expr(*index_assign.object);
   // Writing through an index path (`obj[i] = value`) mutates the referent
-  // that `obj` resolves to, so it needs the same exclusivity check as a
-  // direct `obj = value` assignment — otherwise a live borrow of `obj` would
-  // let an index write through it go unnoticed.
-  if (auto referent = referent_name_from_lvalue(*index_assign.object)) {
-    check_referent_access(*referent, index_assign.location, true);
+  // that `obj[]` resolves to; dynamic indices are conservatively treated as
+  // a single opaque path so `arr[i] = v` and a borrow of `arr[j]` still
+  // conflict (ADR 0028 D12-2).
+  if (auto path = borrow_path(*index_assign.object)) {
+    check_referent_access(*path, index_assign.location, true);
   }
   Type index_type = check_expr(*index_assign.index);
   Type value_type = check_expr(*index_assign.value);
@@ -4099,9 +4099,48 @@ std::optional<std::string> TypeChecker::referent_name_from_lvalue(const ast::Exp
   return std::nullopt;
 }
 
+std::optional<std::string> TypeChecker::borrow_path(const ast::Expr &expr) {
+  if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    return identifier->name;
+  }
+  if (const auto *field = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
+    auto base = borrow_path(*field->object);
+    if (base) {
+      base->push_back('.');
+      base->append(field->field_name);
+    }
+    return base;
+  }
+  if (const auto *index = dynamic_cast<const ast::IndexExpr *>(&expr)) {
+    auto base = borrow_path(*index->object);
+    if (base) {
+      base->append("[]");
+    }
+    return base;
+  }
+  return std::nullopt;
+}
+
+bool TypeChecker::paths_conflict(std::string_view a, std::string_view b) {
+  if (a == b) {
+    return true;
+  }
+  // If the shorter string is a prefix of the longer one and the next
+  // character in the longer string marks a field/index boundary
+  // (dot or bracket), then the shorter path covers the longer one and
+  // the two borrows cannot coexist.
+  if (a.size() < b.size()) {
+    return b.compare(0, a.size(), a) == 0 && (b[a.size()] == '.' || b[a.size()] == '[');
+  }
+  if (b.size() < a.size()) {
+    return a.compare(0, b.size(), b) == 0 && (a[b.size()] == '.' || a[b.size()] == '[');
+  }
+  return false;
+}
+
 void TypeChecker::register_borrow(const std::string &referent, bool mut, ast::SourceLocation loc) {
   for (const ActiveBorrow &borrow : active_borrows_) {
-    if (borrow.referent != referent) {
+    if (!paths_conflict(borrow.referent, referent)) {
       continue;
     }
     if (borrow.mut || mut) {
@@ -4123,7 +4162,7 @@ void TypeChecker::release_mut_borrow(const std::string &referent) {
 void TypeChecker::check_referent_access(const std::string &name, ast::SourceLocation loc,
                                         bool mutating) {
   for (const ActiveBorrow &borrow : active_borrows_) {
-    if (borrow.referent != name) {
+    if (!paths_conflict(borrow.referent, name)) {
       continue;
     }
     if (borrow.mut) {
@@ -4196,8 +4235,8 @@ bool TypeChecker::check_borrow_argument(const ast::Expr &arg_expr, const Type &p
     error_at(loc, "Cannot mutably borrow an immutable lvalue.");
     return true;
   }
-  if (auto referent = referent_name_from_lvalue(referent_expr)) {
-    register_borrow(*referent, mut, loc);
+  if (auto path = borrow_path(referent_expr)) {
+    register_borrow(*path, mut, loc);
   }
   return true;
 }
@@ -4213,8 +4252,8 @@ void TypeChecker::check_call_argument_borrows(const std::vector<const ast::Expr 
   for (std::size_t i = 0; i < args.size() && i < param_types.size(); ++i) {
     const bool registered = check_borrow_argument(*args[i], param_types[i], args[i]->location);
     if (registered && param_types[i].kind == TypeKind::MutRef) {
-      if (auto referent = referent_name_from_lvalue(strip_borrow_marker(*args[i]))) {
-        mut_referents.push_back(*referent);
+      if (auto path = borrow_path(strip_borrow_marker(*args[i]))) {
+        mut_referents.push_back(*path);
       }
     }
     // Bare-T parameter on a resource type: transfer the argument (ADR 0028 D4/D6).

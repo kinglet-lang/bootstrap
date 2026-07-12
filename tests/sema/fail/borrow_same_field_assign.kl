@@ -1,0 +1,20 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+// ADR 0028 D12-2: assigning to a field while the same field is
+// already borrowed must still be detected. Place-based tracking
+// should not loosen this — `p.left` borrow + `p.left` assignment
+// is an exact-path conflict. (enum Coverage: borrow and assign same field path.)
+
+struct Pair {
+  int left;
+  int right;
+}
+
+int main() {
+  Pair p = Pair { 10, 20 };
+  const int& l = p.left;  // shared borrow of p.left
+  p.left = 99;             // ERROR: Cannot mutate 'p.left' while it is borrowed
+  return 0;
+}

@@ -1,0 +1,19 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+// ADR 0028 D12-2: borrowing a struct as a whole and then trying to
+// borrow an individual field must conflict — the whole-struct borrow
+// covers every field. (enum Coverage: p borrow and p.field borrow.)
+
+struct Pair {
+  int left;
+  int right;
+}
+
+int main() {
+  Pair p = Pair { 10, 20 };
+  int& whole = p;        // exclusive borrow of entire p
+  const int& only_left = p.left;  // ERROR: p is already borrowed
+  return 0;
+}
