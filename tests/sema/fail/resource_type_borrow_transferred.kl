@@ -1,0 +1,20 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: was transferred and is no longer valid
+
+// Borrowing a transferred resource-type variable must be rejected.
+
+struct File {
+    int fd;
+
+    @destroy { }
+}
+
+void inspect(const File& f) { }
+
+void main() {
+    File a = File { 1 };
+    File b = a;          // a transferred
+    inspect(a);          // ERROR: a was transferred — cannot borrow
+}
