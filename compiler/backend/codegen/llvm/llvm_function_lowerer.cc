@@ -155,6 +155,7 @@ struct RtFns {
   llvm::Function *float_new = nullptr;
   llvm::Function *float_get = nullptr;
   llvm::Function *float_to_bits = nullptr;
+  llvm::Function *float_to_string = nullptr;
   llvm::Function *bool_to_string = nullptr;
   llvm::Function *null_to_string = nullptr;
   llvm::Function *int_to_string = nullptr;
@@ -311,6 +312,9 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.char_to_string =
       llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                              llvm::Function::ExternalLinkage, "kl_char_to_string", module);
+  rt.float_to_string =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_float_to_string", module);
   rt.value_add = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_value_add", module);
   rt.value_sub = llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
@@ -496,6 +500,9 @@ llvm::Value *wire_for_string_display(llvm::IRBuilder<> &builder, const RtFns &rt
     // Display a char as its character byte, matching VM semantics.
     return builder.CreateCall(rt.char_to_string, {wire});
   default:
+    if (kir_type_is_float(kir_type_normalize(type))) {
+      return builder.CreateCall(rt.float_to_string, {wire});
+    }
     // A value statically known to be a plain integer must be formatted as an
     // integer, never sniffed: large ints whose high bits land on the
     // heap/inline-enum mark would otherwise be misread as a heap ref or enum.
@@ -609,6 +616,9 @@ llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode 
       break;
     case KirOpcode::IDiv:
       fresult = builder.CreateFDiv(l, r);
+      break;
+    case KirOpcode::IMod:
+      fresult = builder.CreateFRem(l, r);
       break;
     default:
       break;
