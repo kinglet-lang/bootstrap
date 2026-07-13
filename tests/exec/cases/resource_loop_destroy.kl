@@ -1,0 +1,21 @@
+// RUN: run
+// EXPECT-EXIT: 0
+
+// Resource locals declared in a loop body are destroyed at the end of
+// each iteration. The scope-exit drop fires once per loop iteration,
+// and the variable is re-declared (not reassigned) on each trip.
+
+struct Token {
+    int id;
+
+    @destroy { }
+}
+
+void main() {
+    // Three iterations — each creates and destroys a fresh Token.
+    int i = 0;
+    while (i < 3) {
+        Token t = Token { i };
+        i = i + 1;
+    }
+}

@@ -1,0 +1,21 @@
+// RUN: run
+// EXPECT-EXIT: 0
+
+// Resource transfer through function calls transfers ownership.
+// The caller cannot use the resource after passing it to a bare-T
+// parameter; the callee can use and destroy it.
+
+struct Buffer {
+    int fd;
+
+    @destroy { }
+}
+
+void process(Buffer buf) {
+    // buf is owned here — destroy fires at scope exit inside process.
+}
+
+void main() {
+    Buffer b = Buffer { 0 };
+    process(b);     // b transferred to process
+}

@@ -1,0 +1,21 @@
+// RUN: run
+// EXPECT-EXIT: 0
+
+// Resource locals in conditional branches are destroyed when their
+// respective branch exits. Each arm of the if creates a different
+// resource, and only the taken branch's resources are destroyed.
+
+struct Handle {
+    int fd;
+
+    @destroy { }
+}
+
+void main() {
+    int cond = 1;
+    if (cond) {
+        Handle a = Handle { 10 };
+    } else {
+        Handle b = Handle { 20 };
+    }
+}

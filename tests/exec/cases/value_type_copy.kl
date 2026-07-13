@@ -1,0 +1,22 @@
+// RUN: run
+// EXPECT-EXIT: 0
+
+// Value-type assignment copies via retain/release. After `let b = a;`,
+// both `a` and `b` are independently usable because value types are not
+// transferred — they are reference-counted copies.
+
+struct Point {
+    int x;
+    int y;
+}
+
+void use_int(int n) { }
+
+void main() {
+    Point a = Point { 1, 2 };
+    Point b = a;
+    // Both a and b remain valid — value types copy, don't transfer.
+    use_int(a.x);
+    use_int(b.x);
+    use_int(b.y);
+}
