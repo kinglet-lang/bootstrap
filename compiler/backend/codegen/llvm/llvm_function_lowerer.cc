@@ -590,23 +590,31 @@ llvm::Value *typed_binop(llvm::IRBuilder<> &builder, const RtFns &rt, KirOpcode 
     llvm::Type *f64 = builder.getDoubleTy();
     llvm::Value *l = lhs->getType()->isDoubleTy() ? lhs : builder.CreateCall(rt.float_get, {lhs});
     llvm::Value *r = rhs->getType()->isDoubleTy() ? rhs : builder.CreateCall(rt.float_get, {rhs});
-    if (lhs_ty == KirType::Int) {
+    if (kir_type_is_integer(lhs_ty)) {
       l = builder.CreateSIToFP(lhs, f64);
     }
-    if (rhs_ty == KirType::Int) {
+    if (kir_type_is_integer(rhs_ty)) {
       r = builder.CreateSIToFP(rhs, f64);
     }
+    llvm::Value *fresult = nullptr;
     switch (op) {
     case KirOpcode::IAdd:
-      return builder.CreateFAdd(l, r);
+      fresult = builder.CreateFAdd(l, r);
+      break;
     case KirOpcode::ISub:
-      return builder.CreateFSub(l, r);
+      fresult = builder.CreateFSub(l, r);
+      break;
     case KirOpcode::IMul:
-      return builder.CreateFMul(l, r);
+      fresult = builder.CreateFMul(l, r);
+      break;
     case KirOpcode::IDiv:
-      return builder.CreateFDiv(l, r);
+      fresult = builder.CreateFDiv(l, r);
+      break;
     default:
       break;
+    }
+    if (fresult != nullptr) {
+      return builder.CreateCall(rt.float_new, {fresult});
     }
   }
   if (op == KirOpcode::IAdd && (lhs_ty == KirType::String || rhs_ty == KirType::String)) {
@@ -1103,17 +1111,55 @@ public:
           return false;
         }
         // Fast path: plain integer comparisons bypass the runtime cmp/eql
-        // call and use LLVM native icmp directly.
-        const bool int_cmp = !kir_type_is_heap(lhs_ty) && !kir_type_is_heap(rhs_ty) &&
-                             lhs_ty != KirType::Any && rhs_ty != KirType::Any;
+        // call and use LLVM native icmp directly. Float comparisons use fcmp
+        // to avoid comparing heap-pointer identity.
+        const bool is_heap_or_any = kir_type_is_heap(lhs_ty) || kir_type_is_heap(rhs_ty) ||
+                                    lhs_ty == KirType::Any || rhs_ty == KirType::Any;
+        const bool is_float_cmp = kir_type_is_float(lhs_ty) || kir_type_is_float(rhs_ty);
         llvm::Value *result = nullptr;
-        if (int_cmp && (op == KirOpcode::ICmpEq || op == KirOpcode::ICmpNeq)) {
+        if (is_float_cmp) {
+          llvm::Type *f64 = builder.getDoubleTy();
+          llvm::Value *l =
+              kir_type_is_float(lhs_ty) ? builder.CreateCall(rt_.float_get, {lhs}) : lhs;
+          llvm::Value *r =
+              kir_type_is_float(rhs_ty) ? builder.CreateCall(rt_.float_get, {rhs}) : rhs;
+          if (kir_type_is_integer(lhs_ty)) {
+            l = builder.CreateSIToFP(lhs, f64);
+          }
+          if (kir_type_is_integer(rhs_ty)) {
+            r = builder.CreateSIToFP(rhs, f64);
+          }
+          llvm::Value *eq = nullptr;
+          switch (op) {
+          case KirOpcode::ICmpLt:
+            eq = builder.CreateFCmpOLT(l, r);
+            break;
+          case KirOpcode::ICmpGt:
+            eq = builder.CreateFCmpOGT(l, r);
+            break;
+          case KirOpcode::ICmpLe:
+            eq = builder.CreateFCmpOLE(l, r);
+            break;
+          case KirOpcode::ICmpGe:
+            eq = builder.CreateFCmpOGE(l, r);
+            break;
+          case KirOpcode::ICmpEq:
+            eq = builder.CreateFCmpOEQ(l, r);
+            break;
+          case KirOpcode::ICmpNeq:
+            eq = builder.CreateFCmpONE(l, r);
+            break;
+          default:
+            break;
+          }
+          result = bool_to_i64(builder, eq);
+        } else if (!is_heap_or_any && (op == KirOpcode::ICmpEq || op == KirOpcode::ICmpNeq)) {
           llvm::Value *eq = builder.CreateICmpEQ(lhs, rhs);
           if (op == KirOpcode::ICmpNeq) {
             eq = builder.CreateXor(eq, llvm::ConstantInt::get(builder.getInt1Ty(), 1));
           }
           result = bool_to_i64(builder, eq);
-        } else if (int_cmp) {
+        } else if (!is_heap_or_any) {
           llvm::Value *eq = nullptr;
           switch (op) {
           case KirOpcode::ICmpLt:
@@ -2158,10 +2204,18 @@ public:
         }
         llvm::Value *result = nullptr;
         if (kind == 0) {
-          result = builder.CreateCall(rt_.cast_to_int, {to_wire_i64(builder, rt_, src, src_ty)});
+          if (kir_type_is_float(src_ty)) {
+            llvm::Value *dbl = builder.CreateCall(rt_.float_get, {src});
+            result = builder.CreateFPToSI(dbl, i64);
+          } else {
+            result = builder.CreateCall(rt_.cast_to_int, {to_wire_i64(builder, rt_, src, src_ty)});
+          }
         } else if (kind == 1) {
-          if (src_ty == KirType::Float && src->getType()->isDoubleTy()) {
-            result = builder.CreateCall(rt_.float_new, {src});
+          if (kir_type_is_float(src_ty)) {
+            result = src;
+          } else if (kir_type_is_integer(kir_type_normalize(src_ty))) {
+            llvm::Value *dbl = builder.CreateSIToFP(src, builder.getDoubleTy());
+            result = builder.CreateCall(rt_.float_new, {dbl});
           } else {
             result =
                 builder.CreateCall(rt_.cast_to_float, {to_wire_i64(builder, rt_, src, src_ty)});
