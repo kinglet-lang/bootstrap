@@ -1,0 +1,7 @@
+zero_is_null=false
+null_is_null=true
+42_is_null=false
+zero_coalesce=0
+null_coalesce=-1
+missing_is_null=true
+present_val=7

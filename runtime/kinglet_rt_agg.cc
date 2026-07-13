@@ -72,12 +72,12 @@ kl_h kl_dense2d_get(kl_h grid, int32_t row, int32_t col) {
   }
   auto *obj = static_cast<KlArray *>(kl_unbox_ptr(grid));
   if (obj->dense_dims.size() != 2 || row < 0 || col < 0) {
-    return kl_from_int(0);
+    return kl_null_value();
   }
   const int32_t rows = obj->dense_dims[0];
   const int32_t cols = obj->dense_dims[1];
   if (row >= rows || col >= cols) {
-    return kl_from_int(0);
+    return kl_null_value();
   }
   const std::size_t idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(cols) +
                           static_cast<std::size_t>(col);
@@ -88,7 +88,7 @@ kl_h kl_dense2d_get(kl_h grid, int32_t row, int32_t col) {
 
 kl_h kl_array_get(kl_h array, int32_t index) {
   if (!kl_is_heap(array) || index < 0) {
-    return kl_from_int(0);
+    return kl_null_value();
   }
   void *ptr = kl_unbox_ptr(array);
   auto *hdr = static_cast<KlHeader *>(ptr);
@@ -102,7 +102,7 @@ kl_h kl_array_get(kl_h array, int32_t index) {
         static_cast<int8_t>(static_cast<unsigned char>(bytes[static_cast<std::size_t>(index)])));
   }
   if (hdr->kind != KlKind::Array) {
-    return kl_from_int(0);
+    return kl_null_value();
   }
   auto *obj = static_cast<KlArray *>(ptr);
   if (kl_array_is_dense(obj)) {
@@ -115,7 +115,7 @@ kl_h kl_array_get(kl_h array, int32_t index) {
       const std::size_t base = static_cast<std::size_t>(index) * static_cast<std::size_t>(cols);
       return kl_array_new(cols, obj->elements.data() + static_cast<std::ptrdiff_t>(base));
     }
-    return kl_from_int(0);
+    return kl_null_value();
   }
   if (static_cast<std::size_t>(index) >= obj->elements.size()) {
     runtime_abort("Array index out of bounds.");

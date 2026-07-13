@@ -14,6 +14,9 @@ using kl_h = int64_t;
 static constexpr uint64_t KL_HEAP_MARK = 0xFFFEULL << 48;
 static constexpr uint64_t KL_INLINE_ENUM_MARK = 0xFFFDULL << 48;
 static constexpr uint64_t KL_INLINE_FLOAT_MARK = 0xFFFCULL << 48;
+// Null sentinel: distinct from plain int 0 so that int? with value 0 is not
+// mistaken for null. Uses the 0xFFFB tag (one slot below inline float).
+static constexpr uint64_t KL_NULL_SENTINEL = 0xFFFBULL << 48;
 
 static inline int kl_is_inline_enum(kl_h value) {
   return (static_cast<uint64_t>(value) & (0xFFFFULL << 48)) ==
@@ -23,6 +26,14 @@ static inline int kl_is_inline_enum(kl_h value) {
 static inline int kl_is_inline_float(kl_h value) {
   return (static_cast<uint64_t>(value) & (0xFFFFULL << 48)) ==
          static_cast<uint64_t>(KL_INLINE_FLOAT_MARK);
+}
+
+static inline int kl_is_null(kl_h value) {
+  return value == static_cast<kl_h>(KL_NULL_SENTINEL);
+}
+
+static inline kl_h kl_null_value() {
+  return static_cast<kl_h>(KL_NULL_SENTINEL);
 }
 
 static inline kl_h kl_enum_inline(int32_t type_index, int32_t variant_index) {

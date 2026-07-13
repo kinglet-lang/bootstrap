@@ -47,8 +47,9 @@ kl_h concat(kl_h left, kl_h right) {
 
 } // namespace
 
-// Note: null and integer 0 share the wire value 0; format the common case
-// (integer zero). Bools likewise print as 1/0 — there is no bool tag.
+// Note: null uses a tagged sentinel (KL_NULL_SENTINEL) distinct from
+// integer 0, so kl_value_is_err can distinguish int? 0 from null.  Bools
+// likewise print as 1/0 — there is no bool tag.
 std::string kl_value_text(kl_h value) {
   if (kl_is_inline_float(value)) {
     const uint32_t bits = static_cast<uint32_t>(static_cast<uint64_t>(value) & 0xFFFFFFFFULL);

@@ -142,7 +142,7 @@ kl_h kl_index_get(kl_h object, kl_h key) {
   if (KlMap *obj = as_map(object)) {
     const KlMapEntry *entry = map_find(obj, key);
     if (entry == nullptr) {
-      return 0;
+      return kl_null_value();
     }
     kl_h v = entry->value;
     kl_retain(v);

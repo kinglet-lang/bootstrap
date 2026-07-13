@@ -1,0 +1,27 @@
+// RUN: run
+using io;
+
+int main() {
+  // Core fix: int? with value 0 must NOT be mistaken for null.
+  int? zero_val = 0;
+  int? actual_null = null;
+  int? non_zero = 42;
+
+  io::out.line("zero_is_null={}", zero_val == null);
+  io::out.line("null_is_null={}", actual_null == null);
+  io::out.line("42_is_null={}", non_zero == null);
+
+  // Coalesce with value 0: should return 0, not the default.
+  io::out.line("zero_coalesce={}", zero_val ?: -1);
+  io::out.line("null_coalesce={}", actual_null ?: -1);
+
+  // Map access: missing key returns null, not 0.
+  {string: int} m = {};
+  m["ok"] = 7;
+  int missing = m["bad"];
+  int present = m["ok"];
+  io::out.line("missing_is_null={}", missing == null);
+  io::out.line("present_val={}", present);
+
+  return 0;
+}

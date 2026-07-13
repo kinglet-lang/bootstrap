@@ -1269,7 +1269,9 @@ public:
         temp_types[i] = KirType::Bool;
         break;
       case KirOpcode::ConstNull:
-        push(llvm::ConstantInt::get(i64, 0));
+        // Use a tagged sentinel (0xFFFB << 48) instead of plain 0 so that
+        // int? with value 0 is not mistaken for null by kl_value_is_err.
+        push(llvm::ConstantInt::get(i64, static_cast<int64_t>(0xFFFB000000000000ULL)));
         temps[i] = stack.back();
         break;
       case KirOpcode::ConstString: {
