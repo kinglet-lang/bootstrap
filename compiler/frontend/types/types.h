@@ -29,6 +29,7 @@ enum class TypeKind : std::uint8_t {
   Ref,
   MutRef,
   Concept,
+  Optional,
 };
 
 struct Type;
@@ -82,6 +83,7 @@ const Type &void_type();
 const Type &null_type();
 Type array_type(Type element_type);
 Type map_type(Type key, Type value);
+Type optional_type(Type inner_type);
 
 std::ostream &operator<<(std::ostream &out, const Type &type);
 std::ostream &operator<<(std::ostream &out, TypeKind kind);
