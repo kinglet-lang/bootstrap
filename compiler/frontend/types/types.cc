@@ -59,6 +59,8 @@ TypeId Type::type_id() const {
     return TypeId::MutRef;
   case TypeKind::Concept:
     return TypeId::Concept;
+  case TypeKind::Optional:
+    return TypeId::Optional;
   }
   return TypeId::Unknown;
 }
@@ -74,10 +76,19 @@ Type::Type(const Type &other)
       variants(other.variants),
       variant_param_types(other.variant_param_types),
       nullable(other.nullable),
-      is_resource(other.is_resource) {}
+      is_resource(other.is_resource),
+      fixed_size(other.fixed_size) {}
 
 Type &Type::operator=(const Type &other) {
   if (this != &other) {
+    // Keep old owned sub-types alive during assignment — 'other' may be a
+    // reference to one of them (e.g. `x = *x.element_type` for Optional
+    // unwrapping).  Without these locals, overwriting the shared_ptr on the
+    // next lines would destroy the object `other` still points into.
+    auto old_return_type = return_type;
+    auto old_element_type = element_type;
+    auto old_key_type = key_type;
+
     kind = other.kind;
     name = other.name;
     param_types = other.param_types;
@@ -89,6 +100,7 @@ Type &Type::operator=(const Type &other) {
     variant_param_types = other.variant_param_types;
     nullable = other.nullable;
     is_resource = other.is_resource;
+    fixed_size = other.fixed_size;
   }
   return *this;
 }
@@ -135,6 +147,12 @@ bool Type::is_compatible_with(const Type &other) const {
       return key_ok && val_ok;
     }
     if (kind == TypeKind::Ref || kind == TypeKind::MutRef) {
+      if (!element_type || !other.element_type) {
+        return true;
+      }
+      return element_type->is_compatible_with(*other.element_type);
+    }
+    if (kind == TypeKind::Optional) {
       if (!element_type || !other.element_type) {
         return true;
       }
@@ -235,12 +253,21 @@ Type map_type(Type key, Type value) {
   return result;
 }
 
+Type optional_type(Type inner_type) {
+  Type result(TypeKind::Optional);
+  result.element_type = std::make_shared<Type>(std::move(inner_type));
+  return result;
+}
+
 std::ostream &operator<<(std::ostream &out, const Type &type) {
   if (type.kind == TypeKind::Array && type.element_type) {
     return out << *type.element_type << "[]";
   }
   if (type.kind == TypeKind::Map && type.key_type && type.element_type) {
     return out << "{" << *type.key_type << ": " << *type.element_type << "}";
+  }
+  if (type.kind == TypeKind::Optional && type.element_type) {
+    return out << *type.element_type << "?";
   }
   return out << type.kind;
 }
@@ -277,6 +304,8 @@ std::ostream &operator<<(std::ostream &out, TypeKind kind) {
     return out << "MutRef";
   case TypeKind::Concept:
     return out << "Concept";
+  case TypeKind::Optional:
+    return out << "Optional";
   }
   return out << "Unknown";
 }

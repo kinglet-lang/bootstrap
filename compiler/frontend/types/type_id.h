@@ -42,6 +42,8 @@ enum class TypeId : uint8_t {
   MutRef,
   // Meta
   Concept,
+  // Wrapper
+  Optional,
   // Unknown / not yet resolved
   Unknown,
 };
