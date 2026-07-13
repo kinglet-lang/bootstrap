@@ -67,6 +67,8 @@ struct Type {
   std::vector<std::vector<Type>> variant_param_types;
   bool nullable = false;
   bool is_resource = false;
+  // Fixed-size array: > 0 means a T[fixed_size] array stored inline.
+  int fixed_size = -1;
 };
 
 const Type &int_type();

@@ -228,6 +228,8 @@ using DeclPtr = std::unique_ptr<Decl>;
 struct TypeExpr {
   std::string name;
   std::vector<TypeExpr> type_args;
+  // Fixed-size array dimension: > 0 means T[array_size]. -1 means dynamic T[].
+  int array_size = -1;
   std::string to_string() const;
 };
 

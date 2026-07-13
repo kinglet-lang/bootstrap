@@ -6,6 +6,7 @@
 
 #include "runtime/kinglet_rt_value.h"
 
+#include <cstring>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -41,10 +42,28 @@ struct KlArray {
   std::vector<int32_t> dense_dims;
 };
 
+// Flat heap storage: header + type_index + field_count, followed by an inline
+// array of field_count kl_h values. Use KlStruct::create(n) to allocate, and
+// fields() / field_count to iterate. No std::vector indirection.
 struct KlStruct {
-  KlHeader hdr{KlKind::Struct};
+  static KlStruct *create(int32_t field_count) {
+    const std::size_t sz = sizeof(KlStruct) + sizeof(kl_h) * static_cast<std::size_t>(field_count);
+    void *buf = ::operator new(sz);
+    auto *s = static_cast<KlStruct *>(buf);
+    s->hdr.kind = KlKind::Struct;
+    s->hdr.refcount = 1;
+    s->type_index = 0;
+    s->field_count = field_count;
+    return s;
+  }
+  static void destroy(KlStruct *s) { ::operator delete(s); }
+
+  kl_h *fields() { return reinterpret_cast<kl_h *>(this + 1); }
+  const kl_h *fields() const { return reinterpret_cast<const kl_h *>(this + 1); }
+
+  KlHeader hdr{}; // kind = Struct; refcount set by create()
   int32_t type_index = 0;
-  std::vector<kl_h> fields;
+  int32_t field_count = 0;
 };
 
 struct KlEnum {
@@ -100,6 +119,12 @@ void kl_array_ensure_jagged(KlArray *arr);
 
 // Unbox a numeric value to double: boxed float as-is, plain integer widened.
 inline double kl_as_double(kl_h value) {
+  if (kl_is_inline_float(value)) {
+    const uint32_t bits = static_cast<uint32_t>(static_cast<uint64_t>(value) & 0xFFFFFFFFULL);
+    float f = 0.0f;
+    std::memcpy(&f, &bits, sizeof(f));
+    return static_cast<double>(f);
+  }
   if (kl_is_kind(value, KlKind::Float)) {
     return static_cast<KlFloat *>(kl_unbox_ptr(value))->value;
   }

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <vector>
+#include <cstring>
 
 namespace {
 
@@ -136,13 +136,14 @@ int32_t kl_array_len(kl_h array) {
   return static_cast<int32_t>(obj->elements.size());
 }
 
-kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields) {
-  auto *obj = new KlStruct();
+kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields_ptr) {
+  auto *obj = KlStruct::create(static_cast<int32_t>(field_count));
   obj->type_index = type_index;
-  if (field_count > 0 && fields != nullptr) {
-    obj->fields.assign(fields, fields + field_count);
-    for (kl_h f : obj->fields) {
-      kl_retain(f);
+  if (field_count > 0 && fields_ptr != nullptr) {
+    kl_h *dst = obj->fields();
+    std::memcpy(dst, fields_ptr, sizeof(kl_h) * static_cast<std::size_t>(field_count));
+    for (int32_t i = 0; i < field_count; ++i) {
+      kl_retain(dst[i]);
     }
   }
   return kl_box_ptr(obj);
@@ -324,10 +325,10 @@ kl_h kl_struct_field_at(kl_h object, int32_t field_index) {
     return kl_from_int(0);
   }
   auto *obj = static_cast<KlStruct *>(kl_unbox_ptr(object));
-  if (static_cast<std::size_t>(field_index) >= obj->fields.size()) {
+  if (field_index >= obj->field_count) {
     return kl_from_int(0);
   }
-  kl_h field = obj->fields[static_cast<std::size_t>(field_index)];
+  kl_h field = obj->fields()[field_index];
   kl_retain(field);
   return field;
 }
@@ -337,12 +338,12 @@ kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value) {
     return object;
   }
   auto *obj = static_cast<KlStruct *>(kl_unbox_ptr(object));
-  if (static_cast<std::size_t>(field_index) >= obj->fields.size()) {
+  if (field_index >= obj->field_count) {
     return object;
   }
-  kl_h old = obj->fields[static_cast<std::size_t>(field_index)];
+  kl_h old = obj->fields()[field_index];
   kl_retain(value);
-  obj->fields[static_cast<std::size_t>(field_index)] = value;
+  obj->fields()[field_index] = value;
   kl_release(old);
   return object;
 }
@@ -356,7 +357,7 @@ kl_h kl_field_mut_ref_new(kl_h object, int32_t field_index) {
     return kl_from_int(0);
   }
   auto *obj = static_cast<KlStruct *>(kl_unbox_ptr(object));
-  if (static_cast<std::size_t>(field_index) >= obj->fields.size()) {
+  if (field_index >= obj->field_count) {
     return kl_from_int(0);
   }
   auto *ref = new KlFieldMutRef();

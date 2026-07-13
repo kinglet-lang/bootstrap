@@ -765,7 +765,11 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
       }
       return array_type(int_type());
     }
-    return array_type(resolve_type_expr(expr.type_args[0], loc));
+    Type arr = array_type(resolve_type_expr(expr.type_args[0], loc));
+    if (expr.array_size > 0) {
+      arr.fixed_size = expr.array_size;
+    }
+    return arr;
   }
   if (expr.name == "Map") {
     if (expr.type_args.size() != 2) {

@@ -55,14 +55,6 @@ std::vector<ast::Parameter> Parser::parameters() {
     if (has_completion())
       return params;
     if (at_completion()) {
-      // Cursor sits at the parameter *name* position (e.g. `auto █`). The
-      // name is a fresh identifier the user is about to type, not a
-      // reference to anything already in scope, so there is nothing
-      // meaningful to suggest here. Without this guard the completion
-      // token is never claimed, parsing falls through to the failing
-      // consume() below, and error recovery discards the whole function
-      // declaration — surfacing unrelated top-level noise (keywords, the
-      // function's own not-yet-parsed name, etc.) instead of an empty list.
       set_completion({lsp::CompletionPosition::None, {}, {}, {}, {}, {}});
       return params;
     }
@@ -97,9 +89,6 @@ ast::StmtPtr Parser::function_body() {
 }
 
 ast::TypeExpr Parser::parse_type_expr() {
-  // Depth guard: type syntax recurses through generic arguments
-  // (List<List<...>>) and map types ({K: V}). Deep nesting would otherwise
-  // overflow the native stack.
   RecursionGuard guard(*this);
   if (!guard.ok()) {
     note_recursion_limit();
@@ -109,22 +98,15 @@ ast::TypeExpr Parser::parse_type_expr() {
     set_completion({lsp::CompletionPosition::TypeExpr, {}, {}, {}, {}, {}, active_type_params_});
     return ast::TypeExpr{"<error>", {}};
   }
-  // `const` here belongs to the type itself, not variable storage: it marks
-  // a shared borrow (`const T&`) as opposed to an exclusive one (`T&`).
-  // Callers that need to disambiguate `const` at the *start* of a variable
-  // declaration (where it could instead mean "non-reassignable binding")
-  // use const_prefix_is_reference_type() before reaching here; by the time
-  // parse_type_expr() itself sees CONST, it is always the type-level shared
-  // borrow marker (ADR 0028 D3).
   const bool shared = match(TokenType::CONST);
   if (!is_type_start(peek().type)) {
     error_at(peek(), "Expected type name.");
     return ast::TypeExpr{"<error>", {}};
   }
   ast::TypeExpr result;
-  // Map type: {K: V} — encoded as Map<K, V> (name="Map", type_args=[K, V]).
+  // Map type: {K: V}
   if (check(TokenType::LEFT_BRACE)) {
-    advance(); // consume '{'
+    advance();
     ast::TypeExpr key = parse_type_expr();
     consume(TokenType::COLON, "Expected ':' between map key and value types.");
     ast::TypeExpr value = parse_type_expr();
@@ -135,6 +117,19 @@ ast::TypeExpr Parser::parse_type_expr() {
     std::string name = "Map";
     std::vector<ast::TypeExpr> type_args = std::move(map_args);
     while (match(TokenType::LEFT_BRACKET)) {
+      if (check(TokenType::INTEGER)) {
+        const Token &size_tok = advance();
+        const int64_t sz = size_tok.int_value;
+        consume(TokenType::RIGHT_BRACKET, "Expected ']' after fixed array size.");
+        if (sz <= 0 || sz > 65535) {
+          error_at(size_tok, "Fixed array size must be between 1 and 65535.");
+        }
+        std::vector<ast::TypeExpr> inner;
+        inner.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
+        result = ast::TypeExpr{"Array", std::move(inner)};
+        result.array_size = static_cast<int>(sz);
+        goto after_brackets_map;
+      }
       consume(TokenType::RIGHT_BRACKET, "Expected ']' after array type suffix.");
       std::vector<ast::TypeExpr> array_arg;
       array_arg.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
@@ -142,6 +137,7 @@ ast::TypeExpr Parser::parse_type_expr() {
       type_args = std::move(array_arg);
     }
     result = ast::TypeExpr{std::move(name), std::move(type_args)};
+  after_brackets_map:;
   } else {
     std::string name = token_text(advance());
     while (match(TokenType::COLON_COLON)) {
@@ -152,12 +148,12 @@ ast::TypeExpr Parser::parse_type_expr() {
     }
     std::vector<ast::TypeExpr> type_args;
     if (check(TokenType::LESS) && !pending_greater_) {
-      advance(); // consume '<'
+      advance();
       do {
         type_args.push_back(parse_type_expr());
       } while (match(TokenType::COMMA));
       if (peek().type == TokenType::GREATER_GREATER && !pending_greater_) {
-        advance(); // consume '>>'
+        advance();
         pending_greater_ = true;
       } else {
         if (!match(TokenType::GREATER)) {
@@ -166,6 +162,19 @@ ast::TypeExpr Parser::parse_type_expr() {
       }
     }
     while (match(TokenType::LEFT_BRACKET)) {
+      if (check(TokenType::INTEGER)) {
+        const Token &size_tok = advance();
+        const int64_t sz = size_tok.int_value;
+        consume(TokenType::RIGHT_BRACKET, "Expected ']' after fixed array size.");
+        if (sz <= 0 || sz > 65535) {
+          error_at(size_tok, "Fixed array size must be between 1 and 65535.");
+        }
+        std::vector<ast::TypeExpr> inner;
+        inner.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
+        result = ast::TypeExpr{"Array", std::move(inner)};
+        result.array_size = static_cast<int>(sz);
+        goto after_brackets;
+      }
       consume(TokenType::RIGHT_BRACKET, "Expected ']' after array type suffix.");
       std::vector<ast::TypeExpr> array_arg;
       array_arg.push_back(ast::TypeExpr{std::move(name), std::move(type_args)});
@@ -173,6 +182,7 @@ ast::TypeExpr Parser::parse_type_expr() {
       type_args = std::move(array_arg);
     }
     result = ast::TypeExpr{std::move(name), std::move(type_args)};
+  after_brackets:;
   }
   if (check(TokenType::QUESTION)) {
     advance();
@@ -180,9 +190,6 @@ ast::TypeExpr Parser::parse_type_expr() {
     inner.push_back(std::move(result));
     result = ast::TypeExpr{"Nullable", std::move(inner)};
   }
-  // Postfix reference marker: `T&` (exclusive) / `const T&` (shared,
-  // `shared` captured above). ADR 0028 D3 replaces 0022's prefix `&T` /
-  // `&mut T` with this postfix form; `mut` is gone entirely.
   if (match(TokenType::AMP)) {
     std::vector<ast::TypeExpr> inner;
     inner.push_back(std::move(result));

@@ -13,10 +13,16 @@ using kl_h = int64_t;
 
 static constexpr uint64_t KL_HEAP_MARK = 0xFFFEULL << 48;
 static constexpr uint64_t KL_INLINE_ENUM_MARK = 0xFFFDULL << 48;
+static constexpr uint64_t KL_INLINE_FLOAT_MARK = 0xFFFCULL << 48;
 
 static inline int kl_is_inline_enum(kl_h value) {
   return (static_cast<uint64_t>(value) & (0xFFFFULL << 48)) ==
          static_cast<uint64_t>(KL_INLINE_ENUM_MARK);
+}
+
+static inline int kl_is_inline_float(kl_h value) {
+  return (static_cast<uint64_t>(value) & (0xFFFFULL << 48)) ==
+         static_cast<uint64_t>(KL_INLINE_FLOAT_MARK);
 }
 
 static inline kl_h kl_enum_inline(int32_t type_index, int32_t variant_index) {
@@ -111,6 +117,7 @@ kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields);
 int32_t kl_struct_type_index(kl_h object);
 kl_h kl_struct_field_at(kl_h object, int32_t field_index);
 kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value);
+
 int32_t kl_field_mut_ref_is(kl_h value);
 kl_h kl_field_mut_ref_new(kl_h object, int32_t field_index);
 kl_h kl_field_mut_ref_load(kl_h reference);
@@ -125,6 +132,7 @@ kl_h kl_slice(kl_h value, int64_t start, int64_t end);
 
 kl_h kl_float_new(double value);
 double kl_float_get(kl_h value);
+kl_h kl_float_to_string(kl_h value);
 kl_h kl_float_from_bits(int64_t bits);
 int64_t kl_float_to_bits(kl_h value);
 kl_h kl_bool_to_string(kl_h value);

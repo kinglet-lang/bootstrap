@@ -88,10 +88,10 @@ void kl_release(kl_h value) {
     }
     case KlKind::Struct: {
       auto *s = static_cast<KlStruct *>(kl_unbox_ptr(v));
-      for (kl_h field : s->fields) {
-        work.push_back(field);
+      for (int32_t i = 0; i < s->field_count; ++i) {
+        work.push_back(s->fields()[i]);
       }
-      delete s;
+      KlStruct::destroy(s);
       break;
     }
     case KlKind::Enum: {

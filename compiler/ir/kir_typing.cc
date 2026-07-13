@@ -42,8 +42,12 @@ int max_local_slot(const KirFunction &fn) {
 struct FlowState {
   std::vector<KirType> stack;
   std::vector<KirContainerType> container_stack;
+  // Parallel to stack: struct type_index per slot, -1 for non-struct values.
+  std::vector<int32_t> struct_stack;
   std::vector<KirType> locals;
   std::vector<KirContainerType> local_containers;
+  // Parallel to locals: struct type_index per slot, -1 for non-struct.
+  std::vector<int32_t> local_struct_types;
 };
 
 bool kir_type_is_container(KirType type) {
@@ -70,12 +74,15 @@ KirContainerType map_container(KirType key_type, KirType value_type) {
   return out;
 }
 
-void push_typed(FlowState *state, KirType type, KirContainerType container = {}) {
+void push_typed(FlowState *state, KirType type, KirContainerType container = {},
+                int32_t struct_type = -1) {
   state->stack.push_back(type);
   state->container_stack.push_back(container);
+  state->struct_stack.push_back(struct_type);
 }
 
-KirType pop_type(FlowState *state, KirContainerType *container_out = nullptr) {
+KirType pop_type(FlowState *state, KirContainerType *container_out = nullptr,
+                 int32_t *struct_type_out = nullptr) {
   KirContainerType container;
   if (!state->container_stack.empty()) {
     container = state->container_stack.back();
@@ -83,6 +90,14 @@ KirType pop_type(FlowState *state, KirContainerType *container_out = nullptr) {
   }
   if (container_out != nullptr) {
     *container_out = container;
+  }
+  int32_t struct_type = -1;
+  if (!state->struct_stack.empty()) {
+    struct_type = state->struct_stack.back();
+    state->struct_stack.pop_back();
+  }
+  if (struct_type_out != nullptr) {
+    *struct_type_out = struct_type;
   }
   if (state->stack.empty()) {
     return KirType::Any;
@@ -185,11 +200,39 @@ void merge_stack_containers(std::vector<KirContainerType> *dst,
   }
 }
 
+void merge_struct_types(std::vector<int32_t> &a, const std::vector<int32_t> &b) {
+  if (a.size() < b.size()) {
+    a.resize(b.size(), -1);
+  }
+  for (std::size_t i = 0; i < b.size(); ++i) {
+    if (a[i] == -1) {
+      a[i] = b[i];
+    } else if (a[i] != b[i]) {
+      a[i] = -1;
+    }
+  }
+}
+
+void merge_stack_struct_types(std::vector<int32_t> *dst, const std::vector<int32_t> &src) {
+  const std::size_t depth = std::max(dst->size(), src.size());
+  dst->resize(depth, -1);
+  for (std::size_t d = 0; d < depth; ++d) {
+    const int32_t rhs = d < src.size() ? src[d] : -1;
+    if ((*dst)[d] == -1) {
+      (*dst)[d] = rhs;
+    } else if ((*dst)[d] != rhs) {
+      (*dst)[d] = -1;
+    }
+  }
+}
+
 void merge_flow_into(FlowState *dst, const FlowState &src) {
   merge_slot_types(&dst->locals, src.locals);
   merge_slot_containers(&dst->local_containers, src.local_containers);
+  merge_struct_types(dst->local_struct_types, src.local_struct_types);
   merge_stack_types(&dst->stack, src.stack);
   merge_stack_containers(&dst->container_stack, src.container_stack);
+  merge_stack_struct_types(&dst->struct_stack, src.struct_stack);
 }
 
 std::size_t block_start_pc(std::size_t pc, const std::set<std::size_t> &leaders) {
@@ -422,13 +465,17 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       const int slot = instr->operands[0];
       KirContainerType container;
       result = KirType::Any;
+      int32_t struct_type = -1;
       if (slot >= 0 && static_cast<std::size_t>(slot) < state.locals.size()) {
         result = state.locals[static_cast<std::size_t>(slot)];
         if (static_cast<std::size_t>(slot) < state.local_containers.size()) {
           container = state.local_containers[static_cast<std::size_t>(slot)];
         }
+        if (static_cast<std::size_t>(slot) < state.local_struct_types.size()) {
+          struct_type = state.local_struct_types[static_cast<std::size_t>(slot)];
+        }
       }
-      push_typed(&state, result, container);
+      push_typed(&state, result, container, struct_type);
       break;
     }
     case KirOpcode::LoadLocalAddr:
@@ -451,12 +498,16 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       const KirType value = state.stack.empty() ? KirType::Any : state.stack.back();
       const KirContainerType container =
           state.container_stack.empty() ? KirContainerType{} : state.container_stack.back();
+      const int32_t struct_type = state.struct_stack.empty() ? -1 : state.struct_stack.back();
       if (slot >= 0) {
         if (static_cast<std::size_t>(slot) >= state.locals.size()) {
           state.locals.resize(static_cast<std::size_t>(slot) + 1, KirType::Any);
         }
         if (static_cast<std::size_t>(slot) >= state.local_containers.size()) {
           state.local_containers.resize(static_cast<std::size_t>(slot) + 1, KirContainerType{});
+        }
+        if (static_cast<std::size_t>(slot) >= state.local_struct_types.size()) {
+          state.local_struct_types.resize(static_cast<std::size_t>(slot) + 1, -1);
         }
         if (state.locals[static_cast<std::size_t>(slot)] == KirType::Any) {
           state.locals[static_cast<std::size_t>(slot)] = value;
@@ -466,6 +517,12 @@ void infer_function(KirFunction *fn, const KirModule &module) {
         }
         state.local_containers[static_cast<std::size_t>(slot)] =
             join_container(state.local_containers[static_cast<std::size_t>(slot)], container);
+        // Join struct type: same type_index stays, different → -1 (ambiguous).
+        if (state.local_struct_types[static_cast<std::size_t>(slot)] == -1) {
+          state.local_struct_types[static_cast<std::size_t>(slot)] = struct_type;
+        } else if (state.local_struct_types[static_cast<std::size_t>(slot)] != struct_type) {
+          state.local_struct_types[static_cast<std::size_t>(slot)] = -1;
+        }
       }
       break;
     }
@@ -574,12 +631,13 @@ void infer_function(KirFunction *fn, const KirModule &module) {
     }
     case KirOpcode::StructNew: {
       const int packed = instr->operands[0];
+      const int type_idx = packed >> 16;
       const int field_count = packed & 0xFFFF;
       for (int fi = 0; fi < field_count; ++fi) {
         pop_type(&state);
       }
       result = KirType::Struct;
-      push_typed(&state, result);
+      push_typed(&state, result, KirContainerType{}, type_idx);
       break;
     }
     case KirOpcode::BorrowFieldMut: {
@@ -595,11 +653,31 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       push_typed(&state, result);
       break;
     }
+    case KirOpcode::FieldSet: {
+      pop_type(&state); // value
+      pop_type(&state); // object
+      break;
+    }
     case KirOpcode::FieldGet: {
-      pop_type(&state);
+      int32_t struct_type = -1;
+      pop_type(&state, nullptr, &struct_type);
       const int pool_idx = instr->operands[0];
       result = KirType::Any;
-      if (pool_idx >= 0 && static_cast<std::size_t>(pool_idx) < module.constant_strings.size()) {
+      // If we know the exact struct type, resolve the field type directly.
+      if (struct_type >= 0 && static_cast<std::size_t>(struct_type) < module.struct_metas.size() &&
+          pool_idx >= 0 && static_cast<std::size_t>(pool_idx) < module.constant_strings.size()) {
+        const KirStructMeta &meta = module.struct_metas[static_cast<std::size_t>(struct_type)];
+        const std::string &field_name = module.constant_strings[static_cast<std::size_t>(pool_idx)];
+        for (std::size_t fi = 0; fi < meta.field_names.size(); ++fi) {
+          if (meta.field_names[fi] == field_name && fi < meta.field_types.size()) {
+            result = meta.field_types[fi];
+            break;
+          }
+        }
+      }
+      // Fallback: name-based matching across all struct metas.
+      if (result == KirType::Any && pool_idx >= 0 &&
+          static_cast<std::size_t>(pool_idx) < module.constant_strings.size()) {
         const std::string &field_name = module.constant_strings[static_cast<std::size_t>(pool_idx)];
         KirType found = KirType::Any;
         int matches = 0;
@@ -622,11 +700,6 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       push_typed(&state, result);
       break;
     }
-    case KirOpcode::FieldSet:
-      pop_type(&state);
-      pop_type(&state);
-      pop_type(&state);
-      break;
     case KirOpcode::ArraySlice: {
       // Stack: [object, start, end] -> slice. The result is the same kind as
       // the sliced object (a string slice is a String, an array slice an
