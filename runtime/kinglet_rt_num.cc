@@ -15,7 +15,7 @@ namespace {
 }
 
 bool is_float(kl_h value) {
-  return kl_is_kind(value, KlKind::Float);
+  return kl_is_inline_float(value) || kl_is_kind(value, KlKind::Float);
 }
 
 bool is_string(kl_h value) {
@@ -50,6 +50,12 @@ kl_h concat(kl_h left, kl_h right) {
 // Note: null and integer 0 share the wire value 0; format the common case
 // (integer zero). Bools likewise print as 1/0 — there is no bool tag.
 std::string kl_value_text(kl_h value) {
+  if (kl_is_inline_float(value)) {
+    const uint32_t bits = static_cast<uint32_t>(static_cast<uint64_t>(value) & 0xFFFFFFFFULL);
+    float f = 0.0f;
+    std::memcpy(&f, &bits, sizeof(f));
+    return float_text(static_cast<double>(f));
+  }
   if (kl_is_inline_enum(value)) {
     const int variant = static_cast<int>(static_cast<uint64_t>(value) & 0xFFFF);
     return std::to_string(variant);
@@ -97,13 +103,31 @@ std::string kl_value_text(kl_h value) {
 extern "C" {
 
 kl_h kl_float_new(double value) {
-  auto *obj = new KlFloat();
-  obj->value = value;
-  return kl_box_ptr(obj);
+  // Encode as tagged inline float: float32 in the low 32 bits, 0xFFFC tag in
+  // the high 16 bits. Float64 (double) heap boxes are no longer created — all
+  // floats are stored as float32-in-kl_h.
+  const float f = static_cast<float>(value);
+  uint32_t bits = 0;
+  std::memcpy(&bits, &f, sizeof(bits));
+  return static_cast<kl_h>(KL_INLINE_FLOAT_MARK | static_cast<uint64_t>(bits));
 }
 
 double kl_float_get(kl_h value) {
+  if (kl_is_inline_float(value)) {
+    const uint32_t bits = static_cast<uint32_t>(static_cast<uint64_t>(value) & 0xFFFFFFFFULL);
+    float f = 0.0f;
+    std::memcpy(&f, &bits, sizeof(f));
+    return static_cast<double>(f);
+  }
   return kl_as_double(value);
+}
+
+kl_h kl_float_to_string(kl_h value) {
+  const double d = kl_float_get(value);
+  std::ostringstream oss;
+  oss << d;
+  const std::string text = oss.str();
+  return kl_string_new(text.data(), static_cast<int32_t>(text.size()));
 }
 
 kl_h kl_bool_to_string(kl_h value) {
@@ -144,8 +168,7 @@ kl_h kl_float_from_bits(int64_t bits) {
 }
 
 int64_t kl_float_to_bits(kl_h value) {
-  const double v = is_float(value) ? static_cast<KlFloat *>(kl_unbox_ptr(value))->value
-                                   : static_cast<double>(kl_to_int(value));
+  const double v = kl_float_get(value);
   int64_t bits = 0;
   std::memcpy(&bits, &v, sizeof(bits));
   return bits;

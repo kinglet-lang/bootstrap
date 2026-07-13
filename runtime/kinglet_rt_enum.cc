@@ -95,7 +95,7 @@ kl_h kl_cast_to_int(kl_h value) {
     return kl_from_int(static_cast<KlEnum *>(ptr)->variant_index);
   }
   if (hdr->kind == KlKind::Float) {
-    return kl_from_int(static_cast<int64_t>(static_cast<KlFloat *>(ptr)->value));
+    return kl_from_int(static_cast<int64_t>(kl_float_get(value)));
   }
   if (hdr->kind != KlKind::String) {
     return kl_from_int(0);
@@ -117,6 +117,9 @@ kl_h kl_cast_to_int(kl_h value) {
 }
 
 kl_h kl_cast_to_float(kl_h value) {
+  if (kl_is_inline_float(value)) {
+    return value; // already a float
+  }
   if (kl_is_inline_enum(value)) {
     int32_t type_idx = 0;
     int32_t variant_idx = 0;
@@ -156,6 +159,10 @@ kl_h kl_cast_to_float(kl_h value) {
 }
 
 kl_h kl_cast_to_string(kl_h value) {
+  if (kl_is_inline_float(value)) {
+    const std::string text = kl_value_text(value);
+    return kl_string_new(text.data(), static_cast<int32_t>(text.size()));
+  }
   if (kl_is_heap(value)) {
     void *ptr = kl_unbox_ptr(value);
     if (static_cast<KlHeader *>(ptr)->kind == KlKind::String) {
@@ -232,9 +239,12 @@ int32_t kl_value_eq(kl_h left, kl_h right) {
     }
     return (lt == rt && lv == rv) ? 1 : 0;
   }
-  if (kl_is_kind(left, KlKind::Float) || kl_is_kind(right, KlKind::Float)) {
-    const bool left_num = kl_is_kind(left, KlKind::Float) || !kl_is_heap(left);
-    const bool right_num = kl_is_kind(right, KlKind::Float) || !kl_is_heap(right);
+  if (kl_is_kind(left, KlKind::Float) || kl_is_inline_float(left) ||
+      kl_is_kind(right, KlKind::Float) || kl_is_inline_float(right)) {
+    const bool left_num =
+        kl_is_kind(left, KlKind::Float) || kl_is_inline_float(left) || !kl_is_heap(left);
+    const bool right_num =
+        kl_is_kind(right, KlKind::Float) || kl_is_inline_float(right) || !kl_is_heap(right);
     if (!left_num || !right_num) {
       return 0;
     }
@@ -260,7 +270,7 @@ int32_t kl_value_eq(kl_h left, kl_h right) {
 }
 
 int32_t kl_exit_code(kl_h value) {
-  if (kl_is_kind(value, KlKind::Float)) {
+  if (kl_is_kind(value, KlKind::Float) || kl_is_inline_float(value)) {
     const auto n = static_cast<int64_t>(kl_as_double(value));
     if (n < 0 || n > 255) {
       return 255;
