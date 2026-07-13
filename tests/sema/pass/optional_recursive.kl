@@ -1,0 +1,15 @@
+// RUN: check
+
+struct node {
+  int value;
+  node? next;
+}
+
+int main() {
+  node n { 1, null };
+  // next? returns node? (Optional)
+  node? a = n.next?;
+  // field without ?
+  node? b = n.next;
+  return 0;
+}

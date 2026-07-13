@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+
+struct HasOpt {
+  int x;
+  int? maybe;
+}
+
+int main() {
+  // null case: field value is null
+  HasOpt t { 10, null };
+  int? a = t.maybe?;
+  int va = a ?: -1;
+  io::out("{}\n", va);
+  return 0;
+}

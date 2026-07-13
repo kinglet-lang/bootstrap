@@ -1,0 +1,15 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+struct HasOpt {
+  int x;
+  int? maybe;
+}
+
+int main() {
+  HasOpt s { 1, 42 };
+  // ERROR: x is int64, not Optional
+  int a = s.x?;
+  return 0;
+}

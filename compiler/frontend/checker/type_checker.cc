@@ -310,7 +310,9 @@ std::optional<std::string> check_nullable_arms_exhaustive(const std::vector<ast:
     return "Non-exhaustive match on nullable type. Missing non-null case.";
   }
   Type inner = nullable_type;
-  inner.nullable = false;
+  if (inner.kind == TypeKind::Optional && inner.element_type) {
+    inner = *inner.element_type;
+  }
   if (inner.kind == TypeKind::Bool) {
     bool missing_true = false;
     bool missing_false = false;
@@ -375,17 +377,19 @@ bool types_assignable(const Type &from, const Type &to) {
       from.kind != TypeKind::MutRef) {
     return to.element_type ? types_assignable(from, *to.element_type) : true;
   }
-  if (to.nullable) {
+  if (to.kind == TypeKind::Optional) {
     if (from.kind == TypeKind::Null) {
       return true;
     }
-    Type from_inner = from;
-    Type to_inner = to;
-    from_inner.nullable = false;
-    to_inner.nullable = false;
-    return types_assignable(from_inner, to_inner);
+    if (!to.element_type) {
+      return true;
+    }
+    if (from.kind == TypeKind::Optional && from.element_type) {
+      return types_assignable(*from.element_type, *to.element_type);
+    }
+    return types_assignable(from, *to.element_type);
   }
-  if (from.nullable) {
+  if (from.kind == TypeKind::Optional) {
     return false;
   }
   if (from.kind == TypeKind::Int && to.kind == TypeKind::Int) {
@@ -448,8 +452,6 @@ bool types_assignable(const Type &from, const Type &to) {
 // function will need updating to support structural identity that is
 // independent of the TypeId encoding.
 bool types_equal(const Type &a, const Type &b) {
-  if (a.nullable != b.nullable)
-    return false;
   if (a.kind != b.kind)
     return false;
 
@@ -471,6 +473,13 @@ bool types_equal(const Type &a, const Type &b) {
       return !a.key_type && !b.key_type && !a.element_type && !b.element_type;
     return types_equal(*a.key_type, *b.key_type) && types_equal(*a.element_type, *b.element_type);
   }
+  case TypeKind::Optional:
+  case TypeKind::Ref:
+  case TypeKind::MutRef: {
+    if (!a.element_type || !b.element_type)
+      return !a.element_type && !b.element_type;
+    return types_equal(*a.element_type, *b.element_type);
+  }
   default:
     // Bool, Char, String, Void, Null, Function, Ref, MutRef, Concept:
     // kind alone is sufficient to distinguish them.
@@ -484,51 +493,48 @@ static std::string mangle_function_name(const std::string &name,
                                         const std::vector<Type> &param_types);
 
 std::string type_to_string(const Type &type) {
-  Type display = type;
-  const bool nullable = display.nullable;
-  display.nullable = false;
-  auto with_nullable = [&](std::string text) {
-    return nullable ? text + "?" : text;
-  };
-  if (display.kind == TypeKind::Struct || display.kind == TypeKind::Enum) {
-    return with_nullable(display.name);
+  if (type.kind == TypeKind::Optional && type.element_type) {
+    return type_to_string(*type.element_type) + "?";
   }
-  if (display.kind == TypeKind::Array && display.element_type) {
-    return with_nullable(type_to_string(*display.element_type) + "[]");
+  if (type.kind == TypeKind::Struct || type.kind == TypeKind::Enum) {
+    return type.name;
   }
-  if (display.kind == TypeKind::Int) {
-    return with_nullable(integer_type_display_name(display));
+  if (type.kind == TypeKind::Array && type.element_type) {
+    return type_to_string(*type.element_type) + "[]";
   }
-  if (display.kind == TypeKind::Float) {
-    return with_nullable(float_type_display_name(display));
+  if (type.kind == TypeKind::Int) {
+    return integer_type_display_name(type);
   }
-  if (display.kind == TypeKind::Char) {
-    return with_nullable("char");
+  if (type.kind == TypeKind::Float) {
+    return float_type_display_name(type);
   }
-  if (display.kind == TypeKind::Bool) {
-    return with_nullable("bool");
+  if (type.kind == TypeKind::Char) {
+    return "char";
   }
-  if (display.kind == TypeKind::String) {
-    return with_nullable("string");
+  if (type.kind == TypeKind::Bool) {
+    return "bool";
   }
-  if (display.kind == TypeKind::Void) {
-    return with_nullable("void");
+  if (type.kind == TypeKind::String) {
+    return "string";
   }
-  if (display.kind == TypeKind::Ref && display.element_type) {
-    return with_nullable("&" + type_to_string(*display.element_type));
+  if (type.kind == TypeKind::Void) {
+    return "void";
   }
-  if (display.kind == TypeKind::MutRef && display.element_type) {
-    return with_nullable("&mut " + type_to_string(*display.element_type));
+  if (type.kind == TypeKind::Ref && type.element_type) {
+    return "&" + type_to_string(*type.element_type);
   }
-  if (display.kind == TypeKind::Null) {
+  if (type.kind == TypeKind::MutRef && type.element_type) {
+    return "&mut " + type_to_string(*type.element_type);
+  }
+  if (type.kind == TypeKind::Null) {
     return "null";
   }
-  if (display.kind == TypeKind::Concept) {
-    return with_nullable(display.name);
+  if (type.kind == TypeKind::Concept) {
+    return type.name;
   }
   std::ostringstream oss;
-  oss << display.kind;
-  return with_nullable(oss.str());
+  oss << type.kind;
+  return oss.str();
 }
 
 // Recursively replace type-parameter names with their concrete arguments
@@ -755,8 +761,7 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
       return int_type();
     }
     Type inner = resolve_type_expr(expr.type_args[0], loc);
-    inner.nullable = true;
-    return inner;
+    return optional_type(inner);
   }
   if (expr.name == "Array") {
     if (expr.type_args.size() != 1) {
@@ -1076,8 +1081,14 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         struct_type.is_resource = struct_decl->destroy_decl.has_value();
         for (const auto &field : struct_decl->fields) {
           Type ft = resolve_type_expr(field.type);
+          bool indirect = false;
+          if (ft.kind == TypeKind::Optional && ft.element_type &&
+              ft.element_type->kind == TypeKind::Struct &&
+              ft.element_type->name == struct_decl->name) {
+            indirect = true;
+          }
           struct_type.fields.push_back(
-              FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft)});
+              FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft), indirect});
         }
         type_registry_.insert_or_assign(struct_decl->name, struct_type);
       }
@@ -2262,16 +2273,18 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
     return "binary operator";
   };
   auto reject_nullable_operand = [&]() {
-    if (!left_type.nullable && !right_type.nullable) {
+    const bool left_nullable = left_type.kind == TypeKind::Optional;
+    const bool right_nullable = right_type.kind == TypeKind::Optional;
+    if (!left_nullable && !right_nullable) {
       return false;
     }
     const std::string op = op_text();
-    if (left_type.nullable && right_type.nullable) {
+    if (left_nullable && right_nullable) {
       error_at(binary.location,
                "Both operands of '" + op + "' are nullable (" + type_to_string(left_type) + " and " +
                    type_to_string(right_type) + "). Handle them first, for example '(left ?: 0) " +
                    op + " (right ?: 0)' or use match/postfix '?'.");
-    } else if (left_type.nullable) {
+    } else if (left_nullable) {
       error_at(binary.location, "Left operand of '" + op + "' has nullable type " +
                                     type_to_string(left_type) +
                                     ". Handle it first, for example '(left ?: 0) " + op +
@@ -2552,7 +2565,7 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
     }
   }
 
-  if (value_type.nullable) {
+  if (value_type.kind == TypeKind::Optional) {
     if (auto err = check_nullable_arms_exhaustive(match_expr.arms, value_type)) {
       error_at(match_expr.location, *err);
     }
@@ -3661,16 +3674,24 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
   }
   for (const auto &f : obj_type.fields) {
     if (f.name == field_access.field_name) {
+      Type field_type = f.type ? *f.type : Type(f.type_kind);
       if (f.type_kind == TypeKind::Struct && !f.type_name.empty()) {
         auto reg_it = type_registry_.find(f.type_name);
         if (reg_it != type_registry_.end())
-          return reg_it->second;
+          field_type = reg_it->second;
       }
-      // Prefer the full resolved type, which retains array element_type and
-      // other detail that type_kind alone drops.
-      if (f.type)
-        return *f.type;
-      return Type(f.type_kind);
+      if (field_access.optional_access) {
+        if (field_type.kind != TypeKind::Optional) {
+          error_at(field_access.location, "Cannot use '?' on non-Optional field '" +
+                                              field_access.field_name + "'. The field type is " +
+                                              type_to_string(field_type) + ".");
+          return int_type();
+        }
+        // field? always returns an Optional type — if the field is null the
+        // whole expression evaluates to null.
+        return field_type;
+      }
+      return field_type;
     }
   }
   std::string method_key = obj_type.name + "::" + field_access.field_name;
@@ -3896,7 +3917,11 @@ Type TypeChecker::check_null_coalesce(const ast::NullCoalesceExpr &null_coalesce
   // fact that the expression came from a fallible operation; callers must
   // store it in T? or explicitly propagate/handle it.  For ordinary nullable
   // values, `x ?: fallback` unwraps to the non-null inner type.
-  result_type.nullable = cast_lhs != nullptr;
+  if (cast_lhs != nullptr) {
+    result_type = optional_type(result_type);
+  } else if (result_type.kind == TypeKind::Optional && result_type.element_type) {
+    result_type = *result_type.element_type;
+  }
 
   const bool has_binding = !null_coalesce.err_binding.empty();
   if (has_binding) {

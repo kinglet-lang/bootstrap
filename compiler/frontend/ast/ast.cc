@@ -691,12 +691,18 @@ void NamespaceAccessExpr::print(std::ostream &out, int indent) const {
   out << "(namespace-access " << namespace_name << "::" << member_name << ")";
 }
 
-FieldAccessExpr::FieldAccessExpr(SourceLocation location, ExprPtr object, std::string field_name)
-    : Expr(location), object(std::move(object)), field_name(std::move(field_name)) {}
+FieldAccessExpr::FieldAccessExpr(SourceLocation location, ExprPtr object, std::string field_name,
+                                 bool optional_access)
+    : Expr(location),
+      object(std::move(object)),
+      field_name(std::move(field_name)),
+      optional_access(optional_access) {}
 
 void FieldAccessExpr::print(std::ostream &out, int indent) const {
   write_indent(out, indent);
   out << "(field-access ." << field_name;
+  if (optional_access)
+    out << "?";
   print_child(out, *object, indent);
   out << ")";
 }

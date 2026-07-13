@@ -1,0 +1,31 @@
+// RUN: run
+
+using io;
+
+struct node {
+  int value;
+  node? next;
+}
+
+int main() {
+  node n2 { 2, null };
+  node n1 { 1, n2 };
+
+  io::out("{} {}\n", n1.value, n2.value);
+
+  // n1.next is non-null
+  if (n1.next? != null) {
+    io::out("has next\n");
+  } else {
+    io::out("no next\n");
+  }
+
+  // n2.next is null
+  if (n2.next? != null) {
+    io::out("has next2\n");
+  } else {
+    io::out("no next2\n");
+  }
+
+  return 0;
+}
