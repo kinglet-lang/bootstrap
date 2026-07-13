@@ -161,7 +161,7 @@ kl_h kl_native_in(int32_t argc, const kl_h *args, int32_t secret) {
 #endif
   std::string line;
   if (!std::getline(std::cin, line)) {
-    return 0;
+    return kl_null_value();
   }
 #if defined(__unix__) || defined(__APPLE__)
   if (secret) {
@@ -176,16 +176,16 @@ kl_h kl_native_fs_read(kl_h path) {
   const char *data = nullptr;
   int32_t len = 0;
   if (!kl_string_view(path, &data, &len)) {
-    return 0;
+    return kl_null_value();
   }
   std::ifstream file(std::string(data, static_cast<std::size_t>(len)), std::ios::binary);
   if (!file) {
-    return 0;
+    return kl_null_value();
   }
   std::ostringstream buffer;
   buffer << file.rdbuf();
   if (file.bad()) {
-    return 0;
+    return kl_null_value();
   }
   const std::string contents = buffer.str();
   return kl_string_new(contents.data(), static_cast<int32_t>(contents.size()));

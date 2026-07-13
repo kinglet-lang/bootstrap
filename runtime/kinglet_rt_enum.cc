@@ -210,7 +210,7 @@ kl_h kl_cast_to_char(kl_h value) {
 }
 
 int32_t kl_value_is_err(kl_h value) {
-  if (value == 0) {
+  if (kl_is_null(value)) {
     return 1;
   }
   if (kl_is_inline_enum(value)) {
@@ -270,6 +270,9 @@ int32_t kl_value_eq(kl_h left, kl_h right) {
 }
 
 int32_t kl_exit_code(kl_h value) {
+  if (kl_is_null(value)) {
+    return 0; // null from void main() → success (backward compat)
+  }
   if (kl_is_kind(value, KlKind::Float) || kl_is_inline_float(value)) {
     const auto n = static_cast<int64_t>(kl_as_double(value));
     if (n < 0 || n > 255) {
