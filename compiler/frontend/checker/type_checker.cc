@@ -1081,8 +1081,14 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
         struct_type.is_resource = struct_decl->destroy_decl.has_value();
         for (const auto &field : struct_decl->fields) {
           Type ft = resolve_type_expr(field.type);
+          bool indirect = false;
+          if (ft.kind == TypeKind::Optional && ft.element_type &&
+              ft.element_type->kind == TypeKind::Struct &&
+              ft.element_type->name == struct_decl->name) {
+            indirect = true;
+          }
           struct_type.fields.push_back(
-              FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft)});
+              FieldInfo{field.name, ft.kind, ft.name, std::make_shared<Type>(ft), indirect});
         }
         type_registry_.insert_or_assign(struct_decl->name, struct_type);
       }
@@ -3668,16 +3674,24 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
   }
   for (const auto &f : obj_type.fields) {
     if (f.name == field_access.field_name) {
+      Type field_type = f.type ? *f.type : Type(f.type_kind);
       if (f.type_kind == TypeKind::Struct && !f.type_name.empty()) {
         auto reg_it = type_registry_.find(f.type_name);
         if (reg_it != type_registry_.end())
-          return reg_it->second;
+          field_type = reg_it->second;
       }
-      // Prefer the full resolved type, which retains array element_type and
-      // other detail that type_kind alone drops.
-      if (f.type)
-        return *f.type;
-      return Type(f.type_kind);
+      if (field_access.optional_access) {
+        if (field_type.kind != TypeKind::Optional) {
+          error_at(field_access.location, "Cannot use '?' on non-Optional field '" +
+                                              field_access.field_name + "'. The field type is " +
+                                              type_to_string(field_type) + ".");
+          return int_type();
+        }
+        // field? always returns an Optional type — if the field is null the
+        // whole expression evaluates to null.
+        return field_type;
+      }
+      return field_type;
     }
   }
   std::string method_key = obj_type.name + "::" + field_access.field_name;

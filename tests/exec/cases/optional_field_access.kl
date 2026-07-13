@@ -1,0 +1,23 @@
+// RUN: run
+
+using io;
+
+struct HasOpt {
+  int x;
+  int? maybe;
+}
+
+int main() {
+  HasOpt s { 10, 42 };
+  // field? on non-null Optional
+  int? a = s.maybe?;
+  // field without ?
+  int? b = s.maybe;
+
+  // Verify a is non-null: a ?: -1 should give 42, not -1
+  int va = a ?: -1;
+  int vb = b ?: -1;
+
+  io::out("{} {}\n", va, vb);
+  return 0;
+}

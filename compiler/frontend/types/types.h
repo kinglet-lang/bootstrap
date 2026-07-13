@@ -42,6 +42,9 @@ struct FieldInfo {
   // loses — notably an array field's element_type. May be null for fields
   // registered before this was populated; callers fall back to type_kind/name.
   std::shared_ptr<Type> type;
+  // True when this Optional<Self> field needs pointer indirection to avoid
+  // infinite struct size (e.g. `node? next` in `struct node`).
+  bool is_indirect = false;
 };
 
 struct Type {

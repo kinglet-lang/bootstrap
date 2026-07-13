@@ -2195,6 +2195,20 @@ void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
   compile_expr(*field_access.object);
   uint32_t field_const = add_constant_(Value::string_value(field_access.field_name));
   emit_operand(LoweringOp::FieldGet, field_const, field_access.location);
+  if (field_access.optional_access) {
+    // After FieldGet the stack top is the Optional field value.  JmpIfErr
+    // peeks at it: if it is the null/error sentinel, jump to the fallback
+    // path that replaces it with Null; otherwise fall through with the
+    // unwrapped value already on the stack.
+    const std::size_t null_jump = emit_jump(LoweringOp::JmpIfErr, field_access.location);
+    // Non-null path: skip the fallback.
+    const std::size_t end_jump = emit_jump(LoweringOp::Jmp, field_access.location);
+    // Null fallback.
+    patch_jump(null_jump);
+    emit(LoweringOp::Pop, field_access.location);
+    emit(LoweringOp::Null, field_access.location);
+    patch_jump(end_jump);
+  }
   return;
 }
 

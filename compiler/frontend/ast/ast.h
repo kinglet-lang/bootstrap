@@ -669,12 +669,14 @@ struct NamespaceAccessExpr final : Expr {
 };
 
 struct FieldAccessExpr final : Expr {
-  FieldAccessExpr(SourceLocation location, ExprPtr object, std::string field_name);
+  FieldAccessExpr(SourceLocation location, ExprPtr object, std::string field_name,
+                  bool optional_access = false);
   void print(std::ostream &out, int indent = 0) const override;
   void accept(ExprVisitor &v) const override { v.visit(*this); }
 
   ExprPtr object;
   std::string field_name;
+  bool optional_access = false;
 };
 
 // Wraps an expression that was successfully parsed up to a completion point

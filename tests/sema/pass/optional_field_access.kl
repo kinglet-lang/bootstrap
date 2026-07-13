@@ -1,0 +1,17 @@
+// RUN: check
+
+struct HasOpt {
+  int x;
+  int? maybe;
+}
+
+int main() {
+  HasOpt s { 1, 42 };
+  // field? on Optional field: result is still int?
+  int? a = s.maybe?;
+  // field without ? on Optional field
+  int? b = s.maybe;
+  // field without ? on non-Optional field
+  int c = s.x;
+  return 0;
+}

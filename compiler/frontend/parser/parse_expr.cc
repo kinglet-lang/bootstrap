@@ -361,8 +361,18 @@ ast::ExprPtr Parser::call() {
         // '<garbage>'" diagnostic unrelated to the actual syntax error.
         break;
       }
+      bool optional = false;
+      if (check(TokenType::QUESTION)) {
+        // Only consume `?` as field-safe-access when the next token is NOT
+        // `:` — otherwise this is null-coalesce `expr.field ?: fallback`.
+        if (current_ + 1 < tokens_.size() && tokens_[current_ + 1].type != TokenType::COLON) {
+          optional = true;
+          advance();
+        }
+      }
       const ast::SourceLocation location = expr->location;
-      expr = std::make_unique<ast::FieldAccessExpr>(location, std::move(expr), token_text(field));
+      expr = std::make_unique<ast::FieldAccessExpr>(location, std::move(expr), token_text(field),
+                                                    optional);
     } else if (match(TokenType::LEFT_BRACKET)) {
       ast::ExprPtr index = expression();
       consume(TokenType::RIGHT_BRACKET, "Expected ']' after index.");
