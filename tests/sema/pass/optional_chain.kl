@@ -1,0 +1,22 @@
+// @expect: ok
+
+using io;
+
+struct node {
+  int value;
+  node? next;
+}
+
+int main() {
+  node n2 { 2, null };
+  node n1 { 1, n2 };
+
+  // field? returns unwrapped T, allowing chain with .field
+  int a = n1.next?.value;
+  // multi-level chain
+  int b = n1.next?.next?.value;
+
+  io::out("{} {}\n", a, b);
+
+  return 0;
+}

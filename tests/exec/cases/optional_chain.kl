@@ -1,0 +1,19 @@
+// RUN: run
+
+using io;
+
+struct node {
+  int value;
+  node? next;
+}
+
+int main() {
+  node n3 { 3, null };
+  node n2 { 2, n3 };
+  node n1 { 1, n2 };
+
+  int v = n1.next?.value;
+  io::out("{}\n", v);
+
+  return 0;
+}

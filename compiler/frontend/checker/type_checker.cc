@@ -3675,10 +3675,18 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
   for (const auto &f : obj_type.fields) {
     if (f.name == field_access.field_name) {
       Type field_type = f.type ? *f.type : Type(f.type_kind);
+      // Resolve named struct types — both direct (TypeKind::Struct) and
+      // wrapped (TypeKind::Optional whose element_type names a struct).
       if (f.type_kind == TypeKind::Struct && !f.type_name.empty()) {
         auto reg_it = type_registry_.find(f.type_name);
         if (reg_it != type_registry_.end())
           field_type = reg_it->second;
+      } else if (f.type_kind == TypeKind::Optional && field_type.element_type &&
+                 field_type.element_type->kind == TypeKind::Struct &&
+                 !field_type.element_type->name.empty()) {
+        auto reg_it = type_registry_.find(field_type.element_type->name);
+        if (reg_it != type_registry_.end())
+          field_type.element_type = std::make_shared<Type>(reg_it->second);
       }
       if (field_access.optional_access) {
         if (field_type.kind != TypeKind::Optional) {
@@ -3687,9 +3695,11 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
                                               type_to_string(field_type) + ".");
           return int_type();
         }
-        // field? always returns an Optional type — if the field is null the
-        // whole expression evaluates to null.
-        return field_type;
+        // field? unwraps the Optional — if the field is null at runtime the
+        // JmpIfErr fallback pushes Null and the result is a null sentinel.
+        // Must be used in a nil-checking context (?:, comparison) or followed
+        // by another field access for chaining.
+        return *field_type.element_type;
       }
       return field_type;
     }
