@@ -1,0 +1,15 @@
+// RUN: check
+// COMPILE-FAIL
+// CHECK-ERR: Cannot cast E to byte
+//
+// Regression test for the check_cast() dispatch-order bug: Enum -> byte
+// used to succeed for the same reason as Enum -> char (see
+// cast_enum_to_char_rejected.kl). Must stay rejected.
+
+enum E { A, B, C }
+
+int main() {
+  E e = E::C;
+  byte b = byte(e);
+  return 0;
+}
