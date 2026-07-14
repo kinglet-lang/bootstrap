@@ -1,0 +1,13 @@
+// RUN: check
+
+int main() {
+  int? a;
+  string s;
+  int[] arr;
+  {int: int} m;
+  int? read_a = a;
+  int read_s_len = s.len();
+  int read_arr_len = arr.len();
+  int read_m_len = m.len();
+  return read_a ?: 0;
+}

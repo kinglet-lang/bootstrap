@@ -1,0 +1,9 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+int main() {
+  int64 wide = 5;
+  int32 narrow = wide;
+  return narrow;
+}

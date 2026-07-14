@@ -45,11 +45,24 @@ public:
   SemanticContext &sema() { return sema_; }
   const SemanticContext &sema() const { return sema_; }
 
+  // Tracks whether a local has a definite value yet. Unassigned means the
+  // declaration had no initializer and the type has no language-level
+  // default (see is_defaultable_type()); reading it before an assignment
+  // covers every path is a compile error. PartiallyInitialized applies only
+  // to struct locals initialized field-by-field: some fields have been
+  // assigned but not all of them, so a field read is only valid for a field
+  // already in initialized_fields, and a whole-value read is not tracked in
+  // this first implementation (see type_checker.cc's VarDeclStmt/field
+  // access handling for the exact scope of what is and isn't covered).
+  enum class InitState { Unassigned, Initialized, PartiallyInitialized };
+
   struct VarInfo {
     Type type;
     bool is_mutable;
     bool used = false;
     bool transferred = false;
+    InitState init_state = InitState::Initialized;
+    std::unordered_set<std::string> initialized_fields;
     ast::SourceLocation location;
   };
 
@@ -175,7 +188,65 @@ private:
   void push_scope();
   void pop_scope();
   void declare_var(const std::string &name, const Type &type, bool is_mutable,
-                   ast::SourceLocation loc = {});
+                   ast::SourceLocation loc = {}, InitState init_state = InitState::Initialized);
+  // True when a bare declaration with no initializer is immediately valid
+  // for this type: `T?`, `string`, arrays, and maps all have a language-
+  // level default value (null / "" / empty array / empty map). Everything
+  // else (scalars, enums, structs with no applicable zero-argument `@init`
+  // path) starts Unassigned and must be assigned on every path before it is
+  // read -- see visit(VarDeclStmt) for where this decides the declared
+  // InitState, and check_int_literal()'s caller in the .cc file for why the
+  // checker must not fabricate a default int/float/bool/char value the way
+  // lowering's old emit_default_value() did.
+  static bool is_defaultable_type(const Type &type);
+  // Field names of a struct type, or an empty set for any other type. Used
+  // to decide when every field of a struct local has been assigned (at
+  // which point the whole variable becomes Initialized) and, during
+  // if/else merging, to treat an Initialized struct branch as having
+  // touched every field for intersection purposes.
+  static std::unordered_set<std::string> struct_field_names(const Type &type);
+  // Marks `name` as definitely assigned as a whole value. Called from
+  // check_assign() for an ordinary `name = expr` write.
+  void mark_initialized(const std::string &name);
+  // Marks a single struct field as definitely assigned. Called from
+  // check_field_assign() for `name.field = expr`. Promotes `name` to fully
+  // Initialized once every field of its struct type has been touched this
+  // way, so later whole-value reads of `name` succeed without requiring a
+  // separate literal/constructor initialization.
+  void mark_field_initialized(const std::string &name, const std::string &field);
+  // Errors if reading `name` as a whole value is not yet definite. Called
+  // from check_identifier() for every bare-identifier read.
+  void check_definite_assignment_read(const std::string &name, ast::SourceLocation loc);
+  // Errors if reading a specific struct field is not yet definite. Called
+  // from check_field_access() when the object being accessed is a bare
+  // local struct variable that is not yet fully Initialized.
+  void check_field_definite_assignment_read(const std::string &name, const std::string &field,
+                                            ast::SourceLocation loc);
+  // Nonzero while resolving the immediate object of `obj.field` when the
+  // field access itself is the operation that decides what part of `obj` is
+  // touched. For `obj.field = value`, an Unassigned struct local is allowed
+  // because the write may initialize that field. For `obj.field` reads, the
+  // object lookup is allowed and the checker then validates the specific
+  // field path with check_field_definite_assignment_read(). Only ever
+  // incremented/decremented directly around that one check_expr() call, so
+  // it cannot leak into unrelated nested reads.
+  int suppress_definite_assignment_for_field_write_ = 0;
+  // Definite-assignment state snapshot, keyed by variable name: (whole-value
+  // state, the set of struct fields touched so far). Used by if/else
+  // branch merging and by loops to save/restore/merge just the
+  // definite-assignment bookkeeping without disturbing borrow/transfer
+  // state or re-running any checks.
+  using DefiniteAssignmentSnapshot =
+      std::unordered_map<std::string, std::pair<InitState, std::unordered_set<std::string>>>;
+  DefiniteAssignmentSnapshot snapshot_definite_assignment_state();
+  void restore_definite_assignment_state(const DefiniteAssignmentSnapshot &snapshot);
+  // Writes the merge of `then_snapshot` and `else_snapshot` into the live
+  // VarInfo objects: a variable/field is Initialized after the branch only
+  // if it is initialized on both arms (an absent `else` passes the pre-if
+  // snapshot here as `else_snapshot`, so "no assignment happened" merges
+  // exactly like a branch that assigned nothing).
+  void merge_definite_assignment_snapshots(const DefiniteAssignmentSnapshot &then_snapshot,
+                                           const DefiniteAssignmentSnapshot &else_snapshot);
   std::optional<Type> lookup_var(const std::string &name);
   VarInfo *find_var_info(const std::string &name);
   std::optional<Type> lookup_type(const std::string &name) const;

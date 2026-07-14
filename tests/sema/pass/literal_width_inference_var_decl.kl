@@ -1,0 +1,9 @@
+// RUN: check
+
+int main() {
+  int32 i = 1;
+  uint16 port = 443;
+  byte b = 10;
+  int32 sum = i + 2;
+  return int(sum) + int(port) + int(b);
+}

@@ -1,0 +1,7 @@
+// RUN: check
+
+int main() {
+  auto x = 1;
+  int64 check = x;
+  return int(check);
+}
