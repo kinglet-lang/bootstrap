@@ -199,13 +199,12 @@ CompileResult Compiler::compile(const ast::Program &program) {
     const int struct_idx = it->second;
 
     // Create a synthetic FunctionDecl for the @destroy body.
-    // The implicit self: *mut Self parameter is added if the parsed
-    // AnnotatedFn didn't include one (the parser stores empty params for
-    // parameterless @destroy annotations).
+    // The implicit self parameter carries the struct value (kl_h), typed
+    // as the struct name so field access (self.field) resolves correctly.
     std::vector<ast::Parameter> synth_params = destroy.params;
     if (synth_params.empty()) {
       synth_params.push_back(ast::Parameter{
-          .type = ast::TypeExpr{.name = "*mut"},
+          .type = ast::TypeExpr{.name = struct_decl->name},
           .name = "self",
       });
     }
@@ -223,6 +222,10 @@ CompileResult Compiler::compile(const ast::Program &program) {
     record_function_source(fn_idx, entry_source_path_);
     function_indices_[synth->name] = fn_idx;
     function_decl_by_index_[fn_idx] = synth.get();
+    // Register the real @destroy body for compile_function to use.
+    if (destroy.body) {
+      destroy_body_overrides_[fn_idx] = destroy.body.get();
+    }
     if (!destroy.params.empty()) {
       const std::string &receiver = destroy.params[0].type.name;
       if (struct_indices_.count(receiver)) {
@@ -406,7 +409,7 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
     std::vector<ast::Parameter> synth_params = destroy.params;
     if (synth_params.empty()) {
       synth_params.push_back(ast::Parameter{
-          .type = ast::TypeExpr{.name = "*mut"},
+          .type = ast::TypeExpr{.name = struct_decl->name},
           .name = "self",
       });
     }
@@ -424,6 +427,9 @@ CompileResult Compiler::compile_module(const ast::Program &program) {
     record_function_source(fn_idx, entry_source_path_);
     function_indices_[synth->name] = fn_idx;
     function_decl_by_index_[fn_idx] = synth.get();
+    if (destroy.body) {
+      destroy_body_overrides_[fn_idx] = destroy.body.get();
+    }
     if (!synth_params.empty()) {
       const std::string &receiver = synth_params[0].type.name;
       if (struct_indices_.count(receiver)) {
@@ -506,17 +512,8 @@ void Compiler::push_scope() {
   scope_stack_.push_back(locals_.size());
 }
 
-void Compiler::pop_scope() {
-  if (scope_stack_.empty())
-    return;
-  const std::size_t target = scope_stack_.back();
-  scope_stack_.pop_back();
-
-  // Emit destroy calls for resource-type locals in reverse declaration
-  // order. The emit calls push values and instructions into the current
-  // basic block; they are indistinguishable from user-authored code at
-  // the KIR level.
-  for (std::size_t i = locals_.size(); i > target; --i) {
+void Compiler::emit_scope_exit_drops(std::size_t target_slot) {
+  for (std::size_t i = locals_.size(); i > target_slot; --i) {
     const Local &local = locals_[i - 1];
     if (local.slot_kind != Local::SlotKind::Value)
       continue;
@@ -533,6 +530,19 @@ void Compiler::pop_scope() {
     emit_operand(LoweringOp::Drop, static_cast<uint32_t>(struct_it->second),
                  ast::SourceLocation{0, 0});
   }
+}
+
+void Compiler::pop_scope() {
+  if (scope_stack_.empty())
+    return;
+  const std::size_t target = scope_stack_.back();
+  scope_stack_.pop_back();
+
+  // Emit destroy calls for resource-type locals in reverse declaration
+  // order. The emit calls push values and instructions into the current
+  // basic block; they are indistinguishable from user-authored code at
+  // the KIR level.
+  emit_scope_exit_drops(target);
 
   while (locals_.size() > target) {
     locals_.pop_back();
@@ -695,41 +705,59 @@ void Compiler::compile_function(
   }
 
   // KIR fast path: single `return <expr>` with IrBuilder-supported expression.
-  if (const ast::Expr *ret_expr = single_return_expr(function)) {
-    IrBuilder builder;
-    if (auto kir = builder.build_expr_function(name, *ret_expr)) {
-      kir->source_path = fn_source;
-      kir->param_count = static_cast<int>(function.params.size());
-      if (!mangled.empty())
-        kir->mangled_name = mangled;
-      kir_module_.functions.push_back(*kir);
-      implicit_return_stmt_ = nullptr;
-      compiling_namespace_ = prev_compiling_ns;
-      return;
+  // Skip for synthetic @destroy functions that have an override body – the
+  // override is a user-written block, not a single-return function.
+  const ast::Stmt *destroy_override = nullptr;
+  if (func_idx >= 0) {
+    auto ov_it = destroy_body_overrides_.find(func_idx);
+    if (ov_it != destroy_body_overrides_.end()) {
+      destroy_override = ov_it->second;
     }
   }
 
+  if (!destroy_override) {
+    if (const ast::Expr *ret_expr = single_return_expr(function)) {
+      IrBuilder builder;
+      if (auto kir = builder.build_expr_function(name, *ret_expr)) {
+        kir->source_path = fn_source;
+        kir->param_count = static_cast<int>(function.params.size());
+        if (!mangled.empty())
+          kir->mangled_name = mangled;
+        kir_module_.functions.push_back(*kir);
+        implicit_return_stmt_ = nullptr;
+        compiling_namespace_ = prev_compiling_ns;
+        return;
+      }
+    }
+  }
+
+  // Use the override body for @destroy functions, otherwise the function body.
+  const ast::Stmt &body_stmt = destroy_override ? *destroy_override : *function.body;
+
   // Detect implicit return: if last statement in body is an ExprStmt,
   // compile it as a return instead of discarding the value.
-  const auto *body = dynamic_cast<const ast::BlockStmt *>(function.body.get());
+  const auto *body = dynamic_cast<const ast::BlockStmt *>(&body_stmt);
   if (body && !body->statements.empty()) {
     const auto *last = dynamic_cast<const ast::ExprStmt *>(body->statements.back().get());
     if (last && function.return_type.name != "void") {
       implicit_return_stmt_ = last;
     }
   }
-
   kir_recorder_.begin_function(plain_name, static_cast<int>(function.params.size()), fn_source,
                                mangled);
   bool body_returned = false;
   if (body && !body->statements.empty()) {
     body_returned = dynamic_cast<const ast::ReturnStmt *>(body->statements.back().get()) != nullptr;
   }
-  compile_stmt(*function.body);
+  compile_stmt(body_stmt);
   implicit_return_stmt_ = nullptr;
 
-  // Fallthrough safety: implicit null return
+  // Fallthrough safety: implicit null return.
+  // Emit scope-exit drops for any locals in pushed scopes (not parameters).
   if (errors_.empty() && !body_returned) {
+    for (std::size_t si = scope_stack_.size(); si > 0; --si) {
+      emit_scope_exit_drops(scope_stack_[si - 1]);
+    }
     emit(LoweringOp::Null, function.location);
     emit(LoweringOp::Return, function.location);
   }
@@ -752,7 +780,17 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
         returned = true;
       }
     }
-    pop_scope();
+    // If a return was hit, drops for this scope were already emitted before
+    // the Return instruction -- only truncate locals, don't re-emit drops.
+    if (returned && !scope_stack_.empty()) {
+      const std::size_t target = scope_stack_.back();
+      scope_stack_.pop_back();
+      while (locals_.size() > target) {
+        locals_.pop_back();
+      }
+    } else {
+      pop_scope();
+    }
     return;
   }
 
@@ -761,6 +799,16 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       compile_expr(*return_stmt->value);
     } else {
       emit(LoweringOp::Null, return_stmt->location);
+    }
+    // Emit drops for ALL enclosing scopes before Return, so they are
+    // reachable code (not dead code after the Return instruction).
+    // Iterate from innermost scope to outermost; the outermost scope
+    // boundary (scope_stack_[0]) is the function body scope, which
+    // starts after parameter slots -- parameters are NOT dropped here
+    // (the LLVM backend's Ret handler releases them via kl_release,
+    // and dropping a @destroy struct's self param would infinite-loop).
+    for (std::size_t si = scope_stack_.size(); si > 0; --si) {
+      emit_scope_exit_drops(scope_stack_[si - 1]);
     }
     emit(LoweringOp::Return, return_stmt->location);
     return;
@@ -785,7 +833,15 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       }
     }
     if (var_decl->init) {
-      compile_expr(*var_decl->init);
+      // A reference-typed local (`const T& r = &x;` / `T& r = &x;`) must
+      // store the ADDRESS of the referent, not its value. compile_expr
+      // would load the value; compile_lvalue_addr loads the address.
+      // For non-ref locals, compile_expr is correct as before.
+      if (local_is_ref(slot)) {
+        compile_lvalue_addr(*var_decl->init);
+      } else {
+        compile_expr(*var_decl->init);
+      }
     } else {
       emit_default_value(var_decl->type, var_decl->location);
     }

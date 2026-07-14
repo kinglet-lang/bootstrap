@@ -59,6 +59,11 @@ private:
 
   void push_scope();
   void pop_scope();
+  // Emit Drop instructions for resource-type locals from the top of the
+  // locals_ stack down to (but not including) `target_slot`. Does NOT
+  // truncate locals_ -- used by ReturnStmt to emit drops for all enclosing
+  // scopes before the Return instruction, so the drops are reachable.
+  void emit_scope_exit_drops(std::size_t target_slot);
 
   void
   compile_function(const ast::FunctionDecl &function, const std::string &lookup_name = "",
@@ -200,6 +205,10 @@ private:
   // matching pre-0028 behavior for those paths, which never declare
   // reference-typed parameters.
   std::unordered_map<int, const ast::FunctionDecl *> function_decl_by_index_;
+  // For synthetic @destroy functions, points to the real @destroy body
+  // (from StructDecl::destroy_decl->body) that compile_function should use
+  // instead of the synthetic FunctionDecl's empty placeholder body.
+  std::unordered_map<int, const ast::Stmt *> destroy_body_overrides_;
   // Compiles each call argument, taking its address instead of its value
   // wherever `decl`'s declared parameter type at that position is
   // reference-typed (`T&` / `const T&`, ADR 0028 D3) -- mirrors

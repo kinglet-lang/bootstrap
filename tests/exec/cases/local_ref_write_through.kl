@@ -1,0 +1,16 @@
+// RUN: run
+// EXPECT-EXIT: 0
+// EXPECT-OUT: 42
+
+// Local mutable reference: write-through must update the referent.
+// Previously crashed (exit 70) because compile_expr loaded the value
+// instead of the address for ref local initialization.
+
+using io;
+int main() {
+  int a = 0;
+  int& r = a;
+  r = 42;
+  io::out("{}", r);
+  return 0;
+}

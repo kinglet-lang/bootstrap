@@ -2,9 +2,8 @@
 // EXPECT-EXIT: 0
 
 // Regression: structs with @destroy must still compile and run with
-// the scope-exit Drop infrastructure. The Drop instruction is currently
-// a placeholder that discards the value; the actual @destroy body is
-// not called yet.
+// the scope-exit Drop infrastructure. The Drop instruction calls the
+// @destroy function before the Return instruction.
 
 struct Holder {
   int value;

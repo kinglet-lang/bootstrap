@@ -1,0 +1,20 @@
+// RUN: run
+// EXPECT-EXIT: 0
+// EXPECT-OUT: created 42\ndestroying 42\n
+
+// @destroy body must be executed at scope exit, not discarded.
+// Previously the synthetic destroy function had an empty body and
+// the Drop instruction was dead code after the Return instruction.
+
+using io;
+struct Tag {
+  int id;
+  @destroy {
+    io::out("destroying {}\n", self.id);
+  }
+}
+int main() {
+  Tag a = Tag { 42 };
+  io::out("created {}\n", a.id);
+  return 0;
+}
