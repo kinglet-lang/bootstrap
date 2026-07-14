@@ -1610,7 +1610,32 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     if (dynamic_cast<const ast::UsingDecl *>(decl.get())) {
       continue;
     }
-    if (dynamic_cast<const ast::StructDecl *>(decl.get())) {
+    if (const auto *struct_decl = dynamic_cast<const ast::StructDecl *>(decl.get())) {
+      // Type-check @destroy body (if present) for non-generic structs.
+      // The body is checked as a void function with an implicit `self`
+      // parameter typed as the struct name, matching the compiler's
+      // synthetic FunctionDecl construction.
+      if (struct_decl->type_params.empty() && struct_decl->destroy_decl.has_value() &&
+          struct_decl->destroy_decl->body) {
+        const auto &destroy = struct_decl->destroy_decl.value();
+        std::vector<ast::Parameter> synth_params = destroy.params;
+        if (synth_params.empty()) {
+          synth_params.push_back(
+              ast::Parameter{.type = ast::TypeExpr{.name = struct_decl->name}, .name = "self"});
+        }
+        push_scope();
+        for (const auto &param : synth_params) {
+          Type param_type = resolve_type_expr(param.type, struct_decl->location);
+          declare_var(param.name, param_type, true);
+        }
+        Type void_type(TypeKind::Void);
+        implicit_return_stmt_ = nullptr;
+        implicit_return_value_type_ = Type(TypeKind::Void);
+        check_stmt(*destroy.body, void_type);
+        implicit_return_stmt_ = nullptr;
+        implicit_return_value_type_ = Type(TypeKind::Void);
+        pop_scope();
+      }
       continue;
     }
     if (dynamic_cast<const ast::EnumDecl *>(decl.get())) {
