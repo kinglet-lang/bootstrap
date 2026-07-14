@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+struct node {
+  int value;
+  node? next;
+}
+
+int main() {
+  node head { 1, null };
+  int? value = head.next?.value;
+  int fallback = value ?: -1;
+  io::out("{}\n", fallback);
+  return 0;
+}
