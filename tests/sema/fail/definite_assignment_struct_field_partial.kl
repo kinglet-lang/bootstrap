@@ -1,0 +1,14 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+struct Point {
+  int x;
+  int y;
+}
+
+int main() {
+  Point p;
+  p.x = 1;
+  return p.y;
+}

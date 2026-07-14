@@ -1835,45 +1835,72 @@ void TypeChecker::visit(const ast::VarDeclStmt &var_decl) {
     return;
   }
   Type var_type = resolve_type_expr(var_decl.type, var_decl.location);
-  if (var_decl.init) {
-    if (var_decl.type.name == "auto") {
-      // `auto` has no target type to classify a borrow against yet -- the
-      // declared type IS the init expression's own type, so this goes
-      // through check_expr() as normal. For `auto v = &a;` specifically,
-      // check_unary's own default (shared borrow, ADR 0028 D3) is exactly
-      // the right answer here, since there genuinely is no target-type
-      // context, matching `const auto& v = a;`.
-      Type init_type = check_expr(*var_decl.init);
-      check_reference_escape(init_type, var_decl.location);
-      var_type = init_type;
+  bool is_mutable = var_decl.storage != "const";
+  if (!var_decl.init) {
+    // No initializer: only types with an actual language-level default
+    // (T?, string, arrays, maps) are readable right away. Everything else
+    // starts Unassigned and the checker enforces assignment on every path
+    // before a read -- there is no zero/blank default for scalars, enums,
+    // or plain structs. Lowering must not paper over this with the old
+    // emit_default_value() null-sentinel fallback for the Unassigned case;
+    // see the header's is_defaultable_type() comment.
+    const InitState init_state =
+        is_defaultable_type(var_type) ? InitState::Initialized : InitState::Unassigned;
+    declare_var(var_decl.name, var_type, is_mutable, var_decl.location, init_state);
+    return;
+  }
+  if (var_decl.type.name == "auto") {
+    // `auto` has no target type to classify a borrow against yet -- the
+    // declared type IS the init expression's own type, so this goes
+    // through check_expr() as normal. For `auto v = &a;` specifically,
+    // check_unary's own default (shared borrow, ADR 0028 D3) is exactly
+    // the right answer here, since there genuinely is no target-type
+    // context, matching `const auto& v = a;`.
+    Type init_type = check_expr(*var_decl.init);
+    check_reference_escape(init_type, var_decl.location);
+    var_type = init_type;
+  } else if (const auto *lit =
+                 dynamic_cast<const ast::IntLiteralExpr *>(&strip_borrow_marker(*var_decl.init));
+             lit && lit->width_suffix.empty() && is_integer_type(var_type)) {
+    // A bare, suffixless integer literal adopts the declared target width
+    // when the value fits -- `int32 i = 1;` instead of requiring
+    // `int32 i = 1i32;`. This only applies to a literal AST node directly
+    // in initializer position, not to any expression tree containing one
+    // (`int32 i = 1 + 2;` still infers `1`/`2` as default `int` and then
+    // fails the ordinary types_assignable() check below), and it does not
+    // touch literals that already carry an explicit width suffix -- those
+    // keep meaning exactly what they say, so `int32 i = 1i64;` is still a
+    // mismatch error.
+    if (!integer_fits_width(lit->value, int_width_info(var_type))) {
+      error_at(lit->location, "Integer literal out of range for type '" +
+                                  integer_type_display_name(var_type) + "'.");
+    }
+  } else {
+    // A declared (non-auto) type IS the target-type context a borrow
+    // classifies against -- use check_call_arg_type() to avoid
+    // check_unary's default running first, then classify against
+    // var_type once, exactly as a call argument does against its
+    // resolved parameter type.
+    Type init_type = check_call_arg_type(*var_decl.init);
+    check_reference_escape(init_type, var_decl.location);
+    if (!types_assignable(init_type, var_type)) {
+      error_at(var_decl.location, "Cannot assign " + type_to_string(init_type) +
+                                      " to variable of type " + type_to_string(var_type) + ".");
     } else {
-      // A declared (non-auto) type IS the target-type context a borrow
-      // classifies against -- use check_call_arg_type() to avoid
-      // check_unary's default running first, then classify against
-      // var_type once, exactly as a call argument does against its
-      // resolved parameter type.
-      Type init_type = check_call_arg_type(*var_decl.init);
-      check_reference_escape(init_type, var_decl.location);
-      if (!types_assignable(init_type, var_type)) {
-        error_at(var_decl.location, "Cannot assign " + type_to_string(init_type) +
-                                        " to variable of type " + type_to_string(var_type) + ".");
-      } else {
-        check_borrow_argument(*var_decl.init, var_type, var_decl.location);
-        // Resource type init transfer (ADR 0028 D6): `T b = a;` where T is_resource
-        if (var_type.is_resource) {
-          const ast::Expr &ref_expr = strip_borrow_marker(*var_decl.init);
-          if (auto ref_name = referent_name_from_lvalue(ref_expr)) {
-            VarInfo *src_vi = find_var_info(*ref_name);
-            if (src_vi) {
-              src_vi->transferred = true;
-            }
+      check_borrow_argument(*var_decl.init, var_type, var_decl.location);
+      // Resource type init transfer (ADR 0028 D6): `T b = a;` where T is_resource
+      if (var_type.is_resource) {
+        const ast::Expr &ref_expr = strip_borrow_marker(*var_decl.init);
+        if (auto ref_name = referent_name_from_lvalue(ref_expr)) {
+          VarInfo *src_vi = find_var_info(*ref_name);
+          if (src_vi) {
+            src_vi->transferred = true;
           }
         }
       }
     }
   }
-  bool is_mutable = var_decl.storage != "const";
-  declare_var(var_decl.name, var_type, is_mutable, var_decl.location);
+  declare_var(var_decl.name, var_type, is_mutable, var_decl.location, InitState::Initialized);
 }
 
 void TypeChecker::visit(const ast::UnpackDeclStmt &unpack) {
@@ -1948,10 +1975,22 @@ void TypeChecker::visit(const ast::IfStmt &if_stmt) {
     warn_at(if_stmt.condition->location,
             std::string("Condition is always ") + (lit->value ? "true" : "false") + ".");
   }
+  // Definite assignment merges by intersection: a variable/field is
+  // initialized after the `if` only when it is initialized on every live
+  // arm. Both arms start from the same pre-if state (captured once here),
+  // run independently, and their post-arm states are combined below -- a
+  // missing `else` reuses the pre-if snapshot as its "else" state, which is
+  // exactly "no additional assignments happened on this path".
+  const DefiniteAssignmentSnapshot before_if = snapshot_definite_assignment_state();
   check_stmt(*if_stmt.then_branch, stmt_expected_return_);
+  const DefiniteAssignmentSnapshot after_then = snapshot_definite_assignment_state();
+  DefiniteAssignmentSnapshot after_else = before_if;
   if (if_stmt.else_branch) {
+    restore_definite_assignment_state(before_if);
     check_stmt(*if_stmt.else_branch, stmt_expected_return_);
+    after_else = snapshot_definite_assignment_state();
   }
+  merge_definite_assignment_snapshots(after_then, after_else);
 }
 
 void TypeChecker::visit(const ast::GuardStmt &guard_stmt) {
@@ -1973,9 +2012,13 @@ void TypeChecker::visit(const ast::WhileStmt &while_stmt) {
               "Condition is always false; loop body never executes.");
     }
   }
+  const DefiniteAssignmentSnapshot before_loop_body = snapshot_definite_assignment_state();
   ++loop_depth_;
   check_stmt(*while_stmt.body, stmt_expected_return_);
   --loop_depth_;
+  // A while body may execute zero times, so assignments made only inside it
+  // are not definitely available after the loop.
+  restore_definite_assignment_state(before_loop_body);
 }
 
 void TypeChecker::visit(const ast::ForStmt &for_stmt) {
@@ -1989,12 +2032,17 @@ void TypeChecker::visit(const ast::ForStmt &for_stmt) {
       error_at(for_stmt.location, "Condition must be Bool or Int.");
     }
   }
+  const DefiniteAssignmentSnapshot before_loop_body = snapshot_definite_assignment_state();
   if (for_stmt.step) {
     check_stmt(*for_stmt.step, stmt_expected_return_);
   }
   ++loop_depth_;
   check_stmt(*for_stmt.body, stmt_expected_return_);
   --loop_depth_;
+  // The body (and the step, which only ever runs after a body execution)
+  // may never run, so nothing assigned only in either one is definitely
+  // available after the loop.
+  restore_definite_assignment_state(before_loop_body);
   pop_scope();
 }
 
@@ -2170,6 +2218,9 @@ Type TypeChecker::check_identifier(const ast::IdentifierExpr &identifier) {
   if (vi && vi->transferred) {
     error_at(identifier.location,
              "Variable '" + identifier.name + "' was transferred and is no longer valid.");
+  }
+  if (suppress_definite_assignment_for_field_write_ == 0) {
+    check_definite_assignment_read(identifier.name, identifier.location);
   }
   check_referent_access(identifier.name, identifier.location, false);
   return deref_ref_type(var_type.value());
@@ -2419,6 +2470,7 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
       src_vi->transferred = true;
     }
   }
+  mark_initialized(assign.name);
   return target_type;
 }
 
@@ -3635,7 +3687,21 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
     }
   }
 
+  // Resolving `obj` for a field READ must not trip the whole-value
+  // definite-assignment check the way an ordinary bare read of `obj` would
+  // -- an Unassigned or PartiallyInitialized struct local can still have
+  // some fields legitimately readable (or, for Unassigned, none, but the
+  // precise diagnostic below is more useful than the generic whole-value
+  // one). The specific field is validated by
+  // check_field_definite_assignment_read() once field_access.field_name is
+  // known.
+  ++suppress_definite_assignment_for_field_write_;
   Type obj_type = deref_ref_type(check_expr(*field_access.object));
+  --suppress_definite_assignment_for_field_write_;
+  if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_access.object.get())) {
+    check_field_definite_assignment_read(id_obj->name, field_access.field_name,
+                                         field_access.location);
+  }
   if (obj_type.kind == TypeKind::Map) {
     const std::string &method = field_access.field_name;
     if (method == "len" || method == "has" || method == "remove" || method == "keys") {
@@ -3729,7 +3795,13 @@ Type TypeChecker::check_field_access(const ast::FieldAccessExpr &field_access) {
 
 Type TypeChecker::check_field_assign(const ast::FieldAssignExpr &field_assign) {
 
+  // Writing `obj.field = value` is exactly how an Unassigned struct local
+  // becomes complete one field at a time, so resolving `obj` here must not
+  // trip the same "read before assignment" check a bare read of `obj` would
+  // -- see suppress_definite_assignment_for_field_write_'s declaration.
+  ++suppress_definite_assignment_for_field_write_;
   Type obj_type = check_expr(*field_assign.object);
+  --suppress_definite_assignment_for_field_write_;
   // Writing through a field path (`obj.field = value`) mutates the referent
   // that `obj.field` resolves to, so it needs a place-based exclusivity check
   // — a borrow of `obj.right` should not conflict with `obj.left = value`
@@ -3757,6 +3829,14 @@ Type TypeChecker::check_field_assign(const ast::FieldAssignExpr &field_assign) {
         error_at(field_assign.location, "Cannot assign " + type_to_string(value_type) +
                                             " to field '" + f.name + "' of type " +
                                             type_to_string(field_type) + ".");
+      }
+      // Field-level definite assignment only covers the direct
+      // `identifier.field = value` shape for now; `nested.obj.field = v`
+      // would need to affect `nested.obj`'s own tracking, which this first
+      // pass does not attempt.
+      if (const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(
+              &strip_borrow_marker(*field_assign.object))) {
+        mark_field_initialized(id_obj->name, field_assign.field_name);
       }
       return field_type;
     }
@@ -4380,7 +4460,7 @@ void TypeChecker::pop_scope() {
 }
 
 void TypeChecker::declare_var(const std::string &name, const Type &type, bool is_mutable,
-                              ast::SourceLocation loc) {
+                              ast::SourceLocation loc, InitState init_state) {
   if (scopes_.empty()) {
     return;
   }
@@ -4395,8 +4475,174 @@ void TypeChecker::declare_var(const std::string &name, const Type &type, bool is
     error_at(loc, "Variable '" + name + "' already declared.");
     return;
   }
-  scope.insert_or_assign(
-      name, VarInfo{.type = type, .is_mutable = is_mutable, .used = false, .location = loc});
+  scope.insert_or_assign(name, VarInfo{.type = type,
+                                       .is_mutable = is_mutable,
+                                       .used = false,
+                                       .init_state = init_state,
+                                       .location = loc});
+}
+
+bool TypeChecker::is_defaultable_type(const Type &type) {
+  switch (type.kind) {
+  case TypeKind::Optional:
+  case TypeKind::String:
+  case TypeKind::Array:
+  case TypeKind::Map:
+    return true;
+  default:
+    return false;
+  }
+}
+
+std::unordered_set<std::string> TypeChecker::struct_field_names(const Type &type) {
+  std::unordered_set<std::string> names;
+  if (type.kind != TypeKind::Struct) {
+    return names;
+  }
+  for (const auto &f : type.fields) {
+    names.insert(f.name);
+  }
+  return names;
+}
+
+void TypeChecker::mark_initialized(const std::string &name) {
+  VarInfo *vi = find_var_info(name);
+  if (vi) {
+    vi->init_state = InitState::Initialized;
+    vi->initialized_fields.clear();
+  }
+}
+
+void TypeChecker::mark_field_initialized(const std::string &name, const std::string &field) {
+  VarInfo *vi = find_var_info(name);
+  if (!vi) {
+    return;
+  }
+  if (vi->init_state == InitState::Initialized) {
+    // Already fully initialized (literal/constructor, or a prior full
+    // assignment) -- a subsequent single-field write doesn't need to
+    // re-derive completeness from struct_field_names().
+    return;
+  }
+  vi->initialized_fields.insert(field);
+  vi->init_state = InitState::PartiallyInitialized;
+  const auto all_fields = struct_field_names(vi->type);
+  if (!all_fields.empty()) {
+    bool complete = true;
+    for (const auto &f : all_fields) {
+      if (vi->initialized_fields.count(f) == 0) {
+        complete = false;
+        break;
+      }
+    }
+    if (complete) {
+      vi->init_state = InitState::Initialized;
+      vi->initialized_fields.clear();
+    }
+  }
+}
+
+void TypeChecker::check_definite_assignment_read(const std::string &name, ast::SourceLocation loc) {
+  VarInfo *vi = find_var_info(name);
+  if (!vi) {
+    return; // undeclared-variable case is reported by the caller separately
+  }
+  if (vi->init_state == InitState::Unassigned) {
+    error_at(loc, "Variable '" + name + "' may be uninitialized. Assign it on every path before " +
+                      "reading it, or give it an initializer.");
+  } else if (vi->init_state == InitState::PartiallyInitialized) {
+    error_at(loc, "Variable '" + name +
+                      "' is only partially initialized. Assign every field before reading the "
+                      "whole value.");
+  }
+}
+
+void TypeChecker::check_field_definite_assignment_read(const std::string &name,
+                                                       const std::string &field,
+                                                       ast::SourceLocation loc) {
+  VarInfo *vi = find_var_info(name);
+  if (!vi) {
+    return;
+  }
+  if (vi->init_state == InitState::Initialized) {
+    return;
+  }
+  if (vi->init_state == InitState::Unassigned || vi->initialized_fields.count(field) == 0) {
+    error_at(loc, "Field '" + name + "." + field + "' may be uninitialized.");
+  }
+}
+
+TypeChecker::DefiniteAssignmentSnapshot TypeChecker::snapshot_definite_assignment_state() {
+  DefiniteAssignmentSnapshot snapshot;
+  for (auto scope_it = scopes_.rbegin(); scope_it != scopes_.rend(); ++scope_it) {
+    for (const auto &[name, info] : *scope_it) {
+      // Innermost declaration wins, matching lookup_var()'s shadowing order.
+      snapshot.try_emplace(name, std::make_pair(info.init_state, info.initialized_fields));
+    }
+  }
+  return snapshot;
+}
+
+void TypeChecker::restore_definite_assignment_state(const DefiniteAssignmentSnapshot &snapshot) {
+  for (auto scope_it = scopes_.rbegin(); scope_it != scopes_.rend(); ++scope_it) {
+    for (auto &[name, info] : *scope_it) {
+      auto found = snapshot.find(name);
+      if (found != snapshot.end()) {
+        info.init_state = found->second.first;
+        info.initialized_fields = found->second.second;
+      }
+    }
+  }
+}
+
+void TypeChecker::merge_definite_assignment_snapshots(
+    const DefiniteAssignmentSnapshot &then_snapshot,
+    const DefiniteAssignmentSnapshot &else_snapshot) {
+  for (auto scope_it = scopes_.rbegin(); scope_it != scopes_.rend(); ++scope_it) {
+    for (auto &[name, info] : *scope_it) {
+      auto then_it = then_snapshot.find(name);
+      auto else_it = else_snapshot.find(name);
+      // A variable declared inside only one branch (e.g. a nested block's
+      // own local) has no entry on the other side; that shape can't reach
+      // this scope's VarInfo at all since it would have gone out of scope
+      // already, so both lookups succeeding is the normal case here.
+      if (then_it == then_snapshot.end() || else_it == else_snapshot.end()) {
+        continue;
+      }
+      const InitState then_state = then_it->second.first;
+      const InitState else_state = else_it->second.first;
+      if (then_state == InitState::Initialized && else_state == InitState::Initialized) {
+        info.init_state = InitState::Initialized;
+        info.initialized_fields.clear();
+        continue;
+      }
+      if (then_state == InitState::Unassigned && else_state == InitState::Unassigned) {
+        info.init_state = InitState::Unassigned;
+        info.initialized_fields.clear();
+        continue;
+      }
+      // Any other combination (partial+anything, or one side fully
+      // initialized while the other is unassigned/partial) intersects to
+      // "not every path has this" for the whole value, but still tracks the
+      // fields both sides agree on for a struct so a later field-level read
+      // of a field assigned on both arms is accepted.
+      std::unordered_set<std::string> then_fields = then_state == InitState::Initialized
+                                                        ? struct_field_names(info.type)
+                                                        : then_it->second.second;
+      std::unordered_set<std::string> else_fields = else_state == InitState::Initialized
+                                                        ? struct_field_names(info.type)
+                                                        : else_it->second.second;
+      std::unordered_set<std::string> common_fields;
+      for (const auto &f : then_fields) {
+        if (else_fields.count(f) != 0) {
+          common_fields.insert(f);
+        }
+      }
+      info.initialized_fields = common_fields;
+      info.init_state =
+          common_fields.empty() ? InitState::Unassigned : InitState::PartiallyInitialized;
+    }
+  }
 }
 
 std::optional<Type> TypeChecker::lookup_var(const std::string &name) {

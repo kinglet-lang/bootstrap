@@ -1,0 +1,12 @@
+// RUN: check
+
+int main() {
+  bool cond = true;
+  int a;
+  if cond {
+    a = 1;
+  } else {
+    a = 2;
+  }
+  return a;
+}
