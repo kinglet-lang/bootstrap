@@ -1,0 +1,17 @@
+// RUN: check
+// COMPILE-FAIL
+// CHECK-ERR: Cannot cast E to char
+//
+// Regression test for the check_cast() dispatch-order bug: Enum sources
+// used to leak through the char/byte target because canonical_int_type_name
+// resolves "char"/"byte" before the dedicated char/byte source whitelist
+// ever ran. Enum -> char/byte must stay rejected; use char(int(e)) if the
+// ordinal is genuinely needed.
+
+enum E { A, B, C }
+
+int main() {
+  E e = E::C;
+  char c = char(e);
+  return 0;
+}

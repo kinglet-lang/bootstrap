@@ -1,0 +1,26 @@
+// RUN: run
+//
+// New cast-matrix capabilities added alongside the char/byte dispatch-order
+// fix: bool -> int/float, char -> float, enum -> int/float. Each of these
+// used to hard-reject at the checker; the runtime lowering (kl_cast_to_int/
+// kl_cast_to_float in kinglet_rt_enum.cc) already special-cased these source
+// kinds, so opening the checker whitelist only exposes existing behaviour.
+using io;
+
+enum Suit { Clubs, Diamonds, Hearts, Spades }
+
+int main() {
+  bool t = true;
+  bool f = false;
+  io::out.line("{} {}", int(t), int(f));
+  io::out.line("{} {}", float(t), float(f));
+
+  char c = 'A';
+  io::out.line("{}", float(c));
+
+  Suit s = Suit::Hearts;
+  io::out.line("{}", int(s));
+  io::out.line("{}", float(s));
+
+  return 0;
+}

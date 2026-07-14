@@ -1,0 +1,16 @@
+// RUN: check
+// COMPILE-FAIL
+// CHECK-ERR: Cannot cast float to char
+//
+// Regression test for the check_cast() dispatch-order bug: "char"/"byte"
+// targets used to fall through canonical_int_type_name()'s int-target
+// branch (canonical_int_type_name("char") == "int8", a truthy optional)
+// before ever reaching the dedicated char/byte branch, so Float sources
+// were silently accepted and returned a bare Int. char/byte casts must
+// stay restricted to Int/Char/String sources.
+
+int main() {
+  float f = 3.14;
+  char c = char(f);
+  return 0;
+}

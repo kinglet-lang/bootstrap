@@ -3863,14 +3863,28 @@ Type TypeChecker::check_cast(const ast::CastExpr &cast) {
     }
   };
 
-  if (auto int_target = canonical_int_type_name(target)) {
+  if (target == "char" || target == "byte") {
+    // char/byte ↔ int: infallible; string → char: fallible (empty → CastError).
+    // This check must come before canonical_int_type_name() below: that
+    // helper resolves "char"/"byte" to their canonical int8/uint8 names (it
+    // is also used by resolve_type() to build the char/byte scalar types),
+    // so if the int_target branch ran first it would silently absorb
+    // char(...)/byte(...) casts and return a bare Int instead of the
+    // dedicated Char/Byte type -- which is what let Float and Enum sources
+    // sneak through this cast without ever reaching the whitelist below.
+    if (src_is(TypeKind::Int) || src_is(TypeKind::Char) || src_is(TypeKind::String)) {
+      reject_unhandled_fallible();
+      return target == "byte" ? byte_type() : char_type();
+    }
+  } else if (auto int_target = canonical_int_type_name(target)) {
     if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
-        src_is(TypeKind::Char) || src_is(TypeKind::Enum)) {
+        src_is(TypeKind::Char) || src_is(TypeKind::Enum) || src_is(TypeKind::Bool)) {
       reject_unhandled_fallible();
       return make_int_type(*int_target);
     }
   } else if (auto float_target = canonical_float_type_name(target)) {
-    if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String)) {
+    if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
+        src_is(TypeKind::Bool) || src_is(TypeKind::Char) || src_is(TypeKind::Enum)) {
       reject_unhandled_fallible();
       return make_float_type(*float_target);
     }
@@ -3878,12 +3892,6 @@ Type TypeChecker::check_cast(const ast::CastExpr &cast) {
     if (src_is(TypeKind::Int) || src_is(TypeKind::Float) || src_is(TypeKind::String) ||
         src_is(TypeKind::Char) || src_is(TypeKind::Bool) || src_is(TypeKind::Null)) {
       return string_type();
-    }
-  } else if (target == "char" || target == "byte") {
-    // char/byte ↔ int: infallible; string → char: fallible (empty → CastError)
-    if (src_is(TypeKind::Int) || src_is(TypeKind::Char) || src_is(TypeKind::String)) {
-      reject_unhandled_fallible();
-      return target == "byte" ? byte_type() : char_type();
     }
   } else {
     error_at(cast.location,
