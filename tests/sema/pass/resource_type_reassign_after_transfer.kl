@@ -1,0 +1,18 @@
+// RUN: check
+// EXPECT-EXIT: 0
+
+// Reassigning a fresh value to a transferred resource-type variable is
+// allowed: the variable gets a new owned value and the transferred flag
+// is cleared, so the new value will be properly destroyed at scope exit.
+
+struct File {
+    int fd;
+
+    @destroy { }
+}
+
+void main() {
+    File a = File { 1 };
+    File b = a;          // a transferred
+    a = File { 2 };      // OK: a gets a fresh value, transferred flag cleared
+}

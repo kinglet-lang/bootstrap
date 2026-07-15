@@ -2470,8 +2470,10 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
   }
   VarInfo *lhs_vi = find_var_info(assign.name);
   if (lhs_vi && lhs_vi->transferred) {
-    error_at(assign.location,
-             "Variable '" + assign.name + "' was transferred and cannot be reassigned.");
+    // Reassignment after a transfer is allowed: the variable gets a fresh
+    // value, so clear the transferred flag (the new value is now owned and
+    // must be dropped at scope exit).
+    lhs_vi->transferred = false;
   }
   check_referent_access(assign.name, assign.location, true);
   Type slot_type = var_type.value();

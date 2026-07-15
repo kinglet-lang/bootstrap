@@ -30,6 +30,7 @@ jobs:
 
       - name: Generate GitHub App token
         id: app-token
+        if: vars.AUTOMERGE_APP_CLIENT_ID != ''
         uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ vars.AUTOMERGE_APP_CLIENT_ID }}
@@ -39,6 +40,7 @@ jobs:
           permission-workflows: write
 
       - name: Enable auto-merge on ready PRs
+        if: steps.app-token.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}

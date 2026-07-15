@@ -1,0 +1,43 @@
+// RUN: run
+// CHECK: single null: -1
+// CHECK: single non-null: 2
+// CHECK: multi null: -1
+// CHECK: multi non-null: 3
+// CHECK: optional var: -1
+
+using io;
+
+struct node {
+  int value;
+  node? next;
+}
+
+int main() {
+  // Single-hop field? with null intermediate + ?: fallback
+  node n1 { 1, null };
+  int v1 = n1.next?.value ?: -1;
+  io::out.line("single null: {}", v1);
+
+  // Single-hop field? with non-null intermediate + ?: fallback
+  node n2b { 2, null };
+  node n2a { 1, n2b };
+  int v2 = n2a.next?.value ?: -1;
+  io::out.line("single non-null: {}", v2);
+
+  // Multi-hop field? chain with null intermediate + ?: fallback
+  int v3 = n1.next?.next?.value ?: -1;
+  io::out.line("multi null: {}", v3);
+
+  // Multi-hop field? chain with all non-null intermediates + ?: fallback
+  node n3c { 3, null };
+  node n3b { 2, n3c };
+  node n3a { 1, n3b };
+  int v4 = n3a.next?.next?.value ?: -1;
+  io::out.line("multi non-null: {}", v4);
+
+  // Optional variable from field? + ?:
+  int? v5 = n1.next?.value;
+  io::out.line("optional var: {}", v5 ?: -1);
+
+  return 0;
+}
