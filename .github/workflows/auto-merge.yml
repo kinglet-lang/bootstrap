@@ -47,23 +47,20 @@ jobs:
         run: |
           # A PR is ready to merge when:
           #   1. All CI status checks have passed (no failures or pendings).
-          #   2. CodeRabbit has posted its review: the "CodeRabbit" status
-          #      context must be present with state "SUCCESS".
+          #   2. kinglet-reviewer has submitted an APPROVED review.
           #   3. The PR is mergeable.
           #
-          # CodeRabbit reports a commit *status* (not a check-run).  It
-          # appears in statusCheckRollup as an entry with context="CodeRabbit"
-          # and state="SUCCESS" (or null conclusion).  The old filter only
-          # rejected non-SUCCESS *conclusions*, so a not-yet-reported
-          # CodeRabbit (absent entirely) did not block merge — the PR was
-          # squashed before the bot finished reviewing.
+          # kinglet-reviewer is a self-hosted GitHub App that posts a review
+          # with event=APPROVE when the LLM finds no issues, or event=COMMENT
+          # with inline comments when it does.  We check the reviews list
+          # (not statusCheckRollup) for an APPROVED review from the bot.
           #
           # We merge directly (not --auto) so the action is synchronous and
           # we can delete fork branches in the same run.
 
-          # Fetch all open, mergeable PRs with their check rollup.
+          # Fetch all open, mergeable PRs with their check rollup and reviews.
           prs_json=$(gh pr list -R "$REPO" --state open \
-            --json number,statusCheckRollup,mergeable,headRepository,headRepositoryOwner,headRefName)
+            --json number,statusCheckRollup,mergeable,headRepository,headRepositoryOwner,headRefName,reviews)
 
           # Filter to PRs that are ready.
           ready=$(echo "$prs_json" | jq '
@@ -73,10 +70,10 @@ jobs:
                 .statusCheckRollup as $checks
                 | (
                     # 1. No failed or pending checks.
-                    #    - Check-runs with conclusion FAILURE/CANCELLED/etc → block
-                    #    - Check-runs with null conclusion (still running) → block
-                    #    - Status contexts with state ERROR/FAILURE/PENDING → block
-                    #    - Status contexts with state SUCCESS → ok
+                    #    - Check-runs with conclusion FAILURE/CANCELLED/etc -> block
+                    #    - Check-runs with null conclusion (still running) -> block
+                    #    - Status contexts with state ERROR/FAILURE/PENDING -> block
+                    #    - Status contexts with state SUCCESS -> ok
                     #    - Entries with null everything (unlikely) -> block
                     $checks
                     | map(
@@ -89,12 +86,9 @@ jobs:
                     | length == 0
                   )
                   and (
-                    # 2. CodeRabbit review present and successful.
-                    $checks
-                    | any(
-                        (.context // .name) == "CodeRabbit"
-                        and ((.state // .conclusion) // "") == "SUCCESS"
-                      )
+                    # 2. kinglet-reviewer has submitted an APPROVED review.
+                    .reviews
+                    | any(.author.login == "kinglet-reviewer[bot]" and .state == "APPROVED")
                   )
               )
             | .number
