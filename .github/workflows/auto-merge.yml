@@ -39,35 +39,74 @@ jobs:
           permission-pull-requests: write
           permission-workflows: write
 
-      - name: Enable auto-merge on ready PRs
+      - name: Merge ready PRs
         if: steps.app-token.outputs.token != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
         run: |
-          # A PR is ready for auto-merge when:
-          #   1. All CI status checks have passed.  Checks with a null or
-          #      empty conclusion (e.g. CodeRabbit status context) are
-          #      ignored, not counted as failures.
-          #   2. The PR is mergeable
-          prs=$(gh pr list -R "$REPO" --state open \
-            --json number,statusCheckRollup,mergeable \
-            --jq '.[]
-              | select(.statusCheckRollup
-                  | map(select(.conclusion != null and .conclusion != "" and .conclusion != "SUCCESS"))
-                  | length == 0)
-              | select(.mergeable == "MERGEABLE")
-              | .number' \
-            | sort -n)
+          # A PR is ready to merge when:
+          #   1. All CI status checks have passed (no failures or pendings).
+          #   2. CodeRabbit has posted its review: the "CodeRabbit" status
+          #      context must be present with state "SUCCESS".
+          #   3. The PR is mergeable.
+          #
+          # CodeRabbit reports a commit *status* (not a check-run).  It
+          # appears in statusCheckRollup as an entry with context="CodeRabbit"
+          # and state="SUCCESS" (or null conclusion).  The old filter only
+          # rejected non-SUCCESS *conclusions*, so a not-yet-reported
+          # CodeRabbit (absent entirely) did not block merge — the PR was
+          # squashed before the bot finished reviewing.
+          #
+          # We merge directly (not --auto) so the action is synchronous and
+          # we can delete fork branches in the same run.
 
-          if [ -z "$prs" ]; then
-            echo "No PRs with all checks passed."
+          # Fetch all open, mergeable PRs with their check rollup.
+          prs_json=$(gh pr list -R "$REPO" --state open \
+            --json number,statusCheckRollup,mergeable,headRepository,headRepositoryOwner,headRefName)
+
+          # Filter to PRs that are ready.
+          ready=$(echo "$prs_json" | jq '
+            .[]
+            | select(.mergeable == "MERGEABLE")
+            | select(
+                .statusCheckRollup as $checks
+                | (
+                    # 1. No failed or pending checks.
+                    #    - Check-runs with conclusion FAILURE/CANCELLED/etc → block
+                    #    - Check-runs with null conclusion (still running) → block
+                    #    - Status contexts with state ERROR/FAILURE/PENDING → block
+                    #    - Status contexts with state SUCCESS → ok
+                    #    - Entries with null everything (shouldn't happen) → block
+                    $checks
+                    | map(
+                        # For check-runs: conclusion tells the final result.
+                        # For status contexts: state tells the result.
+                        # A check is "blocking" if it hasn't succeeded yet.
+                        ( .conclusion // .state ) as $result
+                        | select($result != "SUCCESS")
+                      )
+                    | length == 0
+                  )
+                  and (
+                    # 2. CodeRabbit review present and successful.
+                    $checks
+                    | any(
+                        (.context // .name) == "CodeRabbit"
+                        and ((.state // .conclusion) // "") == "SUCCESS"
+                      )
+                  )
+              )
+            | .number
+          ' | sort -n)
+
+          if [ -z "$ready" ]; then
+            echo "No PRs ready for merge."
             exit 0
           fi
 
-          echo "PRs ready for auto-merge: $prs"
-          for num in $prs; do
-            echo "Enabling auto-merge for PR #$num..."
+          for num in $ready; do
+            echo "=== Merging PR #$num ==="
 
             # Extract only the Summary section of the PR body as the commit body.
             pr_body=$(gh api "repos/$REPO/pulls/$num" --jq '.body' \
@@ -75,6 +114,29 @@ jobs:
               | sed '1d; $d' \
               | sed '/^[[:space:]]*$/d')
 
-            gh pr merge "$num" --auto --squash --delete-branch --body "$pr_body"
-            echo "  Auto-merge enabled."
+            # Capture head repo + branch for fork cleanup.
+            head_owner=$(echo "$prs_json" | jq -r --argjson n "$num" \
+              '.[] | select(.number == $n) | .headRepositoryOwner.login')
+            head_repo_name=$(echo "$prs_json" | jq -r --argjson n "$num" \
+              '.[] | select(.number == $n) | .headRepository.name')
+            head_branch=$(echo "$prs_json" | jq -r --argjson n "$num" \
+              '.[] | select(.number == $n) | .headRefName')
+            head_repo="$head_owner/$head_repo_name"
+
+            # Merge directly (synchronous).
+            if gh pr merge "$num" --squash --delete-branch --body "$pr_body"; then
+              echo "  Merged and upstream branch deleted."
+            else
+              echo "  Merge failed — PR may have been merged by another path."
+              continue
+            fi
+
+            # For cross-fork PRs, --delete-branch only removes the branch
+            # in the upstream repo.  Delete the fork branch separately.
+            if [ "$head_repo" != "$REPO" ] && [ -n "$head_repo" ] && [ "$head_repo" != "null/null" ]; then
+              echo "  Deleting fork branch $head_repo:$head_branch ..."
+              gh api -X DELETE "repos/$head_repo/git/refs/heads/$head_branch" 2>&1 \
+                && echo "  Fork branch deleted." \
+                || echo "  (could not delete fork branch — token may lack scope)"
+            fi
           done
