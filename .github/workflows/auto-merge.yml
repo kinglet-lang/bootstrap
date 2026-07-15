@@ -77,12 +77,12 @@ jobs:
                     #    - Check-runs with null conclusion (still running) → block
                     #    - Status contexts with state ERROR/FAILURE/PENDING → block
                     #    - Status contexts with state SUCCESS → ok
-                    #    - Entries with null everything (shouldn't happen) → block
+                    #    - Entries with null everything (unlikely) -> block
                     $checks
                     | map(
                         # For check-runs: conclusion tells the final result.
                         # For status contexts: state tells the result.
-                        # A check is "blocking" if it hasn't succeeded yet.
+                        # A check is "blocking" if it has not succeeded yet.
                         ( .conclusion // .state ) as $result
                         | select($result != "SUCCESS")
                       )
