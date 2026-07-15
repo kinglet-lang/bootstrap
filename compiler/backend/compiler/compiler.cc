@@ -702,6 +702,12 @@ void Compiler::compile_function(
       // infer_arg_type_name/resolve_free_function_for_type only match on
       // concrete type names.
       auto override_it = param_type_overrides.find(param.type.name);
+      if (override_it == param_type_overrides.end()) {
+        // Handle io::-qualified builtin concept names (ADR 0026 D7).
+        if (param.type.name == "io::reader" || param.type.name == "io::writer") {
+          override_it = param_type_overrides.find(param.type.name.substr(4));
+        }
+      }
       local_types_[param.name] =
           override_it != param_type_overrides.end() ? override_it->second : param.type.name;
     }
@@ -1833,10 +1839,15 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     std::unordered_map<std::string, std::string> overrides;
     for (std::size_t i = 0; i < decl->params.size() && i < call_expr.args.size(); ++i) {
       const ast::TypeExpr &pt = decl->params[i].type;
-      if (pt.type_args.empty() && sema_->concept_registry_.count(pt.name)) {
+      // Handle io::-qualified builtin concept names (ADR 0026 D7).
+      std::string concept_name = pt.name;
+      if (concept_name == "io::reader" || concept_name == "io::writer") {
+        concept_name = concept_name.substr(4);
+      }
+      if (pt.type_args.empty() && sema_->concept_registry_.count(concept_name)) {
         const std::string ty = infer_arg_type_name(*call_expr.args[i]);
         if (!ty.empty()) {
-          overrides[pt.name] = ty;
+          overrides[concept_name] = ty;
           if (concrete_ty.empty()) {
             concrete_ty = ty;
           }

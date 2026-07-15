@@ -1,0 +1,68 @@
+// RUN: run
+//
+// Tests ADR 0026 D7: io::reader and io::writer are compiler-builtin
+// concepts, visible as bare reader/writer with `using io;` and as
+// qualified io::reader / io::writer type names.
+
+using io;
+
+struct fake_file {
+  int fd;
+}
+
+// Free functions satisfying the builtin reader/writer concepts.
+// concept reader<T> { uint64 read(T self, byte[]& buffer); }
+// concept writer<T> { uint64 write(T self, byte[] data); }
+uint64 read(fake_file self, byte[]& buffer) {
+  if (buffer.len() >= 3) {
+    buffer[0] = byte(65);  // 'A'
+    buffer[1] = byte(66);  // 'B'
+    buffer[2] = byte(67);  // 'C'
+    return 3u64;
+  }
+  return 0u64;
+}
+
+uint64 write(fake_file self, byte[] data) {
+  return uint64(data.len());
+}
+
+// Bare concept types (visible via `using io;`).
+int consume(reader input) {
+  byte[] buf = [];
+  buf.resize(4, byte(0));
+  uint64 n = input.read(buf);
+  io::out.line("read {} bytes: [{},{},{}]", n, buf[0], buf[1], buf[2]);
+  return 0;
+}
+
+int emit(writer output) {
+  byte[] data = [];
+  data.push(byte(88));
+  data.push(byte(89));
+  data.push(byte(90));
+  uint64 n = output.write(data);
+  io::out.line("wrote {} bytes", n);
+  return 0;
+}
+
+// Qualified concept type name (io::reader).
+int consume_qualified(io::reader input) {
+  byte[] buf = [];
+  buf.resize(4, byte(0));
+  uint64 n = input.read(buf);
+  io::out.line("qualified read {} bytes: [{},{},{}]", n, buf[0], buf[1], buf[2]);
+  return 0;
+}
+
+int main() {
+  fake_file f;
+  f.fd = 1;
+
+  int a = consume(f);
+  int b = emit(f);
+  int c = consume_qualified(f);
+  io::out.line("{},{},{}", a, b, c);
+
+  return 0;
+}
