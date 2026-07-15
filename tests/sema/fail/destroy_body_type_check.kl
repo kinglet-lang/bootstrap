@@ -1,0 +1,20 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: has no field 'nonexistent'
+
+// @destroy body must be type-checked like a regular function body.
+// Previously the checker skipped StructDecl entirely in its second pass,
+// so type errors inside @destroy bodies were not caught until the
+// compiler's codegen path (or not at all).
+
+using io;
+struct Tag {
+    int id;
+
+    @destroy {
+        io::out("destroying", self.nonexistent);
+    }
+}
+
+void main() { }
