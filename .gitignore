@@ -3,6 +3,7 @@ out/
 .obsidian/
 .opencode/
 .vscode/
+.hermes/
 .DS_Store
 node_modules/
 *.lock
