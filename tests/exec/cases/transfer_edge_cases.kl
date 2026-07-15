@@ -1,0 +1,36 @@
+// RUN: run
+// CHECK: b: 1
+// CHECK: a: 2
+// CHECK: destroy 1
+// CHECK: destroy 2
+
+using io;
+
+struct Tag {
+  int id;
+  @destroy {
+    io::out("destroy {}\n", self.id);
+  }
+}
+
+int main() {
+  // Issue 1: conditional transfer in if-branch
+  Tag a { 1 };
+  bool cond = true;
+  if (cond) {
+    Tag b = a;
+    io::out("b: {}\n", b.id);
+  }
+  // a was transferred in the then-branch, but the else-branch (implicit)
+  // did not transfer. After the if, a is conservatively NOT transferred
+  // (if either branch still owns it, we must drop it).
+
+  // Issue 2: reassign after transfer
+  Tag c { 1 };
+  Tag d = c;         // c transferred
+  c = Tag { 2 };     // c gets fresh value, transferred flag cleared
+  io::out("a: {}\n", c.id);
+
+  return 0;
+  // Expected: destroy 1 (d), destroy 2 (c), destroy 1 (a)
+}

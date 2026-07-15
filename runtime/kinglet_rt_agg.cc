@@ -321,12 +321,12 @@ int32_t kl_struct_type_index(kl_h object) {
 }
 
 kl_h kl_struct_field_at(kl_h object, int32_t field_index) {
-  // A null object here means the chain already short-circuited on an
+  // A null object means the chain already short-circuited on an
   // earlier `field?` hop (e.g. `head.next?.value` when `next` is null).
-  // Propagate the null sentinel instead of falling through to the
-  // "malformed object" 0 below -- otherwise the null becomes a plain int
-  // 0 and kl_value_is_err() can no longer tell it apart from a real 0,
-  // silently breaking the `?:` fallback for the rest of the chain.
+  // Propagate the null sentinel so that `?:` at the end of a `field?`
+  // chain can catch it via JmpIfErr.  Plain (non-`field?`) `.field`
+  // access on a null intermediate is an unsafe usage that leaks the
+  // sentinel -- documented in tutorial 05.
   if (kl_is_null(object)) {
     return kl_null_value();
   }
