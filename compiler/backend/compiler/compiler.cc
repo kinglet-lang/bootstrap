@@ -2429,9 +2429,10 @@ void Compiler::compile_cast(const ast::CastExpr &cast) {
   compile_expr(*cast.value);
   int target_kind = -1;
   const std::string &t = cast.target_type.name;
-  if (t == "int")
+  if (t == "int" || t == "int8" || t == "int16" || t == "int32" || t == "int64" || t == "uint8" ||
+      t == "uint16" || t == "uint32" || t == "uint64")
     target_kind = 0;
-  else if (t == "float")
+  else if (t == "float" || t == "float32" || t == "float64" || t == "double")
     target_kind = 1;
   else if (t == "string")
     target_kind = 2;

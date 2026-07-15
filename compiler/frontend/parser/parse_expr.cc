@@ -404,12 +404,22 @@ ast::ExprPtr Parser::call() {
         case TokenType::INT:
         case TokenType::FLOAT:
         case TokenType::DOUBLE:
+        case TokenType::INT8:
+        case TokenType::INT16:
+        case TokenType::INT32:
+        case TokenType::INT64:
+        case TokenType::UINT8:
+        case TokenType::UINT16:
+        case TokenType::UINT32:
+        case TokenType::UINT64:
+        case TokenType::FLOAT32:
+        case TokenType::FLOAT64:
         case TokenType::BOOL:
         case TokenType::STRING:
         case TokenType::VOID:
         case TokenType::CHAR:
         case TokenType::BYTE:
-          break; // ternary — don't consume `?`
+          break; // ternary - don't consume `?`
         default:
           advance(); // consume `?` as propagate
           const ast::SourceLocation location = location_of(previous());
@@ -496,9 +506,12 @@ ast::ExprPtr Parser::primary() {
     return std::make_unique<ast::MapLiteralExpr>(location_of(left_brace), std::move(keys),
                                                  std::move(values));
   }
-  if (check(TokenType::INT) || check(TokenType::FLOAT) || check(TokenType::STRING) ||
-      check(TokenType::BOOL) || check(TokenType::BYTE) || check(TokenType::DOUBLE) ||
-      check(TokenType::CHAR)) {
+  if (check(TokenType::INT) || check(TokenType::INT8) || check(TokenType::INT16) ||
+      check(TokenType::INT32) || check(TokenType::INT64) || check(TokenType::UINT8) ||
+      check(TokenType::UINT16) || check(TokenType::UINT32) || check(TokenType::UINT64) ||
+      check(TokenType::FLOAT) || check(TokenType::FLOAT32) || check(TokenType::FLOAT64) ||
+      check(TokenType::DOUBLE) || check(TokenType::STRING) || check(TokenType::BOOL) ||
+      check(TokenType::BYTE) || check(TokenType::CHAR)) {
     // Type-qualified method call: int::bits(expr)
     if (current_ + 2 < tokens_.size() && tokens_[current_ + 1].type == TokenType::COLON_COLON &&
         tokens_[current_ + 2].type == TokenType::IDENTIFIER) {

@@ -1,0 +1,55 @@
+// RUN: run
+
+using io;
+
+int main() {
+  int x = 42;
+
+  // All fixed-width int casts (infallible: int -> narrower int)
+  int8 a = int8(x);
+  int16 b = int16(x);
+  int32 c = int32(x);
+  int64 d = int64(x);
+  uint8 e = uint8(x);
+  uint16 f = uint16(x);
+  uint32 g = uint32(x);
+  uint64 h = uint64(x);
+
+  // Float casts (infallible: int -> float)
+  float32 i = float32(x);
+  float64 j = float64(x);
+  double k = double(x);
+  float l = float(x);
+
+  // String -> fixed-width int/float cast (fallible, handled with ?:)
+  uint8? n = uint8("255") ?: 0u8;
+  float32? o = float32("3.14") ?: 0.0f32;
+  int8? p = int8("99") ?: 0i8;
+
+  // Invalid string -> cast fails, fallback value verified
+  uint8? bad_n = uint8("not_a_number") ?: 99u8;
+  float32? bad_o = float32("xxx") ?: 9.99f32;
+  int8? bad_p = int8("") ?: 77i8;
+
+  // Print all cast results for verification
+  io::out.line("a={}", a);
+  io::out.line("b={}", b);
+  io::out.line("c={}", c);
+  io::out.line("d={}", d);
+  io::out.line("e={}", e);
+  io::out.line("f={}", f);
+  io::out.line("g={}", g);
+  io::out.line("h={}", h);
+  io::out.line("i={}", i);
+  io::out.line("j={}", j);
+  io::out.line("k={}", k);
+  io::out.line("l={}", l);
+  io::out.line("n={}", n ?: 0u8);
+  io::out.line("o={}", o ?: 0.0f32);
+  io::out.line("p={}", p ?: 0i8);
+  io::out.line("bad_n={}", bad_n);
+  io::out.line("bad_o={}", bad_o);
+  io::out.line("bad_p={}", bad_p);
+
+  return 0;
+}
