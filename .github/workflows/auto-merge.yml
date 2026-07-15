@@ -75,6 +75,6 @@ jobs:
               | sed '1d; $d' \
               | sed '/^[[:space:]]*$/d')
 
-            gh pr merge "$num" --auto --squash --body "$pr_body"
+            gh pr merge "$num" --auto --squash --delete-branch --body "$pr_body"
             echo "  Auto-merge enabled."
           done
