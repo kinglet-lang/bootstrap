@@ -2946,6 +2946,61 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       }
       return array_type(string_type());
     }
+    // Public API (ADR 0027).
+    if (ns_callee->member_name == "exists") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::exists expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::exists expects a string path.");
+      }
+      return bool_type();
+    }
+    if (ns_callee->member_name == "readtext") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::readtext expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::readtext expects a string path.");
+      }
+      return string_type();
+    }
+    if (ns_callee->member_name == "writetext") {
+      if (call_expr.args.size() != 2) {
+        error_at(call_expr.location, "fs::writetext expects exactly two arguments (path, text).");
+      } else {
+        if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+          error_at(call_expr.args[0]->location, "fs::writetext expects a string path.");
+        }
+        if (check_expr(*call_expr.args[1]).kind != TypeKind::String) {
+          error_at(call_expr.args[1]->location, "fs::writetext expects string content.");
+        }
+      }
+      return void_type();
+    }
+    if (ns_callee->member_name == "read") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::read expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::read expects a string path.");
+      }
+      return array_type(byte_type());
+    }
+    if (ns_callee->member_name == "write") {
+      if (call_expr.args.size() != 2) {
+        error_at(call_expr.location, "fs::write expects exactly two arguments (path, data).");
+      } else {
+        if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+          error_at(call_expr.args[0]->location, "fs::write expects a string path.");
+        }
+        // Verify data argument is byte[] (array of byte).
+        Type data_type = check_expr(*call_expr.args[1]);
+        if (data_type.kind != TypeKind::Array || !data_type.element_type ||
+            data_type.element_type->kind != TypeKind::Int ||
+            data_type.element_type->name != "uint8") {
+          error_at(call_expr.args[1]->location, "fs::write expects a byte[] array for data.");
+        }
+      }
+      return void_type();
+    }
     error_at(ns_callee->location, "Unknown fs member '" + ns_callee->member_name + "'.");
     return void_type();
   }

@@ -1,0 +1,11 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+using fs;
+
+int main() {
+  // fs::exists expects a string, not an int.
+  bool b = fs::exists(42);
+  return 0;
+}
