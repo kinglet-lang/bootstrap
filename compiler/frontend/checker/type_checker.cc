@@ -806,10 +806,28 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
     return ref;
   }
   if (expr.type_args.empty()) {
-    if (sema_.concept_registry_.count(expr.name)) {
-      Type concept_type(TypeKind::Concept);
-      concept_type.name = expr.name;
-      return concept_type;
+    // Check for io::reader / io::writer qualified concept names (always
+    // available) and bare reader/writer (only when `using io;` is active,
+    // unless the user has declared their own concept with the same name).
+    std::string concept_name = expr.name;
+    bool is_qualified_io = (concept_name == "io::reader" || concept_name == "io::writer");
+    if (is_qualified_io) {
+      concept_name = concept_name.substr(4); // strip "io::"
+    }
+    auto cr_it = sema_.concept_registry_.find(concept_name);
+    if (cr_it != sema_.concept_registry_.end()) {
+      bool is_builtin_name = (concept_name == "reader" || concept_name == "writer");
+      // Check if this is still our builtin or has been overwritten by a
+      // user-declared concept. User declarations have a non-zero source
+      // location; builtins use {0,0,0}.
+      bool is_builtin = is_builtin_name && cr_it->second && cr_it->second->location.line == 0 &&
+                        cr_it->second->location.column == 0;
+      bool builtin_allowed = is_qualified_io || (is_builtin && sema_.used_.count("io"));
+      if (!is_builtin || builtin_allowed) {
+        Type concept_type(TypeKind::Concept);
+        concept_type.name = concept_name;
+        return concept_type;
+      }
     }
     const std::string resolved_name = resolve_qualified_type_name(expr.name);
     Type t = resolve_type_name(resolved_name);
@@ -817,6 +835,26 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
       error_at(loc, "Unknown type '" + expr.name + "'.");
     }
     return t;
+  }
+  // io::reader<T> / io::writer<T> with explicit type args.
+  {
+    std::string concept_name = expr.name;
+    bool is_qualified_io = (concept_name == "io::reader" || concept_name == "io::writer");
+    if (is_qualified_io) {
+      concept_name = concept_name.substr(4); // strip "io::"
+    }
+    auto cr_it = sema_.concept_registry_.find(concept_name);
+    if (cr_it != sema_.concept_registry_.end()) {
+      bool is_builtin_name = (concept_name == "reader" || concept_name == "writer");
+      bool is_builtin = is_builtin_name && cr_it->second && cr_it->second->location.line == 0 &&
+                        cr_it->second->location.column == 0;
+      bool builtin_allowed = is_qualified_io || (is_builtin && sema_.used_.count("io"));
+      if (!is_builtin || builtin_allowed) {
+        Type concept_type(TypeKind::Concept);
+        concept_type.name = concept_name;
+        return concept_type;
+      }
+    }
   }
   const std::string resolved_base = resolve_qualified_type_name(expr.name);
   std::string mangled = mangle_name(resolved_base, expr.type_args);
@@ -955,6 +993,57 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   // before check) so that check() can take a const Program without casting.
 
   push_scope();
+
+  // Pre-register the built-in io::reader and io::writer concepts (ADR 0026 D7).
+  // These are synthesized internally, not declared in user .kl source, and are
+  // visible as bare `reader`/`writer` when `using io;` is active, or as
+  // qualified `io::reader`/`io::writer` type names. User-declared concepts
+  // with the same name overwrite these entries in the loop below.
+  {
+    ast::SourceLocation builtin_loc{0, 0, 0};
+
+    // concept reader<T> { uint64 read(T self, byte[]& buffer); }
+    {
+      ast::ConceptMethodDecl read_method;
+      read_method.return_type = ast::TypeExpr{"uint64", {}, -1};
+      read_method.name = "read";
+      ast::Parameter self_param;
+      self_param.type = ast::TypeExpr{"T", {}, -1};
+      self_param.name = "self";
+      ast::Parameter buf_param;
+      // byte[]&  ->  parsed as &Array<byte>
+      buf_param.type =
+          ast::TypeExpr{"&", {ast::TypeExpr{"Array", {ast::TypeExpr{"byte", {}, -1}}, -1}}, -1};
+      buf_param.name = "buffer";
+      read_method.params = {self_param, buf_param};
+
+      auto reader_decl = std::make_unique<const ast::ConceptDecl>(
+          builtin_loc, "reader", std::vector<std::string>{"T"},
+          std::vector<ast::ConceptMethodDecl>{read_method});
+      sema_.concept_registry_["reader"] = reader_decl.get();
+      builtin_concepts_.push_back(std::move(reader_decl));
+    }
+
+    // concept writer<T> { uint64 write(T self, byte[] data); }
+    {
+      ast::ConceptMethodDecl write_method;
+      write_method.return_type = ast::TypeExpr{"uint64", {}, -1};
+      write_method.name = "write";
+      ast::Parameter self_param;
+      self_param.type = ast::TypeExpr{"T", {}, -1};
+      self_param.name = "self";
+      ast::Parameter data_param;
+      data_param.type = ast::TypeExpr{"Array", {ast::TypeExpr{"byte", {}, -1}}, -1}; // byte[]
+      data_param.name = "data";
+      write_method.params = {self_param, data_param};
+
+      auto writer_decl = std::make_unique<const ast::ConceptDecl>(
+          builtin_loc, "writer", std::vector<std::string>{"T"},
+          std::vector<ast::ConceptMethodDecl>{write_method});
+      sema_.concept_registry_["writer"] = writer_decl.get();
+      builtin_concepts_.push_back(std::move(writer_decl));
+    }
+  }
 
   for (const ast::DeclPtr &decl : program.declarations) {
     if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(decl.get())) {
@@ -3421,9 +3510,13 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
         std::function<ast::TypeExpr(const ast::TypeExpr &)> substitute_concepts;
         substitute_concepts = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
           if (te.type_args.empty()) {
-            auto concept_it = sema_.concept_registry_.find(te.name);
+            std::string concept_name = te.name;
+            if (concept_name == "io::reader" || concept_name == "io::writer") {
+              concept_name = concept_name.substr(4);
+            }
+            auto concept_it = sema_.concept_registry_.find(concept_name);
             if (concept_it != sema_.concept_registry_.end()) {
-              auto binding_it = concept_bindings.find(te.name);
+              auto binding_it = concept_bindings.find(concept_name);
               if (binding_it != concept_bindings.end()) {
                 return type_to_type_expr(binding_it->second);
               }

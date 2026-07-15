@@ -1,0 +1,4 @@
+read 3 bytes: [65,66,67]
+wrote 3 bytes
+qualified read 3 bytes: [65,66,67]
+0,0,0
