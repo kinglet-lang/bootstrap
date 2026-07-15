@@ -119,6 +119,11 @@ enum class LoweringOp : uint8_t {
   DenseArrayNew,
   BorrowIndexMut,
   Drop,
+  NativeFsExists,
+  NativeFsReadText,
+  NativeFsWriteText,
+  NativeFsReadBytes,
+  NativeFsWriteBytes,
 };
 
 const char *lowering_op_name(LoweringOp op);

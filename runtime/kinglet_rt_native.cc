@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -259,6 +260,78 @@ kl_h kl_native_fs_listdir(kl_h path) {
   return kl_array_new(static_cast<int32_t>(entries.size()), entries.data());
 }
 
+// --- Public API (ADR 0027) ---
+
+kl_h kl_native_fs_exists(kl_h path) {
+  const char *data = nullptr;
+  int32_t len = 0;
+  if (!kl_string_view(path, &data, &len)) {
+    return kl_from_int(0);
+  }
+  const std::string p(data, static_cast<std::size_t>(len));
+  std::error_code ec;
+  return kl_from_int(std::filesystem::exists(p, ec) ? 1 : 0);
+}
+
+kl_h kl_native_fs_readtext(kl_h path) {
+  // Same semantics as kl_native_fs_read but under the public name.
+  return kl_native_fs_read(path);
+}
+
+kl_h kl_native_fs_writetext(kl_h path, kl_h content) {
+  // Same semantics as kl_native_fs_write but under the public name.
+  return kl_native_fs_write(path, content);
+}
+
+kl_h kl_native_fs_read_bytes(kl_h path) {
+  const char *data = nullptr;
+  int32_t len = 0;
+  if (!kl_string_view(path, &data, &len)) {
+    return kl_null_value();
+  }
+  std::ifstream file(std::string(data, static_cast<std::size_t>(len)), std::ios::binary);
+  if (!file) {
+    return kl_null_value();
+  }
+  std::ostringstream buffer;
+  buffer << file.rdbuf();
+  if (file.bad()) {
+    return kl_null_value();
+  }
+  const std::string contents = buffer.str();
+  // Build a byte[] array: each byte becomes a kl_h int element.
+  std::vector<kl_h> bytes;
+  bytes.reserve(contents.size());
+  for (unsigned char c : contents) {
+    bytes.push_back(kl_from_int(static_cast<int64_t>(c)));
+  }
+  return kl_array_new(static_cast<int32_t>(bytes.size()), bytes.data());
+}
+
+kl_h kl_native_fs_write_bytes(kl_h path, kl_h data) {
+  const char *path_data = nullptr;
+  int32_t path_len = 0;
+  if (!kl_string_view(path, &path_data, &path_len)) {
+    return 0;
+  }
+  // Extract bytes from the byte[] array.
+  std::string contents;
+  int32_t arr_len = kl_array_len(data);
+  if (arr_len > 0) {
+    contents.reserve(static_cast<std::size_t>(arr_len));
+    for (int32_t i = 0; i < arr_len; ++i) {
+      kl_h elem = kl_array_get(data, i);
+      contents.push_back(static_cast<char>(kl_to_int(elem) & 0xFF));
+    }
+  }
+  std::ofstream file(std::string(path_data, static_cast<std::size_t>(path_len)),
+                     std::ios::binary | std::ios::trunc);
+  if (file) {
+    file.write(contents.data(), static_cast<std::streamsize>(contents.size()));
+  }
+  return 0;
+}
+
 kl_h kl_native_sys_args(void) {
   std::vector<kl_h> elements;
   elements.reserve(g_program_args.size());
@@ -297,6 +370,16 @@ kl_h kl_invoke_native(kl_h callee, int32_t argc, const kl_h *args) {
     return kl_native_out_flush();
   case 10:
     return kl_native_err_flush();
+  case 11:
+    return argc == 1 ? kl_native_fs_exists(args[0]) : 0;
+  case 12:
+    return argc == 1 ? kl_native_fs_readtext(args[0]) : 0;
+  case 13:
+    return argc == 2 ? kl_native_fs_writetext(args[0], args[1]) : 0;
+  case 14:
+    return argc == 1 ? kl_native_fs_read_bytes(args[0]) : 0;
+  case 15:
+    return argc == 2 ? kl_native_fs_write_bytes(args[0], args[1]) : 0;
   default:
     return 0;
   }

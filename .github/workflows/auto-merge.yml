@@ -87,8 +87,10 @@ jobs:
                   )
                   and (
                     # 2. kinglet-reviewer has submitted an APPROVED review.
+                    #    The login may appear as "kinglet-reviewer" or
+                    #    "kinglet-reviewer[bot]" depending on the API path.
                     .reviews
-                    | any(.author.login == "kinglet-reviewer[bot]" and .state == "APPROVED")
+                    | any((.author.login | startswith("kinglet-reviewer")) and .state == "APPROVED")
                   )
               )
             | .number
