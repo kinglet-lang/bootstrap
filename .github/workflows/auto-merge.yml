@@ -2,8 +2,12 @@ name: Auto Merge
 
 on:
   workflow_run:
-    workflows: [CI, Lint]
+    workflows: [CI, Lint, Validate PR]
     types: [completed]
+  pull_request_review:
+    types: [submitted]
+  schedule:
+    - cron: '0 */2 * * *'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +19,11 @@ concurrency:
 
 jobs:
   automerge:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request_review' ||
+      github.event_name == 'schedule' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,9 +43,19 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
         run: |
+          # A PR is ready for auto-merge when:
+          #   1. All CI status checks have passed.  Checks with a null or
+          #      empty conclusion (e.g. CodeRabbit status context) are
+          #      ignored, not counted as failures.
+          #   2. The PR is mergeable
           prs=$(gh pr list -R "$REPO" --state open \
             --json number,statusCheckRollup,mergeable \
-            --jq '.[] | select(.statusCheckRollup | map(select(.conclusion != "" and .conclusion != "SUCCESS")) | length == 0) | select(.mergeable == "MERGEABLE") | .number' \
+            --jq '.[]
+              | select(.statusCheckRollup
+                  | map(select(.conclusion != null and .conclusion != "" and .conclusion != "SUCCESS"))
+                  | length == 0)
+              | select(.mergeable == "MERGEABLE")
+              | .number' \
             | sort -n)
 
           if [ -z "$prs" ]; then
