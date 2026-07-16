@@ -185,6 +185,10 @@ enum class KirOpcode : std::uint8_t {
   NativeFileSync,
   NativeFileClose,
   NativeFileIsOpen,
+  NativeTxtUtf8Encode,
+  NativeTxtUtf8Decode,
+  NativeTxtGbkEncode,
+  NativeTxtGbkDecode,
 };
 
 struct KirStructMeta {

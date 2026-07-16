@@ -1,0 +1,11 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+using txt;
+
+int main() {
+  byte[] bad = txt::utf8.encode(42);
+  string also_bad = txt::utf8.decode("not bytes");
+  return 0;
+}

@@ -1592,6 +1592,33 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     }
   }
 
+  // Handle txt::utf8.encode/decode and txt::gbk.encode/decode (ADR 0032).
+  if (field_callee) {
+    const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
+    if (ns_obj && ns_obj->namespace_name == "txt" && sema_->used_.count("txt") != 0) {
+      LoweringOp op = LoweringOp::NativeTxtUtf8Encode;
+      bool matched = true;
+      if (ns_obj->member_name == "utf8" && field_callee->field_name == "encode") {
+        op = LoweringOp::NativeTxtUtf8Encode;
+      } else if (ns_obj->member_name == "utf8" && field_callee->field_name == "decode") {
+        op = LoweringOp::NativeTxtUtf8Decode;
+      } else if (ns_obj->member_name == "gbk" && field_callee->field_name == "encode") {
+        op = LoweringOp::NativeTxtGbkEncode;
+      } else if (ns_obj->member_name == "gbk" && field_callee->field_name == "decode") {
+        op = LoweringOp::NativeTxtGbkDecode;
+      } else {
+        matched = false;
+      }
+      if (matched) {
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(op, static_cast<uint32_t>(call_expr.args.size()), call_expr.location);
+        return;
+      }
+    }
+  }
+
   // Handle `using namespace io;` bare out.line / err.line / in.secret.
   if (field_callee) {
     const auto *id_obj = dynamic_cast<const ast::IdentifierExpr *>(field_callee->object.get());

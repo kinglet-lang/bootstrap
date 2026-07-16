@@ -453,6 +453,22 @@ void KirRecorder::on_emit(LoweringOp op, uint32_t operand, ast::SourceLocation l
     bb_.instrs.push_back(
         rec(KirOpcode::NativeFileIsOpen, {static_cast<int32_t>(operand)}, location));
     break;
+  case LoweringOp::NativeTxtUtf8Encode:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeTxtUtf8Encode, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeTxtUtf8Decode:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeTxtUtf8Decode, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeTxtGbkEncode:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeTxtGbkEncode, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeTxtGbkDecode:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeTxtGbkDecode, {static_cast<int32_t>(operand)}, location));
+    break;
   default:
     bb_.instrs.push_back(rec(KirOpcode::Nop, {}, location));
     break;

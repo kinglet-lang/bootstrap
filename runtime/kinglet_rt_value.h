@@ -96,6 +96,10 @@ kl_h kl_native_file_size(kl_h file);
 kl_h kl_native_file_sync(kl_h file);
 kl_h kl_native_file_close(kl_h file);
 kl_h kl_native_file_is_open(kl_h file);
+kl_h kl_native_txt_utf8_encode(kl_h text);
+kl_h kl_native_txt_utf8_decode(kl_h data);
+kl_h kl_native_txt_gbk_encode(kl_h text);
+kl_h kl_native_txt_gbk_decode(kl_h data);
 kl_h kl_native_sys_args(void);
 kl_h kl_invoke_native(kl_h callee, int32_t argc, const kl_h *args);
 // Reference counting for heap values. No-ops on plain integers and inline

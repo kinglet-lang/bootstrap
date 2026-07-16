@@ -1,0 +1,29 @@
+// RUN: run
+// CHECK: 7
+// CHECK: 100
+// CHECK: default
+// CHECK: 4
+// CHECK: 214
+// CHECK: 208
+// CHECK: 206
+// CHECK: 196
+// CHECK: 中文
+
+using io;
+using txt;
+
+int main() {
+  byte[] defaults = txt::utf8.encode("default");
+  io::out.line("{}", defaults.len());
+  io::out.line("{}", defaults[0]);
+  io::out.line("{}", txt::utf8.decode(defaults));
+
+  byte[] gbk = txt::gbk.encode("中文");
+  io::out.line("{}", gbk.len());
+  io::out.line("{}", gbk[0]);
+  io::out.line("{}", gbk[1]);
+  io::out.line("{}", gbk[2]);
+  io::out.line("{}", gbk[3]);
+  io::out.line("{}", txt::gbk.decode(gbk));
+  return 0;
+}
