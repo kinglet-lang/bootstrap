@@ -1,6 +1,7 @@
 // RUN: run
 // CHECK: 5
-// CHECK: World
+// CHECK: 5
+// CHECK: 87
 
 using io;
 using fs;
@@ -26,9 +27,10 @@ int main() {
   output.sync();
   output.close();
 
-  // Read back and verify
-  string content = fs::readtext("/tmp/kinglet_fs_write_test.txt");
-  io::out.line("{}", content);
+  // Read back and verify through the byte[] whole-file API.
+  byte[] content = fs::read("/tmp/kinglet_fs_write_test.txt");
+  io::out.line("{}", content.len());
+  io::out.line("{}", content[0]);
 
   return 0;
 }

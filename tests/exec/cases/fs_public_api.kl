@@ -1,7 +1,6 @@
 // RUN: run
 // RUN-ARGS: $HARNESS_TMP
 
-using io;
 using fs;
 using sys;
 
@@ -14,42 +13,38 @@ int main() {
   string path2 = tmp + "/kl_fs_pub_test2.txt";
   string nope = tmp + "/kl_fs_pub_does_not_exist_xyz";
 
-  // Write a test file using the public API.
-  fs::writetext(path1, "hello world");
+  // Write a test file using the public byte[] API.
+  byte[] hello = [byte(104), byte(101), byte(108), byte(108), byte(111),
+                  byte(32), byte(119), byte(111), byte(114), byte(108), byte(100)];
+  fs::write(path1, hello);
 
   // Verify it exists.
   if (!fs::exists(path1)) {
     return 1;
   }
 
-  // Read it back as text.
-  string content = fs::readtext(path1);
-  if (content != "hello world") {
-    return 2;
-  }
-
-  // Read as bytes.
+  // Read it back as bytes.
   byte[] data = fs::read(path1);
   if (data.len() != 11) {
-    return 3;
+    return 2;
   }
 
   // Check first byte is 'h' (104).
   if (data[0] != 104) {
-    return 4;
+    return 3;
   }
 
   // Write bytes back.
   byte[] out_data = [byte(72), byte(73)];  // "HI"
   fs::write(path2, out_data);
-  string roundtrip = fs::readtext(path2);
-  if (roundtrip != "HI") {
-    return 5;
+  byte[] roundtrip = fs::read(path2);
+  if (roundtrip.len() != 2 || roundtrip[0] != 72 || roundtrip[1] != 73) {
+    return 4;
   }
 
   // Non-existent file should not exist.
   if (fs::exists(nope)) {
-    return 6;
+    return 5;
   }
 
   return 0;

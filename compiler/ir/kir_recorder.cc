@@ -420,14 +420,6 @@ void KirRecorder::on_emit(LoweringOp op, uint32_t operand, ast::SourceLocation l
   case LoweringOp::NativeFsExists:
     bb_.instrs.push_back(rec(KirOpcode::NativeFsExists, {static_cast<int32_t>(operand)}, location));
     break;
-  case LoweringOp::NativeFsReadText:
-    bb_.instrs.push_back(
-        rec(KirOpcode::NativeFsReadText, {static_cast<int32_t>(operand)}, location));
-    break;
-  case LoweringOp::NativeFsWriteText:
-    bb_.instrs.push_back(
-        rec(KirOpcode::NativeFsWriteText, {static_cast<int32_t>(operand)}, location));
-    break;
   case LoweringOp::NativeFsReadBytes:
     bb_.instrs.push_back(
         rec(KirOpcode::NativeFsReadBytes, {static_cast<int32_t>(operand)}, location));

@@ -977,17 +977,6 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       result = KirType::Int;
       push_typed(&state, result);
       break;
-    case KirOpcode::NativeFsReadText:
-      pop_type(&state);
-      result = KirType::String;
-      push_typed(&state, result);
-      break;
-    case KirOpcode::NativeFsWriteText:
-      pop_type(&state);
-      pop_type(&state);
-      result = KirType::Null;
-      push_typed(&state, result);
-      break;
     case KirOpcode::NativeFsReadBytes:
       pop_type(&state);
       result = KirType::Array;

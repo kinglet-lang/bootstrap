@@ -1465,22 +1465,6 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
                    call_expr.location);
       return;
     }
-    if (ns_callee->member_name == "readtext") {
-      for (const ast::ExprPtr &arg : call_expr.args) {
-        compile_expr(*arg);
-      }
-      emit_operand(LoweringOp::NativeFsReadText, static_cast<uint32_t>(call_expr.args.size()),
-                   call_expr.location);
-      return;
-    }
-    if (ns_callee->member_name == "writetext") {
-      for (const ast::ExprPtr &arg : call_expr.args) {
-        compile_expr(*arg);
-      }
-      emit_operand(LoweringOp::NativeFsWriteText, static_cast<uint32_t>(call_expr.args.size()),
-                   call_expr.location);
-      return;
-    }
     if (ns_callee->member_name == "read") {
       for (const ast::ExprPtr &arg : call_expr.args) {
         compile_expr(*arg);

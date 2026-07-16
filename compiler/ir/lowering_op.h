@@ -120,8 +120,6 @@ enum class LoweringOp : uint8_t {
   BorrowIndexMut,
   Drop,
   NativeFsExists,
-  NativeFsReadText,
-  NativeFsWriteText,
   NativeFsReadBytes,
   NativeFsWriteBytes,
   NativeFsOpen,
