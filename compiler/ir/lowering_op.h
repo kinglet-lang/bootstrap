@@ -130,6 +130,10 @@ enum class LoweringOp : uint8_t {
   NativeFileSync,
   NativeFileClose,
   NativeFileIsOpen,
+  NativeTxtUtf8Encode,
+  NativeTxtUtf8Decode,
+  NativeTxtGbkEncode,
+  NativeTxtGbkDecode,
 };
 
 const char *lowering_op_name(LoweringOp op);

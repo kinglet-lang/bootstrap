@@ -1030,6 +1030,18 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       result = KirType::Int; // bool
       push_typed(&state, result);
       break;
+    case KirOpcode::NativeTxtUtf8Encode:
+    case KirOpcode::NativeTxtGbkEncode:
+      pop_type(&state);
+      result = KirType::Array;
+      push_typed(&state, result);
+      break;
+    case KirOpcode::NativeTxtUtf8Decode:
+    case KirOpcode::NativeTxtGbkDecode:
+      pop_type(&state);
+      result = KirType::String;
+      push_typed(&state, result);
+      break;
     }
 
     fn->instr_types[i] = result;

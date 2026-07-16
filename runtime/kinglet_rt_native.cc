@@ -1,5 +1,6 @@
 #include "runtime/kinglet_rt_internal.h"
 
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #if defined(__unix__) || defined(__APPLE__)
+#include <iconv.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -24,6 +26,130 @@
 namespace {
 
 std::vector<std::string> g_program_args;
+
+kl_h bytes_from_string_bytes(const std::string &bytes) {
+  std::vector<kl_h> out;
+  out.reserve(bytes.size());
+  for (char c : bytes) {
+    out.push_back(kl_from_int(static_cast<int64_t>(static_cast<unsigned char>(c))));
+  }
+  return kl_array_new(static_cast<int32_t>(out.size()), out.data());
+}
+
+std::string bytes_array_to_string(kl_h data) {
+  std::string out;
+  const int32_t len = kl_array_len(data);
+  if (len <= 0) {
+    return out;
+  }
+  out.reserve(static_cast<std::size_t>(len));
+  for (int32_t i = 0; i < len; ++i) {
+    out.push_back(static_cast<char>(kl_to_int(kl_array_get(data, i)) & 0xFF));
+  }
+  return out;
+}
+
+#if defined(__unix__) || defined(__APPLE__)
+std::string convert_encoding_iconv(const std::string &input, const char *to_code,
+                                   const char *from_code) {
+  iconv_t cd = iconv_open(to_code, from_code);
+  if (cd == reinterpret_cast<iconv_t>(-1)) {
+    return "";
+  }
+
+  std::vector<char> output(input.size() * 4 + 16);
+  char *in_ptr = const_cast<char *>(input.data());
+  std::size_t in_left = input.size();
+  char *out_ptr = output.data();
+  std::size_t out_left = output.size();
+
+  while (true) {
+    const std::size_t rc = iconv(cd, &in_ptr, &in_left, &out_ptr, &out_left);
+    if (rc != static_cast<std::size_t>(-1)) {
+      break;
+    }
+    if (errno == E2BIG) {
+      const std::size_t used = static_cast<std::size_t>(out_ptr - output.data());
+      output.resize(output.size() * 2 + 16);
+      out_ptr = output.data() + used;
+      out_left = output.size() - used;
+      continue;
+    }
+    iconv_close(cd);
+    return "";
+  }
+
+  const std::size_t used = static_cast<std::size_t>(out_ptr - output.data());
+  iconv_close(cd);
+  return std::string(output.data(), used);
+}
+#endif
+
+#if defined(_WIN32)
+std::string convert_windows_codepage_to_utf8(const std::string &input, UINT codepage) {
+  if (input.empty()) {
+    return "";
+  }
+  const int wide_len =
+      MultiByteToWideChar(codepage, 0, input.data(), static_cast<int>(input.size()), nullptr, 0);
+  if (wide_len <= 0) {
+    return "";
+  }
+  std::wstring wide(static_cast<std::size_t>(wide_len), L'\0');
+  MultiByteToWideChar(codepage, 0, input.data(), static_cast<int>(input.size()), wide.data(),
+                      wide_len);
+  const int utf8_len =
+      WideCharToMultiByte(CP_UTF8, 0, wide.data(), wide_len, nullptr, 0, nullptr, nullptr);
+  if (utf8_len <= 0) {
+    return "";
+  }
+  std::string out(static_cast<std::size_t>(utf8_len), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, wide.data(), wide_len, out.data(), utf8_len, nullptr, nullptr);
+  return out;
+}
+
+std::string convert_utf8_to_windows_codepage(const std::string &input, UINT codepage) {
+  if (input.empty()) {
+    return "";
+  }
+  const int wide_len =
+      MultiByteToWideChar(CP_UTF8, 0, input.data(), static_cast<int>(input.size()), nullptr, 0);
+  if (wide_len <= 0) {
+    return "";
+  }
+  std::wstring wide(static_cast<std::size_t>(wide_len), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, input.data(), static_cast<int>(input.size()), wide.data(),
+                      wide_len);
+  const int out_len =
+      WideCharToMultiByte(codepage, 0, wide.data(), wide_len, nullptr, 0, nullptr, nullptr);
+  if (out_len <= 0) {
+    return "";
+  }
+  std::string out(static_cast<std::size_t>(out_len), '\0');
+  WideCharToMultiByte(codepage, 0, wide.data(), wide_len, out.data(), out_len, nullptr, nullptr);
+  return out;
+}
+#endif
+
+std::string convert_utf8_to_gbk(const std::string &input) {
+#if defined(_WIN32)
+  return convert_utf8_to_windows_codepage(input, 936);
+#elif defined(__unix__) || defined(__APPLE__)
+  return convert_encoding_iconv(input, "GBK", "UTF-8");
+#else
+  return input;
+#endif
+}
+
+std::string convert_gbk_to_utf8(const std::string &input) {
+#if defined(_WIN32)
+  return convert_windows_codepage_to_utf8(input, 936);
+#elif defined(__unix__) || defined(__APPLE__)
+  return convert_encoding_iconv(input, "UTF-8", "GBK");
+#else
+  return input;
+#endif
+}
 
 void write_formatted(std::ostream &out, int32_t argc, const kl_h *args) {
   auto write_arg = [&out](kl_h arg) {
@@ -508,6 +634,35 @@ kl_h kl_native_file_is_open(kl_h file_val) {
   }
   auto *f = static_cast<KlFile *>(kl_unbox_ptr(file_val));
   return kl_from_int(f->fd >= 0 ? 1 : 0);
+}
+
+kl_h kl_native_txt_utf8_encode(kl_h text) {
+  const char *data = nullptr;
+  int32_t len = 0;
+  if (!kl_string_view(text, &data, &len)) {
+    return kl_array_new(0, nullptr);
+  }
+  return bytes_from_string_bytes(std::string(data, static_cast<std::size_t>(len)));
+}
+
+kl_h kl_native_txt_utf8_decode(kl_h data) {
+  const std::string bytes = bytes_array_to_string(data);
+  return kl_string_new(bytes.data(), static_cast<int32_t>(bytes.size()));
+}
+
+kl_h kl_native_txt_gbk_encode(kl_h text) {
+  const char *data = nullptr;
+  int32_t len = 0;
+  if (!kl_string_view(text, &data, &len)) {
+    return kl_array_new(0, nullptr);
+  }
+  return bytes_from_string_bytes(
+      convert_utf8_to_gbk(std::string(data, static_cast<std::size_t>(len))));
+}
+
+kl_h kl_native_txt_gbk_decode(kl_h data) {
+  const std::string utf8 = convert_gbk_to_utf8(bytes_array_to_string(data));
+  return kl_string_new(utf8.data(), static_cast<int32_t>(utf8.size()));
 }
 
 kl_h kl_native_sys_args(void) {

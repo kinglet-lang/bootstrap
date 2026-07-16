@@ -157,6 +157,10 @@ struct RtFns {
   llvm::Function *native_file_sync = nullptr;
   llvm::Function *native_file_close = nullptr;
   llvm::Function *native_file_is_open = nullptr;
+  llvm::Function *native_txt_utf8_encode = nullptr;
+  llvm::Function *native_txt_utf8_decode = nullptr;
+  llvm::Function *native_txt_gbk_encode = nullptr;
+  llvm::Function *native_txt_gbk_decode = nullptr;
   llvm::Function *native_sys_args = nullptr;
   llvm::Function *invoke_native = nullptr;
   llvm::Function *value_eq = nullptr;
@@ -321,6 +325,18 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.native_file_is_open =
       llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                              llvm::Function::ExternalLinkage, "kl_native_file_is_open", module);
+  rt.native_txt_utf8_encode =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_txt_utf8_encode", module);
+  rt.native_txt_utf8_decode =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_txt_utf8_decode", module);
+  rt.native_txt_gbk_encode =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_txt_gbk_encode", module);
+  rt.native_txt_gbk_decode =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_txt_gbk_decode", module);
   rt.native_sys_args =
       llvm::Function::Create(llvm::FunctionType::get(i64, false), llvm::Function::ExternalLinkage,
                              "kl_native_sys_args", module);
@@ -821,6 +837,10 @@ bool link_objects(const std::vector<std::string> &obj_paths, const std::string &
     cmd << " \"" << obj_path << '"';
   }
   cmd << " \"" << rt_lib_path << '"';
+#if defined(__APPLE__)
+  // macOS keeps iconv in libiconv, while Linux/glibc exposes it from libc.
+  cmd << " -liconv";
+#endif
   const int rc = std::system(cmd.str().c_str());
   if (rc != 0) {
     *error = "link failed (exit " + std::to_string(rc) + "): " + cmd.str();
@@ -2554,6 +2574,41 @@ public:
           return false;
         }
         llvm::Value *result = builder.CreateCall(rt_.native_file_is_open, {file});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeTxtUtf8Encode:
+      case KirOpcode::NativeTxtUtf8Decode:
+      case KirOpcode::NativeTxtGbkEncode:
+      case KirOpcode::NativeTxtGbkDecode: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native text codec op expects exactly one argument";
+          return false;
+        }
+        llvm::Value *arg = pop_value(&stack, error, &type_stack);
+        if (arg == nullptr) {
+          return false;
+        }
+        llvm::Function *callee = nullptr;
+        switch (instr->op) {
+        case KirOpcode::NativeTxtUtf8Encode:
+          callee = rt_.native_txt_utf8_encode;
+          break;
+        case KirOpcode::NativeTxtUtf8Decode:
+          callee = rt_.native_txt_utf8_decode;
+          break;
+        case KirOpcode::NativeTxtGbkEncode:
+          callee = rt_.native_txt_gbk_encode;
+          break;
+        case KirOpcode::NativeTxtGbkDecode:
+          callee = rt_.native_txt_gbk_decode;
+          break;
+        default:
+          break;
+        }
+        llvm::Value *result = builder.CreateCall(callee, {arg});
         push(result);
         temps[i] = result;
         break;

@@ -1671,7 +1671,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     if (const auto *using_decl = dynamic_cast<const ast::UsingDecl *>(decl.get())) {
       const bool runtime_ns =
           using_decl->namespace_name == "io" || using_decl->namespace_name == "fs" ||
-          using_decl->namespace_name == "sys" || using_decl->namespace_name == "rt";
+          using_decl->namespace_name == "sys" || using_decl->namespace_name == "txt" ||
+          using_decl->namespace_name == "rt";
       if (!runtime_ns && !sema_.imported_namespaces_.count(using_decl->namespace_name)) {
         error_at(using_decl->location, "Unknown module '" + using_decl->namespace_name + "'.");
       }
@@ -2291,6 +2292,20 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
       fn.return_type = std::make_shared<Type>(array_type(string_type()));
       return fn;
     }
+  }
+  if (ns_access.namespace_name == "txt") {
+    if (sema_.used_.count("txt") == 0) {
+      error_at(ns_access.location,
+               "Module 'txt' is not imported. Add 'using txt;' at the top of the file.");
+      return void_type();
+    }
+    if (ns_access.member_name == "utf8" || ns_access.member_name == "gbk") {
+      Type codec(TypeKind::Struct);
+      codec.name = "txt::" + ns_access.member_name;
+      return codec;
+    }
+    error_at(ns_access.location, "Unknown txt member '" + ns_access.member_name + "'.");
+    return void_type();
   }
   // Check for imported function (e.g. math::add or parser::ast::Node)
   {
@@ -3144,6 +3159,52 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       error_at(ns_obj->location, "Module '" + ns_obj->namespace_name +
                                      "' is not imported. Add 'using " + ns_obj->namespace_name +
                                      ";' at the top of the file.");
+      return void_type();
+    }
+  }
+
+  // Handle text codec calls: txt::utf8.encode(s), txt::gbk.decode(bytes), etc. (ADR 0032)
+  if (field_callee) {
+    const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
+    if (ns_obj && ns_obj->namespace_name == "txt") {
+      if (sema_.used_.count("txt") == 0) {
+        error_at(ns_obj->location,
+                 "Module 'txt' is not imported. Add 'using txt;' at the top of the file.");
+        return void_type();
+      }
+      const bool known_codec = ns_obj->member_name == "utf8" || ns_obj->member_name == "gbk";
+      if (!known_codec) {
+        error_at(ns_obj->location, "Unknown txt member '" + ns_obj->member_name + "'.");
+        return void_type();
+      }
+      const std::string &method = field_callee->field_name;
+      if (method == "encode") {
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location,
+                   "txt::" + ns_obj->member_name + ".encode expects exactly one string argument.");
+        } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+          error_at(call_expr.args[0]->location,
+                   "txt::" + ns_obj->member_name + ".encode expects a string argument.");
+        }
+        return array_type(byte_type());
+      }
+      if (method == "decode") {
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location,
+                   "txt::" + ns_obj->member_name + ".decode expects exactly one byte[] argument.");
+        } else {
+          Type data_type = check_expr(*call_expr.args[0]);
+          if (data_type.kind != TypeKind::Array || !data_type.element_type ||
+              data_type.element_type->kind != TypeKind::Int ||
+              data_type.element_type->name != "uint8") {
+            error_at(call_expr.args[0]->location,
+                     "txt::" + ns_obj->member_name + ".decode expects a byte[] argument.");
+          }
+        }
+        return string_type();
+      }
+      error_at(call_expr.location,
+               "txt::" + ns_obj->member_name + " has no method '" + method + "'.");
       return void_type();
     }
   }

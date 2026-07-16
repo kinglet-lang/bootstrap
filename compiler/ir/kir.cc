@@ -259,6 +259,14 @@ const char *kir_opcode_name(KirOpcode op) {
     return "native_file_close";
   case KirOpcode::NativeFileIsOpen:
     return "native_file_is_open";
+  case KirOpcode::NativeTxtUtf8Encode:
+    return "native_txt_utf8_encode";
+  case KirOpcode::NativeTxtUtf8Decode:
+    return "native_txt_utf8_decode";
+  case KirOpcode::NativeTxtGbkEncode:
+    return "native_txt_gbk_encode";
+  case KirOpcode::NativeTxtGbkDecode:
+    return "native_txt_gbk_decode";
   }
   return "unknown";
 }

@@ -227,6 +227,14 @@ const char *lowering_op_name(LoweringOp op) {
     return "NativeFileClose";
   case LoweringOp::NativeFileIsOpen:
     return "NativeFileIsOpen";
+  case LoweringOp::NativeTxtUtf8Encode:
+    return "NativeTxtUtf8Encode";
+  case LoweringOp::NativeTxtUtf8Decode:
+    return "NativeTxtUtf8Decode";
+  case LoweringOp::NativeTxtGbkEncode:
+    return "NativeTxtGbkEncode";
+  case LoweringOp::NativeTxtGbkDecode:
+    return "NativeTxtGbkDecode";
   }
   return "Unknown";
 }

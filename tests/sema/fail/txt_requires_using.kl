@@ -1,0 +1,8 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+int main() {
+  byte[] data = txt::utf8.encode("default");
+  return 0;
+}
