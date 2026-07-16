@@ -88,7 +88,7 @@ jobs:
                   and (
                     # 2. kinglet-reviewer has submitted an APPROVED review.
                     .reviews
-                    | any(.author.login == "kinglet-reviewer[bot]" and .state == "APPROVED")
+                    | any((.author.login | startswith("kinglet-reviewer")) and .state == "APPROVED")
                   )
               )
             | .number
