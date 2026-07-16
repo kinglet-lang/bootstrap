@@ -5146,6 +5146,21 @@ bool TypeChecker::type_satisfies_concept(const ast::ConceptDecl *concept_decl, c
   subst[tp_name] = type_to_type_expr(concrete);
   const std::string key = type_match_key(concrete);
 
+  // Builtin resource types (fs::file) satisfy io::reader / io::writer through
+  // their compiler-native read/write methods, not through user free functions.
+  // This is the only builtin type with concept satisfaction -- if more builtin
+  // types need this in the future, refactor to a registry (e.g. a map from
+  // (builtin_type, concept_name) pairs to bool). For now, an explicit check is
+  // simpler and avoids premature abstraction.
+  if (concrete.kind == TypeKind::Struct && concrete.name == "fs::file" &&
+      concept_decl->name == "reader") {
+    return true;
+  }
+  if (concrete.kind == TypeKind::Struct && concrete.name == "fs::file" &&
+      concept_decl->name == "writer") {
+    return true;
+  }
+
   for (const ast::ConceptMethodDecl &method : concept_decl->methods) {
     const ast::FunctionDecl *impl = find_free_function_for_type(method.name, key);
     if (impl == nullptr) {

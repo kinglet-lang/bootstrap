@@ -612,6 +612,14 @@ std::string Compiler::infer_struct_type(const ast::Expr &expr) const {
       if (ret_it != method_return_types_.end() && struct_indices_.count(ret_it->second))
         return ret_it->second;
     }
+    // Handle namespace-qualified calls that return builtin resource types
+    // (e.g. fs::open(path) -> fs::file, fs::create(path) -> fs::file).
+    if (const auto *ns_callee = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get())) {
+      if (ns_callee->namespace_name == "fs" &&
+          (ns_callee->member_name == "open" || ns_callee->member_name == "create")) {
+        return "fs::file";
+      }
+    }
     if (const auto *field_callee = dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
       std::string obj_type = infer_struct_type(*field_callee->object);
       if (!obj_type.empty()) {
@@ -1833,6 +1841,51 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       if (free_idx < 0) {
         free_idx = resolve_free_function_for_type(field_callee->field_name, receiver_ty);
       }
+      // Fallback: builtin fs::file methods for concept-generic monomorphization.
+      // When a concept-generic function is instantiated with fs::file, UFCS
+      // dispatch (resolve_free_function_for_type) fails because fs::file has no
+      // user free functions. Fall back to the native file method handler.
+      if (free_idx < 0 && receiver_ty == "fs::file") {
+        const std::string &method = field_callee->field_name;
+        if (method == "read") {
+          compile_expr(*field_callee->object);
+          for (const ast::ExprPtr &arg : call_expr.args) {
+            compile_expr(*arg);
+          }
+          emit_operand(LoweringOp::NativeFileRead, static_cast<uint32_t>(call_expr.args.size() + 1),
+                       call_expr.location);
+          return;
+        }
+        if (method == "write") {
+          compile_expr(*field_callee->object);
+          for (const ast::ExprPtr &arg : call_expr.args) {
+            compile_expr(*arg);
+          }
+          emit_operand(LoweringOp::NativeFileWrite,
+                       static_cast<uint32_t>(call_expr.args.size() + 1), call_expr.location);
+          return;
+        }
+        if (method == "size") {
+          compile_expr(*field_callee->object);
+          emit_operand(LoweringOp::NativeFileSize, 1, call_expr.location);
+          return;
+        }
+        if (method == "sync") {
+          compile_expr(*field_callee->object);
+          emit_operand(LoweringOp::NativeFileSync, 1, call_expr.location);
+          return;
+        }
+        if (method == "close") {
+          compile_expr(*field_callee->object);
+          emit_operand(LoweringOp::NativeFileClose, 1, call_expr.location);
+          return;
+        }
+        if (method == "open") {
+          compile_expr(*field_callee->object);
+          emit_operand(LoweringOp::NativeFileIsOpen, 1, call_expr.location);
+          return;
+        }
+      }
       if (free_idx >= 0) {
         const ast::FunctionDecl *resolved_decl = nullptr;
         if (auto decl_it = function_decl_by_index_.find(free_idx);
@@ -1894,7 +1947,10 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     if (type_arg_names.size() == decl->type_params.size()) {
       std::string mangled = callee_id->name;
       for (const std::string &n : type_arg_names) {
-        mangled += "__" + n;
+        // Sanitize :: to avoid breaking LLVM function names.
+        std::string safe = n;
+        std::replace(safe.begin(), safe.end(), ':', '_');
+        mangled += "$" + safe;
       }
       auto func_it = function_indices_.find(mangled);
       if (func_it == function_indices_.end()) {
@@ -1960,7 +2016,11 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       }
     }
     if (!concrete_ty.empty()) {
-      const std::string mangled = callee_id->name + "__" + concrete_ty;
+      // Sanitize :: in concrete type name to avoid breaking LLVM function names.
+      // Use '$' as separator (invalid in source-level identifiers, so no collision).
+      std::string safe_ty = concrete_ty;
+      std::replace(safe_ty.begin(), safe_ty.end(), ':', '_');
+      const std::string mangled = callee_id->name + "$" + safe_ty;
       auto func_it = function_indices_.find(mangled);
       if (func_it == function_indices_.end()) {
         int idx = static_cast<int>(function_infos_.size());

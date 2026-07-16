@@ -391,7 +391,11 @@ kl_h kl_native_fs_create(kl_h path) {
   return kl_box_ptr(f);
 }
 
+// Returns bytes read (>=0) or 0 on error. Error is not propagated as an
+// exception -- callers that need to distinguish EOF from error should check
+// the file state via open(). This mirrors fs::readtext/writetext behavior.
 kl_h kl_native_file_read(kl_h file_val, kl_h buffer_val) {
+  // Type/mode guard: wrong kind or wrong mode -> 0 (no bytes read).
   if (!kl_is_kind(file_val, KlKind::File)) {
     return kl_from_int(0);
   }
@@ -421,7 +425,9 @@ kl_h kl_native_file_read(kl_h file_val, kl_h buffer_val) {
   return kl_from_int(static_cast<int64_t>(n));
 }
 
+// Returns bytes written (>=0) or 0 on error. Same error convention as read.
 kl_h kl_native_file_write(kl_h file_val, kl_h data_val) {
+  // Type/mode guard: wrong kind or wrong mode -> 0 (no bytes written).
   if (!kl_is_kind(file_val, KlKind::File)) {
     return kl_from_int(0);
   }
