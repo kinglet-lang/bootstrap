@@ -2,14 +2,21 @@
 // CHECK: 16
 // CHECK: 1
 // CHECK: 0
-// CHECK: Hello, fs::file!
+// CHECK: 16
+// CHECK: 72
 
 using io;
 using fs;
 
 int main() {
-  // Create a test file using the text API.
-  fs::writetext("/tmp/kinglet_fs_file_test.txt", "Hello, fs::file!");
+  // Create a test file using fs::file directly.
+  fs::file seed = fs::create("/tmp/kinglet_fs_file_test.txt");
+  byte[] hello = [byte(72), byte(101), byte(108), byte(108), byte(111), byte(44),
+                  byte(32), byte(102), byte(115), byte(58), byte(58), byte(102),
+                  byte(105), byte(108), byte(101), byte(33)];
+  seed.write(hello);
+  seed.sync();
+  seed.close();
 
   // D2: fs::open(path) -> fs::file
   fs::file input = fs::open("/tmp/kinglet_fs_file_test.txt");
@@ -33,9 +40,10 @@ int main() {
   // D1: file.open() -> bool (handle is closed)
   io::out.line("{}", output.open());
 
-  // Verify content using readtext
-  string content = fs::readtext("/tmp/kinglet_fs_file_test.txt");
-  io::out.line("{}", content);
+  // Verify content using fs::read byte[] API.
+  byte[] content = fs::read("/tmp/kinglet_fs_file_test.txt");
+  io::out.line("{}", content.len());
+  io::out.line("{}", content[0]);
 
   return 0;
 }

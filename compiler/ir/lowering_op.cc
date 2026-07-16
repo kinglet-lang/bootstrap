@@ -207,10 +207,6 @@ const char *lowering_op_name(LoweringOp op) {
     return "Drop";
   case LoweringOp::NativeFsExists:
     return "NativeFsExists";
-  case LoweringOp::NativeFsReadText:
-    return "NativeFsReadText";
-  case LoweringOp::NativeFsWriteText:
-    return "NativeFsWriteText";
   case LoweringOp::NativeFsReadBytes:
     return "NativeFsReadBytes";
   case LoweringOp::NativeFsWriteBytes:

@@ -2974,27 +2974,6 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       }
       return bool_type();
     }
-    if (ns_callee->member_name == "readtext") {
-      if (call_expr.args.size() != 1) {
-        error_at(call_expr.location, "fs::readtext expects exactly one argument (path).");
-      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
-        error_at(call_expr.args[0]->location, "fs::readtext expects a string path.");
-      }
-      return string_type();
-    }
-    if (ns_callee->member_name == "writetext") {
-      if (call_expr.args.size() != 2) {
-        error_at(call_expr.location, "fs::writetext expects exactly two arguments (path, text).");
-      } else {
-        if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
-          error_at(call_expr.args[0]->location, "fs::writetext expects a string path.");
-        }
-        if (check_expr(*call_expr.args[1]).kind != TypeKind::String) {
-          error_at(call_expr.args[1]->location, "fs::writetext expects string content.");
-        }
-      }
-      return void_type();
-    }
     if (ns_callee->member_name == "read") {
       if (call_expr.args.size() != 1) {
         error_at(call_expr.location, "fs::read expects exactly one argument (path).");

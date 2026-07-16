@@ -1,0 +1,11 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+using fs;
+
+int main() {
+  string s = fs::readtext("/tmp/nope.txt");
+  fs::writetext("/tmp/nope.txt", s);
+  return 0;
+}

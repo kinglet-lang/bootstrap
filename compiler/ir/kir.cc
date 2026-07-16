@@ -239,10 +239,6 @@ const char *kir_opcode_name(KirOpcode op) {
     return "drop";
   case KirOpcode::NativeFsExists:
     return "native_fs_exists";
-  case KirOpcode::NativeFsReadText:
-    return "native_fs_readtext";
-  case KirOpcode::NativeFsWriteText:
-    return "native_fs_writetext";
   case KirOpcode::NativeFsReadBytes:
     return "native_fs_read_bytes";
   case KirOpcode::NativeFsWriteBytes:

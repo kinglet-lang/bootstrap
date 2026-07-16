@@ -175,8 +175,6 @@ enum class KirOpcode : std::uint8_t {
   BorrowIndexMut,
   Drop,
   NativeFsExists,
-  NativeFsReadText,
-  NativeFsWriteText,
   NativeFsReadBytes,
   NativeFsWriteBytes,
   NativeFsOpen,

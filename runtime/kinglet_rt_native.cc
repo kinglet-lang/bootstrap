@@ -277,16 +277,6 @@ kl_h kl_native_fs_exists(kl_h path) {
   return kl_from_int(std::filesystem::exists(p, ec) ? 1 : 0);
 }
 
-kl_h kl_native_fs_readtext(kl_h path) {
-  // Same semantics as kl_native_fs_read but under the public name.
-  return kl_native_fs_read(path);
-}
-
-kl_h kl_native_fs_writetext(kl_h path, kl_h content) {
-  // Same semantics as kl_native_fs_write but under the public name.
-  return kl_native_fs_write(path, content);
-}
-
 kl_h kl_native_fs_read_bytes(kl_h path) {
   const char *data = nullptr;
   int32_t len = 0;
@@ -393,7 +383,7 @@ kl_h kl_native_fs_create(kl_h path) {
 
 // Returns bytes read (>=0) or 0 on error. Error is not propagated as an
 // exception -- callers that need to distinguish EOF from error should check
-// the file state via open(). This mirrors fs::readtext/writetext behavior.
+// the file state via open(). This mirrors the current whole-file fs::read/fs::write behavior.
 kl_h kl_native_file_read(kl_h file_val, kl_h buffer_val) {
   // Type/mode guard: wrong kind or wrong mode -> 0 (no bytes read).
   if (!kl_is_kind(file_val, KlKind::File)) {
@@ -561,9 +551,9 @@ kl_h kl_invoke_native(kl_h callee, int32_t argc, const kl_h *args) {
   case 11:
     return argc == 1 ? kl_native_fs_exists(args[0]) : 0;
   case 12:
-    return argc == 1 ? kl_native_fs_readtext(args[0]) : 0;
   case 13:
-    return argc == 2 ? kl_native_fs_writetext(args[0], args[1]) : 0;
+    // Reserved: removed public text helper slots.
+    return 0;
   case 14:
     return argc == 1 ? kl_native_fs_read_bytes(args[0]) : 0;
   case 15:

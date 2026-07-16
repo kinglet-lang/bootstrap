@@ -147,8 +147,6 @@ struct RtFns {
   llvm::Function *native_fs_write = nullptr;
   llvm::Function *native_fs_listdir = nullptr;
   llvm::Function *native_fs_exists = nullptr;
-  llvm::Function *native_fs_readtext = nullptr;
-  llvm::Function *native_fs_writetext = nullptr;
   llvm::Function *native_fs_read_bytes = nullptr;
   llvm::Function *native_fs_write_bytes = nullptr;
   llvm::Function *native_fs_open = nullptr;
@@ -292,12 +290,6 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.native_fs_exists =
       llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                              llvm::Function::ExternalLinkage, "kl_native_fs_exists", module);
-  rt.native_fs_readtext =
-      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
-                             llvm::Function::ExternalLinkage, "kl_native_fs_readtext", module);
-  rt.native_fs_writetext =
-      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
-                             llvm::Function::ExternalLinkage, "kl_native_fs_writetext", module);
   rt.native_fs_read_bytes =
       llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                              llvm::Function::ExternalLinkage, "kl_native_fs_read_bytes", module);
@@ -2411,37 +2403,6 @@ public:
         llvm::Value *result = builder.CreateCall(rt_.native_fs_exists, {path});
         push(result);
         temps[i] = result;
-        break;
-      }
-      case KirOpcode::NativeFsReadText: {
-        const int argc = instr->operands[0];
-        if (argc != 1) {
-          *error = "native_fs_readtext expects exactly one argument";
-          return false;
-        }
-        llvm::Value *path = pop_value(&stack, error, &type_stack);
-        if (path == nullptr) {
-          return false;
-        }
-        llvm::Value *result = builder.CreateCall(rt_.native_fs_readtext, {path});
-        push(result);
-        temps[i] = result;
-        break;
-      }
-      case KirOpcode::NativeFsWriteText: {
-        const int argc = instr->operands[0];
-        if (argc != 2) {
-          *error = "native_fs_writetext expects exactly two arguments";
-          return false;
-        }
-        llvm::Value *content = pop_value(&stack, error, &type_stack);
-        llvm::Value *path = pop_value(&stack, error, &type_stack);
-        if (path == nullptr || content == nullptr) {
-          return false;
-        }
-        builder.CreateCall(rt_.native_fs_writetext, {path, content});
-        push(llvm::ConstantInt::get(i64, 0));
-        temps[i] = stack.back();
         break;
       }
       case KirOpcode::NativeFsReadBytes: {
