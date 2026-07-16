@@ -174,6 +174,11 @@ enum class KirOpcode : std::uint8_t {
   DenseArrayNew,
   BorrowIndexMut,
   Drop,
+  NativeFsExists,
+  NativeFsReadText,
+  NativeFsWriteText,
+  NativeFsReadBytes,
+  NativeFsWriteBytes,
 };
 
 struct KirStructMeta {
