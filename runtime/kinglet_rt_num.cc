@@ -97,6 +97,8 @@ std::string kl_value_text(kl_h value) {
   case KlKind::FieldMutRef:
   case KlKind::IndexMutRef:
     return "<ref>";
+  case KlKind::File:
+    return "<file>";
   }
   return "?";
 }

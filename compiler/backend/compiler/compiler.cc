@@ -1489,6 +1489,23 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
                    call_expr.location);
       return;
     }
+    // D2: fs::open(path) / fs::create(path)
+    if (ns_callee->member_name == "open") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsOpen, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (ns_callee->member_name == "create") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsCreate, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
   }
 
   // Handle sys::args() direct call.
@@ -1609,6 +1626,53 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         }
         emit_operand(LoweringOp::NativeInSecret, static_cast<uint32_t>(call_expr.args.size()),
                      call_expr.location);
+        return;
+      }
+    }
+  }
+
+  // Handle fs::file method calls (ADR 0027 D1)
+  if (field_callee) {
+    std::string file_obj_type = infer_struct_type(*field_callee->object);
+    if (file_obj_type == "fs::file") {
+      const std::string &method = field_callee->field_name;
+      if (method == "read") {
+        // compile file handle, then buffer
+        compile_expr(*field_callee->object);
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(LoweringOp::NativeFileRead, static_cast<uint32_t>(call_expr.args.size() + 1),
+                     call_expr.location);
+        return;
+      }
+      if (method == "write") {
+        compile_expr(*field_callee->object);
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(LoweringOp::NativeFileWrite, static_cast<uint32_t>(call_expr.args.size() + 1),
+                     call_expr.location);
+        return;
+      }
+      if (method == "size") {
+        compile_expr(*field_callee->object);
+        emit_operand(LoweringOp::NativeFileSize, 1, call_expr.location);
+        return;
+      }
+      if (method == "sync") {
+        compile_expr(*field_callee->object);
+        emit_operand(LoweringOp::NativeFileSync, 1, call_expr.location);
+        return;
+      }
+      if (method == "close") {
+        compile_expr(*field_callee->object);
+        emit_operand(LoweringOp::NativeFileClose, 1, call_expr.location);
+        return;
+      }
+      if (method == "open") {
+        compile_expr(*field_callee->object);
+        emit_operand(LoweringOp::NativeFileIsOpen, 1, call_expr.location);
         return;
       }
     }

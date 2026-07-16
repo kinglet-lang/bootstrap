@@ -743,6 +743,15 @@ Type TypeChecker::resolve_type_name(const std::string &name) const {
   if (name == "void") {
     return void_type();
   }
+  // Builtin resource type: fs::file (ADR 0027 D1).
+  // Only the qualified name is a builtin; bare "file" resolves through
+  // the user type registry so user-defined structs named "file" still work.
+  if (name == "fs::file") {
+    Type t(TypeKind::Struct);
+    t.name = "fs::file";
+    t.is_resource = true;
+    return t;
+  }
   auto it = type_registry_.find(name);
   if (it != type_registry_.end()) {
     return it->second;
@@ -2259,6 +2268,16 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
       fn.return_type = std::make_shared<Type>(array_type(string_type()));
       return fn;
     }
+    // D2: fs::open / fs::create return fs::file.
+    if (ns_access.member_name == "open" || ns_access.member_name == "create") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      Type file_type(TypeKind::Struct);
+      file_type.name = "fs::file";
+      file_type.is_resource = true;
+      fn.return_type = std::make_shared<Type>(file_type);
+      return fn;
+    }
   }
   if (ns_access.namespace_name == "sys") {
     if (sema_.used_.count("sys") == 0) {
@@ -3001,6 +3020,29 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       }
       return void_type();
     }
+    // D2: fs::open(path) -> fs::file, fs::create(path) -> fs::file
+    if (ns_callee->member_name == "open") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::open expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::open expects a string path.");
+      }
+      Type file_type(TypeKind::Struct);
+      file_type.name = "fs::file";
+      file_type.is_resource = true;
+      return file_type;
+    }
+    if (ns_callee->member_name == "create") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::create expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::create expects a string path.");
+      }
+      Type file_type(TypeKind::Struct);
+      file_type.name = "fs::file";
+      file_type.is_resource = true;
+      return file_type;
+    }
     error_at(ns_callee->location, "Unknown fs member '" + ns_callee->member_name + "'.");
     return void_type();
   }
@@ -3123,6 +3165,70 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       error_at(ns_obj->location, "Module '" + ns_obj->namespace_name +
                                      "' is not imported. Add 'using " + ns_obj->namespace_name +
                                      ";' at the top of the file.");
+      return void_type();
+    }
+  }
+
+  // Handle fs::file method calls: f.read(buf), f.write(data), etc. (ADR 0027 D1)
+  if (field_callee) {
+    Type obj_type = check_expr(*field_callee->object);
+    if (obj_type.kind == TypeKind::Struct && obj_type.name == "fs::file") {
+      const std::string &method = field_callee->field_name;
+      if (method == "read") {
+        // read(mut byte[] buffer) -> usize (bytes read)
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location,
+                   "fs::file.read expects exactly one argument (byte[] buffer).");
+        } else {
+          Type buf_type = check_expr(*call_expr.args[0]);
+          if (buf_type.kind != TypeKind::Array || !buf_type.element_type ||
+              buf_type.element_type->kind != TypeKind::Int ||
+              buf_type.element_type->name != "uint8") {
+            error_at(call_expr.args[0]->location, "fs::file.read expects a byte[] buffer.");
+          }
+        }
+        return int_type(); // usize
+      }
+      if (method == "write") {
+        // write(byte[] data) -> usize (bytes written)
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location,
+                   "fs::file.write expects exactly one argument (byte[] data).");
+        } else {
+          Type data_type = check_expr(*call_expr.args[0]);
+          if (data_type.kind != TypeKind::Array || !data_type.element_type ||
+              data_type.element_type->kind != TypeKind::Int ||
+              data_type.element_type->name != "uint8") {
+            error_at(call_expr.args[0]->location, "fs::file.write expects a byte[] array.");
+          }
+        }
+        return int_type();
+      }
+      if (method == "size") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "fs::file.size takes no arguments.");
+        }
+        return int_type(); // u64
+      }
+      if (method == "sync") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "fs::file.sync takes no arguments.");
+        }
+        return void_type();
+      }
+      if (method == "close") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "fs::file.close takes no arguments.");
+        }
+        return void_type();
+      }
+      if (method == "open") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "fs::file.open takes no arguments.");
+        }
+        return bool_type();
+      }
+      error_at(call_expr.location, "fs::file has no method '" + method + "'.");
       return void_type();
     }
   }
