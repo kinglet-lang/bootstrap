@@ -1,1 +1,1 @@
-error: Cannot assign int to variable of type int32.
+error[K2001]: Cannot assign int to variable of type int32.

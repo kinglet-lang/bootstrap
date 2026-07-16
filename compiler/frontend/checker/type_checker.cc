@@ -841,7 +841,7 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
     const std::string resolved_name = resolve_qualified_type_name(expr.name);
     Type t = resolve_type_name(resolved_name);
     if (t.name.find("<unknown:") == 0 && loc.line > 0) {
-      error_at(loc, "Unknown type '" + expr.name + "'.");
+      error_at(loc, "K1001", "Unknown type '" + expr.name + "'.");
     }
     return t;
   }
@@ -880,7 +880,7 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
     }
   }
   if (loc.line > 0) {
-    error_at(loc, "Unknown type '" + expr.to_string() + "'.");
+    error_at(loc, "K1001", "Unknown type '" + expr.to_string() + "'.");
   }
   Type err(TypeKind::Void);
   err.name = "<unknown:" + expr.to_string() + ">";
@@ -904,9 +904,8 @@ void TypeChecker::instantiate_generic_struct(const ast::StructDecl *decl,
   instantiated_.insert(mangled);
 
   if (args.size() != decl->type_params.size()) {
-    errors_.push_back(
-        TypeError{.location = decl->location,
-                  .message = "Wrong number of type arguments for '" + decl->name + "'."});
+    errors_.push_back(make_diagnostic(Severity::Error, decl->location,
+                                      "Wrong number of type arguments for '" + decl->name + "'."));
     return;
   }
 
@@ -1244,7 +1243,7 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       std::string mangled = mangle_function_name(func->name, param_types);
       const_cast<ast::FunctionDecl *>(func)->mangled_name = mangled;
       function_overloads_[func->name].push_back(
-          {func_type, mangled, static_cast<int>(param_types.size())});
+          {func_type, mangled, static_cast<int>(param_types.size()), func->location});
       declare_var(func->name, func_type, false);
       kir_function_sigs_[mangled] = kir_sig_from(func_type);
       if (mangled != func->name) {
@@ -1674,7 +1673,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           using_decl->namespace_name == "sys" || using_decl->namespace_name == "txt" ||
           using_decl->namespace_name == "rt";
       if (!runtime_ns && !sema_.imported_namespaces_.count(using_decl->namespace_name)) {
-        error_at(using_decl->location, "Unknown module '" + using_decl->namespace_name + "'.");
+        error_at(using_decl->location, "K15001",
+                 "Unknown module '" + using_decl->namespace_name + "'.");
       }
       sema_.used_.insert(using_decl->namespace_name);
       if (using_decl->is_namespace) {
@@ -1697,7 +1697,8 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
     }
     if (const auto *using_alias = dynamic_cast<const ast::UsingAliasDecl *>(decl.get())) {
       if (!sema_.imported_namespaces_.count(using_alias->module_id)) {
-        error_at(using_alias->location, "Unknown module '" + using_alias->module_id + "'.");
+        error_at(using_alias->location, "K15001",
+                 "Unknown module '" + using_alias->module_id + "'.");
       } else {
         sema_.module_aliases_[using_alias->alias] = module_id_to_qualifier(using_alias->module_id);
       }
@@ -1949,7 +1950,7 @@ void TypeChecker::visit(const ast::ReturnStmt &return_stmt) {
                                          type_to_string(stmt_expected_return_) + ".");
     }
   } else if (stmt_expected_return_.kind != TypeKind::Void) {
-    error_at(return_stmt.location, "Non-void function must return a value.");
+    error_at(return_stmt.location, "K7007", "Non-void function must return a value.");
   }
 }
 
@@ -2008,8 +2009,9 @@ void TypeChecker::visit(const ast::VarDeclStmt &var_decl) {
     Type init_type = check_call_arg_type(*var_decl.init);
     check_reference_escape(init_type, var_decl.location);
     if (!types_assignable(init_type, var_type)) {
-      error_at(var_decl.location, "Cannot assign " + type_to_string(init_type) +
-                                      " to variable of type " + type_to_string(var_type) + ".");
+      error_at(var_decl.location, "K2001",
+               "Cannot assign " + type_to_string(init_type) + " to variable of type " +
+                   type_to_string(var_type) + ".");
     } else {
       check_borrow_argument(*var_decl.init, var_type, var_decl.location);
       // Resource type init transfer (ADR 0028 D6): `T b = a;` where T is_resource
@@ -2019,6 +2021,7 @@ void TypeChecker::visit(const ast::VarDeclStmt &var_decl) {
           VarInfo *src_vi = find_var_info(*ref_name);
           if (src_vi) {
             src_vi->transferred = true;
+            src_vi->transfer_location = var_decl.location;
           }
         }
       }
@@ -2086,7 +2089,7 @@ void TypeChecker::visit(const ast::ExprStmt &expr_stmt) {
       }
     }
     if (!suppress)
-      warn_at(expr_stmt.location, "Expression result is unused.");
+      warn_at(expr_stmt.location, "K7010", "Expression result is unused.");
   }
 }
 
@@ -2359,13 +2362,23 @@ Type TypeChecker::check_identifier(const ast::IdentifierExpr &identifier) {
   }
   auto var_type = lookup_var(identifier.name);
   if (!var_type.has_value()) {
-    error_at(identifier.location, "Undeclared variable '" + identifier.name + "'.");
+    error_at(identifier.location, "K1001", "Undeclared variable '" + identifier.name + "'.");
     return int_type();
   }
   VarInfo *vi = find_var_info(identifier.name);
   if (vi && vi->transferred) {
-    error_at(identifier.location,
-             "Variable '" + identifier.name + "' was transferred and is no longer valid.");
+    // K4001 — point at the use (primary) and the transfer site (secondary),
+    // the canonical two-span ownership diagnostic from ADR 0031 D4.
+    Diagnostic d;
+    d.code = "K4001";
+    d.severity = Severity::Error;
+    d.message = "Variable '" + identifier.name + "' was transferred and is no longer valid.";
+    d.labels.push_back(DiagnosticLabel{span_from(identifier.location), std::string{}});
+    if (vi->transfer_location.line > 0) {
+      d.labels.push_back(
+          DiagnosticLabel{span_from(vi->transfer_location), "value transferred here"});
+    }
+    emit(std::move(d));
   }
   if (suppress_definite_assignment_for_field_write_ == 0) {
     check_definite_assignment_read(identifier.name, identifier.location);
@@ -2609,8 +2622,22 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
                                : slot_type;
   Type value_type = check_expr(*assign.value);
   if (!types_assignable(value_type, target_type)) {
-    error_at(assign.location, "Cannot assign " + type_to_string(value_type) + " to " +
-                                  type_to_string(target_type) + ".");
+    // Point at both the assignment (primary) and the original declaration
+    // (secondary), so multi-line files are readable without hunting for the
+    // binding. Requires VarInfo::location to have been recorded when the
+    // slot was introduced — true for every user-declared local/parameter.
+    Diagnostic d;
+    d.code = "K2001";
+    d.severity = Severity::Error;
+    d.message =
+        "Cannot assign " + type_to_string(value_type) + " to " + type_to_string(target_type) + ".";
+    d.labels.push_back(DiagnosticLabel{span_from(assign.location), std::string{}});
+    if (lhs_vi != nullptr && lhs_vi->location.line > 0) {
+      d.labels.push_back(DiagnosticLabel{span_from(lhs_vi->location),
+                                         "'" + assign.name + "' declared here with type " +
+                                             type_to_string(target_type)});
+    }
+    emit(std::move(d));
   }
   // Resource type transfer: if the RHS is a bare identifier of a resource
   // type, mark the source variable as transferred (ADR 0028 D6).
@@ -2618,6 +2645,7 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
     VarInfo *src_vi = find_var_info(id_expr->name);
     if (src_vi && src_vi->type.is_resource) {
       src_vi->transferred = true;
+      src_vi->transfer_location = assign.location;
     }
   }
   mark_initialized(assign.name);
@@ -3838,8 +3866,23 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       const TypeChecker::OverloadEntry *selected =
           resolve_overload(ov_it->second, arg_types, errors);
       if (!selected) {
-        for (const auto &e : errors)
-          error_at(call_expr.location, e);
+        // K7001 — surface every candidate with a secondary label so the
+        // user can see why none matched, not just "no overload". The
+        // errors vector currently holds one line ("No matching overload."
+        // or "Ambiguous call.") — code it and attach the candidate spans.
+        Diagnostic d;
+        d.code = "K7001";
+        d.severity = Severity::Error;
+        d.message =
+            errors.empty() ? "No matching overload for '" + callee_id->name + "'." : errors.front();
+        d.labels.push_back(DiagnosticLabel{span_from(call_expr.location), std::string{}});
+        for (const auto &cand : ov_it->second) {
+          if (cand.location.line <= 0)
+            continue;
+          d.labels.push_back(DiagnosticLabel{span_from(cand.location),
+                                             "candidate '" + callee_id->name + "' defined here"});
+        }
+        emit(std::move(d));
         return int_type();
       }
       // Store the resolved mangled name on the AST node so the compiler
@@ -4259,8 +4302,9 @@ Type TypeChecker::check_cast(const ast::CastExpr &cast) {
 
   auto reject_unhandled_fallible = [&]() {
     if (string_source && allow_fallible_cast_depth_ == 0) {
-      error_at(cast.location, "Fallible cast from string to " + target +
-                                  " must be handled with '?:' or postfix '?'.");
+      error_at(cast.location, "K10002",
+               "Fallible cast from string to " + target +
+                   " must be handled with '?:' or postfix '?'.");
     }
   };
 
@@ -4592,12 +4636,26 @@ void TypeChecker::register_borrow(const std::string &referent, bool mut, ast::So
       continue;
     }
     if (borrow.mut || mut) {
-      error_at(loc, "Conflicting borrow of '" + referent + "'.");
+      // K5001 — point at the new borrow (primary) and the earlier borrow
+      // that conflicts (secondary), the canonical two-span borrow
+      // diagnostic. Mut/shared kind is spelt out in the note so the user
+      // does not have to guess which rule fired.
+      Diagnostic d;
+      d.code = "K5001";
+      d.severity = Severity::Error;
+      d.message = "Conflicting borrow of '" + referent + "'.";
+      d.labels.push_back(DiagnosticLabel{span_from(loc), std::string{}});
+      if (borrow.location.line > 0) {
+        d.labels.push_back(
+            DiagnosticLabel{span_from(borrow.location),
+                            std::string(borrow.mut ? "mutable" : "shared") + " borrow taken here"});
+      }
+      emit(std::move(d));
       return;
     }
   }
-  active_borrows_.push_back(
-      ActiveBorrow{.referent = referent, .mut = mut, .scope_depth = scopes_.size()});
+  active_borrows_.push_back(ActiveBorrow{
+      .referent = referent, .mut = mut, .scope_depth = scopes_.size(), .location = loc});
 }
 
 void TypeChecker::release_mut_borrow(const std::string &referent) {
@@ -4614,11 +4672,31 @@ void TypeChecker::check_referent_access(const std::string &name, ast::SourceLoca
       continue;
     }
     if (borrow.mut) {
-      error_at(loc, "Cannot use '" + name + "' while it is mutably borrowed.");
+      // Same K5001 family — a live mut borrow blocks any use of the
+      // referent until it is released. Show the borrow site alongside
+      // the offending use so the user sees both ends of the conflict.
+      Diagnostic d;
+      d.code = "K5001";
+      d.severity = Severity::Error;
+      d.message = "Cannot use '" + name + "' while it is mutably borrowed.";
+      d.labels.push_back(DiagnosticLabel{span_from(loc), std::string{}});
+      if (borrow.location.line > 0) {
+        d.labels.push_back(
+            DiagnosticLabel{span_from(borrow.location), "mutable borrow taken here"});
+      }
+      emit(std::move(d));
       return;
     }
     if (mutating) {
-      error_at(loc, "Cannot mutate '" + name + "' while it is borrowed.");
+      Diagnostic d;
+      d.code = "K5001";
+      d.severity = Severity::Error;
+      d.message = "Cannot mutate '" + name + "' while it is borrowed.";
+      d.labels.push_back(DiagnosticLabel{span_from(loc), std::string{}});
+      if (borrow.location.line > 0) {
+        d.labels.push_back(DiagnosticLabel{span_from(borrow.location), "borrow taken here"});
+      }
+      emit(std::move(d));
       return;
     }
   }
@@ -4711,6 +4789,7 @@ void TypeChecker::check_call_argument_borrows(const std::vector<const ast::Expr 
         VarInfo *vi = find_var_info(*referent);
         if (vi && vi->type.is_resource) {
           vi->transferred = true;
+          vi->transfer_location = args[i]->location;
         }
       }
     }
@@ -4773,7 +4852,7 @@ void TypeChecker::pop_scope() {
                           active_borrows_.end());
     for (const auto &[name, info] : scopes_.back()) {
       if (!info.used && name != "_" && info.location.line > 0) {
-        warn_at(info.location, "Unused variable '" + name + "'.");
+        warn_at(info.location, "K18001", "Unused variable '" + name + "'.");
       }
     }
     scopes_.pop_back();
@@ -4793,7 +4872,18 @@ void TypeChecker::declare_var(const std::string &name, const Type &type, bool is
     if (type.kind == TypeKind::Function && it->second.type.kind == TypeKind::Function) {
       return; // silently accept; overload set already has both entries
     }
-    error_at(loc, "Variable '" + name + "' already declared.");
+    // K1002 — the second declaration is the one flagged; the first sits
+    // on VarInfo::location and reads well as "previously declared here".
+    Diagnostic d;
+    d.code = "K1002";
+    d.severity = Severity::Error;
+    d.message = "Variable '" + name + "' already declared.";
+    d.labels.push_back(DiagnosticLabel{span_from(loc), std::string{}});
+    if (it->second.location.line > 0) {
+      d.labels.push_back(
+          DiagnosticLabel{span_from(it->second.location), "previously declared here"});
+    }
+    emit(std::move(d));
     return;
   }
   scope.insert_or_assign(name, VarInfo{.type = type,
@@ -4999,13 +5089,24 @@ std::optional<Type> TypeChecker::lookup_type(const std::string &name) const {
 }
 
 void TypeChecker::error_at(ast::SourceLocation location, std::string message) {
-  errors_.push_back(TypeError{
-      .location = location, .message = std::move(message), .severity = DiagnosticSeverity::Error});
+  errors_.push_back(make_diagnostic(Severity::Error, location, std::move(message)));
+}
+
+void TypeChecker::error_at(ast::SourceLocation location, std::string code, std::string message) {
+  errors_.push_back(make_diagnostic(Severity::Error, location, std::move(code), std::move(message)));
+}
+
+void TypeChecker::emit(Diagnostic diag) {
+  errors_.push_back(std::move(diag));
 }
 
 void TypeChecker::warn_at(ast::SourceLocation location, std::string message) {
-  errors_.push_back(TypeError{
-      .location = location, .message = std::move(message), .severity = DiagnosticSeverity::Warning});
+  errors_.push_back(make_diagnostic(Severity::Warning, location, std::move(message)));
+}
+
+void TypeChecker::warn_at(ast::SourceLocation location, std::string code, std::string message) {
+  errors_.push_back(
+      make_diagnostic(Severity::Warning, location, std::move(code), std::move(message)));
 }
 
 void TypeChecker::populate_kir_types(KirModule *module) const {

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "frontend/ast/ast.h"
+#include "frontend/diagnostics/diagnostic.h"
 #include "ir/kir.h"
 #include "frontend/types/types.h"
 #include "frontend/sema/semantic_context.h"
@@ -25,16 +26,14 @@ struct ParsedModule;
 
 namespace kinglet {
 
+// Deprecated alias for the pre-0031 severity enum. Kept only so external
+// tools (the sema_probe below, editor extensions in flight) can continue to
+// spell the old name for one release while they migrate to `Severity` from
+// diagnostic.h. Values mirror the LSP severities the LSP driver still emits.
 enum class DiagnosticSeverity : std::uint8_t { Error = 1, Warning = 2, Info = 3, Hint = 4 };
 
-struct TypeError {
-  ast::SourceLocation location;
-  std::string message;
-  DiagnosticSeverity severity = DiagnosticSeverity::Error;
-};
-
 struct TypeCheckResult {
-  std::vector<TypeError> errors;
+  std::vector<Diagnostic> errors;
 };
 
 class TypeChecker : public ast::StmtVisitor, public ast::ExprVisitor {
@@ -61,6 +60,10 @@ public:
     bool is_mutable;
     bool used = false;
     bool transferred = false;
+    // Source location of the transfer point, so K4001 can render both the
+    // use site (primary) and the transfer site (secondary). Only meaningful
+    // when `transferred` is true; zero-initialized otherwise.
+    ast::SourceLocation transfer_location{};
     InitState init_state = InitState::Initialized;
     std::unordered_set<std::string> initialized_fields;
     ast::SourceLocation location;
@@ -72,6 +75,11 @@ public:
     Type func_type;
     std::string mangled_name;
     int arity; // cached for fast filtering
+    // Source location of the declaring FunctionDecl, so failed overload
+    // resolution can point at every candidate as a secondary label
+    // (ADR 0031 D4). Defaulted for entries synthesised without a
+    // FunctionDecl (e.g. imported symbols we know only by type).
+    ast::SourceLocation location{};
   };
 
   using OverloadSet = std::vector<OverloadEntry>;
@@ -277,7 +285,15 @@ private:
   void instantiate_generic_struct(const ast::StructDecl *decl,
                                   const std::vector<ast::TypeExpr> &args);
   void error_at(ast::SourceLocation location, std::string message);
+  // Preferred at migrated call sites: attaches a stable K-code
+  // (ADR 0031 D2) to the diagnostic.
+  void error_at(ast::SourceLocation location, std::string code, std::string message);
+  // Push a fully-built Diagnostic. Use this when a call site needs
+  // secondary labels (ADR 0031 D4) — e.g. pointing at the original
+  // declaration alongside the offending use.
+  void emit(Diagnostic diag);
   void warn_at(ast::SourceLocation location, std::string message);
+  void warn_at(ast::SourceLocation location, std::string code, std::string message);
   void check_fmt_args(const std::vector<ast::ExprPtr> &args, ast::SourceLocation location);
   void forward_declare_imported_types(const ParsedModule &mod, const std::string &qualifier = "");
   std::string resolve_module_qualified(const std::string &ns, const std::string &member) const;
@@ -288,6 +304,9 @@ private:
     std::string referent;
     bool mut = false;
     std::size_t scope_depth = 0;
+    // Where the borrow was taken, so K5001 can point back at "borrowed
+    // here" from the conflicting use / re-borrow site (ADR 0031 D4).
+    ast::SourceLocation location{};
   };
 
   void register_borrow(const std::string &referent, bool mut, ast::SourceLocation loc);
@@ -346,7 +365,7 @@ private:
 
   std::unordered_map<std::string, MethodInfo> method_registry_;
 
-  std::vector<TypeError> errors_;
+  std::vector<Diagnostic> errors_;
   std::unordered_map<std::string, KirFunctionSig> kir_function_sigs_;
   std::unordered_set<std::string> imported_bare_names_; // for selective imports
   // Owns the built-in io::reader / io::writer concept declarations so the

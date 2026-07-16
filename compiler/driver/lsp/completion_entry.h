@@ -13,6 +13,7 @@
 
 #include "frontend/ast/ast.h"
 #include "frontend/checker/type_checker.h"
+#include "frontend/diagnostics/diagnostic.h"
 #include "frontend/lexer/token.h"
 #include "frontend/parser/completion_context.h"
 #include "frontend/parser/parser.h"
@@ -45,8 +46,11 @@ struct CompletionResponse {
   // scope/method/type registries for the new TypeChecker callback path).
   std::optional<TypeChecker::CompletionContext> sema_completion;
   std::unique_ptr<ast::Program> program;
-  std::vector<ParseError> parse_errors;
-  std::vector<TypeError> type_errors;
+  // ADR 0031: unified diagnostic type across parser and checker. LSP consumers
+  // read `severity`, `code`, `labels[0].span.{line,column,length}`, and
+  // `message`; secondary labels carry the transfer/borrow origin spans.
+  std::vector<Diagnostic> parse_errors;
+  std::vector<Diagnostic> type_errors;
 };
 
 CompletionResponse run_completion(const CompletionRequest &request);

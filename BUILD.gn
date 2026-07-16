@@ -59,6 +59,7 @@ executable("kinglet") {
   deps = [
     "//compiler/frontend/checker",
     "//compiler/backend/compiler",
+    "//compiler/frontend/diagnostics",
     "//compiler/ir",
     "//compiler/frontend/lexer",
     "//compiler/frontend/module",

@@ -61,8 +61,9 @@ FormatResult format_string(std::string_view source, const FmtConfig &config) {
   ParseResult parsed = parser.parse();
   if (!parsed.errors.empty()) {
     std::ostringstream out;
-    out << "parse error at " << parsed.errors.front().line << ":" << parsed.errors.front().column
-        << ": " << parsed.errors.front().message;
+    const Diagnostic &first = parsed.errors.front();
+    const SourceSpan span = first.labels.empty() ? SourceSpan{} : first.labels.front().span;
+    out << "parse error at " << span.line << ":" << span.column << ": " << first.message;
     result.error = out.str();
     return result;
   }
