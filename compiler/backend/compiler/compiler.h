@@ -4,6 +4,7 @@
 #pragma once
 
 #include "frontend/ast/ast.h"
+#include "frontend/diagnostics/diagnostic.h"
 #include "ir/kir.h"
 #include "ir/kir_recorder.h"
 #include "frontend/module/module_loader.h"
@@ -20,20 +21,14 @@
 
 namespace kinglet {
 
-struct CompileError {
-  ast::SourceLocation location;
-  std::string message;
-};
-
-struct CompileWarning {
-  ast::SourceLocation location;
-  std::string message;
-};
-
 struct CompileResult {
   KirModule kir;
-  std::vector<CompileError> errors;
-  std::vector<CompileWarning> warnings;
+  // Migrated to unified `Diagnostic` (ADR 0031 D10 step 4). `errors` holds
+  // Severity::Error entries; `warnings` holds Severity::Warning. Keeping the
+  // two vectors separate here mirrors the existing driver split and keeps
+  // call sites in main.cc mechanical to migrate.
+  std::vector<Diagnostic> errors;
+  std::vector<Diagnostic> warnings;
 };
 
 class Compiler : public ast::ExprVisitor {
@@ -51,6 +46,12 @@ private:
     bool is_resource = false;
     bool transferred = false; // Resource type moved out via assignment/param transfer
     enum class SlotKind { Value, Ref, MutRef } slot_kind = SlotKind::Value;
+    // Source location of the declaration this slot came from. Set at
+    // var-decl and parameter sites so diagnostics like K3002 can point back
+    // at "declared const here"; may be defaulted (line = 0) for compiler-
+    // synthesised slots (match temporaries, pattern bindings) where there
+    // is no user-visible declaration to blame.
+    ast::SourceLocation location{};
   };
 
   struct LoopInfo {
@@ -164,7 +165,11 @@ private:
   // in compile_stmt.
   void emit_default_value(const ast::TypeExpr &type, ast::SourceLocation location);
   void error_at(ast::SourceLocation location, std::string message);
+  // Preferred at migrated call sites: attaches a stable K-code
+  // (ADR 0031 D2) to the diagnostic.
+  void error_at(ast::SourceLocation location, std::string code, std::string message);
   void warning_at(ast::SourceLocation location, std::string message);
+  void warning_at(ast::SourceLocation location, std::string code, std::string message);
 
   void process_import(const ast::ImportDecl &import_decl);
   void process_import_from(const ast::ImportDecl &import_decl,
@@ -194,8 +199,8 @@ private:
   KirRecorder kir_recorder_;
   std::vector<Local> locals_;
   std::vector<std::size_t> scope_stack_;
-  std::vector<CompileError> errors_;
-  std::vector<CompileWarning> warnings_;
+  std::vector<Diagnostic> errors_;
+  std::vector<Diagnostic> warnings_;
   std::vector<LoopInfo> loop_stack_;
   SemanticContext *sema_ = nullptr;
   std::unordered_map<std::string, int> function_indices_;

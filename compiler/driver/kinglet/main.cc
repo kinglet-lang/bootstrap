@@ -7,6 +7,9 @@
 #include "frontend/ast/ast.h"
 #include "frontend/checker/type_checker.h"
 #include "backend/compiler/compiler.h"
+#include "frontend/diagnostics/diagnostic.h"
+#include "frontend/diagnostics/renderer.h"
+#include "frontend/diagnostics/source_map.h"
 #ifdef KINGLET_HAVE_LLVM
 #include "backend/codegen/llvm/kir_to_llvm.h"
 #endif
@@ -16,6 +19,7 @@
 #include "frontend/lexer/token.h"
 #include "frontend/parser/parser.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -233,13 +237,14 @@ std::string compiler_identity(const char *argv0) {
 
 void print_usage(std::ostream &out) {
   out << "usage: kinglet [--tokens | --ast | --check | --ir | --native <out> [-g] [--obj-cache "
-         "<dir>] | -o <out>] [file.kl] [args...]\n"
+         "<dir>] | -o <out>] [--color=<auto|always|never>] [file.kl] [args...]\n"
       << "\n"
       << "Reads Kinglet source from a .kl file, or stdin when file is omitted.\n"
       << "By default, compiles to a native executable and runs main() (requires LLVM build).\n"
       << "With --native -g, emits DWARF debug info from KIR line tables.\n"
       << "With --obj-cache, caches per-module objects by content stamp for incremental rebuilds.\n"
-      << "With selfhost <args...>, runs the embedded native compiler (if built in).\n";
+      << "With selfhost <args...>, runs the embedded native compiler (if built in).\n"
+      << "--color controls ANSI in diagnostics (auto = detect tty and NO_COLOR).\n";
 }
 
 std::string read_stdin() {
@@ -330,6 +335,7 @@ int main(int argc, char **argv) {
   Mode mode = Mode::Run;
   bool native_debug_info = false;
   std::vector<std::string> program_args;
+  kinglet::diag::ColorMode color_mode = kinglet::diag::ColorMode::Auto;
 
   for (int i = 1; i < argc; ++i) {
     const std::string_view arg(argv[i]);
@@ -408,6 +414,41 @@ int main(int argc, char **argv) {
       }
       continue;
     }
+    // ADR 0031 D7 — diagnostic color control. Auto is the default and matches
+    // rustc/gcc/clang behaviour: colored on a tty, plain when redirected, off
+    // when NO_COLOR is set or TERM=dumb.
+    if (arg == "--color=auto") {
+      color_mode = kinglet::diag::ColorMode::Auto;
+      continue;
+    }
+    if (arg == "--color=always") {
+      color_mode = kinglet::diag::ColorMode::Always;
+      continue;
+    }
+    if (arg == "--color=never" || arg == "--no-color") {
+      color_mode = kinglet::diag::ColorMode::Never;
+      continue;
+    }
+    if (arg == "--color") {
+      if (i + 1 < argc) {
+        ++i;
+        const std::string_view v(argv[i]);
+        if (v == "auto") {
+          color_mode = kinglet::diag::ColorMode::Auto;
+        } else if (v == "always") {
+          color_mode = kinglet::diag::ColorMode::Always;
+        } else if (v == "never") {
+          color_mode = kinglet::diag::ColorMode::Never;
+        } else {
+          std::cerr << "kinglet: --color must be one of auto|always|never\n";
+          return 64;
+        }
+      } else {
+        std::cerr << "kinglet: --color requires an argument\n";
+        return 64;
+      }
+      continue;
+    }
     input_path = std::string(arg);
   }
 
@@ -419,13 +460,42 @@ int main(int argc, char **argv) {
     return 66;
   }
 
+  // Keep the entry source alive under a display-path key so the diagnostic
+  // renderer can pull snippet lines when it draws underlines. Registered
+  // BEFORE the scanner runs so lexer diagnostics can render snippets too.
+  // (Module-level sources will be registered by the loader in a later pass;
+  // for now every diagnostic in this run points at the entry file.)
+  kinglet::diag::SourceMap source_map;
+  const std::string display_path = input_path.empty() ? std::string("<stdin>") : input_path;
+  source_map.add(display_path, source);
+
   kinglet::Scanner scanner(std::move(source));
   const std::vector<kinglet::Token> tokens = scanner.scan_tokens();
+
+  // One shared rendering configuration for every diagnostic printed by this
+  // driver invocation. `source_path` is the display path shown in the
+  // "path:L:C: severity: …" prefix; falling back to <stdin> keeps piped
+  // input rendered consistently. `use_color` is decided once against stderr's
+  // tty state so all output stays in one color regime.
+  kinglet::diag::RenderOptions render_opts;
+  render_opts.color = color_mode;
+  render_opts.source_path = display_path;
+  render_opts.sources = &source_map;
+  const bool use_color = kinglet::diag::color_enabled_for_stream(fileno(stderr), color_mode);
 
   bool had_lexer_error = false;
   for (const kinglet::Token &token : tokens) {
     if (token.type == kinglet::TokenType::ERROR) {
-      std::cerr << token.line << ':' << token.column << ": lexer error: " << token.lexeme << '\n';
+      // Lexer errors are single-span, no code yet. Length 1 approximates the
+      // point where the scanner tripped; a follow-up can widen to token.length
+      // once ERROR tokens learn to carry their extent.
+      kinglet::ast::SourceLocation loc;
+      loc.line = token.line;
+      loc.column = token.column;
+      loc.length = 1;
+      kinglet::Diagnostic d = kinglet::make_diagnostic(kinglet::Severity::Error, loc,
+                                                       "lexer error: " + std::string(token.lexeme));
+      kinglet::diag::render(std::cerr, d, render_opts, use_color);
       had_lexer_error = true;
     }
   }
@@ -443,9 +513,7 @@ int main(int argc, char **argv) {
 
   kinglet::Parser parser(tokens);
   kinglet::ParseResult result = parser.parse();
-  for (const kinglet::ParseError &error : result.errors) {
-    std::cerr << error.line << ':' << error.column << ": parse error: " << error.message << '\n';
-  }
+  kinglet::diag::render_all(std::cerr, result.errors, render_opts, use_color);
 
   if (!result.errors.empty()) {
     return 65;
@@ -487,14 +555,13 @@ int main(int argc, char **argv) {
   // each having to mutate (and cast away const on) the program.
   kinglet::ast::desugar_pipes(*result.program);
   kinglet::TypeCheckResult type_result = checker.check(*result.program);
+  kinglet::diag::render_all(std::cerr, type_result.errors, render_opts, use_color);
   bool has_type_errors = false;
-  for (const kinglet::TypeError &error : type_result.errors) {
-    const char *label =
-        error.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
-    std::cerr << error.location.line << ':' << error.location.column << ": " << label << ": "
-              << error.message << '\n';
-    if (error.severity == kinglet::DiagnosticSeverity::Error)
+  for (const kinglet::Diagnostic &d : type_result.errors) {
+    if (d.severity == kinglet::Severity::Error) {
       has_type_errors = true;
+      break;
+    }
   }
 
   if (has_type_errors) {
@@ -518,19 +585,13 @@ int main(int argc, char **argv) {
     compiler.set_entry_source_path(entry_path.string());
   }
   kinglet::CompileResult compile_result = compiler.compile(*result.program);
-  for (const kinglet::CompileError &error : compile_result.errors) {
-    std::cerr << error.location.line << ':' << error.location.column
-              << ": compile error: " << error.message << '\n';
-  }
+  kinglet::diag::render_all(std::cerr, compile_result.errors, render_opts, use_color);
 
   if (!compile_result.errors.empty()) {
     return 65;
   }
 
-  for (const kinglet::CompileWarning &warning : compile_result.warnings) {
-    std::cerr << warning.location.line << ':' << warning.location.column
-              << ": warning: " << warning.message << '\n';
-  }
+  kinglet::diag::render_all(std::cerr, compile_result.warnings, render_opts, use_color);
 
   kinglet::prepare_kir(compile_result.kir, checker);
 

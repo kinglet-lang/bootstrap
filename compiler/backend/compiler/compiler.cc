@@ -2698,7 +2698,20 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
     return;
   }
   if (!locals_[static_cast<std::size_t>(slot)].is_mutable) {
-    error_at(assign.location, "Cannot assign to const variable '" + assign.name + "'.");
+    // Attach the declaration span so the user can see `const T x = …;`
+    // without hunting for the binding — same secondary-label pattern as
+    // K2001 (ADR 0031 D4).
+    Diagnostic d;
+    d.code = "K3002";
+    d.severity = Severity::Error;
+    d.message = "Cannot assign to const variable '" + assign.name + "'.";
+    d.labels.push_back(DiagnosticLabel{span_from(assign.location), std::string{}});
+    const auto &decl_loc = locals_[static_cast<std::size_t>(slot)].location;
+    if (decl_loc.line > 0) {
+      d.labels.push_back(
+          DiagnosticLabel{span_from(decl_loc), "'" + assign.name + "' declared const here"});
+    }
+    errors_.push_back(std::move(d));
     return;
   }
 
@@ -2928,6 +2941,7 @@ bool Compiler::declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot) {
       .name = var_decl.name,
       .is_mutable = is_mutable,
   };
+  local.location = var_decl.location;
   // A reference-typed local (`const T& r = &x;` / `T& r = &x;`, ADR 0028 D3)
   // is initialized from compile_lvalue_addr's address, not a plain value --
   // mirrors compile_function()'s identical check for reference parameters,
@@ -3015,17 +3029,20 @@ int Compiler::resolve_struct(const ast::TypeExpr &type) {
 }
 
 void Compiler::error_at(ast::SourceLocation location, std::string message) {
-  errors_.push_back(CompileError{
-      .location = location,
-      .message = std::move(message),
-  });
+  errors_.push_back(make_diagnostic(Severity::Error, location, std::move(message)));
+}
+
+void Compiler::error_at(ast::SourceLocation location, std::string code, std::string message) {
+  errors_.push_back(make_diagnostic(Severity::Error, location, std::move(code), std::move(message)));
 }
 
 void Compiler::warning_at(ast::SourceLocation location, std::string message) {
-  warnings_.push_back(CompileWarning{
-      .location = location,
-      .message = std::move(message),
-  });
+  warnings_.push_back(make_diagnostic(Severity::Warning, location, std::move(message)));
+}
+
+void Compiler::warning_at(ast::SourceLocation location, std::string code, std::string message) {
+  warnings_.push_back(
+      make_diagnostic(Severity::Warning, location, std::move(code), std::move(message)));
 }
 
 void Compiler::process_import(const ast::ImportDecl &import_decl) {

@@ -10,6 +10,7 @@ static_library("parser") {
 
   deps = [
     "//compiler/frontend/ast",
+    "//compiler/frontend/diagnostics",
     "//compiler/frontend/lexer",
   ]
 

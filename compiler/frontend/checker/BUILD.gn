@@ -6,6 +6,7 @@ static_library("checker") {
 
   deps = [
     "//compiler/frontend/ast",
+    "//compiler/frontend/diagnostics",
     "//compiler/ir",
     "//compiler/frontend/module",
     "//compiler/frontend/types",

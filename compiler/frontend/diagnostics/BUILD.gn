@@ -1,0 +1,16 @@
+static_library("diagnostics") {
+  sources = [
+    "diagnostic.h",
+    "renderer.cc",
+    "renderer.h",
+    "source_map.h",
+  ]
+
+  deps = [
+    "//compiler/frontend/ast",
+  ]
+
+  include_dirs = [
+    "//compiler",
+  ]
+}

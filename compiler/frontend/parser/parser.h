@@ -4,6 +4,7 @@
 #pragma once
 
 #include "frontend/ast/ast.h"
+#include "frontend/diagnostics/diagnostic.h"
 #include "frontend/lexer/token.h"
 #include "frontend/parser/completion_context.h"
 
@@ -15,15 +16,11 @@
 
 namespace kinglet {
 
-struct ParseError {
-  int line;
-  int column;
-  std::string message;
-};
-
 struct ParseResult {
   std::unique_ptr<ast::Program> program;
-  std::vector<ParseError> errors;
+  // Migrated to unified `Diagnostic` (ADR 0031 D10 step 3). Code is empty
+  // for now; a follow-up assigns K0xxx codes to the parse family.
+  std::vector<Diagnostic> errors;
 };
 
 class Parser {
@@ -117,6 +114,9 @@ private:
   ast::ExprPtr parse_namespace_access(const Token &first, std::vector<std::string> segments);
   void synchronize();
   void error_at(const Token &token, std::string_view message);
+  // Preferred at migrated call sites: attaches a stable K-code
+  // (ADR 0031 D2) to the diagnostic.
+  void error_at(const Token &token, std::string_view code, std::string_view message);
 
   // Hard ceiling on accumulated parse errors. A malformed input can drive a
   // recovery path that reports an error without consuming a token; the
@@ -177,7 +177,7 @@ private:
 
   const std::vector<Token> &tokens_;
   std::size_t current_ = 0;
-  std::vector<ParseError> errors_;
+  std::vector<Diagnostic> errors_;
   int recursion_depth_ = 0;
   bool recursion_limit_hit_ = false;
   bool pending_greater_ = false;

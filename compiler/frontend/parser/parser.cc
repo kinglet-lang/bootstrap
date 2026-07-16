@@ -543,17 +543,28 @@ void Parser::note_recursion_limit() {
 }
 
 void Parser::error_at(const Token &token, std::string_view message) {
-  errors_.push_back(ParseError{
-      .line = token.line,
-      .column = token.column,
-      .message = std::string(message),
-  });
+  ast::SourceLocation loc;
+  loc.line = token.line;
+  loc.column = token.column;
+  loc.length = 1;
+  errors_.push_back(make_diagnostic(Severity::Error, loc, std::string(message)));
   // Backstop against any un-guarded no-progress recovery path: once the error
   // count crosses the ceiling, jump to end-of-input so every parse loop that
   // tests is_at_end() terminates. Bounds both time and memory on adversarial
   // input without changing behavior for well-formed or normally-erroneous code.
   if (errors_.size() >= kMaxParseErrors && !tokens_.empty()) {
     current_ = tokens_.size() - 1; // END_OF_FILE sentinel
+  }
+}
+
+void Parser::error_at(const Token &token, std::string_view code, std::string_view message) {
+  ast::SourceLocation loc;
+  loc.line = token.line;
+  loc.column = token.column;
+  loc.length = 1;
+  errors_.push_back(make_diagnostic(Severity::Error, loc, std::string(code), std::string(message)));
+  if (errors_.size() >= kMaxParseErrors && !tokens_.empty()) {
+    current_ = tokens_.size() - 1;
   }
 }
 

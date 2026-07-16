@@ -1,2 +1,2 @@
-warning: Unused variable 'x'.
-warning: Unused variable 'x'.
+warning[K18001]: Unused variable 'x'.
+warning[K18001]: Unused variable 'x'.

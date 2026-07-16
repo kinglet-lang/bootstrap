@@ -100,9 +100,9 @@ int main(int argc, char **argv) {
 
   std::cout << "=== TypeChecker diagnostics (" << resp.type_errors.size() << ") ===\n";
   for (const auto &err : resp.type_errors) {
-    const char *label = err.severity == kinglet::DiagnosticSeverity::Warning ? "warning" : "error";
-    std::cout << err.location.line << ":" << err.location.column << ": " << label << ": "
-              << err.message << "\n";
+    const char *label = err.severity == kinglet::Severity::Warning ? "warning" : "error";
+    const auto span = err.labels.empty() ? kinglet::SourceSpan{} : err.labels.front().span;
+    std::cout << span.line << ":" << span.column << ": " << label << ": " << err.message << "\n";
   }
 
   std::cout << "=== probe completed without crash ===\n";
