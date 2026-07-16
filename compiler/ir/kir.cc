@@ -247,6 +247,22 @@ const char *kir_opcode_name(KirOpcode op) {
     return "native_fs_read_bytes";
   case KirOpcode::NativeFsWriteBytes:
     return "native_fs_write_bytes";
+  case KirOpcode::NativeFsOpen:
+    return "native_fs_open";
+  case KirOpcode::NativeFsCreate:
+    return "native_fs_create";
+  case KirOpcode::NativeFileRead:
+    return "native_file_read";
+  case KirOpcode::NativeFileWrite:
+    return "native_file_write";
+  case KirOpcode::NativeFileSize:
+    return "native_file_size";
+  case KirOpcode::NativeFileSync:
+    return "native_file_sync";
+  case KirOpcode::NativeFileClose:
+    return "native_file_close";
+  case KirOpcode::NativeFileIsOpen:
+    return "native_file_is_open";
   }
   return "unknown";
 }
