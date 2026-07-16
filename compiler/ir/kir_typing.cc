@@ -999,6 +999,48 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       result = KirType::Null;
       push_typed(&state, result);
       break;
+    case KirOpcode::NativeFsOpen:
+      pop_type(&state);      // path
+      result = KirType::Int; // file handle (opaque kl_h pointer boxed)
+      push_typed(&state, result);
+      break;
+    case KirOpcode::NativeFsCreate:
+      pop_type(&state);      // path
+      result = KirType::Int; // file handle
+      push_typed(&state, result);
+      break;
+    case KirOpcode::NativeFileRead:
+      pop_type(&state);      // buffer
+      pop_type(&state);      // file handle
+      result = KirType::Int; // bytes read
+      push_typed(&state, result);
+      break;
+    case KirOpcode::NativeFileWrite:
+      pop_type(&state);      // data
+      pop_type(&state);      // file handle
+      result = KirType::Int; // bytes written
+      push_typed(&state, result);
+      break;
+    case KirOpcode::NativeFileSize:
+      pop_type(&state);      // file handle
+      result = KirType::Int; // size
+      push_typed(&state, result);
+      break;
+    case KirOpcode::NativeFileSync:
+      pop_type(&state); // file handle
+      result = KirType::Null;
+      push_typed(&state, result);
+      break;
+    case KirOpcode::NativeFileClose:
+      pop_type(&state); // file handle
+      result = KirType::Null;
+      push_typed(&state, result);
+      break;
+    case KirOpcode::NativeFileIsOpen:
+      pop_type(&state);      // file handle
+      result = KirType::Int; // bool
+      push_typed(&state, result);
+      break;
     }
 
     fn->instr_types[i] = result;

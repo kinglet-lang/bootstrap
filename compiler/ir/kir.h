@@ -179,6 +179,14 @@ enum class KirOpcode : std::uint8_t {
   NativeFsWriteText,
   NativeFsReadBytes,
   NativeFsWriteBytes,
+  NativeFsOpen,
+  NativeFsCreate,
+  NativeFileRead,
+  NativeFileWrite,
+  NativeFileSize,
+  NativeFileSync,
+  NativeFileClose,
+  NativeFileIsOpen,
 };
 
 struct KirStructMeta {

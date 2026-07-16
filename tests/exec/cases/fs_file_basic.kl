@@ -1,0 +1,41 @@
+// RUN: run
+// CHECK: 16
+// CHECK: 1
+// CHECK: 0
+// CHECK: Hello, fs::file!
+
+using io;
+using fs;
+
+int main() {
+  // Create a test file using the text API.
+  fs::writetext("/tmp/kinglet_fs_file_test.txt", "Hello, fs::file!");
+
+  // D2: fs::open(path) -> fs::file
+  fs::file input = fs::open("/tmp/kinglet_fs_file_test.txt");
+
+  // D1: file.size() -> u64
+  int sz = input.size();
+  io::out.line("{}", sz);
+
+  // D1: file.open() -> bool (handle is open before close)
+  io::out.line("{}", input.open());
+
+  // D1: file.close()
+  input.close();
+
+  // D2: fs::create(path) -> fs::file (write mode)
+  fs::file output = fs::create("/tmp/kinglet_fs_file_test2.txt");
+
+  // D1: file.close()
+  output.close();
+
+  // D1: file.open() -> bool (handle is closed)
+  io::out.line("{}", output.open());
+
+  // Verify content using readtext
+  string content = fs::readtext("/tmp/kinglet_fs_file_test.txt");
+  io::out.line("{}", content);
+
+  return 0;
+}
