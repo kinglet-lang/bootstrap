@@ -743,6 +743,15 @@ Type TypeChecker::resolve_type_name(const std::string &name) const {
   if (name == "void") {
     return void_type();
   }
+  // Builtin resource type: fs::file (ADR 0027 D1).
+  // Only the qualified name is a builtin; bare "file" resolves through
+  // the user type registry so user-defined structs named "file" still work.
+  if (name == "fs::file") {
+    Type t(TypeKind::Struct);
+    t.name = "fs::file";
+    t.is_resource = true;
+    return t;
+  }
   auto it = type_registry_.find(name);
   if (it != type_registry_.end()) {
     return it->second;
@@ -806,10 +815,28 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
     return ref;
   }
   if (expr.type_args.empty()) {
-    if (sema_.concept_registry_.count(expr.name)) {
-      Type concept_type(TypeKind::Concept);
-      concept_type.name = expr.name;
-      return concept_type;
+    // Check for io::reader / io::writer qualified concept names (always
+    // available) and bare reader/writer (only when `using io;` is active,
+    // unless the user has declared their own concept with the same name).
+    std::string concept_name = expr.name;
+    bool is_qualified_io = (concept_name == "io::reader" || concept_name == "io::writer");
+    if (is_qualified_io) {
+      concept_name = concept_name.substr(4); // strip "io::"
+    }
+    auto cr_it = sema_.concept_registry_.find(concept_name);
+    if (cr_it != sema_.concept_registry_.end()) {
+      bool is_builtin_name = (concept_name == "reader" || concept_name == "writer");
+      // Check if this is still our builtin or has been overwritten by a
+      // user-declared concept. User declarations have a non-zero source
+      // location; builtins use {0,0,0}.
+      bool is_builtin = is_builtin_name && cr_it->second && cr_it->second->location.line == 0 &&
+                        cr_it->second->location.column == 0;
+      bool builtin_allowed = is_qualified_io || (is_builtin && sema_.used_.count("io"));
+      if (!is_builtin || builtin_allowed) {
+        Type concept_type(TypeKind::Concept);
+        concept_type.name = concept_name;
+        return concept_type;
+      }
     }
     const std::string resolved_name = resolve_qualified_type_name(expr.name);
     Type t = resolve_type_name(resolved_name);
@@ -817,6 +844,26 @@ Type TypeChecker::resolve_type_expr(const ast::TypeExpr &expr, ast::SourceLocati
       error_at(loc, "Unknown type '" + expr.name + "'.");
     }
     return t;
+  }
+  // io::reader<T> / io::writer<T> with explicit type args.
+  {
+    std::string concept_name = expr.name;
+    bool is_qualified_io = (concept_name == "io::reader" || concept_name == "io::writer");
+    if (is_qualified_io) {
+      concept_name = concept_name.substr(4); // strip "io::"
+    }
+    auto cr_it = sema_.concept_registry_.find(concept_name);
+    if (cr_it != sema_.concept_registry_.end()) {
+      bool is_builtin_name = (concept_name == "reader" || concept_name == "writer");
+      bool is_builtin = is_builtin_name && cr_it->second && cr_it->second->location.line == 0 &&
+                        cr_it->second->location.column == 0;
+      bool builtin_allowed = is_qualified_io || (is_builtin && sema_.used_.count("io"));
+      if (!is_builtin || builtin_allowed) {
+        Type concept_type(TypeKind::Concept);
+        concept_type.name = concept_name;
+        return concept_type;
+      }
+    }
   }
   const std::string resolved_base = resolve_qualified_type_name(expr.name);
   std::string mangled = mangle_name(resolved_base, expr.type_args);
@@ -955,6 +1002,57 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
   // before check) so that check() can take a const Program without casting.
 
   push_scope();
+
+  // Pre-register the built-in io::reader and io::writer concepts (ADR 0026 D7).
+  // These are synthesized internally, not declared in user .kl source, and are
+  // visible as bare `reader`/`writer` when `using io;` is active, or as
+  // qualified `io::reader`/`io::writer` type names. User-declared concepts
+  // with the same name overwrite these entries in the loop below.
+  {
+    ast::SourceLocation builtin_loc{0, 0, 0};
+
+    // concept reader<T> { uint64 read(T self, byte[]& buffer); }
+    {
+      ast::ConceptMethodDecl read_method;
+      read_method.return_type = ast::TypeExpr{"uint64", {}, -1};
+      read_method.name = "read";
+      ast::Parameter self_param;
+      self_param.type = ast::TypeExpr{"T", {}, -1};
+      self_param.name = "self";
+      ast::Parameter buf_param;
+      // byte[]&  ->  parsed as &Array<byte>
+      buf_param.type =
+          ast::TypeExpr{"&", {ast::TypeExpr{"Array", {ast::TypeExpr{"byte", {}, -1}}, -1}}, -1};
+      buf_param.name = "buffer";
+      read_method.params = {self_param, buf_param};
+
+      auto reader_decl = std::make_unique<const ast::ConceptDecl>(
+          builtin_loc, "reader", std::vector<std::string>{"T"},
+          std::vector<ast::ConceptMethodDecl>{read_method});
+      sema_.concept_registry_["reader"] = reader_decl.get();
+      builtin_concepts_.push_back(std::move(reader_decl));
+    }
+
+    // concept writer<T> { uint64 write(T self, byte[] data); }
+    {
+      ast::ConceptMethodDecl write_method;
+      write_method.return_type = ast::TypeExpr{"uint64", {}, -1};
+      write_method.name = "write";
+      ast::Parameter self_param;
+      self_param.type = ast::TypeExpr{"T", {}, -1};
+      self_param.name = "self";
+      ast::Parameter data_param;
+      data_param.type = ast::TypeExpr{"Array", {ast::TypeExpr{"byte", {}, -1}}, -1}; // byte[]
+      data_param.name = "data";
+      write_method.params = {self_param, data_param};
+
+      auto writer_decl = std::make_unique<const ast::ConceptDecl>(
+          builtin_loc, "writer", std::vector<std::string>{"T"},
+          std::vector<ast::ConceptMethodDecl>{write_method});
+      sema_.concept_registry_["writer"] = writer_decl.get();
+      builtin_concepts_.push_back(std::move(writer_decl));
+    }
+  }
 
   for (const ast::DeclPtr &decl : program.declarations) {
     if (const auto *concept_decl = dynamic_cast<const ast::ConceptDecl *>(decl.get())) {
@@ -2170,6 +2268,16 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
       fn.return_type = std::make_shared<Type>(array_type(string_type()));
       return fn;
     }
+    // D2: fs::open / fs::create return fs::file.
+    if (ns_access.member_name == "open" || ns_access.member_name == "create") {
+      Type fn(TypeKind::Function);
+      fn.name = "native_fn";
+      Type file_type(TypeKind::Struct);
+      file_type.name = "fs::file";
+      file_type.is_resource = true;
+      fn.return_type = std::make_shared<Type>(file_type);
+      return fn;
+    }
   }
   if (ns_access.namespace_name == "sys") {
     if (sema_.used_.count("sys") == 0) {
@@ -2470,8 +2578,10 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
   }
   VarInfo *lhs_vi = find_var_info(assign.name);
   if (lhs_vi && lhs_vi->transferred) {
-    error_at(assign.location,
-             "Variable '" + assign.name + "' was transferred and cannot be reassigned.");
+    // Reassignment after a transfer is allowed: the variable gets a fresh
+    // value, so clear the transferred flag (the new value is now owned and
+    // must be dropped at scope exit).
+    lhs_vi->transferred = false;
   }
   check_referent_access(assign.name, assign.location, true);
   Type slot_type = var_type.value();
@@ -2855,6 +2965,84 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       }
       return array_type(string_type());
     }
+    // Public API (ADR 0027).
+    if (ns_callee->member_name == "exists") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::exists expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::exists expects a string path.");
+      }
+      return bool_type();
+    }
+    if (ns_callee->member_name == "readtext") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::readtext expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::readtext expects a string path.");
+      }
+      return string_type();
+    }
+    if (ns_callee->member_name == "writetext") {
+      if (call_expr.args.size() != 2) {
+        error_at(call_expr.location, "fs::writetext expects exactly two arguments (path, text).");
+      } else {
+        if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+          error_at(call_expr.args[0]->location, "fs::writetext expects a string path.");
+        }
+        if (check_expr(*call_expr.args[1]).kind != TypeKind::String) {
+          error_at(call_expr.args[1]->location, "fs::writetext expects string content.");
+        }
+      }
+      return void_type();
+    }
+    if (ns_callee->member_name == "read") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::read expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::read expects a string path.");
+      }
+      return array_type(byte_type());
+    }
+    if (ns_callee->member_name == "write") {
+      if (call_expr.args.size() != 2) {
+        error_at(call_expr.location, "fs::write expects exactly two arguments (path, data).");
+      } else {
+        if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+          error_at(call_expr.args[0]->location, "fs::write expects a string path.");
+        }
+        // Verify data argument is byte[] (array of byte).
+        Type data_type = check_expr(*call_expr.args[1]);
+        if (data_type.kind != TypeKind::Array || !data_type.element_type ||
+            data_type.element_type->kind != TypeKind::Int ||
+            data_type.element_type->name != "uint8") {
+          error_at(call_expr.args[1]->location, "fs::write expects a byte[] array for data.");
+        }
+      }
+      return void_type();
+    }
+    // D2: fs::open(path) -> fs::file, fs::create(path) -> fs::file
+    if (ns_callee->member_name == "open") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::open expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::open expects a string path.");
+      }
+      Type file_type(TypeKind::Struct);
+      file_type.name = "fs::file";
+      file_type.is_resource = true;
+      return file_type;
+    }
+    if (ns_callee->member_name == "create") {
+      if (call_expr.args.size() != 1) {
+        error_at(call_expr.location, "fs::create expects exactly one argument (path).");
+      } else if (check_expr(*call_expr.args[0]).kind != TypeKind::String) {
+        error_at(call_expr.args[0]->location, "fs::create expects a string path.");
+      }
+      Type file_type(TypeKind::Struct);
+      file_type.name = "fs::file";
+      file_type.is_resource = true;
+      return file_type;
+    }
     error_at(ns_callee->location, "Unknown fs member '" + ns_callee->member_name + "'.");
     return void_type();
   }
@@ -2977,6 +3165,70 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
       error_at(ns_obj->location, "Module '" + ns_obj->namespace_name +
                                      "' is not imported. Add 'using " + ns_obj->namespace_name +
                                      ";' at the top of the file.");
+      return void_type();
+    }
+  }
+
+  // Handle fs::file method calls: f.read(buf), f.write(data), etc. (ADR 0027 D1)
+  if (field_callee) {
+    Type obj_type = check_expr(*field_callee->object);
+    if (obj_type.kind == TypeKind::Struct && obj_type.name == "fs::file") {
+      const std::string &method = field_callee->field_name;
+      if (method == "read") {
+        // read(mut byte[] buffer) -> usize (bytes read)
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location,
+                   "fs::file.read expects exactly one argument (byte[] buffer).");
+        } else {
+          Type buf_type = check_expr(*call_expr.args[0]);
+          if (buf_type.kind != TypeKind::Array || !buf_type.element_type ||
+              buf_type.element_type->kind != TypeKind::Int ||
+              buf_type.element_type->name != "uint8") {
+            error_at(call_expr.args[0]->location, "fs::file.read expects a byte[] buffer.");
+          }
+        }
+        return int_type(); // usize
+      }
+      if (method == "write") {
+        // write(byte[] data) -> usize (bytes written)
+        if (call_expr.args.size() != 1) {
+          error_at(call_expr.location,
+                   "fs::file.write expects exactly one argument (byte[] data).");
+        } else {
+          Type data_type = check_expr(*call_expr.args[0]);
+          if (data_type.kind != TypeKind::Array || !data_type.element_type ||
+              data_type.element_type->kind != TypeKind::Int ||
+              data_type.element_type->name != "uint8") {
+            error_at(call_expr.args[0]->location, "fs::file.write expects a byte[] array.");
+          }
+        }
+        return int_type();
+      }
+      if (method == "size") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "fs::file.size takes no arguments.");
+        }
+        return int_type(); // u64
+      }
+      if (method == "sync") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "fs::file.sync takes no arguments.");
+        }
+        return void_type();
+      }
+      if (method == "close") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "fs::file.close takes no arguments.");
+        }
+        return void_type();
+      }
+      if (method == "open") {
+        if (!call_expr.args.empty()) {
+          error_at(call_expr.location, "fs::file.open takes no arguments.");
+        }
+        return bool_type();
+      }
+      error_at(call_expr.location, "fs::file has no method '" + method + "'.");
       return void_type();
     }
   }
@@ -3419,9 +3671,13 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
         std::function<ast::TypeExpr(const ast::TypeExpr &)> substitute_concepts;
         substitute_concepts = [&](const ast::TypeExpr &te) -> ast::TypeExpr {
           if (te.type_args.empty()) {
-            auto concept_it = sema_.concept_registry_.find(te.name);
+            std::string concept_name = te.name;
+            if (concept_name == "io::reader" || concept_name == "io::writer") {
+              concept_name = concept_name.substr(4);
+            }
+            auto concept_it = sema_.concept_registry_.find(concept_name);
             if (concept_it != sema_.concept_registry_.end()) {
-              auto binding_it = concept_bindings.find(te.name);
+              auto binding_it = concept_bindings.find(concept_name);
               if (binding_it != concept_bindings.end()) {
                 return type_to_type_expr(binding_it->second);
               }
@@ -4889,6 +5145,21 @@ bool TypeChecker::type_satisfies_concept(const ast::ConceptDecl *concept_decl, c
   std::unordered_map<std::string, ast::TypeExpr> subst;
   subst[tp_name] = type_to_type_expr(concrete);
   const std::string key = type_match_key(concrete);
+
+  // Builtin resource types (fs::file) satisfy io::reader / io::writer through
+  // their compiler-native read/write methods, not through user free functions.
+  // This is the only builtin type with concept satisfaction -- if more builtin
+  // types need this in the future, refactor to a registry (e.g. a map from
+  // (builtin_type, concept_name) pairs to bool). For now, an explicit check is
+  // simpler and avoids premature abstraction.
+  if (concrete.kind == TypeKind::Struct && concrete.name == "fs::file" &&
+      concept_decl->name == "reader") {
+    return true;
+  }
+  if (concrete.kind == TypeKind::Struct && concrete.name == "fs::file" &&
+      concept_decl->name == "writer") {
+    return true;
+  }
 
   for (const ast::ConceptMethodDecl &method : concept_decl->methods) {
     const ast::FunctionDecl *impl = find_free_function_for_type(method.name, key);

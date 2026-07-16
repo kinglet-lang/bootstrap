@@ -417,6 +417,50 @@ void KirRecorder::on_emit(LoweringOp op, uint32_t operand, ast::SourceLocation l
   case LoweringOp::Drop:
     bb_.instrs.push_back(rec(KirOpcode::Drop, {static_cast<int32_t>(operand)}, location));
     break;
+  case LoweringOp::NativeFsExists:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFsExists, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFsReadText:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeFsReadText, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFsWriteText:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeFsWriteText, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFsReadBytes:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeFsReadBytes, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFsWriteBytes:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeFsWriteBytes, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFsOpen:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFsOpen, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFsCreate:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFsCreate, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFileRead:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFileRead, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFileWrite:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFileWrite, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFileSize:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFileSize, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFileSync:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFileSync, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFileClose:
+    bb_.instrs.push_back(rec(KirOpcode::NativeFileClose, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::NativeFileIsOpen:
+    bb_.instrs.push_back(
+        rec(KirOpcode::NativeFileIsOpen, {static_cast<int32_t>(operand)}, location));
+    break;
   default:
     bb_.instrs.push_back(rec(KirOpcode::Nop, {}, location));
     break;

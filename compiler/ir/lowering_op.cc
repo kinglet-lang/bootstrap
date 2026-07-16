@@ -205,6 +205,32 @@ const char *lowering_op_name(LoweringOp op) {
     return "BorrowIndexMut";
   case LoweringOp::Drop:
     return "Drop";
+  case LoweringOp::NativeFsExists:
+    return "NativeFsExists";
+  case LoweringOp::NativeFsReadText:
+    return "NativeFsReadText";
+  case LoweringOp::NativeFsWriteText:
+    return "NativeFsWriteText";
+  case LoweringOp::NativeFsReadBytes:
+    return "NativeFsReadBytes";
+  case LoweringOp::NativeFsWriteBytes:
+    return "NativeFsWriteBytes";
+  case LoweringOp::NativeFsOpen:
+    return "NativeFsOpen";
+  case LoweringOp::NativeFsCreate:
+    return "NativeFsCreate";
+  case LoweringOp::NativeFileRead:
+    return "NativeFileRead";
+  case LoweringOp::NativeFileWrite:
+    return "NativeFileWrite";
+  case LoweringOp::NativeFileSize:
+    return "NativeFileSize";
+  case LoweringOp::NativeFileSync:
+    return "NativeFileSync";
+  case LoweringOp::NativeFileClose:
+    return "NativeFileClose";
+  case LoweringOp::NativeFileIsOpen:
+    return "NativeFileIsOpen";
   }
   return "Unknown";
 }

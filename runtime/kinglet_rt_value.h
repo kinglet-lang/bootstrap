@@ -83,6 +83,21 @@ kl_h kl_native_fs_write(kl_h path, kl_h content);
 // type: policy lives in the caller. Returns a kl_h array of kl_h strings,
 // or 0 (null) if the path cannot be opened as a directory.
 kl_h kl_native_fs_listdir(kl_h path);
+// Public API (ADR 0027): exists, readtext, writetext, read (bytes), write (bytes).
+// These complement the legacy __read/__write/__listdir intrinsics.
+kl_h kl_native_fs_exists(kl_h path);
+kl_h kl_native_fs_readtext(kl_h path);
+kl_h kl_native_fs_writetext(kl_h path, kl_h content);
+kl_h kl_native_fs_read_bytes(kl_h path);
+kl_h kl_native_fs_write_bytes(kl_h path, kl_h data);
+kl_h kl_native_fs_open(kl_h path);
+kl_h kl_native_fs_create(kl_h path);
+kl_h kl_native_file_read(kl_h file, kl_h buffer);
+kl_h kl_native_file_write(kl_h file, kl_h data);
+kl_h kl_native_file_size(kl_h file);
+kl_h kl_native_file_sync(kl_h file);
+kl_h kl_native_file_close(kl_h file);
+kl_h kl_native_file_is_open(kl_h file);
 kl_h kl_native_sys_args(void);
 kl_h kl_invoke_native(kl_h callee, int32_t argc, const kl_h *args);
 // Reference counting for heap values. No-ops on plain integers and inline

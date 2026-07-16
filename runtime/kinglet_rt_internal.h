@@ -21,6 +21,7 @@ enum class KlKind : uint8_t {
   Map = 5,
   FieldMutRef = 6,
   IndexMutRef = 7,
+  File = 8,
 };
 
 struct KlHeader {
@@ -104,6 +105,15 @@ struct KlIndexMutRef {
   KlHeader hdr{KlKind::IndexMutRef};
   kl_h array_obj = 0;
   int32_t index = -1;
+};
+
+struct KlFile {
+  KlHeader hdr{KlKind::File};
+  // Native file handle. -1 means closed/invalid.
+  // On POSIX this stores a POSIX fd cast to int64_t; on Windows a HANDLE.
+  int64_t fd = -1;
+  // 0 = read mode, 1 = write mode (set by fs::open / fs::create).
+  int32_t write_mode = 0;
 };
 
 inline KlKind kl_heap_kind(kl_h value) {

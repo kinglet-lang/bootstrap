@@ -14,6 +14,10 @@
 
 #include <vector>
 
+#if defined(__unix__) || defined(__APPLE__)
+#include <unistd.h>
+#endif
+
 extern "C" {
 
 void kl_retain(kl_h value) {
@@ -107,9 +111,23 @@ void kl_release(kl_h value) {
       delete static_cast<KlFieldMutRef *>(kl_unbox_ptr(v));
       break;
     case KlKind::IndexMutRef:
-      // Borrows the array; does not own it — do not cascade into array_obj.
+      // Borrows the array; does not own it - do not cascade into array_obj.
       delete static_cast<KlIndexMutRef *>(kl_unbox_ptr(v));
       break;
+    case KlKind::File: {
+      // Close the native handle before freeing, so file handles are not
+      // leaked even if the user forgot to call .close().
+      auto *f = static_cast<KlFile *>(kl_unbox_ptr(v));
+      if (f->fd >= 0) {
+#if defined(__unix__) || defined(__APPLE__)
+        ::close(static_cast<int>(f->fd));
+#else
+        ::_close(static_cast<int>(f->fd));
+#endif
+      }
+      delete f;
+      break;
+    }
     }
   }
 }

@@ -9,7 +9,14 @@ namespace kinglet {
 
 bool SemanticContext::function_uses_concept_params(const ast::FunctionDecl &function) const {
   return std::ranges::any_of(function.params, [this](const ast::Parameter &param) {
-    return param.type.type_args.empty() && concept_registry_.contains(param.type.name);
+    if (concept_registry_.contains(param.type.name)) {
+      return true;
+    }
+    // Handle io::-qualified builtin concept names (ADR 0026 D7).
+    if (param.type.name == "io::reader" || param.type.name == "io::writer") {
+      return concept_registry_.contains(param.type.name.substr(4));
+    }
+    return false;
   });
 }
 

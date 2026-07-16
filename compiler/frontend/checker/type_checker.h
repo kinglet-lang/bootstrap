@@ -349,6 +349,9 @@ private:
   std::vector<TypeError> errors_;
   std::unordered_map<std::string, KirFunctionSig> kir_function_sigs_;
   std::unordered_set<std::string> imported_bare_names_; // for selective imports
+  // Owns the built-in io::reader / io::writer concept declarations so the
+  // raw pointers in concept_registry_ remain valid for the checker's lifetime.
+  std::vector<std::unique_ptr<const ast::ConceptDecl>> builtin_concepts_;
   // Per-namespace exported / private symbol names, populated when an import is
   // processed. Used to give a precise diagnostic for `using mod { sym };` when
   // a symbol is missing from the module or exists but is not pub.

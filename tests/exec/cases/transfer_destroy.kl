@@ -1,0 +1,32 @@
+// RUN: run
+// CHECK: b: 1
+// CHECK: consuming 42
+// CHECK: destroy 42
+// CHECK: destroy 1
+
+using io;
+
+struct Tag {
+  int id;
+  @destroy {
+    io::out("destroy {}\n", self.id);
+  }
+}
+
+int consume(Tag t) {
+  io::out("consuming {}\n", t.id);
+  return 0;
+}
+
+int main() {
+  // VarDecl transfer: Tag b = a;
+  Tag a { 1 };
+  Tag b = a;
+  io::out("b: {}\n", b.id);
+
+  // Parameter transfer: consume(c)
+  Tag c { 42 };
+  consume(c);
+
+  return 0;
+}

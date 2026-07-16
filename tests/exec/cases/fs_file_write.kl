@@ -1,0 +1,34 @@
+// RUN: run
+// CHECK: 5
+// CHECK: World
+
+using io;
+using fs;
+
+int main() {
+  // D2: fs::create(path) -> fs::file (write mode)
+  fs::file output = fs::create("/tmp/kinglet_fs_write_test.txt");
+
+  // Build a byte[] buffer with "World" (5 bytes)
+  byte[] data;
+  data.resize(5, byte(0));
+  data[0] = byte(87);  // W
+  data[1] = byte(111); // o
+  data[2] = byte(114); // r
+  data[3] = byte(108); // l
+  data[4] = byte(100); // d
+
+  // D1: file.write(byte[] data) -> usize (bytes written)
+  int n = output.write(data);
+  io::out.line("{}", n);
+
+  // D1: file.sync()
+  output.sync();
+  output.close();
+
+  // Read back and verify
+  string content = fs::readtext("/tmp/kinglet_fs_write_test.txt");
+  io::out.line("{}", content);
+
+  return 0;
+}

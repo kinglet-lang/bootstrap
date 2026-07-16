@@ -517,6 +517,8 @@ void Compiler::emit_scope_exit_drops(std::size_t target_slot) {
     const Local &local = locals_[i - 1];
     if (local.slot_kind != Local::SlotKind::Value)
       continue;
+    if (local.transferred)
+      continue;
     auto type_it = local_types_.find(local.name);
     if (type_it == local_types_.end())
       continue;
@@ -546,6 +548,33 @@ void Compiler::pop_scope() {
 
   while (locals_.size() > target) {
     locals_.pop_back();
+  }
+}
+
+void Compiler::emit_parameter_drops(const ast::FunctionDecl &function) {
+  // Drop resource-type parameters in reverse order before Return/fallthrough.
+  // Skip reference parameters (they don't own the value) and the @destroy
+  // function's self param (would infinite-loop).
+  for (std::size_t i = function.params.size(); i > 0; --i) {
+    const auto &param = function.params[i - 1];
+    if (param.type.name == "&" || param.type.name == "&mut")
+      continue;
+    // Look up the parameter's type (may be overridden for generics).
+    auto type_it = local_types_.find(param.name);
+    if (type_it == local_types_.end())
+      continue;
+    auto struct_it = struct_indices_.find(type_it->second);
+    if (struct_it == struct_indices_.end())
+      continue;
+    const auto &meta = struct_metas_[static_cast<std::size_t>(struct_it->second)];
+    if (!meta.has_destroy)
+      continue;
+    // Skip if this parameter was transferred inside the function body.
+    if (i - 1 < locals_.size() && locals_[i - 1].transferred)
+      continue;
+    emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(i - 1), ast::SourceLocation{0, 0});
+    emit_operand(LoweringOp::Drop, static_cast<uint32_t>(struct_it->second),
+                 ast::SourceLocation{0, 0});
   }
 }
 
@@ -582,6 +611,14 @@ std::string Compiler::infer_struct_type(const ast::Expr &expr) const {
       auto ret_it = method_return_types_.find(callee_id->name);
       if (ret_it != method_return_types_.end() && struct_indices_.count(ret_it->second))
         return ret_it->second;
+    }
+    // Handle namespace-qualified calls that return builtin resource types
+    // (e.g. fs::open(path) -> fs::file, fs::create(path) -> fs::file).
+    if (const auto *ns_callee = dynamic_cast<const ast::NamespaceAccessExpr *>(call->callee.get())) {
+      if (ns_callee->namespace_name == "fs" &&
+          (ns_callee->member_name == "open" || ns_callee->member_name == "create")) {
+        return "fs::file";
+      }
     }
     if (const auto *field_callee = dynamic_cast<const ast::FieldAccessExpr *>(call->callee.get())) {
       std::string obj_type = infer_struct_type(*field_callee->object);
@@ -673,6 +710,12 @@ void Compiler::compile_function(
       // infer_arg_type_name/resolve_free_function_for_type only match on
       // concrete type names.
       auto override_it = param_type_overrides.find(param.type.name);
+      if (override_it == param_type_overrides.end()) {
+        // Handle io::-qualified builtin concept names (ADR 0026 D7).
+        if (param.type.name == "io::reader" || param.type.name == "io::writer") {
+          override_it = param_type_overrides.find(param.type.name.substr(4));
+        }
+      }
       local_types_[param.name] =
           override_it != param_type_overrides.end() ? override_it->second : param.type.name;
     }
@@ -734,6 +777,13 @@ void Compiler::compile_function(
   // Use the override body for @destroy functions, otherwise the function body.
   const ast::Stmt &body_stmt = destroy_override ? *destroy_override : *function.body;
 
+  // Track whether we're inside a @destroy function (to suppress param drops)
+  // and the current function decl (for ReturnStmt param drops).
+  const bool prev_in_destroy = in_destroy_function_;
+  const ast::FunctionDecl *prev_fn = current_function_;
+  in_destroy_function_ = (destroy_override != nullptr);
+  current_function_ = &function;
+
   // Detect implicit return: if last statement in body is an ExprStmt,
   // compile it as a return instead of discarding the value.
   const auto *body = dynamic_cast<const ast::BlockStmt *>(&body_stmt);
@@ -758,10 +808,17 @@ void Compiler::compile_function(
     for (std::size_t si = scope_stack_.size(); si > 0; --si) {
       emit_scope_exit_drops(scope_stack_[si - 1]);
     }
+    // Drop resource-type parameters (but not @destroy's own self param,
+    // which would infinite-loop).
+    if (!in_destroy_function_) {
+      emit_parameter_drops(*current_function_);
+    }
     emit(LoweringOp::Null, function.location);
     emit(LoweringOp::Return, function.location);
   }
   kir_recorder_.end_function(&kir_module_);
+  in_destroy_function_ = prev_in_destroy;
+  current_function_ = prev_fn;
   compiling_namespace_ = prev_compiling_ns;
 }
 
@@ -796,6 +853,10 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
 
   if (const auto *return_stmt = dynamic_cast<const ast::ReturnStmt *>(&stmt)) {
     if (return_stmt->value) {
+      // If returning a bare resource-type identifier, mark it as
+      // transferred so its Drop is suppressed at scope exit (the value
+      // is being returned to the caller, not destroyed here).
+      mark_transferred_if_resource(*return_stmt->value);
       compile_expr(*return_stmt->value);
     } else {
       emit(LoweringOp::Null, return_stmt->location);
@@ -805,10 +866,14 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
     // Iterate from innermost scope to outermost; the outermost scope
     // boundary (scope_stack_[0]) is the function body scope, which
     // starts after parameter slots -- parameters are NOT dropped here
-    // (the LLVM backend's Ret handler releases them via kl_release,
-    // and dropping a @destroy struct's self param would infinite-loop).
+    // (see emit_parameter_drops below).
     for (std::size_t si = scope_stack_.size(); si > 0; --si) {
       emit_scope_exit_drops(scope_stack_[si - 1]);
+    }
+    // Drop resource-type parameters before Return (but not in @destroy
+    // functions, whose self param would infinite-loop).
+    if (!in_destroy_function_) {
+      emit_parameter_drops(*current_function_);
     }
     emit(LoweringOp::Return, return_stmt->location);
     return;
@@ -840,6 +905,10 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
       if (local_is_ref(slot)) {
         compile_lvalue_addr(*var_decl->init);
       } else {
+        // Resource type transfer: if the initializer is a bare identifier
+        // of a resource type, mark the source local as transferred so its
+        // Drop is suppressed at scope exit (prevents double-destroy).
+        mark_transferred_if_resource(*var_decl->init);
         compile_expr(*var_decl->init);
       }
     } else {
@@ -894,14 +963,31 @@ void Compiler::compile_stmt(const ast::Stmt &stmt) {
   if (const auto *if_stmt = dynamic_cast<const ast::IfStmt *>(&stmt)) {
     compile_expr(*if_stmt->condition);
     const std::size_t then_jump = emit_jump(LoweringOp::JmpFalse, if_stmt->location);
+    // Snapshot transferred flags before each branch so a transfer in one
+    // branch does not leak to the other branch's scope-exit drops.
+    auto saved = snapshot_transferred();
     compile_stmt(*if_stmt->then_branch);
+    const auto then_transferred = snapshot_transferred();
+    restore_transferred(saved);
     if (if_stmt->else_branch) {
       const std::size_t else_jump = emit_jump(LoweringOp::Jmp, if_stmt->location);
       patch_jump(then_jump);
       compile_stmt(*if_stmt->else_branch);
+      const auto else_transferred = snapshot_transferred();
+      restore_transferred(saved);
+      // After both branches, a local is transferred only if it was
+      // transferred on BOTH paths (conservative: if either branch still
+      // owns it, we must drop it).
       patch_jump(else_jump);
+      const std::size_t n =
+          std::min({then_transferred.size(), else_transferred.size(), locals_.size()});
+      for (std::size_t i = 0; i < n; ++i)
+        locals_[i].transferred = then_transferred[i] && else_transferred[i];
     } else {
       patch_jump(then_jump);
+      // No else branch: the then-branch is conditional, so a transfer
+      // inside it does not necessarily happen. Restore to pre-then state.
+      restore_transferred(saved);
     }
     return;
   }
@@ -1370,6 +1456,64 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
                    call_expr.location);
       return;
     }
+    // Public API (ADR 0027).
+    if (ns_callee->member_name == "exists") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsExists, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (ns_callee->member_name == "readtext") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsReadText, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (ns_callee->member_name == "writetext") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsWriteText, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (ns_callee->member_name == "read") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsReadBytes, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (ns_callee->member_name == "write") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsWriteBytes, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    // D2: fs::open(path) / fs::create(path)
+    if (ns_callee->member_name == "open") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsOpen, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
+    if (ns_callee->member_name == "create") {
+      for (const ast::ExprPtr &arg : call_expr.args) {
+        compile_expr(*arg);
+      }
+      emit_operand(LoweringOp::NativeFsCreate, static_cast<uint32_t>(call_expr.args.size()),
+                   call_expr.location);
+      return;
+    }
   }
 
   // Handle sys::args() direct call.
@@ -1495,6 +1639,53 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     }
   }
 
+  // Handle fs::file method calls (ADR 0027 D1)
+  if (field_callee) {
+    std::string file_obj_type = infer_struct_type(*field_callee->object);
+    if (file_obj_type == "fs::file") {
+      const std::string &method = field_callee->field_name;
+      if (method == "read") {
+        // compile file handle, then buffer
+        compile_expr(*field_callee->object);
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(LoweringOp::NativeFileRead, static_cast<uint32_t>(call_expr.args.size() + 1),
+                     call_expr.location);
+        return;
+      }
+      if (method == "write") {
+        compile_expr(*field_callee->object);
+        for (const ast::ExprPtr &arg : call_expr.args) {
+          compile_expr(*arg);
+        }
+        emit_operand(LoweringOp::NativeFileWrite, static_cast<uint32_t>(call_expr.args.size() + 1),
+                     call_expr.location);
+        return;
+      }
+      if (method == "size") {
+        compile_expr(*field_callee->object);
+        emit_operand(LoweringOp::NativeFileSize, 1, call_expr.location);
+        return;
+      }
+      if (method == "sync") {
+        compile_expr(*field_callee->object);
+        emit_operand(LoweringOp::NativeFileSync, 1, call_expr.location);
+        return;
+      }
+      if (method == "close") {
+        compile_expr(*field_callee->object);
+        emit_operand(LoweringOp::NativeFileClose, 1, call_expr.location);
+        return;
+      }
+      if (method == "open") {
+        compile_expr(*field_callee->object);
+        emit_operand(LoweringOp::NativeFileIsOpen, 1, call_expr.location);
+        return;
+      }
+    }
+  }
+
   // Handle array/string method calls
   if (field_callee) {
     const std::string &method = field_callee->field_name;
@@ -1611,12 +1802,24 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       std::string method_key = obj_type + "::" + field_callee->field_name;
       auto func_it = function_indices_.find(method_key);
       if (func_it != function_indices_.end()) {
-        compile_expr(*field_callee->object);
+        // If the receiver is a bare resource-type identifier passed by
+        // value, mark it as transferred (callee drops self; caller must
+        // not re-drop). Reference receivers (`&self`/`&mut self`) retain
+        // ownership and are not transferred.
         const ast::FunctionDecl *resolved_decl = nullptr;
         if (auto decl_it = function_decl_by_index_.find(func_it->second);
             decl_it != function_decl_by_index_.end()) {
           resolved_decl = decl_it->second;
         }
+        bool receiver_by_value = true;
+        if (resolved_decl && !resolved_decl->params.empty()) {
+          const auto &first_param = resolved_decl->params[0];
+          if (first_param.type.name == "&" || first_param.type.name == "&mut")
+            receiver_by_value = false;
+        }
+        if (receiver_by_value)
+          mark_transferred_if_resource(*field_callee->object);
+        compile_expr(*field_callee->object);
         // Receiver (params[0]) was already compiled above via compile_expr on
         // field_callee->object directly; call_expr.args maps to params[1..].
         compile_call_arguments(call_expr.args, resolved_decl, /*param_offset=*/1);
@@ -1638,13 +1841,67 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       if (free_idx < 0) {
         free_idx = resolve_free_function_for_type(field_callee->field_name, receiver_ty);
       }
+      // Fallback: builtin fs::file methods for concept-generic monomorphization.
+      // When a concept-generic function is instantiated with fs::file, UFCS
+      // dispatch (resolve_free_function_for_type) fails because fs::file has no
+      // user free functions. Fall back to the native file method handler.
+      if (free_idx < 0 && receiver_ty == "fs::file") {
+        const std::string &method = field_callee->field_name;
+        if (method == "read") {
+          compile_expr(*field_callee->object);
+          for (const ast::ExprPtr &arg : call_expr.args) {
+            compile_expr(*arg);
+          }
+          emit_operand(LoweringOp::NativeFileRead, static_cast<uint32_t>(call_expr.args.size() + 1),
+                       call_expr.location);
+          return;
+        }
+        if (method == "write") {
+          compile_expr(*field_callee->object);
+          for (const ast::ExprPtr &arg : call_expr.args) {
+            compile_expr(*arg);
+          }
+          emit_operand(LoweringOp::NativeFileWrite,
+                       static_cast<uint32_t>(call_expr.args.size() + 1), call_expr.location);
+          return;
+        }
+        if (method == "size") {
+          compile_expr(*field_callee->object);
+          emit_operand(LoweringOp::NativeFileSize, 1, call_expr.location);
+          return;
+        }
+        if (method == "sync") {
+          compile_expr(*field_callee->object);
+          emit_operand(LoweringOp::NativeFileSync, 1, call_expr.location);
+          return;
+        }
+        if (method == "close") {
+          compile_expr(*field_callee->object);
+          emit_operand(LoweringOp::NativeFileClose, 1, call_expr.location);
+          return;
+        }
+        if (method == "open") {
+          compile_expr(*field_callee->object);
+          emit_operand(LoweringOp::NativeFileIsOpen, 1, call_expr.location);
+          return;
+        }
+      }
       if (free_idx >= 0) {
-        compile_expr(*field_callee->object);
         const ast::FunctionDecl *resolved_decl = nullptr;
         if (auto decl_it = function_decl_by_index_.find(free_idx);
             decl_it != function_decl_by_index_.end()) {
           resolved_decl = decl_it->second;
         }
+        // Same receiver-transfer logic as impl-method path above.
+        bool receiver_by_value = true;
+        if (resolved_decl && !resolved_decl->params.empty()) {
+          const auto &first_param = resolved_decl->params[0];
+          if (first_param.type.name == "&" || first_param.type.name == "&mut")
+            receiver_by_value = false;
+        }
+        if (receiver_by_value)
+          mark_transferred_if_resource(*field_callee->object);
+        compile_expr(*field_callee->object);
         compile_call_arguments(call_expr.args, resolved_decl, /*param_offset=*/1);
         emit_constant(Value::function_value(free_idx), call_expr.location);
         emit_operand(LoweringOp::Call, static_cast<uint32_t>(call_expr.args.size() + 1),
@@ -1690,7 +1947,10 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     if (type_arg_names.size() == decl->type_params.size()) {
       std::string mangled = callee_id->name;
       for (const std::string &n : type_arg_names) {
-        mangled += "__" + n;
+        // Sanitize :: to avoid breaking LLVM function names.
+        std::string safe = n;
+        std::replace(safe.begin(), safe.end(), ':', '_');
+        mangled += "$" + safe;
       }
       auto func_it = function_indices_.find(mangled);
       if (func_it == function_indices_.end()) {
@@ -1740,10 +2000,15 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
     std::unordered_map<std::string, std::string> overrides;
     for (std::size_t i = 0; i < decl->params.size() && i < call_expr.args.size(); ++i) {
       const ast::TypeExpr &pt = decl->params[i].type;
-      if (pt.type_args.empty() && sema_->concept_registry_.count(pt.name)) {
+      // Handle io::-qualified builtin concept names (ADR 0026 D7).
+      std::string concept_name = pt.name;
+      if (concept_name == "io::reader" || concept_name == "io::writer") {
+        concept_name = concept_name.substr(4);
+      }
+      if (pt.type_args.empty() && sema_->concept_registry_.count(concept_name)) {
         const std::string ty = infer_arg_type_name(*call_expr.args[i]);
         if (!ty.empty()) {
-          overrides[pt.name] = ty;
+          overrides[concept_name] = ty;
           if (concrete_ty.empty()) {
             concrete_ty = ty;
           }
@@ -1751,7 +2016,11 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
       }
     }
     if (!concrete_ty.empty()) {
-      const std::string mangled = callee_id->name + "__" + concrete_ty;
+      // Sanitize :: in concrete type name to avoid breaking LLVM function names.
+      // Use '$' as separator (invalid in source-level identifiers, so no collision).
+      std::string safe_ty = concrete_ty;
+      std::replace(safe_ty.begin(), safe_ty.end(), ':', '_');
+      const std::string mangled = callee_id->name + "$" + safe_ty;
       auto func_it = function_indices_.find(mangled);
       if (func_it == function_indices_.end()) {
         int idx = static_cast<int>(function_infos_.size());
@@ -2249,21 +2518,26 @@ void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
     return;
   }
   compile_expr(*field_access.object);
-  uint32_t field_const = add_constant_(Value::string_value(field_access.field_name));
-  emit_operand(LoweringOp::FieldGet, field_const, field_access.location);
   if (field_access.optional_access) {
-    // After FieldGet the stack top is the Optional field value.  JmpIfErr
-    // peeks at it: if it is the null/error sentinel, jump to the fallback
-    // path that replaces it with Null; otherwise fall through with the
-    // unwrapped value already on the stack.
+    // For `field?`: check the object for null BEFORE FieldGet.
+    // If null, skip FieldGet and push Null (the null sentinel).
+    // This prevents the subsequent plain `.field` in a chain from
+    // reading garbage off the null sentinel's bit pattern.
+    // JmpIfErr peeks at the stack top without consuming it.
     const std::size_t null_jump = emit_jump(LoweringOp::JmpIfErr, field_access.location);
-    // Non-null path: skip the fallback.
+    // Non-null path: FieldGet reads the field value.
+    uint32_t field_const = add_constant_(Value::string_value(field_access.field_name));
+    emit_operand(LoweringOp::FieldGet, field_const, field_access.location);
     const std::size_t end_jump = emit_jump(LoweringOp::Jmp, field_access.location);
-    // Null fallback.
+    // Null path: pop the null object, push Null.
     patch_jump(null_jump);
     emit(LoweringOp::Pop, field_access.location);
     emit(LoweringOp::Null, field_access.location);
     patch_jump(end_jump);
+  } else {
+    // Plain `.field` (no `?`): just FieldGet.
+    uint32_t field_const = add_constant_(Value::string_value(field_access.field_name));
+    emit_operand(LoweringOp::FieldGet, field_const, field_access.location);
   }
   return;
 }
@@ -2331,9 +2605,10 @@ void Compiler::compile_cast(const ast::CastExpr &cast) {
   compile_expr(*cast.value);
   int target_kind = -1;
   const std::string &t = cast.target_type.name;
-  if (t == "int")
+  if (t == "int" || t == "int8" || t == "int16" || t == "int32" || t == "int64" || t == "uint8" ||
+      t == "uint16" || t == "uint32" || t == "uint64")
     target_kind = 0;
-  else if (t == "float")
+  else if (t == "float" || t == "float32" || t == "float64" || t == "double")
     target_kind = 1;
   else if (t == "string")
     target_kind = 2;
@@ -2434,6 +2709,10 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
   }
 
   if (assign.op == ast::AssignOp::Assign) {
+    // Resource type transfer: if the RHS is a bare identifier of a resource
+    // type, mark the source local as transferred so its Drop is suppressed at
+    // scope exit (prevents double-destroy).
+    mark_transferred_if_resource(*assign.value);
     compile_expr(*assign.value);
   } else {
     emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(slot), assign.location);
@@ -2458,6 +2737,10 @@ void Compiler::compile_assignment(const ast::AssignExpr &assign) {
   }
 
   emit_operand(LoweringOp::StoreLocal, static_cast<uint32_t>(slot), assign.location);
+  // A new value was stored into the destination local, so it now owns a
+  // fresh value. Reset the transferred flag so the scope-exit Drop fires
+  // for the new value (prevents leak when reassigning after a prior move).
+  locals_[static_cast<std::size_t>(slot)].transferred = false;
 }
 
 void Compiler::emit(LoweringOp op, ast::SourceLocation location) {
@@ -2518,6 +2801,39 @@ bool Compiler::local_is_mut_ref(int slot) const {
   return locals_[static_cast<std::size_t>(slot)].slot_kind == Local::SlotKind::MutRef;
 }
 
+void Compiler::mark_transferred_if_resource(const ast::Expr &expr) {
+  const auto *id_expr = dynamic_cast<const ast::IdentifierExpr *>(&expr);
+  if (!id_expr)
+    return;
+  const int src_slot = resolve_local(id_expr->name);
+  if (src_slot < 0)
+    return;
+  auto src_type_it = local_types_.find(id_expr->name);
+  if (src_type_it == local_types_.end())
+    return;
+  auto src_struct_it = struct_indices_.find(src_type_it->second);
+  if (src_struct_it == struct_indices_.end())
+    return;
+  if (struct_metas_[static_cast<std::size_t>(src_struct_it->second)].has_destroy) {
+    locals_[static_cast<std::size_t>(src_slot)].transferred = true;
+  }
+}
+
+std::vector<bool> Compiler::snapshot_transferred() const {
+  std::vector<bool> snapshot(locals_.size());
+  for (std::size_t i = 0; i < locals_.size(); ++i)
+    snapshot[i] = locals_[i].transferred;
+  return snapshot;
+}
+
+void Compiler::restore_transferred(const std::vector<bool> &snapshot) {
+  // The snapshot may be shorter if new locals were declared in the branch
+  // and then popped. Only restore entries that still exist.
+  const std::size_t n = std::min(snapshot.size(), locals_.size());
+  for (std::size_t i = 0; i < n; ++i)
+    locals_[i].transferred = snapshot[i];
+}
+
 void Compiler::compile_call_arguments(const std::vector<ast::ExprPtr> &args,
                                       const ast::FunctionDecl *decl, std::size_t param_offset) {
   // An explicit `&expr` marker (ADR 0028 D3) contributes nothing extra at
@@ -2540,6 +2856,10 @@ void Compiler::compile_call_arguments(const std::vector<ast::ExprPtr> &args,
     if (wants_ref) {
       compile_lvalue_addr(referent);
     } else {
+      // Resource type transfer via parameter: mark the source local as
+      // transferred so its Drop is suppressed at scope exit (prevents
+      // double-destroy: callee drops the parameter, we must not re-drop).
+      mark_transferred_if_resource(referent);
       compile_expr(referent);
     }
   }

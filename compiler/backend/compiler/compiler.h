@@ -49,6 +49,7 @@ private:
     std::string name;
     bool is_mutable = true;
     bool is_resource = false;
+    bool transferred = false; // Resource type moved out via assignment/param transfer
     enum class SlotKind { Value, Ref, MutRef } slot_kind = SlotKind::Value;
   };
 
@@ -64,6 +65,10 @@ private:
   // truncate locals_ -- used by ReturnStmt to emit drops for all enclosing
   // scopes before the Return instruction, so the drops are reachable.
   void emit_scope_exit_drops(std::size_t target_slot);
+  // Emit Drop instructions for resource-type function parameters.
+  // Called before Return and at fallthrough. Skipped for @destroy
+  // functions (self param would infinite-loop).
+  void emit_parameter_drops(const ast::FunctionDecl &function);
 
   void
   compile_function(const ast::FunctionDecl &function, const std::string &lookup_name = "",
@@ -209,6 +214,12 @@ private:
   // (from StructDecl::destroy_decl->body) that compile_function should use
   // instead of the synthetic FunctionDecl's empty placeholder body.
   std::unordered_map<int, const ast::Stmt *> destroy_body_overrides_;
+  // True while compiling a @destroy function body (suppresses param drops
+  // to avoid infinite recursion on self).
+  bool in_destroy_function_ = false;
+  // Pointer to the function currently being compiled (for param drops
+  // in ReturnStmt path).
+  const ast::FunctionDecl *current_function_ = nullptr;
   // Compiles each call argument, taking its address instead of its value
   // wherever `decl`'s declared parameter type at that position is
   // reference-typed (`T&` / `const T&`, ADR 0028 D3) -- mirrors
@@ -221,6 +232,16 @@ private:
   // and pass only the remaining call_expr.args here, so args[i] corresponds
   // to decl->params[i + param_offset] (offset 1, skipping the receiver
   // param), not decl->params[i].
+  // Mark a bare-identifier local as transferred if it is a resource type
+  // (has @destroy). Used by VarDecl init, AssignExpr, call arguments,
+  // return statements, and method-call receivers to suppress the source
+  // local's Drop at scope exit (prevents double-destroy).
+  void mark_transferred_if_resource(const ast::Expr &expr);
+  // Snapshot/restore transferred flags for all locals currently in scope.
+  // Used around IfStmt/loop branches so a transfer in one branch does not
+  // leak to the other branch's drop code.
+  std::vector<bool> snapshot_transferred() const;
+  void restore_transferred(const std::vector<bool> &snapshot);
   void compile_call_arguments(const std::vector<ast::ExprPtr> &args, const ast::FunctionDecl *decl,
                               std::size_t param_offset = 0);
   std::unordered_map<std::string, int> struct_indices_;

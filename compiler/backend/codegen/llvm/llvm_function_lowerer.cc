@@ -146,6 +146,19 @@ struct RtFns {
   llvm::Function *native_fs_read = nullptr;
   llvm::Function *native_fs_write = nullptr;
   llvm::Function *native_fs_listdir = nullptr;
+  llvm::Function *native_fs_exists = nullptr;
+  llvm::Function *native_fs_readtext = nullptr;
+  llvm::Function *native_fs_writetext = nullptr;
+  llvm::Function *native_fs_read_bytes = nullptr;
+  llvm::Function *native_fs_write_bytes = nullptr;
+  llvm::Function *native_fs_open = nullptr;
+  llvm::Function *native_fs_create = nullptr;
+  llvm::Function *native_file_read = nullptr;
+  llvm::Function *native_file_write = nullptr;
+  llvm::Function *native_file_size = nullptr;
+  llvm::Function *native_file_sync = nullptr;
+  llvm::Function *native_file_close = nullptr;
+  llvm::Function *native_file_is_open = nullptr;
   llvm::Function *native_sys_args = nullptr;
   llvm::Function *invoke_native = nullptr;
   llvm::Function *value_eq = nullptr;
@@ -276,6 +289,46 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.native_fs_listdir =
       llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
                              llvm::Function::ExternalLinkage, "kl_native_fs_listdir", module);
+  rt.native_fs_exists =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_exists", module);
+  rt.native_fs_readtext =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_readtext", module);
+  rt.native_fs_writetext =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_writetext", module);
+  rt.native_fs_read_bytes =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_read_bytes", module);
+  rt.native_fs_write_bytes =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_write_bytes", module);
+  // File handle API (ADR 0027 D1+D2)
+  rt.native_fs_open =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_open", module);
+  rt.native_fs_create =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_fs_create", module);
+  rt.native_file_read =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_file_read", module);
+  rt.native_file_write =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_file_write", module);
+  rt.native_file_size =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_file_size", module);
+  rt.native_file_sync =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_file_sync", module);
+  rt.native_file_close =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_file_close", module);
+  rt.native_file_is_open =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_native_file_is_open", module);
   rt.native_sys_args =
       llvm::Function::Create(llvm::FunctionType::get(i64, false), llvm::Function::ExternalLinkage,
                              "kl_native_sys_args", module);
@@ -2343,6 +2396,205 @@ public:
         llvm::Value *contents = builder.CreateCall(rt_.native_fs_listdir, {path});
         push(contents);
         temps[i] = contents;
+        break;
+      }
+      case KirOpcode::NativeFsExists: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_fs_exists expects exactly one argument";
+          return false;
+        }
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
+        if (path == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_fs_exists, {path});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeFsReadText: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_fs_readtext expects exactly one argument";
+          return false;
+        }
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
+        if (path == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_fs_readtext, {path});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeFsWriteText: {
+        const int argc = instr->operands[0];
+        if (argc != 2) {
+          *error = "native_fs_writetext expects exactly two arguments";
+          return false;
+        }
+        llvm::Value *content = pop_value(&stack, error, &type_stack);
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
+        if (path == nullptr || content == nullptr) {
+          return false;
+        }
+        builder.CreateCall(rt_.native_fs_writetext, {path, content});
+        push(llvm::ConstantInt::get(i64, 0));
+        temps[i] = stack.back();
+        break;
+      }
+      case KirOpcode::NativeFsReadBytes: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_fs_read_bytes expects exactly one argument";
+          return false;
+        }
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
+        if (path == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_fs_read_bytes, {path});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeFsWriteBytes: {
+        const int argc = instr->operands[0];
+        if (argc != 2) {
+          *error = "native_fs_write_bytes expects exactly two arguments";
+          return false;
+        }
+        llvm::Value *data = pop_value(&stack, error, &type_stack);
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
+        if (path == nullptr || data == nullptr) {
+          return false;
+        }
+        builder.CreateCall(rt_.native_fs_write_bytes, {path, data});
+        push(llvm::ConstantInt::get(i64, 0));
+        temps[i] = stack.back();
+        break;
+      }
+      case KirOpcode::NativeFsOpen: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_fs_open expects exactly one argument";
+          return false;
+        }
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
+        if (path == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_fs_open, {path});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeFsCreate: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_fs_create expects exactly one argument";
+          return false;
+        }
+        llvm::Value *path = pop_value(&stack, error, &type_stack);
+        if (path == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_fs_create, {path});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeFileRead: {
+        const int argc = instr->operands[0];
+        if (argc != 2) {
+          *error = "native_file_read expects exactly two arguments";
+          return false;
+        }
+        llvm::Value *buffer = pop_value(&stack, error, &type_stack);
+        llvm::Value *file = pop_value(&stack, error, &type_stack);
+        if (file == nullptr || buffer == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_file_read, {file, buffer});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeFileWrite: {
+        const int argc = instr->operands[0];
+        if (argc != 2) {
+          *error = "native_file_write expects exactly two arguments";
+          return false;
+        }
+        llvm::Value *data = pop_value(&stack, error, &type_stack);
+        llvm::Value *file = pop_value(&stack, error, &type_stack);
+        if (file == nullptr || data == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_file_write, {file, data});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeFileSize: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_file_size expects exactly one argument";
+          return false;
+        }
+        llvm::Value *file = pop_value(&stack, error, &type_stack);
+        if (file == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_file_size, {file});
+        push(result);
+        temps[i] = result;
+        break;
+      }
+      case KirOpcode::NativeFileSync: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_file_sync expects exactly one argument";
+          return false;
+        }
+        llvm::Value *file = pop_value(&stack, error, &type_stack);
+        if (file == nullptr) {
+          return false;
+        }
+        builder.CreateCall(rt_.native_file_sync, {file});
+        push(llvm::ConstantInt::get(i64, 0));
+        temps[i] = stack.back();
+        break;
+      }
+      case KirOpcode::NativeFileClose: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_file_close expects exactly one argument";
+          return false;
+        }
+        llvm::Value *file = pop_value(&stack, error, &type_stack);
+        if (file == nullptr) {
+          return false;
+        }
+        builder.CreateCall(rt_.native_file_close, {file});
+        push(llvm::ConstantInt::get(i64, 0));
+        temps[i] = stack.back();
+        break;
+      }
+      case KirOpcode::NativeFileIsOpen: {
+        const int argc = instr->operands[0];
+        if (argc != 1) {
+          *error = "native_file_is_open expects exactly one argument";
+          return false;
+        }
+        llvm::Value *file = pop_value(&stack, error, &type_stack);
+        if (file == nullptr) {
+          return false;
+        }
+        llvm::Value *result = builder.CreateCall(rt_.native_file_is_open, {file});
+        push(result);
+        temps[i] = result;
         break;
       }
       case KirOpcode::NativeSysArgs: {
