@@ -1,0 +1,24 @@
+// RUN: run
+// EXPECT-EXIT: 65
+// CHECK-ERR: Cannot assign to const variable 'max'.
+//
+// Chapter 02 coverage: `const` forbids reassignment after initialization.
+//
+// KNOWN GAP (tracked, not fixed here): this diagnostic (K3002) is only
+// raised by Compiler::compile_assignment in the backend (compiler.cc), not
+// by TypeChecker::check_assign (type_checker.cc) — the checker never
+// inspects VarInfo::is_mutable on assignment. `kinglet --check` on this
+// exact file exits 0 (no error reported); only default run / `kinglet run`
+// / native compile modes catch it, because they invoke the backend after
+// the checker passes. This RUN: run case documents the diagnostic that
+// currently exists; it does not exercise `--check`, which would currently
+// (incorrectly) pass. See sema/fail/ for the `--check`-only pipeline used
+// by every other const/type-error regression in this suite.
+using io;
+
+int main() {
+  const int max = 100;
+  max = 200;
+  io::out("{}\n", max);
+  return 0;
+}

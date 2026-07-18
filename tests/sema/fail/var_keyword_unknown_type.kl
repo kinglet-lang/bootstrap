@@ -1,0 +1,15 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: Unknown type 'var'.
+//
+// Chapter 02 coverage: Kinglet has no `var` keyword. The lexer/parser treat
+// it as an ordinary (unknown) type name, so `var c = ...;` fails at the
+// checker with K1001, not with a dedicated "no var keyword" diagnostic.
+// The correct inference keyword is `auto` (see auto_without_initializer.kl
+// and definite_assignment_simple.kl for `auto`'s behavior).
+
+int main() {
+  var c = 1 + 2;
+  return c;
+}

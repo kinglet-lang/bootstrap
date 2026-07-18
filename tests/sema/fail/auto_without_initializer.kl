@@ -1,0 +1,14 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: auto requires an initializer.
+//
+// Chapter 02 coverage: `auto` infers its type from the initializer, so it
+// has no meaning without one. Unlike bare scalar declarations (`int a;`,
+// legal but unread-before-assign per definite assignment), `auto x;` is
+// rejected outright at declaration time.
+
+int main() {
+  auto x;
+  return x;
+}
