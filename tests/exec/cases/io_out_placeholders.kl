@@ -1,0 +1,12 @@
+// RUN: run
+// Chapter 01 coverage: io::out(...) (not just io::out.line) accepts {}
+// placeholders with multiple positional args and no trailing newline.
+using io;
+
+int main() {
+  io::out("sum {} and {} is {}\n", 2, 3, 5);
+  io::out("no-arg literal\n");
+  io::out("no newline after this");
+  io::out(" — appended\n");
+  return 0;
+}

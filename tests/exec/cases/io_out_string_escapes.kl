@@ -1,0 +1,11 @@
+// RUN: run
+// Chapter 01 coverage: string literal escape sequences (\t, \", \\, \n) are
+// interpreted before being written by io::out.
+using io;
+
+int main() {
+  io::out("tab\there\n");
+  io::out("quote\"end\n");
+  io::out("backslash\\end\n");
+  return 0;
+}

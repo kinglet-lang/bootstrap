@@ -1,0 +1,12 @@
+// RUN: run
+// Chapter 01 coverage: io::err / io::err.line write to stderr, not stdout.
+// Exact-match sidecars (.expected / .stderr) prove the two streams don't mix:
+// stdout carries only the io::out.line call, stderr only the io::err calls.
+using io;
+
+int main() {
+  io::out.line("on stdout");
+  io::err("plain {}\n", "stderr");
+  io::err.line("templated {}", 99);
+  return 0;
+}
