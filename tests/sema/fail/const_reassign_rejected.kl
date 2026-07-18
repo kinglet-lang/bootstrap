@@ -1,0 +1,21 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: Cannot assign to const variable 'max'.
+//
+// Chapter 02 coverage: `const` forbids reassignment after initialization.
+// Previously this diagnostic (K3002) was only raised by
+// Compiler::compile_assignment in the backend (compiler.cc); the checker's
+// TypeChecker::check_assign never inspected VarInfo::is_mutable on
+// assignment, so `kinglet --check` silently exited 0 on this exact file.
+// Fixed by adding the same K3002 check to check_assign — see the
+// checker/backend divergence writeup in kinglet-lang/bootstrap#144. This
+// case moved here from tests/exec/cases/const_reassign_rejected.kl (a
+// RUN: run case written to document the gap before the fix) now that the
+// checker catches it directly through the normal RUN: check pipeline.
+
+int main() {
+  const int max = 100;
+  max = 200;
+  return max;
+}

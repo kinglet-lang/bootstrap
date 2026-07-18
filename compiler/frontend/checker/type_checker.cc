@@ -2605,6 +2605,29 @@ Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
     return int_type();
   }
   VarInfo *lhs_vi = find_var_info(assign.name);
+  if (lhs_vi && !lhs_vi->is_mutable) {
+    // K3002 — mirrors Compiler::compile_assignment's backend-side check
+    // (compiler.cc), so `kinglet --check` catches const reassignment
+    // directly instead of relying on the backend compile pass to observe
+    // it. Same diagnostic shape: primary label at the assignment, secondary
+    // label pointing back at the const declaration.
+    //
+    // Still type-check the RHS for its side effects (undeclared names,
+    // nested errors) so a single `--check` pass surfaces every problem in
+    // the statement, not just the const violation.
+    check_expr(*assign.value);
+    Diagnostic d;
+    d.code = "K3002";
+    d.severity = Severity::Error;
+    d.message = "Cannot assign to const variable '" + assign.name + "'.";
+    d.labels.push_back(DiagnosticLabel{span_from(assign.location), std::string{}});
+    if (lhs_vi->location.line > 0) {
+      d.labels.push_back(DiagnosticLabel{span_from(lhs_vi->location),
+                                         "'" + assign.name + "' declared const here"});
+    }
+    emit(std::move(d));
+    return var_type.value();
+  }
   if (lhs_vi && lhs_vi->transferred) {
     // Reassignment after a transfer is allowed: the variable gets a fresh
     // value, so clear the transferred flag (the new value is now owned and
