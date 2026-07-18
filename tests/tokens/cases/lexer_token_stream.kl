@@ -1,0 +1,18 @@
+// RUN: tokens
+// CHECK: USING "using"
+// CHECK: IDENTIFIER "io"
+// CHECK: SEMICOLON ";"
+// CHECK: INT "int"
+// CHECK: IDENTIFIER "main"
+// CHECK: STRING_LIT
+// CHECK: INTEGER "7" = 7
+// CHECK: FLOAT_LIT "1.5"
+// CHECK: RETURN "return"
+
+using io;
+
+int main() {
+  io::out("hi {}\n", 7);
+  float f = 1.5;
+  return 0;
+}

@@ -13,6 +13,7 @@ bash tests/sema/run.sh                # type checker pass + fail
 bash tests/codegen/run.sh             # KIR shape checks
 bash tests/ir/run.sh                  # KIR (`--ir`) dump checks
 bash tests/parser/run.sh              # AST (`--ast`) checks
+bash tests/tokens/run.sh              # lexer (`--tokens`) checks
 bash tests/probe/run_matrix.sh        # capability snapshot (non-gating)
 ```
 
@@ -30,6 +31,7 @@ tests/
   codegen/cases/    RUN: ir (KIR shape checks)
   ir/cases/         RUN: ir (bootstrap KIR dump)
   parser/cases/     RUN: ast
+  tokens/cases/     RUN: tokens (lexer token stream)
   probe/            capability matrix (snapshot, always exits 0)
   module/           logical module integration + hierarchical rejections
   fmt/              preen formatter goldens
@@ -51,6 +53,7 @@ See [harness/directives.md](harness/directives.md).
 | `check` | `kinglet --check file.kl` |
 | `ir` | `kinglet --ir file.kl` |
 | `ast` | `kinglet --ast file.kl` |
+| `tokens` | `kinglet --tokens file.kl` |
 
 Environment:
 
@@ -69,4 +72,5 @@ Environment:
 | KIR shape | `codegen/cases/` | `RUN: ir`, `CHECK:` |
 | KIR lowering | `ir/cases/` | `RUN: ir`, `CHECK:` |
 | AST shape | `parser/cases/` | `RUN: ast`, `CHECK:` |
+| Token stream | `tokens/cases/` | `RUN: tokens`, `CHECK:` |
 | Language probe | `probe/cases/` | `// EXPECT_OUT:` header |

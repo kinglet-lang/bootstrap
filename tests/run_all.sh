@@ -29,6 +29,7 @@ run_suite() {
 
 run_suite "Sema (pass + fail)" "$ROOT/tests/sema/run.sh"
 run_suite "Parser (AST)" "$ROOT/tests/parser/run.sh"
+run_suite "Lexer (tokens)" "$ROOT/tests/tokens/run.sh"
 run_suite "Codegen (KIR shape)" "$ROOT/tests/codegen/run.sh"
 run_suite "IR (KIR dump)" "$ROOT/tests/ir/run.sh"
 run_suite "Exec (native run)" "$ROOT/tests/exec/run.sh"

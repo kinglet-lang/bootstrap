@@ -14,6 +14,7 @@ ends at the first line that is neither a directive nor a blank line.
 | `check` | `kinglet --check <file>` |
 | `ir` | `kinglet --ir <file>`; assert `CHECK` substrings on stdout |
 | `ast` | `kinglet --ast <file>`; assert `CHECK` substrings on stdout |
+| `tokens` | `kinglet --tokens <file>`; assert `CHECK` substrings on stdout |
 
 `run` is skipped when `KINGLET_SKIP_RUN=1` (Windows CI).
 
@@ -68,4 +69,4 @@ int main() { int32 x = 42; return 0; }
 ```
 
 Suite runners: `tests/exec/run.sh`, `tests/sema/run.sh`, `tests/codegen/run.sh`,
-`tests/ir/run.sh`, `tests/parser/run.sh`.
+`tests/ir/run.sh`, `tests/parser/run.sh`, `tests/tokens/run.sh`.

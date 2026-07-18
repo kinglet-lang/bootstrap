@@ -268,6 +268,15 @@ run_ast_pipeline() {
   echo "$ec"
 }
 
+run_tokens_pipeline() {
+  local src="$1"
+  local stdout="$2"
+  local stderr="$3"
+  local ec=0
+  "$KINGLET_BIN" --tokens "$src" >"$stdout" 2>"$stderr" || ec=$?
+  echo "$ec"
+}
+
 finalize_case() {
   local name="$1"
   local stdout="$2"
@@ -343,11 +352,13 @@ run_one_file() {
       finalize_case "$name" "$stdout" "$stderr" "$ec"
       ;;
 
-    ir|ast)
+    ir|ast|tokens)
       if [[ "$RUN" == "ir" ]]; then
         ec=$(run_ir_pipeline "$src" "$stdout" "$stderr")
-      else
+      elif [[ "$RUN" == "ast" ]]; then
         ec=$(run_ast_pipeline "$src" "$stdout" "$stderr")
+      else
+        ec=$(run_tokens_pipeline "$src" "$stdout" "$stderr")
       fi
       strip_cr "$stdout" "$stderr"
       if [[ "$ec" -ne 0 ]]; then
