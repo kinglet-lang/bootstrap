@@ -1,0 +1,12 @@
+// RUN: run
+//
+// Chapter 02 coverage: `char` participates in arithmetic/printing as its
+// numeric value, not as a character glyph. `io::out("{}", c)` for a `char`
+// prints the ordinal, not the letter. Verified with 'K' -> 75.
+using io;
+
+int main() {
+  char c = 'K';
+  io::out("{}\n", c);
+  return 0;
+}
