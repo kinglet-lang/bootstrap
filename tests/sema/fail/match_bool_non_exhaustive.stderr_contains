@@ -1,1 +1,1 @@
-error: Non-exhaustive match on bool. Missing case(s): false.
+error[K13001]: Non-exhaustive match on bool. Missing case(s): false.

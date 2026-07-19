@@ -1,1 +1,1 @@
-error: Non-exhaustive struct pattern for 'Point'.
+error[K13001]: Non-exhaustive struct pattern for 'Point'.

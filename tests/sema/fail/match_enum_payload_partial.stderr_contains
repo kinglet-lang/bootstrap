@@ -1,1 +1,1 @@
-error: Non-exhaustive payload pattern for variant(s): Some.
+error[K13001]: Non-exhaustive payload pattern for variant(s): Some.

@@ -37,29 +37,36 @@ for the scheme, categories, and rendering rules.
 | `K18xxx` | Unused code, style, and suspicious patterns |
 | `K19xxx` | Compiler limits and internal diagnostics |
 
-## Assigned codes (initial batch)
+## Assigned codes
 
 | Code | Severity | Description | Example message | Secondary label |
 |------|----------|-------------|-----------------|-----------------|
+| `K0001` | error | Lexical error — the source contains an invalid or unterminated token. | `lexer error: Unexpected character.` | — |
+| `K0002` | error | Syntax error — the token stream does not match the Kinglet grammar. | `Expected expression.` | — |
 | `K1001` | error | Name resolution failure — unknown type or undeclared variable. | `Unknown type 'Foo'.` / `Undeclared variable 'x'.` | — |
 | `K1002` | error | Redeclaration of a name in the same scope. | `Variable 'x' already declared.` | first declaration site |
 | `K2001` | error | Type mismatch on assignment or initialization. | `Cannot assign string to variable of type int.` | declaration site of the target |
 | `K3002` | error | Assignment to a `const` binding after initialization. | `Cannot assign to const variable 'x'.` | declaration site of the const |
 | `K4001` | error | Use of a value that was moved / transferred elsewhere. | `Variable 'x' was transferred and is no longer valid.` | transfer site |
 | `K5001` | error | Conflicting borrow — a new borrow overlaps a live one, or a use overlaps a live mutable borrow. | `Conflicting borrow of 'x'.` / `Cannot use 'x' while it is mutably borrowed.` | earlier borrow site |
+| `K5004` | error | A reference escapes the scope that owns its referent. | `References cannot escape their owning scope.` | — |
+| `K6001` | error | A variable or field may be read before it is definitely initialized. | `Variable 'x' may be uninitialized.` | — |
 | `K7001` | error | Overload resolution failed — no viable candidate for the call. | `No matching overload.` | every candidate's declaration |
-| `K7007` | error | Non-void function reaches a return statement with no value. | `Non-void function must return a value.` | — |
+| `K7007` | error | A non-void function has an incomplete return — a bare `return` or a path that reaches the end without a value. | `Non-void function must return a value.` | — |
 | `K7010` | warning | Expression statement's result is discarded silently. | `Expression result is unused.` | — |
+| `K8001` | warning | A statement or match arm cannot be reached. | `Unreachable code.` | — |
+| `K10001` | error | A nullable value is used where its non-null inner value is required. | `Left operand of '+' has nullable type int?.` | — |
 | `K10002` | error | Fallible cast (`string → int`, etc.) not handled with `?:` or postfix `?`. | `Fallible cast from string to int must be handled with '?:' or postfix '?'.` | — |
-| `K15001` | error | Module resolution failure — `using`/`import` references an unknown module. | `Unknown module 'foo'.` | — |
+| `K13001` | error | A match expression does not cover every possible input. | `Non-exhaustive match. Missing variant(s): Blue.` | — |
+| `K15001` | error | Module resolution failure — `using`/`import` references a module that cannot be resolved. | `Unknown module 'foo'.` | — |
+| `K15002` | error | A known module is referenced without first being imported or opened. | `Module 'io' is not imported.` | — |
 | `K18001` | warning | Local variable declared but never read. | `Unused variable 'x'.` | — |
+| `K19001` | error | Source nesting exceeds the compiler's supported parsing limit. | `Maximum nesting depth exceeded.` | — |
 
-Codes not yet assigned in-tree but reserved by ADR 0031:
+Codes reserved for checks that are not currently emitted by the compiler:
 
-- `K2008` (recursive layout), `K4005` (partial move), `K5004` (lifetime),
-  `K6001` (definite assignment), `K8001` (unreachable), `K10001` (`T?`
-  where `T` is required), `K11001` (out-of-bounds), `K13001` (non-exhaustive
-  match).
+- `K2008` (recursive layout)
+- `K4005` (partial move)
+- `K11001` (compile-time out-of-bounds indexing)
 
-New codes are added by appending to this table — no separate ADR required
-(ADR 0031 D2).
+New codes are added by appending to this table; no separate architecture decision is required.

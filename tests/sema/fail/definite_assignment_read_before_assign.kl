@@ -1,6 +1,7 @@
 // RUN: check
 // COMPILE-FAIL
 // EXPECT-EXIT: 65
+// CHECK-ERR: error[K6001]: Variable 'a' may be uninitialized.
 
 int main() {
   int a;

@@ -1,6 +1,6 @@
 // RUN: check
 // COMPILE-FAIL
-// CHECK-ERR: Maximum nesting depth exceeded
+// CHECK-ERR: error[K19001]: Maximum nesting depth exceeded
 //
 // A pathologically deep run of nested parentheses must be rejected with a
 // diagnostic rather than overflowing the parser stack. Regression test for the

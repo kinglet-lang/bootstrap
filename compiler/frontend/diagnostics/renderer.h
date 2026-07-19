@@ -3,11 +3,9 @@
 //
 // Rendering of Diagnostic values into human-readable stderr text.
 //
-// Phase 1 shape (ADR 0031 D10 steps 1–4): one line per diagnostic in the
-// familiar "path:L:C: severity: message" format, colored by severity, with
-// secondary labels dumped as follow-up "note:" lines. Snippet rendering
-// (`|` + `^`), error codes (D3), and warning groups (D6) come in a later
-// step; those are additive to this file.
+// The human-readable renderer prints stable error codes, source snippets,
+// primary carets, and secondary labels. It falls back to a compact single-line
+// layout when source text is unavailable.
 //
 // The renderer is deliberately self-contained: it owns its ANSI constants
 // and its own tty/NO_COLOR detection, so `frontend/diagnostics` does not

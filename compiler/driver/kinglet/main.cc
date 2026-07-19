@@ -486,14 +486,14 @@ int main(int argc, char **argv) {
   bool had_lexer_error = false;
   for (const kinglet::Token &token : tokens) {
     if (token.type == kinglet::TokenType::ERROR) {
-      // Lexer errors are single-span, no code yet. Length 1 approximates the
-      // point where the scanner tripped; a follow-up can widen to token.length
-      // once ERROR tokens learn to carry their extent.
+      // Lexer errors are single-span. Length 1 approximates the point where
+      // the scanner tripped; a follow-up can widen to token.length once ERROR
+      // tokens learn to carry their extent.
       kinglet::ast::SourceLocation loc;
       loc.line = token.line;
       loc.column = token.column;
       loc.length = 1;
-      kinglet::Diagnostic d = kinglet::make_diagnostic(kinglet::Severity::Error, loc,
+      kinglet::Diagnostic d = kinglet::make_diagnostic(kinglet::Severity::Error, loc, "K0001",
                                                        "lexer error: " + std::string(token.lexeme));
       kinglet::diag::render(std::cerr, d, render_opts, use_color);
       had_lexer_error = true;

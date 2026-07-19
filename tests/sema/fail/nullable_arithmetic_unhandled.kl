@@ -1,6 +1,7 @@
 // RUN: check
 // COMPILE-FAIL
 // EXPECT-EXIT: 65
+// CHECK-ERR: error[K10001]: Both operands of '+' are nullable
 
 int main() {
   int? a = 7;

@@ -1,5 +1,5 @@
 warning: Condition is always true.
 warning: Condition is always false; loop body never executes.
 warning[K18001]: Unused variable 'x'.
-warning: Unreachable code.
+warning[K8001]: Unreachable code.
 warning[K18001]: Unused variable 'unused'.

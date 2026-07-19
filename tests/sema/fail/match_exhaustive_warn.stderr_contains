@@ -1,1 +1,1 @@
-error: Non-exhaustive match. Missing variant(s): Blue.
+error[K13001]: Non-exhaustive match. Missing variant(s): Blue.

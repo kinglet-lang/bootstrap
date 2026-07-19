@@ -1,0 +1,16 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: error[K2001]: Cannot assign string to field 'x' of type int.
+// CHECK-ERR: error[K1001]: Assignment to undeclared variable 'missing'.
+
+struct Point {
+  int x;
+}
+
+int main() {
+  Point p { 1 };
+  p.x = "bad";
+  missing = 2;
+  return 0;
+}
