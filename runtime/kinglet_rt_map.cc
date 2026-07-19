@@ -100,6 +100,21 @@ bool map_erase(KlMap *map, kl_h key) {
   return false;
 }
 
+// Mutable counterpart to map_find: same lookup, but returns a non-const
+// pointer so callers can ensure-unique the entry's value in place.
+KlMapEntry *map_find_mut(KlMap *map, kl_h key) {
+  if (is_string_key(key)) {
+    const auto &bytes = static_cast<KlString *>(kl_unbox_ptr(key))->bytes;
+    auto it = map->str_entries.find(bytes);
+    return it != map->str_entries.end() ? &it->second : nullptr;
+  }
+  if (is_int_key(key)) {
+    auto it = map->int_entries.find(kl_to_int(key));
+    return it != map->int_entries.end() ? &it->second : nullptr;
+  }
+  return nullptr;
+}
+
 } // namespace
 
 extern "C" {
@@ -136,6 +151,31 @@ kl_h kl_map_keys(kl_h map) {
   return kl_array_new(static_cast<int32_t>(keys.size()), keys.data());
 }
 
+kl_h kl_map_shallow_clone(kl_h object) {
+  KlMap *src = as_map(object);
+  if (src == nullptr) {
+    return object;
+  }
+  auto *dst = new KlMap();
+  dst->order = src->order;
+  dst->int_entries = src->int_entries;
+  dst->str_entries = src->str_entries;
+  // Each key/value pair is retained exactly once here, mirroring map_set's
+  // single retain per insertion. `order` holds the same handles as the
+  // entries' `.key` fields (not a second independent reference) -- kl_release's
+  // cascade walks int_entries/str_entries only, never `order`, so retaining
+  // from `order` too would double-count and leak the object.
+  for (auto &kv : dst->int_entries) {
+    kl_retain(kv.second.key);
+    kl_retain(kv.second.value);
+  }
+  for (auto &kv : dst->str_entries) {
+    kl_retain(kv.second.key);
+    kl_retain(kv.second.value);
+  }
+  return kl_box_ptr(dst);
+}
+
 // Generic indexed read: maps look up by key (missing -> null), strings yield
 // the byte as a char, arrays index by integer.
 kl_h kl_index_get(kl_h object, kl_h key) {
@@ -149,6 +189,42 @@ kl_h kl_index_get(kl_h object, kl_h key) {
     return v;
   }
   return kl_array_get(object, static_cast<int32_t>(kl_to_int(key)));
+}
+
+// Copy-on-write descent for a chained index write (`m[i][j] = x`, or the
+// final level of `arr[i] = x` / a map index write). Given a uniquely-owned
+// `object` (array or map), ensure the value at `key` is itself uniquely
+// owned before the caller descends into or mutates it: if shared, clone it
+// one level deep and store the clone back into object's own storage (the
+// array element slot, or the map entry's value) in place. Returns the (now
+// unique) value retained once for the operand stack, mirroring
+// kl_array_get/kl_index_get's convention -- distinct from whatever reference
+// object's own storage still holds. Does not touch object's own refcount;
+// the caller retains responsibility for its own stack reference to object.
+kl_h kl_ensure_unique_index_at(kl_h object, kl_h key) {
+  if (KlMap *obj = as_map(object)) {
+    KlMapEntry *entry = map_find_mut(obj, key);
+    if (entry == nullptr) {
+      return kl_null_value();
+    }
+    kl_h unique = kl_ensure_unique(&entry->value);
+    kl_retain(unique);
+    return unique;
+  }
+  if (kl_is_kind(object, KlKind::Array)) {
+    auto *arr = static_cast<KlArray *>(kl_unbox_ptr(object));
+    if (!arr->dense_dims.empty()) {
+      kl_array_ensure_jagged(arr);
+    }
+    const int64_t idx = kl_to_int(key);
+    if (idx < 0 || static_cast<std::size_t>(idx) >= arr->elements.size()) {
+      return kl_from_int(0);
+    }
+    kl_h unique = kl_ensure_unique(&arr->elements[static_cast<std::size_t>(idx)]);
+    kl_retain(unique);
+    return unique;
+  }
+  return kl_from_int(0);
 }
 
 // Generic indexed write; returns the stored value (the VM pushes it back).

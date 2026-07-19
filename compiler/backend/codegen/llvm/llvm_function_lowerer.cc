@@ -127,6 +127,9 @@ struct RtFns {
   llvm::Function *struct_type_index = nullptr;
   llvm::Function *struct_field_at = nullptr;
   llvm::Function *struct_field_set = nullptr;
+  llvm::Function *ensure_unique_local = nullptr;
+  llvm::Function *ensure_unique_field_at = nullptr;
+  llvm::Function *ensure_unique_index_at = nullptr;
   llvm::Function *field_mut_ref_new = nullptr;
   llvm::Function *ref_load = nullptr;
   llvm::Function *ref_store = nullptr;
@@ -229,7 +232,7 @@ RtFns declare_runtime(llvm::Module *module) {
                                         llvm::Function::ExternalLinkage, "kl_array_get", module);
   rt.value_len = llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
                                         llvm::Function::ExternalLinkage, "kl_value_len", module);
-  rt.struct_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32, i64p}, false),
+  rt.struct_new = llvm::Function::Create(llvm::FunctionType::get(i64, {i32, i32, i64p, i32}, false),
                                          llvm::Function::ExternalLinkage, "kl_struct_new", module);
   rt.struct_type_index =
       llvm::Function::Create(llvm::FunctionType::get(i32, {i64}, false),
@@ -240,6 +243,15 @@ RtFns declare_runtime(llvm::Module *module) {
   rt.struct_field_set =
       llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32, i64}, false),
                              llvm::Function::ExternalLinkage, "kl_struct_field_set", module);
+  rt.ensure_unique_local =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64p}, false),
+                             llvm::Function::ExternalLinkage, "kl_ensure_unique", module);
+  rt.ensure_unique_field_at =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
+                             llvm::Function::ExternalLinkage, "kl_ensure_unique_field_at", module);
+  rt.ensure_unique_index_at =
+      llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i64}, false),
+                             llvm::Function::ExternalLinkage, "kl_ensure_unique_index_at", module);
   rt.field_mut_ref_new =
       llvm::Function::Create(llvm::FunctionType::get(i64, {i64, i32}, false),
                              llvm::Function::ExternalLinkage, "kl_field_mut_ref_new", module);
@@ -1402,6 +1414,57 @@ public:
         temp_types[i] = KirType::Int64;
         break;
       }
+      case KirOpcode::EnsureUniqueLocal: {
+        const int slot = instr->operands[0];
+        if (slot < 0 || static_cast<std::size_t>(slot) >= local_slots_.size()) {
+          *error = "ensure_unique_local slot out of range";
+          return false;
+        }
+        // kl_ensure_unique reads/writes *slot directly, so no explicit
+        // load/store is needed here -- it clones in place and updates the
+        // alloca itself when the value is shared. No stack effect.
+        builder.CreateCall(rt_.ensure_unique_local, {local_slots_[static_cast<std::size_t>(slot)]});
+        break;
+      }
+      case KirOpcode::EnsureUniqueField: {
+        const int operand = instr->operands[0];
+        llvm::Value *obj = pop_value(&stack, error, &type_stack);
+        if (obj == nullptr) {
+          return false;
+        }
+        llvm::Type *i32 = builder.getInt32Ty();
+        llvm::Value *type_idx = builder.CreateCall(rt_.struct_type_index, {obj});
+        llvm::Value *field_idx = nullptr;
+        if (kir_module_.field_operands_resolved) {
+          field_idx = llvm::ConstantInt::get(i32, operand);
+        } else {
+          if (operand < 0 ||
+              static_cast<std::size_t>(operand) >= kir_module_.constant_strings.size()) {
+            *error = "ensure_unique_field pool index out of range";
+            return false;
+          }
+          const std::string &field_name =
+              kir_module_.constant_strings[static_cast<std::size_t>(operand)];
+          field_idx = resolve_field_index(builder, type_idx, kir_module_, field_name);
+        }
+        llvm::Value *unique = builder.CreateCall(rt_.ensure_unique_field_at, {obj, field_idx});
+        push(unique);
+        temps[i] = unique;
+        temp_types[i] = KirType::Any;
+        break;
+      }
+      case KirOpcode::EnsureUniqueIndex: {
+        llvm::Value *key = pop_value(&stack, error, &type_stack);
+        llvm::Value *obj = pop_value(&stack, error, &type_stack);
+        if (key == nullptr || obj == nullptr) {
+          return false;
+        }
+        llvm::Value *unique = builder.CreateCall(rt_.ensure_unique_index_at, {obj, key});
+        push(unique);
+        temps[i] = unique;
+        temp_types[i] = KirType::Any;
+        break;
+      }
       case KirOpcode::DerefLoad: {
         llvm::Value *ref = pop_value(&stack, error, &type_stack);
         if (ref == nullptr) {
@@ -1682,10 +1745,14 @@ public:
           llvm::Value *slot = builder.CreateGEP(i64, fields, llvm::ConstantInt::get(i32, fi));
           builder.CreateStore(field, slot);
         }
+        const bool is_resource =
+            type_idx >= 0 && static_cast<std::size_t>(type_idx) < kir_module_.struct_metas.size() &&
+            kir_module_.struct_metas[static_cast<std::size_t>(type_idx)].has_destroy;
         llvm::Value *obj =
             builder.CreateCall(rt_.struct_new, {llvm::ConstantInt::get(i32, type_idx),
                                                 llvm::ConstantInt::get(i32, field_count),
-                                                builder.CreateBitCast(fields, i64p)});
+                                                builder.CreateBitCast(fields, i64p),
+                                                llvm::ConstantInt::get(i32, is_resource ? 1 : 0)});
         push(obj);
         temps[i] = obj;
         break;
@@ -1864,6 +1931,15 @@ public:
           return false;
         }
         llvm::Value *wire = builder.CreateCall(rt_.index_get, {array, index});
+        // The popped array/index references were borrowed from the value
+        // stack for this read only -- kl_index_get retains what it returns,
+        // so these two are no longer needed. Releasing them here keeps the
+        // container's refcount honest: without this, every `m[k]` read
+        // leaks one reference on `m`, which EnsureUniqueLocal then observes
+        // as "shared" and clones the whole map on every iteration of
+        // `m[k] = m[k] + 1` (O(n^2) blowup on bench_map).
+        builder.CreateCall(rt_.release, {array});
+        builder.CreateCall(rt_.release, {index});
         const KirType element_ty =
             static_cast<std::size_t>(i) < fn.instr_types.size() ? fn.instr_types[i] : KirType::Any;
         if (kir_type_is_scalar(element_ty)) {
@@ -1897,6 +1973,15 @@ public:
         }
         llvm::Value *wire_value = to_wire_i64(builder, rt_, value, value_ty);
         llvm::Value *result = builder.CreateCall(rt_.index_set, {object, index, wire_value});
+        // Same borrowed-reference release as IndexGet: the object slot's
+        // reference was loaded onto the value stack for this one write,
+        // and kl_index_set retains `wire_value` into the container, so the
+        // borrowed object/index references are done once the call returns.
+        // Without this, every `m[k] = v` leaks one reference on `m`, which
+        // EnsureUniqueLocal then reads as "shared" and clones the whole
+        // map on every iteration (O(n^2) blowup on bench_map).
+        builder.CreateCall(rt_.release, {object});
+        builder.CreateCall(rt_.release, {index});
         push(result);
         temps[i] = result;
         break;

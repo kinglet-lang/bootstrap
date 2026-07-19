@@ -136,9 +136,11 @@ int32_t kl_array_len(kl_h array) {
   return static_cast<int32_t>(obj->elements.size());
 }
 
-kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields_ptr) {
+kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields_ptr,
+                   int32_t is_resource) {
   auto *obj = KlStruct::create(static_cast<int32_t>(field_count));
   obj->type_index = type_index;
+  obj->is_resource = is_resource != 0;
   if (field_count > 0 && fields_ptr != nullptr) {
     kl_h *dst = obj->fields();
     std::memcpy(dst, fields_ptr, sizeof(kl_h) * static_cast<std::size_t>(field_count));
@@ -147,6 +149,38 @@ kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields_p
     }
   }
   return kl_box_ptr(obj);
+}
+
+kl_h kl_struct_shallow_clone(kl_h object) {
+  if (!kl_is_kind(object, KlKind::Struct)) {
+    return object;
+  }
+  auto *src = static_cast<KlStruct *>(kl_unbox_ptr(object));
+  auto *dst = KlStruct::create(src->field_count);
+  dst->type_index = src->type_index;
+  dst->is_resource = src->is_resource;
+  if (src->field_count > 0) {
+    std::memcpy(dst->fields(), src->fields(),
+                sizeof(kl_h) * static_cast<std::size_t>(src->field_count));
+    for (int32_t i = 0; i < src->field_count; ++i) {
+      kl_retain(dst->fields()[i]);
+    }
+  }
+  return kl_box_ptr(dst);
+}
+
+kl_h kl_array_shallow_clone(kl_h object) {
+  if (!kl_is_kind(object, KlKind::Array)) {
+    return object;
+  }
+  auto *src = static_cast<KlArray *>(kl_unbox_ptr(object));
+  auto *dst = new KlArray();
+  dst->elements = src->elements;
+  dst->dense_dims = src->dense_dims;
+  for (kl_h elem : dst->elements) {
+    kl_retain(elem);
+  }
+  return kl_box_ptr(dst);
 }
 
 int32_t kl_value_len(kl_h value) {
@@ -340,6 +374,32 @@ kl_h kl_struct_field_at(kl_h object, int32_t field_index) {
   kl_h field = obj->fields()[field_index];
   kl_retain(field);
   return field;
+}
+
+// Copy-on-write descent for a chained field write (`outer.inner.x = 99`).
+// Given a uniquely-owned `object`, ensure the value stored in its
+// `field_index` slot is itself uniquely owned before the caller descends
+// into or mutates it: if that field value is shared, clone it one level deep
+// and store the clone back into object's own field slot in place (so
+// `object` and any other reference to it observe the same, now-unique,
+// field value on their next read). Returns the (now unique) field value
+// retained once for the operand stack -- the same convention
+// kl_struct_field_at uses -- distinct from the reference object's field
+// array still holds, so releasing one does not dangle the other. Mirrors
+// kl_struct_field_at/kl_struct_field_set: does not touch object's own
+// refcount (the caller already holds and is responsible for object's stack
+// reference).
+kl_h kl_ensure_unique_field_at(kl_h object, int32_t field_index) {
+  if (!kl_is_kind(object, KlKind::Struct) || field_index < 0) {
+    return kl_from_int(0);
+  }
+  auto *obj = static_cast<KlStruct *>(kl_unbox_ptr(object));
+  if (field_index >= obj->field_count) {
+    return kl_from_int(0);
+  }
+  kl_h unique = kl_ensure_unique(&obj->fields()[field_index]);
+  kl_retain(unique);
+  return unique;
 }
 
 kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value) {

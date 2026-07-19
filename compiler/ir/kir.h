@@ -189,6 +189,13 @@ enum class KirOpcode : std::uint8_t {
   NativeTxtUtf8Decode,
   NativeTxtGbkEncode,
   NativeTxtGbkDecode,
+  // Copy-on-write: ensure the value at a local slot / struct field / array
+  // or map element is uniquely owned before an in-place write. See
+  // kl_ensure_unique() in runtime/kinglet_rt_mem.cc for the clone-and-swap
+  // semantics; these opcodes only marshal operands to and from that call.
+  EnsureUniqueLocal,
+  EnsureUniqueField,
+  EnsureUniqueIndex,
 };
 
 struct KirStructMeta {

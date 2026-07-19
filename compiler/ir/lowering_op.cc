@@ -235,6 +235,12 @@ const char *lowering_op_name(LoweringOp op) {
     return "NativeTxtGbkEncode";
   case LoweringOp::NativeTxtGbkDecode:
     return "NativeTxtGbkDecode";
+  case LoweringOp::EnsureUniqueLocal:
+    return "EnsureUniqueLocal";
+  case LoweringOp::EnsureUniqueField:
+    return "EnsureUniqueField";
+  case LoweringOp::EnsureUniqueIndex:
+    return "EnsureUniqueIndex";
   }
   return "Unknown";
 }

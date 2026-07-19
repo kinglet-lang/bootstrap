@@ -1,0 +1,24 @@
+// RUN: run
+
+using io;
+
+// Chained field writes must ensure uniqueness at every level of the path,
+// not just the innermost field: `b.inner.x = 99` shares `inner` with `a`
+// too, so cloning only the outermost struct would still leak the write
+// into `a.inner.x` through the shared inner struct (issue #118).
+
+struct Inner {
+  int x;
+}
+
+struct Outer {
+  Inner inner;
+}
+
+int main() {
+  Outer a = Outer { Inner { 1 } };
+  Outer b = a;
+  b.inner.x = 99;
+  io::out("{} {}\n", a.inner.x, b.inner.x);
+  return 0;
+}

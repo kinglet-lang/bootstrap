@@ -1,0 +1,26 @@
+// RUN: run
+
+using io;
+
+// Resource-typed structs (with @destroy) are move-only by language
+// semantics and must never be cloned by the copy-on-write machinery --
+// only value types (no @destroy) get Copy-on-write semantics. Pushing a
+// resource value into a shared array and mutating it through the array
+// element must still destroy exactly once, at the single owning
+// reference's scope exit, not twice from a spuriously cloned copy.
+
+struct Tag {
+  int id;
+
+  @destroy {
+    io::out("destroy {}\n", self.id);
+  }
+}
+
+int main() {
+  Tag[] tags;
+  Tag t = Tag { 1 };
+  tags.push(t);
+  io::out("after push: {}\n", t.id);
+  return 0;
+}

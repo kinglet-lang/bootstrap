@@ -1,0 +1,32 @@
+// RUN: run
+
+using io;
+
+// Array element writes (IndexSet) and mutating array methods (push/pop/
+// resize/insert/remove/clear/reverse) must not write through a shared
+// backing store either (issue #118): `b.push(4)` growing `a`'s storage
+// too would be the same class of bug as the struct-field case, just
+// reached through the method-call path instead of assignment.
+
+int main() {
+  int[] a = [1, 2, 3];
+  int[] b = a;
+  b[0] = 99;
+  io::out("{} {}\n", a[0], b[0]);
+
+  int[] c = [1, 2, 3];
+  int[] d = c;
+  d.push(4);
+  io::out("{} {}\n", c.len(), d.len());
+
+  int[] e = [1, 2, 3];
+  int[] f = e;
+  f.pop();
+  io::out("{} {}\n", e.len(), f.len());
+
+  int[] g = [1, 2, 3];
+  int[] h = g;
+  h.resize(5, 0);
+  io::out("{} {}\n", g.len(), h.len());
+  return 0;
+}

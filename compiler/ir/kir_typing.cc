@@ -653,6 +653,32 @@ void infer_function(KirFunction *fn, const KirModule &module) {
       push_typed(&state, result);
       break;
     }
+    case KirOpcode::EnsureUniqueLocal: {
+      // Operates entirely on a local slot; no stack effect.
+      break;
+    }
+    case KirOpcode::EnsureUniqueField: {
+      // Pops the object and pushes the value now sitting at its field_index
+      // slot -- a different value with a different (generally unrelated)
+      // type than the object itself, so this is not a round-trip of the
+      // object's type/container/struct-type metadata. The precise field type
+      // isn't reliably known here (this runs before/independent of
+      // FieldGet's struct-type-aware resolution and the chain may descend
+      // through several nested struct types); push Any and let downstream
+      // consumers (the immediately following FieldSet/FieldGet on this same
+      // value) resolve their own operand types as they already do.
+      pop_type(&state); // object
+      push_typed(&state, KirType::Any);
+      break;
+    }
+    case KirOpcode::EnsureUniqueIndex: {
+      // Same reasoning as EnsureUniqueField: pushes the element/entry value
+      // at the given index/key, not the container itself.
+      pop_type(&state); // index
+      pop_type(&state); // object
+      push_typed(&state, KirType::Any);
+      break;
+    }
     case KirOpcode::FieldSet: {
       pop_type(&state); // value
       pop_type(&state); // object

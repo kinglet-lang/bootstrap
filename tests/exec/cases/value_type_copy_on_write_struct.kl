@@ -1,0 +1,21 @@
+// RUN: run
+
+using io;
+
+// Assignment shares the underlying heap object by reference (kl_retain);
+// value types get Copy semantics on the *write* path instead, via
+// copy-on-write: the first write through a shared value clones it in place
+// so the write never leaks into the other variable's copy (issue #118).
+
+struct Point {
+  int x;
+  int y;
+}
+
+int main() {
+  Point a = Point { 1, 2 };
+  Point b = a;
+  b.x = 99;
+  io::out("{} {}\n", a.x, b.x);
+  return 0;
+}

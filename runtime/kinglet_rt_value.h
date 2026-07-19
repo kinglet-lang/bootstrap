@@ -141,10 +141,35 @@ kl_h kl_str_trim(kl_h str);
 kl_h kl_str_to_upper(kl_h str);
 kl_h kl_str_to_lower(kl_h str);
 
-kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields);
+kl_h kl_struct_new(int32_t type_index, int32_t field_count, const kl_h *fields, int32_t is_resource);
 int32_t kl_struct_type_index(kl_h object);
 kl_h kl_struct_field_at(kl_h object, int32_t field_index);
 kl_h kl_struct_field_set(kl_h object, int32_t field_index, kl_h value);
+
+// Copy-on-write support for value-type Copy semantics (structs/arrays/maps
+// without @destroy). Each *_shallow_clone allocates a fresh container of the
+// same shape and copies the immediate slots, retaining each so the clone and
+// the original independently own their contents (one level deep; nested
+// containers are shared until they themselves are mutated, at which point
+// their own ensure-unique triggers). kl_ensure_unique inspects the value at
+// *slot: if it is a shared (refcount > 1) value-type container, it clones it,
+// stores the clone back through slot, releases the original's shared
+// reference, and returns the clone; otherwise it returns the value unchanged.
+// Resource-typed structs are never cloned (move-only semantics).
+kl_h kl_struct_shallow_clone(kl_h object);
+kl_h kl_array_shallow_clone(kl_h object);
+kl_h kl_map_shallow_clone(kl_h object);
+kl_h kl_ensure_unique(kl_h *slot);
+// Copy-on-write descent one level into an already-unique `object`: ensures
+// the value stored at `object`'s given field/key is itself uniquely owned
+// (cloning and writing the clone back into object's own storage if it was
+// shared), and returns that (now unique) value retained once for the
+// operand stack -- mirroring kl_struct_field_at/kl_index_get's convention.
+// Used by chained lvalue writes (`outer.inner.x = 99`, `m[i][j] = x`) to
+// walk the write path one level at a time, each level ensuring uniqueness
+// before descending further.
+kl_h kl_ensure_unique_field_at(kl_h object, int32_t field_index);
+kl_h kl_ensure_unique_index_at(kl_h object, kl_h key);
 
 int32_t kl_field_mut_ref_is(kl_h value);
 kl_h kl_field_mut_ref_new(kl_h object, int32_t field_index);
