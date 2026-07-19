@@ -1,6 +1,7 @@
 // RUN: check
 // COMPILE-FAIL
 // EXPECT-EXIT: 65
+// CHECK-ERR: error[K5004]: References cannot escape their owning scope.
 
 int main() {
   int a = 1;

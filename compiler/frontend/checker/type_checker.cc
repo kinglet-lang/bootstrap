@@ -1540,11 +1540,11 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
           }
         }
         if (result.modules.empty()) {
-          error_at(logical_import->location,
+          error_at(logical_import->location, "K15001",
                    result.error.empty() ? ("Unknown module '" + logical_import->module_id + "'")
                                         : result.error);
         } else if (!result.error.empty()) {
-          error_at(logical_import->location, result.error);
+          error_at(logical_import->location, "K15001", result.error);
         }
       }
     }
@@ -1927,7 +1927,7 @@ void TypeChecker::visit(const ast::BlockStmt &block) {
   bool returned = false;
   for (const ast::StmtPtr &statement : block.statements) {
     if (returned) {
-      warn_at(statement->location, "Unreachable code.");
+      warn_at(statement->location, "K8001", "Unreachable code.");
       break;
     }
     check_stmt(*statement, stmt_expected_return_);
@@ -2231,7 +2231,7 @@ Type TypeChecker::check_null_literal(const ast::NullLiteralExpr &) {
 Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_access) {
   if (ns_access.namespace_name == "io") {
     if (sema_.used_.count("io") == 0) {
-      error_at(ns_access.location,
+      error_at(ns_access.location, "K15002",
                "Module 'io' is not imported. Add 'using io;' at the top of the file.");
       return void_type();
     }
@@ -2250,7 +2250,7 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
   }
   if (ns_access.namespace_name == "fs") {
     if (sema_.used_.count("fs") == 0) {
-      error_at(ns_access.location,
+      error_at(ns_access.location, "K15002",
                "Module 'fs' is not imported. Add 'using fs;' at the top of the file.");
       return void_type();
     }
@@ -2285,7 +2285,7 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
   }
   if (ns_access.namespace_name == "sys") {
     if (sema_.used_.count("sys") == 0) {
-      error_at(ns_access.location,
+      error_at(ns_access.location, "K15002",
                "Module 'sys' is not imported. Add 'using sys;' at the top of the file.");
       return void_type();
     }
@@ -2298,7 +2298,7 @@ Type TypeChecker::check_namespace_access(const ast::NamespaceAccessExpr &ns_acce
   }
   if (ns_access.namespace_name == "txt") {
     if (sema_.used_.count("txt") == 0) {
-      error_at(ns_access.location,
+      error_at(ns_access.location, "K15002",
                "Module 'txt' is not imported. Add 'using txt;' at the top of the file.");
       return void_type();
     }
@@ -2492,20 +2492,20 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
     }
     const std::string op = op_text();
     if (left_nullable && right_nullable) {
-      error_at(binary.location,
+      error_at(binary.location, "K10001",
                "Both operands of '" + op + "' are nullable (" + type_to_string(left_type) + " and " +
                    type_to_string(right_type) + "). Handle them first, for example '(left ?: 0) " +
                    op + " (right ?: 0)' or use match/postfix '?'.");
     } else if (left_nullable) {
-      error_at(binary.location, "Left operand of '" + op + "' has nullable type " +
-                                    type_to_string(left_type) +
-                                    ". Handle it first, for example '(left ?: 0) " + op +
-                                    " right' or use match/postfix '?'.");
+      error_at(binary.location, "K10001",
+               "Left operand of '" + op + "' has nullable type " + type_to_string(left_type) +
+                   ". Handle it first, for example '(left ?: 0) " + op +
+                   " right' or use match/postfix '?'.");
     } else {
-      error_at(binary.location, "Right operand of '" + op + "' has nullable type " +
-                                    type_to_string(right_type) +
-                                    ". Handle it first, for example 'left " + op +
-                                    " (right ?: 0)' or use match/postfix '?'.");
+      error_at(binary.location, "K10001",
+               "Right operand of '" + op + "' has nullable type " + type_to_string(right_type) +
+                   ". Handle it first, for example 'left " + op +
+                   " (right ?: 0)' or use match/postfix '?'.");
     }
     return true;
   };
@@ -2601,7 +2601,7 @@ Type TypeChecker::check_binary(const ast::BinaryExpr &binary) {
 Type TypeChecker::check_assign(const ast::AssignExpr &assign) {
   auto var_type = lookup_var(assign.name);
   if (!var_type.has_value()) {
-    error_at(assign.location, "Assignment to undeclared variable '" + assign.name + "'.");
+    error_at(assign.location, "K1001", "Assignment to undeclared variable '" + assign.name + "'.");
     return int_type();
   }
   VarInfo *lhs_vi = find_var_info(assign.name);
@@ -2820,7 +2820,7 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
 
   if (value_type.kind == TypeKind::Optional) {
     if (auto err = check_nullable_arms_exhaustive(match_expr.arms, value_type)) {
-      error_at(match_expr.location, *err);
+      error_at(match_expr.location, "K13001", *err);
     }
   } else if (value_type.kind == TypeKind::Bool) {
     bool missing_true = false;
@@ -2834,12 +2834,12 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
           missing += ", ";
         missing += "false";
       }
-      error_at(match_expr.location,
+      error_at(match_expr.location, "K13001",
                "Non-exhaustive match on bool. Missing case(s): " + missing + ".");
     }
   } else if (value_type.kind == TypeKind::Enum) {
     if (auto err = check_enum_arms_exhaustive(match_expr.arms, value_type)) {
-      error_at(match_expr.location, *err);
+      error_at(match_expr.location, "K13001", *err);
     }
   } else if (value_type.kind == TypeKind::Int || value_type.kind == TypeKind::Char ||
              value_type.kind == TypeKind::Float) {
@@ -2851,7 +2851,7 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
       }
     }
     if (!covered) {
-      error_at(match_expr.location,
+      error_at(match_expr.location, "K13001",
                "Non-exhaustive match on int. Add a catch-all pattern (`_` or `let x`).");
     }
   } else if (value_type.kind == TypeKind::String) {
@@ -2863,12 +2863,12 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
       }
     }
     if (!covered) {
-      error_at(match_expr.location,
+      error_at(match_expr.location, "K13001",
                "Non-exhaustive match on string. Add a catch-all pattern (`_` or `let x`).");
     }
   } else if (value_type.kind == TypeKind::Struct) {
     if (auto err = check_struct_arms_exhaustive(match_expr.arms, value_type)) {
-      error_at(match_expr.location, *err);
+      error_at(match_expr.location, "K13001", *err);
     }
   }
 
@@ -2877,7 +2877,7 @@ Type TypeChecker::check_match(const ast::MatchExpr &match_expr) {
   bool seen_null_arm = false;
   for (const ast::MatchArm &arm : match_expr.arms) {
     if (past_catchall) {
-      warn_at(arm.pattern->location, "Unreachable match arm.");
+      warn_at(arm.pattern->location, "K8001", "Unreachable match arm.");
       continue;
     }
     if (match_arm_is_catchall(arm)) {
@@ -2959,7 +2959,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   }
   if (ns_callee && ns_callee->namespace_name == "io") {
     if (sema_.used_.count("io") == 0) {
-      error_at(ns_callee->location,
+      error_at(ns_callee->location, "K15002",
                "Module 'io' is not imported. Add 'using io;' at the top of the file.");
       return void_type();
     }
@@ -2998,7 +2998,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   // Handle fs::__read(path) -> string, fs::__write(path, content) -> void.
   if (ns_callee && ns_callee->namespace_name == "fs") {
     if (sema_.used_.count("fs") == 0) {
-      error_at(ns_callee->location,
+      error_at(ns_callee->location, "K15002",
                "Module 'fs' is not imported. Add 'using fs;' at the top of the file.");
       return void_type();
     }
@@ -3095,7 +3095,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
   // Handle sys::args() -> string[].
   if (ns_callee && ns_callee->namespace_name == "sys") {
     if (sema_.used_.count("sys") == 0) {
-      error_at(ns_callee->location,
+      error_at(ns_callee->location, "K15002",
                "Module 'sys' is not imported. Add 'using sys;' at the top of the file.");
       return void_type();
     }
@@ -3207,9 +3207,9 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
         return *result;
     }
     if (ns_obj && sema_.used_.count(ns_obj->namespace_name) == 0) {
-      error_at(ns_obj->location, "Module '" + ns_obj->namespace_name +
-                                     "' is not imported. Add 'using " + ns_obj->namespace_name +
-                                     ";' at the top of the file.");
+      error_at(ns_obj->location, "K15002",
+               "Module '" + ns_obj->namespace_name + "' is not imported. Add 'using " +
+                   ns_obj->namespace_name + ";' at the top of the file.");
       return void_type();
     }
   }
@@ -3219,7 +3219,7 @@ Type TypeChecker::check_call(const ast::CallExpr &call_expr) {
     const auto *ns_obj = dynamic_cast<const ast::NamespaceAccessExpr *>(field_callee->object.get());
     if (ns_obj && ns_obj->namespace_name == "txt") {
       if (sema_.used_.count("txt") == 0) {
-        error_at(ns_obj->location,
+        error_at(ns_obj->location, "K15002",
                  "Module 'txt' is not imported. Add 'using txt;' at the top of the file.");
         return void_type();
       }
@@ -4213,9 +4213,9 @@ Type TypeChecker::check_field_assign(const ast::FieldAssignExpr &field_assign) {
         field_type = *f.type;
       }
       if (!types_assignable(value_type, field_type)) {
-        error_at(field_assign.location, "Cannot assign " + type_to_string(value_type) +
-                                            " to field '" + f.name + "' of type " +
-                                            type_to_string(field_type) + ".");
+        error_at(field_assign.location, "K2001",
+                 "Cannot assign " + type_to_string(value_type) + " to field '" + f.name +
+                     "' of type " + type_to_string(field_type) + ".");
       }
       // Field-level definite assignment only covers the direct
       // `identifier.field = value` shape for now; `nested.obj.field = v`
@@ -4467,9 +4467,9 @@ Type TypeChecker::check_index_assign(const ast::IndexAssignExpr &index_assign) {
                                                  type_to_string(index_type) + ".");
     }
     if (object_type.element_type && !types_assignable(value_type, *object_type.element_type)) {
-      error_at(index_assign.value->location, "Cannot assign " + type_to_string(value_type) +
-                                                 " to map value of type " +
-                                                 type_to_string(*object_type.element_type) + ".");
+      error_at(index_assign.value->location, "K2001",
+               "Cannot assign " + type_to_string(value_type) + " to map value of type " +
+                   type_to_string(*object_type.element_type) + ".");
     }
     return object_type.element_type ? *object_type.element_type : value_type;
   }
@@ -4481,9 +4481,9 @@ Type TypeChecker::check_index_assign(const ast::IndexAssignExpr &index_assign) {
     return value_type;
   }
   if (!types_assignable(value_type, *object_type.element_type)) {
-    error_at(index_assign.value->location, "Cannot assign " + type_to_string(value_type) +
-                                               " to array element of type " +
-                                               type_to_string(*object_type.element_type) + ".");
+    error_at(index_assign.value->location, "K2001",
+             "Cannot assign " + type_to_string(value_type) + " to array element of type " +
+                 type_to_string(*object_type.element_type) + ".");
   }
   return *object_type.element_type;
 }
@@ -4857,7 +4857,7 @@ bool TypeChecker::is_reference_type(const Type &type) {
 
 void TypeChecker::check_reference_escape(const Type &value_type, ast::SourceLocation loc) {
   if (is_reference_type(value_type)) {
-    error_at(loc, "References cannot escape their owning scope.");
+    error_at(loc, "K5004", "References cannot escape their owning scope.");
   }
 }
 
@@ -4982,12 +4982,14 @@ void TypeChecker::check_definite_assignment_read(const std::string &name, ast::S
     return; // undeclared-variable case is reported by the caller separately
   }
   if (vi->init_state == InitState::Unassigned) {
-    error_at(loc, "Variable '" + name + "' may be uninitialized. Assign it on every path before " +
-                      "reading it, or give it an initializer.");
+    error_at(loc, "K6001",
+             "Variable '" + name + "' may be uninitialized. Assign it on every path before " +
+                 "reading it, or give it an initializer.");
   } else if (vi->init_state == InitState::PartiallyInitialized) {
-    error_at(loc, "Variable '" + name +
-                      "' is only partially initialized. Assign every field before reading the "
-                      "whole value.");
+    error_at(
+        loc, "K6001",
+        "Variable '" + name +
+            "' is only partially initialized. Assign every field before reading the whole value.");
   }
 }
 
@@ -5002,7 +5004,7 @@ void TypeChecker::check_field_definite_assignment_read(const std::string &name,
     return;
   }
   if (vi->init_state == InitState::Unassigned || vi->initialized_fields.count(field) == 0) {
-    error_at(loc, "Field '" + name + "." + field + "' may be uninitialized.");
+    error_at(loc, "K6001", "Field '" + name + "." + field + "' may be uninitialized.");
   }
 }
 

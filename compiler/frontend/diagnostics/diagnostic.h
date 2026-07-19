@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: MIT
 //
 // Unified diagnostic representation shared by lexer/parser/checker/backend.
-// See ADR 0031. Phase 1 of the migration: only the shape and severities are
-// defined here; error codes, source snippet rendering, and warning groups
-// (D2/D3/D6/D7) come in later phases and can be added without breaking
-// existing producers, all of which set `code` to an empty string for now.
+// Producers attach stable codes to established diagnostic families while
+// diagnostics that have not completed semantic review may leave `code` empty.
 
 #pragma once
 
@@ -53,8 +51,8 @@ struct FixIt {
 };
 
 struct Diagnostic {
-  // Stable error code, e.g. "K4001". Empty during migration (ADR 0031 D10 step
-  // 2/3/4); the renderer must omit the "[Kxxxx]" tag in that case.
+  // Stable error code, e.g. "K4001". The renderer omits the "[Kxxxx]" tag when
+  // this is empty for a diagnostic that has not completed semantic review.
   std::string code;
   Severity severity = Severity::Error;
   std::string message;

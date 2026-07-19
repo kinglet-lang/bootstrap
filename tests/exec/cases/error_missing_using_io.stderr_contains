@@ -1,1 +1,1 @@
-error: Module 'io' is not imported. Add 'using io;' at the top of the file.
+error[K15002]: Module 'io' is not imported. Add 'using io;' at the top of the file.

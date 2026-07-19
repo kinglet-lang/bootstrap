@@ -18,8 +18,8 @@ namespace kinglet {
 
 struct ParseResult {
   std::unique_ptr<ast::Program> program;
-  // Migrated to unified `Diagnostic` (ADR 0031 D10 step 3). Code is empty
-  // for now; a follow-up assigns K0xxx codes to the parse family.
+  // Parser failures use the unified `Diagnostic` representation. Grammar
+  // failures use K0002; implementation limits use the K19xxx family.
   std::vector<Diagnostic> errors;
 };
 

@@ -536,7 +536,7 @@ void Parser::note_recursion_limit() {
   // every enclosing loop and recursive call so the stack unwinds instead of
   // overflowing; the single diagnostic points at where nesting got too deep.
   recursion_limit_hit_ = true;
-  error_at(peek(), "Maximum nesting depth exceeded.");
+  error_at(peek(), "K19001", "Maximum nesting depth exceeded.");
   if (!tokens_.empty()) {
     current_ = tokens_.size() - 1; // END_OF_FILE sentinel
   }
@@ -547,7 +547,7 @@ void Parser::error_at(const Token &token, std::string_view message) {
   loc.line = token.line;
   loc.column = token.column;
   loc.length = 1;
-  errors_.push_back(make_diagnostic(Severity::Error, loc, std::string(message)));
+  errors_.push_back(make_diagnostic(Severity::Error, loc, "K0002", std::string(message)));
   // Backstop against any un-guarded no-progress recovery path: once the error
   // count crosses the ceiling, jump to end-of-input so every parse loop that
   // tests is_at_end() terminates. Bounds both time and memory on adversarial
