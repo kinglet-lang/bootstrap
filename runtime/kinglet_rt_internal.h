@@ -55,6 +55,7 @@ struct KlStruct {
     s->hdr.refcount = 1;
     s->type_index = 0;
     s->field_count = field_count;
+    s->is_resource = false;
     return s;
   }
   static void destroy(KlStruct *s) { ::operator delete(s); }
@@ -65,6 +66,13 @@ struct KlStruct {
   KlHeader hdr{}; // kind = Struct; refcount set by create()
   int32_t type_index = 0;
   int32_t field_count = 0;
+  // Mirrors the checker's Type::is_resource for this struct's declared type
+  // (true iff the struct has an @destroy body). Resource-typed values are
+  // move-only by language semantics, so kl_ensure_unique() must never clone
+  // them -- cloning would fabricate a second independent owner of a value
+  // the type system treats as uniquely owned. Set by kl_struct_new() from
+  // the type metadata the compiler already tracks (KirStructMeta::has_destroy).
+  bool is_resource = false;
 };
 
 struct KlEnum {

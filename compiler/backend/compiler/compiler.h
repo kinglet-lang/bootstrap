@@ -154,6 +154,16 @@ private:
   bool local_is_ref(int slot) const;
   bool local_is_mut_ref(int slot) const;
   void compile_lvalue_addr(const ast::Expr &expr);
+  // Copy-on-write descent for a value-type write path (`b.x = 99`,
+  // `outer.inner.x = 99`, `arr[i] = x`, `m[i][j] = x`). Compiles `expr` as an
+  // lvalue the same shape as compile_lvalue_addr, but ensures every level
+  // from the root local down to (and including) `expr` itself is uniquely
+  // owned before the caller performs its write, cloning and writing back in
+  // place wherever a level is shared. Leaves the (now-unique) value of
+  // `expr` on the operand stack, retained once, ready for the caller's
+  // FieldSet/IndexSet. See the EnsureUniqueLocal/Field/Index opcodes and
+  // kl_ensure_unique() family in runtime/kinglet_rt_mem.cc.
+  void compile_ensure_unique_lvalue(const ast::Expr &expr);
   bool declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot);
   int resolve_struct(const ast::TypeExpr &type);
   // Emits a real, type-appropriate default value for a local declared

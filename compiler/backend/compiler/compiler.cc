@@ -1706,7 +1706,23 @@ void Compiler::compile_call(const ast::CallExpr &call_expr) {
         method == "keys" || method == "starts_with" || method == "ends_with" ||
         method == "replace" || method == "split" || method == "trim" || method == "to_upper" ||
         method == "to_lower") {
-      compile_expr(*field_callee->object);
+      // The mutating array methods write through the receiver in place
+      // (`arr.push(x)` grows arr's own backing storage, etc.), so a shared
+      // array must be cloned before the mutation the same way a field/index
+      // write is (issue #118) -- otherwise `Array b = a; b.push(x);` would
+      // grow `a`'s storage too. The rest of this method list (len/has/keys/
+      // string ops/slice/index_of/contains) never writes through the
+      // receiver -- strings are immutable values and these all return a new
+      // value -- so ensure-unique would be pure overhead with no
+      // correctness benefit for them.
+      const bool receiver_is_mutated = method == "push" || method == "pop" || method == "remove" ||
+                                       method == "clear" || method == "insert" ||
+                                       method == "resize" || method == "reverse";
+      if (receiver_is_mutated) {
+        compile_ensure_unique_lvalue(*field_callee->object);
+      } else {
+        compile_expr(*field_callee->object);
+      }
       if (method == "len") {
         emit(LoweringOp::ArrayLen, call_expr.location);
         return;
@@ -2555,7 +2571,12 @@ void Compiler::compile_field_access(const ast::FieldAccessExpr &field_access) {
 
 void Compiler::compile_field_assign(const ast::FieldAssignExpr &field_assign) {
 
-  compile_expr(*field_assign.object);
+  // Ensure `object` (and, for a chained write like `outer.inner.x = 99`,
+  // every level between the root local and `object`) is uniquely owned
+  // before writing through it, so the write cannot alias a value shared
+  // with another variable (issue #118 -- struct assignment shares by
+  // reference; this gives value types Copy semantics on the write path).
+  compile_ensure_unique_lvalue(*field_assign.object);
   compile_expr(*field_assign.value);
   uint32_t field_const = add_constant_(Value::string_value(field_assign.field_name));
   emit_operand(LoweringOp::FieldSet, field_const, field_assign.location);
@@ -2604,7 +2625,10 @@ void Compiler::compile_index(const ast::IndexExpr &index_expr) {
 
 void Compiler::compile_index_assign(const ast::IndexAssignExpr &index_assign) {
 
-  compile_expr(*index_assign.object);
+  // Same reasoning as compile_field_assign: ensure `object` (and every
+  // level above it, for `m[i][j] = x`) is uniquely owned before writing an
+  // element/entry through it (issue #118).
+  compile_ensure_unique_lvalue(*index_assign.object);
   compile_expr(*index_assign.index);
   compile_expr(*index_assign.value);
   emit(LoweringOp::IndexSet, index_assign.location);
@@ -2929,6 +2953,54 @@ void Compiler::compile_lvalue_addr(const ast::Expr &expr) {
   emit_operand(LoweringOp::StoreLocal, temp_slot, expr.location);
   emit(LoweringOp::Pop, expr.location);
   emit_operand(LoweringOp::LoadLocalAddr, temp_slot, expr.location);
+}
+
+void Compiler::compile_ensure_unique_lvalue(const ast::Expr &expr) {
+  if (const auto *identifier = dynamic_cast<const ast::IdentifierExpr *>(&expr)) {
+    const int slot = resolve_local(identifier->name);
+    if (slot < 0) {
+      error_at(identifier->location, "Use of undeclared variable '" + identifier->name + "'.");
+      return;
+    }
+    // A ref-typed local aliases someone else's storage rather than owning a
+    // value of its own -- there is no local value-type container here for
+    // ensure-unique to clone, and cloning through the alias would silently
+    // detach the write from the referent the reference is supposed to name.
+    // Fall through to the referent's own value the same way compile_identifier
+    // does for a plain read.
+    if (local_is_ref(slot)) {
+      emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(slot), identifier->location);
+      emit(LoweringOp::DerefLoad, identifier->location);
+      return;
+    }
+    // Ensures the slot holds a uniquely-owned value (cloning in place if it
+    // was shared), then loads that (now-unique) value for the caller to
+    // descend into or write through.
+    emit_operand(LoweringOp::EnsureUniqueLocal, static_cast<uint32_t>(slot), identifier->location);
+    emit_operand(LoweringOp::LoadLocal, static_cast<uint32_t>(slot), identifier->location);
+    return;
+  }
+  if (const auto *field_access = dynamic_cast<const ast::FieldAccessExpr *>(&expr)) {
+    // Recurse first so `object` itself is uniquely owned before checking
+    // whether the field slot inside it is shared -- otherwise a shared
+    // `outer` would let two `outer`s each "uniquely" clone the same `inner`
+    // out from under one another.
+    compile_ensure_unique_lvalue(*field_access->object);
+    uint32_t field_const = add_constant_(Value::string_value(field_access->field_name));
+    emit_operand(LoweringOp::EnsureUniqueField, field_const, field_access->location);
+    return;
+  }
+  if (const auto *index = dynamic_cast<const ast::IndexExpr *>(&expr)) {
+    compile_ensure_unique_lvalue(*index->object);
+    compile_expr(*index->index);
+    emit(LoweringOp::EnsureUniqueIndex, index->location);
+    return;
+  }
+  // Anything else (a call result, a literal, etc.) is a fresh value with no
+  // pre-existing shared storage to worry about -- compile it plainly. This
+  // mirrors compile_lvalue_addr falling back to materializing a temporary,
+  // except there is no address to hand back here, just the value itself.
+  compile_expr(expr);
 }
 
 bool Compiler::declare_local(const ast::VarDeclStmt &var_decl, uint32_t *slot) {

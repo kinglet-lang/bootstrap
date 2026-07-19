@@ -1,0 +1,16 @@
+// RUN: run
+
+using io;
+
+// Map index writes go through the same generic kl_index_set dispatch as
+// array element writes, so a shared map must not have its entries mutated
+// through one alias leak into the other (issue #118).
+
+int main() {
+  {string: int} a = {};
+  a["x"] = 1;
+  {string: int} b = a;
+  b["x"] = 99;
+  io::out("{} {}\n", a["x"], b["x"]);
+  return 0;
+}

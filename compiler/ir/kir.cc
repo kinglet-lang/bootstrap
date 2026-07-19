@@ -267,6 +267,12 @@ const char *kir_opcode_name(KirOpcode op) {
     return "native_txt_gbk_encode";
   case KirOpcode::NativeTxtGbkDecode:
     return "native_txt_gbk_decode";
+  case KirOpcode::EnsureUniqueLocal:
+    return "ensure_unique_local";
+  case KirOpcode::EnsureUniqueField:
+    return "ensure_unique_field";
+  case KirOpcode::EnsureUniqueIndex:
+    return "ensure_unique_index";
   }
   return "unknown";
 }

@@ -299,6 +299,17 @@ void KirRecorder::on_emit(LoweringOp op, uint32_t operand, ast::SourceLocation l
   case LoweringOp::BorrowIndexMut:
     bb_.instrs.push_back(rec(KirOpcode::BorrowIndexMut, {}, location));
     break;
+  case LoweringOp::EnsureUniqueLocal:
+    bb_.instrs.push_back(
+        rec(KirOpcode::EnsureUniqueLocal, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::EnsureUniqueField:
+    bb_.instrs.push_back(
+        rec(KirOpcode::EnsureUniqueField, {static_cast<int32_t>(operand)}, location));
+    break;
+  case LoweringOp::EnsureUniqueIndex:
+    bb_.instrs.push_back(rec(KirOpcode::EnsureUniqueIndex, {}, location));
+    break;
   case LoweringOp::ArrayLen:
     bb_.instrs.push_back(rec(KirOpcode::ArrayLen, {}, location));
     break;

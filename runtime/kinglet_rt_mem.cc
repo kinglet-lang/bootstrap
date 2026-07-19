@@ -132,4 +132,46 @@ void kl_release(kl_h value) {
   }
 }
 
+// Copy-on-write: guarantees the value at *slot is uniquely owned before a
+// caller writes through it in place. Value-type containers (struct/array/map
+// without @destroy) are cloned one level deep when shared (refcount > 1);
+// resource-typed structs are left untouched (move-only, never cloned) and
+// non-container/non-heap values pass through unchanged. The clone is stored
+// back into *slot so subsequent reads of that local/field/element see the
+// now-independent copy, and the original's shared reference is released.
+kl_h kl_ensure_unique(kl_h *slot) {
+  const kl_h value = *slot;
+  if (!kl_is_heap(value)) {
+    return value;
+  }
+  auto *hdr = static_cast<KlHeader *>(kl_unbox_ptr(value));
+  if (hdr->refcount <= 1) {
+    return value;
+  }
+  if (hdr->kind == KlKind::Struct && static_cast<KlStruct *>(kl_unbox_ptr(value))->is_resource) {
+    return value;
+  }
+  kl_h clone = value;
+  switch (hdr->kind) {
+  case KlKind::Struct:
+    clone = kl_struct_shallow_clone(value);
+    break;
+  case KlKind::Array:
+    clone = kl_array_shallow_clone(value);
+    break;
+  case KlKind::Map:
+    clone = kl_map_shallow_clone(value);
+    break;
+  default:
+    // Strings, enums, and the borrow/file kinds are not COW targets here:
+    // strings already have their own in-place-append fast path (kinglet_rt_num.cc),
+    // and enums/borrows/files are either immutable-by-value or not written
+    // through this path.
+    return value;
+  }
+  *slot = clone;
+  kl_release(value);
+  return clone;
+}
+
 } // extern "C"

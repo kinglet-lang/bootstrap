@@ -12,7 +12,7 @@ alpha
 === struct_fields ===
 x=10, y=20
 p1.x after update: 99
-p2.x unchanged: 99
+p2.x unchanged: 10
 === map_exercise ===
 map len: 2
 three: 3

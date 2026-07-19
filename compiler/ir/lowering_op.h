@@ -134,6 +134,9 @@ enum class LoweringOp : uint8_t {
   NativeTxtUtf8Decode,
   NativeTxtGbkEncode,
   NativeTxtGbkDecode,
+  EnsureUniqueLocal,
+  EnsureUniqueField,
+  EnsureUniqueIndex,
 };
 
 const char *lowering_op_name(LoweringOp op);

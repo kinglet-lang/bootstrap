@@ -70,7 +70,7 @@ void resolve_kir_field_operands(KirModule &module) {
     for (KirBasicBlock &bb : fn.blocks) {
       for (KirInstr &instr : bb.instrs) {
         if (instr.op != KirOpcode::FieldGet && instr.op != KirOpcode::FieldSet &&
-            instr.op != KirOpcode::BorrowFieldMut) {
+            instr.op != KirOpcode::BorrowFieldMut && instr.op != KirOpcode::EnsureUniqueField) {
           continue;
         }
         if (instr.operands.empty()) {

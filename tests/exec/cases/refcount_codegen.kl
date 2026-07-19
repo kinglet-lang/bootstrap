@@ -54,9 +54,9 @@ void struct_fields() {
   Point p2 = p1;             // struct value loaded and stored
   io::out.line("x={}, y={}", p2.x, p2.y);
 
-  p1.x = 99;                 // field-set through StoreLocal
+  p1.x = 99;                 // field-set: p1 is uniquely owned, writes in place
   io::out.line("p1.x after update: {}", p1.x);
-  io::out.line("p2.x unchanged: {}", p2.x);
+  io::out.line("p2.x unchanged: {}", p2.x);  // copy-on-write: p1 was cloned before the write, p2 still holds the original
 }
 
 // Map ops exercise retain/release on container elements.
