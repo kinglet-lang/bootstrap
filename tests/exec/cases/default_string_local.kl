@@ -1,0 +1,17 @@
+// RUN: run
+//
+// Chapter 03 coverage: `string` is one of the four defaultable types
+// (`T?`, `string`, `T[]`, `{K: V}`) -- a bare declaration is immediately
+// readable and yields the empty string, not a null placeholder or an
+// unassigned state. Complements default_array_local.kl and
+// default_map_local.kl, which pin the same "not a null placeholder"
+// behavior for arrays and maps. The check-only positive for all four
+// types already lives in sema/pass/definite_assignment_defaultable_
+// types.kl; this test pins the runtime value, not just the compile pass.
+using io;
+
+int main() {
+  string s;
+  io::out("len={} empty={}\n", s.len(), s == "");
+  return 0;
+}

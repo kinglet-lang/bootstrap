@@ -1,0 +1,23 @@
+// RUN: run
+//
+// Chapter 03 coverage: Kinglet structs declare fields only -- there is no
+// in-struct method syntax. Method-call syntax `p.dist2()` is UFCS sugar
+// for the free function `dist2(p)` whose first parameter is the receiver.
+// Both spellings must produce the same value, so the equivalence is
+// observable end-to-end.
+using io;
+
+struct Point {
+  int x;
+  int y;
+}
+
+int dist2(Point p) {
+  return p.x * p.x + p.y * p.y;
+}
+
+int main() {
+  Point p { 3, 4 };
+  io::out("{} {}\n", p.dist2(), dist2(p));
+  return 0;
+}
