@@ -63,23 +63,35 @@ jobs:
             --json number,statusCheckRollup,mergeable,headRepository,headRepositoryOwner,headRefName,reviews)
 
           # Filter to PRs that are ready.
+          #
+          # statusCheckRollup is append-only: when a check re-runs (e.g. after
+          # a push or close/reopen), the new run is added alongside the old
+          # one rather than replacing it. Group by check name (or context,
+          # for legacy status contexts) and look only at the most recent run
+          # so a stale FAILURE from an earlier commit doesn't block merge.
           ready=$(echo "$prs_json" | jq '
+            def check_key: .name // .context // "";
+            # A run that has not finished yet (no timestamps, e.g. QUEUED) is
+            # logically the newest, so sort it last by falling back to a
+            # high sentinel rather than the empty string.
+            def check_time: (.completedAt // .startedAt // "9999");
             .[]
             | select(.mergeable == "MERGEABLE")
             | select(
                 .statusCheckRollup as $checks
                 | (
-                    # 1. No failed or pending checks.
+                    # 1. Latest run of each distinct check must be SUCCESS.
+                    #    - Group by name/context so old runs are shadowed by new.
+                    #    - Within a group, sort by completedAt/startedAt and take
+                    #      the last (most recent) entry.
                     #    - Check-runs with conclusion FAILURE/CANCELLED/etc -> block
                     #    - Check-runs with null conclusion (still running) -> block
                     #    - Status contexts with state ERROR/FAILURE/PENDING -> block
                     #    - Status contexts with state SUCCESS -> ok
-                    #    - Entries with null everything (unlikely) -> block
                     $checks
+                    | group_by(check_key)
+                    | map(sort_by(check_time) | last)
                     | map(
-                        # For check-runs: conclusion tells the final result.
-                        # For status contexts: state tells the result.
-                        # A check is "blocking" if it has not succeeded yet.
                         ( .conclusion // .state ) as $result
                         | select($result != "SUCCESS")
                       )
@@ -102,11 +114,53 @@ jobs:
           for num in $ready; do
             echo "=== Merging PR #$num ==="
 
-            # Extract only the Summary section of the PR body as the commit body.
-            pr_body=$(gh api "repos/$REPO/pulls/$num" --jq '.body' \
+            # Build the squash commit body: start with the PR's Summary
+            # section, then append any issue-closing keywords found anywhere
+            # in the PR body. GitHub's auto-close only fires on keywords that
+            # end up in the default-branch commit message, so surfacing them
+            # here means authors can write "Fixes #N" in whichever section
+            # feels natural and still get the issue closed on merge.
+            pr_full_body=$(gh api "repos/$REPO/pulls/$num" --jq '.body')
+
+            pr_body=$(printf '%s' "$pr_full_body" \
               | sed -n '/^\*\*Summary\*\*$/,/^\*\*[A-Z]/p' \
               | sed '1d; $d' \
               | sed '/^[[:space:]]*$/d')
+
+            # Scan the full body for closing keywords (close/closes/closed/
+            # fix/fixes/fixed/resolve/resolves/resolved) followed by #N.
+            # Tolerate a trailing punctuation mark after the issue number,
+            # but strip it so the emitted line is the canonical "Fixes #N"
+            # form GitHub's parser always recognises. Case-insensitive.
+            closing_lines=$(printf '%s' "$pr_full_body" \
+              | grep -ioE '\b(close[sd]?|fix(es|ed)?|resolve[sd]?)[[:space:]]+#[0-9]+' \
+              | sed -E 's/[[:space:]]+/ /g' \
+              | awk '{ keyword=tolower($1);
+                       issue=$2;
+                       # Strip any trailing punctuation the regex may have
+                       # pulled in (e.g. "#144." from "Fixes #144.").
+                       sub(/[^0-9]+$/, "", issue);
+                       # Normalise to the plural "Fixes/Closes/Resolves" form.
+                       if (keyword ~ /^fix/)       kw="Fixes";
+                       else if (keyword ~ /^close/)  kw="Closes";
+                       else if (keyword ~ /^resolve/) kw="Resolves";
+                       print kw, issue }' \
+              | sort -u)
+
+            if [ -n "$closing_lines" ]; then
+              # Drop any closing lines that are already present verbatim in
+              # the Summary section so we don't duplicate them.
+              new_closings=""
+              while IFS= read -r line; do
+                if ! printf '%s' "$pr_body" | grep -qiF "$line"; then
+                  new_closings="${new_closings}${line}"$'\n'
+                fi
+              done <<< "$closing_lines"
+              new_closings=$(printf '%s' "$new_closings" | sed '/^[[:space:]]*$/d')
+              if [ -n "$new_closings" ]; then
+                pr_body=$(printf '%s\n\n%s' "$pr_body" "$new_closings")
+              fi
+            fi
 
             # Capture head repo + branch for fork cleanup.
             head_owner=$(echo "$prs_json" | jq -r --argjson n "$num" \
