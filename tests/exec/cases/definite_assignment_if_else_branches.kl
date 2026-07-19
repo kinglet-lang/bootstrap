@@ -1,0 +1,24 @@
+// RUN: run
+//
+// Chapter 03 coverage: definite assignment merges across if/else -- when
+// both branches assign a variable, the join point treats it as assigned.
+// Complements sema/fail/definite_assignment_missing_else.kl (only one
+// branch assigns, read afterwards is rejected) and
+// sema/fail/definite_assignment_loop_not_enough.kl (loop body assignment
+// does not promote, since the loop may run zero times).
+using io;
+
+int pick(bool cond) {
+  int a;
+  if cond {
+    a = 1;
+  } else {
+    a = 2;
+  }
+  return a;
+}
+
+int main() {
+  io::out("{} {}\n", pick(true), pick(false));
+  return 0;
+}

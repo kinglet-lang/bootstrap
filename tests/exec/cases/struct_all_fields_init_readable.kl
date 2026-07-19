@@ -1,0 +1,26 @@
+// RUN: run
+//
+// Chapter 03 coverage: a struct local declared without an initializer is
+// tracked field-by-field. Assigning every field promotes the variable to
+// fully initialized, so whole-struct reads (field reads, passing the struct
+// by value to a function) become legal -- not just reads of the assigned
+// fields themselves. Complements sema/fail/definite_assignment_struct_
+// field_partial.kl, which pins the negative case.
+using io;
+
+struct Point {
+  int x;
+  int y;
+}
+
+int sum(Point p) {
+  return p.x + p.y;
+}
+
+int main() {
+  Point p;
+  p.x = 3;
+  p.y = 4;
+  io::out("{} {} {}\n", p.x, p.y, sum(p));
+  return 0;
+}
