@@ -52,7 +52,7 @@ for the scheme, categories, and rendering rules.
 | `K5004` | error | A reference escapes the scope that owns its referent. | `References cannot escape their owning scope.` | — |
 | `K6001` | error | A variable or field may be read before it is definitely initialized. | `Variable 'x' may be uninitialized.` | — |
 | `K7001` | error | Overload resolution failed — no viable candidate for the call. | `No matching overload.` | every candidate's declaration |
-| `K7007` | error | A non-void function has an incomplete return — a bare `return` or a path that reaches the end without a value. | `Non-void function must return a value.` | — |
+| `K7007` | error | A non-void function has an incomplete return — a bare `return` or a path that reaches the end without a value. | `Non-void function must return a value.` / `Not all paths return a value in function 'choose'.` | — |
 | `K7010` | warning | Expression statement's result is discarded silently. | `Expression result is unused.` | — |
 | `K8001` | warning | A statement or match arm cannot be reached. | `Unreachable code.` | — |
 | `K10001` | error | A nullable value is used where its non-null inner value is required. | `Left operand of '+' has nullable type int?.` | — |

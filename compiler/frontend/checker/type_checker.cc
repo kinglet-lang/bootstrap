@@ -1749,9 +1749,15 @@ TypeCheckResult TypeChecker::check(const ast::Program &program) {
       // (`input.read(...)`) get checked against the concept's declared
       // method signatures (see check_field_access's TypeKind::Concept
       // branch). Ordinary generic `<T>` functions remain unchecked at
-      // declaration site since `T` carries no signature to check against.
+      // declaration site since `T` carries no signature to check against, but
+      // their structural return completeness is independent of concrete types
+      // and can still be validated here.
       if (func->type_params.empty()) {
         check_function(*func);
+      } else if (func->body && func->return_type.name != "void" &&
+                 implicit_return_expr(*func) == nullptr && !stmt_always_returns(*func->body)) {
+        error_at(func->location, "K7007",
+                 "Not all paths return a value in function '" + func->name + "'.");
       }
     }
     if (const auto *top = dynamic_cast<const ast::TopLevelStmtDecl *>(decl.get())) {
@@ -1816,6 +1822,54 @@ void TypeChecker::collect_return_types(const ast::Stmt &stmt, std::vector<Type> 
     }
     return;
   }
+}
+
+bool TypeChecker::stmt_always_returns(const ast::Stmt &stmt) {
+  if (dynamic_cast<const ast::ReturnStmt *>(&stmt)) {
+    return true;
+  }
+  if (const auto *block = dynamic_cast<const ast::BlockStmt *>(&stmt)) {
+    for (const auto &child : block->statements) {
+      if (stmt_always_returns(*child)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (const auto *if_stmt = dynamic_cast<const ast::IfStmt *>(&stmt)) {
+    if (const auto *constant =
+            dynamic_cast<const ast::BoolLiteralExpr *>(if_stmt->condition.get())) {
+      if (constant->value) {
+        return stmt_always_returns(*if_stmt->then_branch);
+      }
+      return if_stmt->else_branch && stmt_always_returns(*if_stmt->else_branch);
+    }
+    return if_stmt->else_branch && stmt_always_returns(*if_stmt->then_branch) &&
+           stmt_always_returns(*if_stmt->else_branch);
+  }
+  if (const auto *try_catch = dynamic_cast<const ast::TryCatchStmt *>(&stmt)) {
+    if (!stmt_always_returns(*try_catch->body) || try_catch->catches.empty()) {
+      return false;
+    }
+    for (const ast::CatchArm &arm : try_catch->catches) {
+      if (!stmt_always_returns(*arm.body)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+const ast::ExprStmt *TypeChecker::implicit_return_expr(const ast::FunctionDecl &function) {
+  if (!function.body || function.return_type.name == "void") {
+    return nullptr;
+  }
+  const auto *block = dynamic_cast<const ast::BlockStmt *>(function.body.get());
+  if (!block || block->statements.empty()) {
+    return nullptr;
+  }
+  return dynamic_cast<const ast::ExprStmt *>(block->statements.back().get());
 }
 
 Type TypeChecker::infer_auto_return_type(const ast::FunctionDecl &function) {
@@ -1892,16 +1946,21 @@ void TypeChecker::check_function(const ast::FunctionDecl &function) {
     implicit_return_stmt_ = nullptr;
     implicit_return_value_type_ = Type(TypeKind::Void);
     if (return_type.kind != TypeKind::Void) {
-      if (const auto *block = dynamic_cast<const ast::BlockStmt *>(function.body.get())) {
-        if (!block->statements.empty()) {
-          if (const auto *last_expr =
-                  dynamic_cast<const ast::ExprStmt *>(block->statements.back().get())) {
-            implicit_return_stmt_ = last_expr;
-          }
-        }
-      }
+      implicit_return_stmt_ = implicit_return_expr(function);
     }
     check_stmt(*function.body, return_type);
+    const bool has_implicit_return =
+        implicit_return_stmt_ != nullptr && implicit_return_value_type_.kind != TypeKind::Void;
+    if (has_implicit_return && !types_assignable(implicit_return_value_type_, return_type)) {
+      error_at(implicit_return_stmt_->location,
+               "Cannot return " + type_to_string(implicit_return_value_type_) +
+                   " from function returning " + type_to_string(return_type) + ".");
+    }
+    if (return_type.kind != TypeKind::Void && !has_implicit_return &&
+        !stmt_always_returns(*function.body)) {
+      error_at(function.location, "K7007",
+               "Not all paths return a value in function '" + function.name + "'.");
+    }
     if (function.return_type.name == "auto" && implicit_return_value_type_.kind != TypeKind::Void) {
       std::vector<Type> fn_params;
       for (const auto &param : function.params) {

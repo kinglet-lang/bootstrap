@@ -1,0 +1,29 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: error[K7007]: Not all paths return a value in function 'missing_else'.
+// CHECK-ERR: error[K7007]: Not all paths return a value in function 'inferred_missing'.
+// CHECK-ERR: error[K7007]: Not all paths return a value in function 'generic_missing'.
+// CHECK-ERR: Cannot return string from function returning int.
+
+int missing_else(bool cond) {
+  if cond {
+    return 1;
+  }
+}
+
+auto inferred_missing(bool cond) {
+  if cond {
+    return 2;
+  }
+}
+
+T generic_missing<T>(bool cond, T value) {
+  if cond {
+    return value;
+  }
+}
+
+int wrong_implicit_return() {
+  "not an int";
+}
