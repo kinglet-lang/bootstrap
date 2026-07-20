@@ -270,6 +270,14 @@ private:
   Type infer_auto_return_type(const ast::FunctionDecl &function);
   // Recursively collect the types of every value-bearing `return` in a stmt.
   void collect_return_types(const ast::Stmt &stmt, std::vector<Type> &out);
+  // True when every control-flow path through `stmt` executes a return before
+  // reaching the following statement. Loops are handled conservatively; an
+  // ordinary loop may execute zero times and therefore does not satisfy a
+  // non-void function's return contract by itself.
+  static bool stmt_always_returns(const ast::Stmt &stmt);
+  // The trailing expression statement that acts as this function's implicit
+  // return, or null when the body has no such expression.
+  static const ast::ExprStmt *implicit_return_expr(const ast::FunctionDecl &function);
   std::string type_match_key(const Type &type) const;
   bool type_satisfies_concept(const ast::ConceptDecl *concept_decl, const Type &concrete,
                               ast::SourceLocation loc);

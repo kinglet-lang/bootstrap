@@ -1,0 +1,47 @@
+// RUN: check
+
+int choose(bool cond) {
+  if cond {
+    return 1;
+  } else {
+    return 2;
+  }
+}
+
+int nested(int value) {
+  if value > 0 {
+    if value > 10 {
+      return 10;
+    } else {
+      return 1;
+    }
+  } else {
+    return 0;
+  }
+}
+
+int constant_true_branch() {
+  if true {
+    return 3;
+  }
+}
+
+int parse_or_default(string text) {
+  try {
+    return int(text)?;
+  } catch (let err: CastError) {
+    return 0;
+  }
+}
+
+int explicit_then_implicit(bool cond) {
+  if cond {
+    return 4;
+  }
+  5;
+}
+
+int main() {
+  return choose(true) + nested(12) + constant_true_branch() + parse_or_default("bad") +
+         explicit_then_implicit(false);
+}
