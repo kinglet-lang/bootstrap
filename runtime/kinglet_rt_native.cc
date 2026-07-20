@@ -275,7 +275,7 @@ kl_h kl_native_err_flush(void) {
   return 0;
 }
 
-kl_h kl_native_in(int32_t argc, const kl_h *args, int32_t secret) {
+kl_h kl_native_in(int32_t argc, const kl_h *args, [[maybe_unused]] int32_t secret) {
   for (int32_t i = 0; i < argc; ++i) {
     const char *data = nullptr;
     int32_t len = 0;
@@ -422,8 +422,8 @@ kl_h kl_native_fs_read_bytes(kl_h path) {
   // Build a byte[] array: each byte becomes a kl_h int element.
   std::vector<kl_h> bytes;
   bytes.reserve(contents.size());
-  for (unsigned char c : contents) {
-    bytes.push_back(kl_from_int(static_cast<int64_t>(c)));
+  for (char c : contents) {
+    bytes.push_back(kl_from_int(static_cast<int64_t>(static_cast<unsigned char>(c))));
   }
   return kl_array_new(static_cast<int32_t>(bytes.size()), bytes.data());
 }
@@ -536,7 +536,8 @@ kl_h kl_native_file_read(kl_h file_val, kl_h buffer_val) {
   // Write bytes back into the kl_h array elements.
   for (ssize_t i = 0; i < n; ++i) {
     kl_index_set(buffer_val, kl_from_int(static_cast<int64_t>(i)),
-                 kl_from_int(static_cast<int64_t>(static_cast<unsigned char>(raw[i]))));
+                 kl_from_int(static_cast<int64_t>(
+                     static_cast<unsigned char>(raw[static_cast<std::size_t>(i)]))));
   }
   return kl_from_int(static_cast<int64_t>(n));
 }

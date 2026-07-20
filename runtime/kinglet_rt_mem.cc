@@ -16,6 +16,9 @@
 
 #if defined(__unix__) || defined(__APPLE__)
 #include <unistd.h>
+#elif defined(_WIN32)
+#include <io.h>
+#include <fcntl.h>
 #endif
 
 extern "C" {

@@ -124,8 +124,9 @@ if ($LASTEXITCODE -ne 0) { Fail "gn gen failed" }
 
 # ========== build ==========
 
-$targets = @("kinglet")
-if ($enableLlvm) { $targets += "kinglet_rt" }
+# kinglet_rt is LLVM-independent; always build it so compile-only runs still
+# type-check the runtime (catches Windows/MinGW-only regressions).
+$targets = @("kinglet", "kinglet_rt")
 
 Info "ninja -C $Out $($targets -join ' ')"
 & $ninja -C $Out @targets

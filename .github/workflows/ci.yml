@@ -220,35 +220,97 @@ jobs:
           fail_ci_if_error: false
 
   build-and-test-windows:
+    # Build with the MSYS2 MinGW toolchain — the same one release uses and the
+    # one docs/BUILD.md mandates for the native backend. The PATH clang on
+    # windows-latest is the MSVC-ABI llvm.org build; it uses different headers
+    # and silently masks MinGW-only issues (e.g. the runtime's missing <io.h>
+    # include that broke _close). kinglet_rt is LLVM-independent, so it is
+    # always compiled and Windows-only runtime regressions are caught on every
+    # PR regardless of whether the LLVM cache is warm.
     if: github.event_name == 'pull_request'
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up pinned toolchain (GN + Ninja)
-        shell: pwsh
+      - name: Set up native Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up MSYS2 (MinGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            unzip
+            mingw-w64-x86_64-ca-certificates
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+
+      # Restore the LLVM install tree primed by prime-llvm-cache.yml (same key
+      # release.yml uses). PRs never build LLVM from source (~40 min); a cache
+      # miss degrades to a MinGW compile-only build that still compiles
+      # kinglet_rt, so runtime regressions are still caught.
+      - name: Restore LLVM cache
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/msys64/llvm-install
+          key: llvm-22.1.0-x86-ffs-v3
+
+      - name: Install GN
         run: |
-          pwsh -File scripts/setup.ps1
-          Add-Content -Path $env:GITHUB_PATH -Value "$PWD\tools\bin"
+          curl -Lo gn.zip "https://chrome-infra-packages.appspot.com/dl/gn/gn/windows-amd64/+/latest"
+          unzip -o gn.zip -d /usr/bin
 
-      - name: Build
-        shell: pwsh
-        run: pwsh -File scripts/build.ps1 -Out out\Debug
+      - name: Generate build files (with LLVM backend)
+        if: steps.cache-llvm.outputs.cache-hit == 'true'
+        run: |
+          PYW="$(cygpath -m "$pythonLocation")/python.exe"
+          LLVMW="$(cygpath -m /llvm-install/bin/llvm-config)"
+          CLANG_BASE="$(cygpath -m /mingw64/bin)"
+          gn gen out/Debug --script-executable="$PYW" \
+            --args="is_debug=true enable_llvm=true llvm_link_static=true llvm_config=\"$LLVMW\" clang_base_path=\"$CLANG_BASE\""
 
-      - name: Run golden tests (compile-only)
-        shell: bash
+      - name: Generate build files (compile-only, MinGW clang)
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        run: |
+          echo "::warning::LLVM cache miss — compile-only with MinGW clang (no native backend / native tests). Re-run the 'Prime LLVM Cache' workflow to restore full coverage."
+          PYW="$(cygpath -m "$pythonLocation")/python.exe"
+          CLANG_BASE="$(cygpath -m /mingw64/bin)"
+          gn gen out/Debug --script-executable="$PYW" \
+            --args="is_debug=true clang_base_path=\"$CLANG_BASE\""
+
+      - name: Build (kinglet + kinglet_rt; runtime is always compiled)
+        run: ninja -C out/Debug kinglet kinglet_rt
+
+      - name: Run full test suite (incl. native execution)
+        if: steps.cache-llvm.outputs.cache-hit == 'true'
+        run: |
+          export KINGLET="$PWD/out/Debug/kinglet"
+          export KINGLET_SKIP_REBUILD=1
+          export NEST_TEST_OUT="$PWD/out/Debug"
+          bash tests/run_all.sh
+
+      - name: Run golden suites (compile-only)
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: |
           export KINGLET="$PWD/out/Debug/kinglet"
           export KINGLET_SKIP_RUN=1
           export KINGLET_SKIP_REBUILD=1
+          export NEST_TEST_OUT="$PWD/out/Debug"
           bash tests/sema/run.sh
           bash tests/parser/run.sh
           bash tests/codegen/run.sh
           bash tests/ir/run.sh
 
       - name: Compile smoke
-        shell: bash
         run: |
           ./out/Debug/kinglet.exe --check tests/exec/cases/structs_basic.kl
           ./out/Debug/kinglet.exe --ir tests/exec/cases/structs_basic.kl >/dev/null

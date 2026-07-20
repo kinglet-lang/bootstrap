@@ -102,10 +102,10 @@ eval gn gen "$OUT_DIR" --args="'$GN_ARGS'"
 
 # ========== build ==========
 
-NINJA_TARGETS="kinglet"
-if [[ "$GN_ARGS" == *enable_llvm=true* ]]; then
-  NINJA_TARGETS="kinglet kinglet_rt"
-fi
+# kinglet_rt is LLVM-independent; always build it so compile-only runs still
+# type-check the runtime (catches Windows/MinGW-only regressions like the
+# missing <io.h> include that broke _close).
+NINJA_TARGETS="kinglet kinglet_rt"
 
 info "ninja -C $OUT_DIR $NINJA_TARGETS"
 ninja -C "$OUT_DIR" $NINJA_TARGETS
