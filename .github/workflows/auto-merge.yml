@@ -110,7 +110,7 @@ jobs:
 
           # Fetch all open, mergeable PRs with their check rollup and reviews.
           prs_json=$(gh pr list -R "$REPO" --state open \
-            --json number,statusCheckRollup,mergeable,headRepository,headRepositoryOwner,headRefName,reviews)
+            --json number,statusCheckRollup,mergeable,headRepository,headRepositoryOwner,headRefName,headRefOid,reviews)
 
           # Filter to PRs that are ready.
           #
@@ -148,9 +148,18 @@ jobs:
                     | length == 0
                   )
                   and (
-                    # 2. kinglet-reviewer has submitted an APPROVED review.
-                    .reviews
-                    | any((.author.login | startswith("kinglet-reviewer")) and .state == "APPROVED")
+                    # 2. The latest kinglet-reviewer review for the current
+                    #    head commit is APPROVED. Historical approvals must not
+                    #    hide a later REQUEST_CHANGES review or survive a push.
+                    .headRefOid as $head
+                    | .reviews
+                    | map(select(
+                        (.author.login | startswith("kinglet-reviewer"))
+                        and .commit.oid == $head
+                      ))
+                    | sort_by(.submittedAt)
+                    | last
+                    | .state == "APPROVED"
                   )
               )
             | .number
@@ -184,10 +193,17 @@ jobs:
                     then "checks=" + ($blocked_checks | join(","))
                     else empty
                     end,
-                  if (.reviews | any(
+                  if (
+                    .headRefOid as $head
+                    | .reviews
+                    | map(select(
                         (.author.login | startswith("kinglet-reviewer"))
-                        and .state == "APPROVED"
+                        and .commit.oid == $head
                       ))
+                    | sort_by(.submittedAt)
+                    | last
+                    | .state == "APPROVED"
+                  )
                   then empty
                   else "reviewer approval missing"
                   end
