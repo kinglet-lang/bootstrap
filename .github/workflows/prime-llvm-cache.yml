@@ -6,13 +6,18 @@ name: Prime LLVM Cache
 # cache saved by a different tag.  Caches saved on the default branch,
 # however, are accessible from ANY workflow run — including releases.
 #
-# This workflow is triggered manually after LLVM build configuration
-# changes (version bumps, cmake flags, target additions).  Once primed,
-# every subsequent release restores the install tree instantly, skipping
-# the ~40-minute LLVM source build.
+# This workflow runs at least every five days to keep the caches inside
+# GitHub's seven-day inactivity window.  It can also be triggered manually
+# after LLVM build configuration changes (version bumps, cmake flags, target
+# additions).  Once primed, every subsequent release restores the install
+# tree instantly, skipping the ~40-minute LLVM source build.
 
 on:
   workflow_dispatch:
+  schedule:
+    # Days 1, 6, 11, 16, 21, 26, and 31 at 03:17 UTC. Month boundaries can
+    # shorten an interval, but no interval exceeds five days.
+    - cron: '17 3 */5 * *'
 
 permissions:
   actions: write
