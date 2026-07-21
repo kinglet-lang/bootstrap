@@ -4,10 +4,10 @@
 #   irm https://kinglet-lang.org/install.ps1 | iex
 #
 # With KINGLET_VERSION to install a specific or prerelease version:
-#   $env:KINGLET_VERSION = "v0.1.0-rc.3"; irm ... | iex
+#   $env:KINGLET_VERSION = "v0.1.0"; irm ... | iex
 #
 # Environment overrides:
-#   KINGLET_VERSION       Tag to install (e.g. v0.1.0-rc.3). Default: latest
+#   KINGLET_VERSION       Tag to install (e.g. v0.1.0). Default: latest
 #                         stable (non-prerelease) release.
 #   KINGLET_INSTALL_DIR   Install prefix. Default: $HOME\.kinglet
 #   KINGLET_REPO          GitHub owner/repo. Default: kinglet-lang/bootstrap
@@ -67,18 +67,18 @@ Network error — if you are behind a firewall or proxy, set the proxy before ru
 
 Or skip the API call by specifying a version directly:
 
-  `$env:KINGLET_VERSION = 'v0.1.4'; irm https://kinglet-lang.org/install.ps1 | iex
+  `$env:KINGLET_VERSION = 'v0.1.0'; irm https://kinglet-lang.org/install.ps1 | iex
 "@
     }
     if ($statusCode -eq 404) {
       Warn "No stable (non-prerelease) release found on $Script:Repo yet."
-      Fail "Set `$env:KINGLET_VERSION = 'v0.1.0-rc.3' to install a prerelease, or 'v0.1.4' for the latest."
+      Fail "Set `$env:KINGLET_VERSION = 'v0.1.0' to install a specific published release."
     }
     if ($statusCode -eq 403) {
-      Warn "GitHub API rate-limited — wait a minute and retry, or set `$env:KINGLET_VERSION = 'v0.1.4'"
+      Warn "GitHub API rate-limited — wait a minute and retry, or set `$env:KINGLET_VERSION = 'v0.1.0'"
       Fail "Set `$env:KINGLET_VERSION=<tag> to install a specific version without hitting the API."
     }
-    Fail "unexpected HTTP $statusCode from $api — retry or set KINGLET_VERSION=v0.1.4"
+    Fail "unexpected HTTP $statusCode from $api — retry or set KINGLET_VERSION=v0.1.0"
   }
 
   if (-not $release -or -not $release.tag_name) {

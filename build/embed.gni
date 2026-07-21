@@ -8,5 +8,7 @@
 
 declare_args() {
   embed_compiler_path = ""
-  kinglet_version = "0.1.6"
+  # Release builds override this from the tag. Keep direct GN development
+  # builds distinguishable from a published release.
+  kinglet_version = "0.1.0-dev"
 }

@@ -177,5 +177,5 @@ compile-only build.
 `enable_llvm=true`, or run with `--check` / `--ir` (compile-only modes).
 
 **Stack overflow during parse** — the parser has a recursion depth guard
-(`kMaxRecursionDepth = 48`). If you hit it on deep input (> 24 nesting levels),
-the input is pathological; reduce nesting.
+(`kMaxRecursionDepth = 16`). If valid input reaches the limit, reduce its nesting
+depth; malformed input is rejected before exhausting the process stack.

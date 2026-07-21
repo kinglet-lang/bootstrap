@@ -36,8 +36,8 @@ Set `KINGLET_VERSION=<tag>` to install a specific or prerelease version.
 irm https://kinglet-lang.org/install.ps1 | iex
 ```
 
-Set `$env:KINGLET_VERSION = 'v0.1.0-rc.3';` before the command to install a
-prerelease.
+Set `$env:KINGLET_VERSION = 'v0.1.0';` before the command to install a specific
+release.
 
 Or download a release archive manually from [Releases](https://github.com/kinglet-lang/bootstrap/releases):
 
@@ -51,7 +51,7 @@ Extract and add the directory to your `PATH`:
 
 ```bash
 tar xzf kinglet-<platform>.tar.gz
-# Add the extracted directory to PATH once (contains kinglet and a klet alias).
+# Add the extracted bin/ directory to PATH once (contains kinglet and klet).
 ```
 
 Release archives ship **one** `kinglet` binary. `klet` is a hard link (Windows/macOS/Linux) or symlink (Unix) to the same file — `klet build` ≡ `kinglet build`. Only one directory needs to be on `PATH`. Do not use `klet.cmd`; if present from an older package, delete it and re-run `scripts/stage-klet-alias.ps1 dist`.
