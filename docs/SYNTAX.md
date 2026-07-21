@@ -1,7 +1,7 @@
 # Kinglet Language Syntax Reference
 
 This document describes the surface syntax of the Kinglet language as implemented
-by the self-hosting bootstrap compiler (`kinglet 0.1.0-rc.3`). It is derived
+by the Kinglet bootstrap compiler (`kinglet 0.1.0`). It is derived
 directly from the compiler frontend:
 
 - Lexer: `compiler/frontend/lexer/scanner.cc`, `token.h`
@@ -56,8 +56,9 @@ they are placeholders for future features and cannot be used today.
 `module` is **not** a keyword; it is a contextual identifier matched only in the
 `export module <name>;` form.
 
-`mut` is **not** a keyword; it is a contextual identifier recognized only
-directly after `&` in type and reference position (`&mut T`, `&mut x`).
+`mut` is **not** a keyword. Reference mutability is expressed in type position
+with `T&` (exclusive) and `const T&` (shared); `&expr` is the explicit borrow
+expression for both forms.
 
 ### Integer literals
 
@@ -174,11 +175,12 @@ string?
 
 ### Reference types
 
-A leading `&` (optionally `&mut`) forms a reference type:
+A trailing `&` forms a reference type. `T&` is an exclusive reference and
+`const T&` is a shared reference:
 
 ```kinglet
-&int
-&mut Point
+int&
+const Point&
 ```
 
 ## Top-level declarations
@@ -454,7 +456,7 @@ comparison        <  >  <=  >=                  (supports chaining, see below)
 shift             <<  >>
 term              +  -
 factor            *  /  %
-unary             !  -  ~  &  &mut              (prefix)
+unary             !  -  ~  &                     (prefix)
 call / postfix    f(x)  a.b  a[i]  x match {…}  e?
 primary           literals, identifiers, (…), […], {…}
 ```
@@ -488,7 +490,6 @@ a && b   a || b   !a
 !flag    // logical not
 ~bits    // bitwise not
 &x       // reference
-&mut x   // mutable reference
 ```
 
 ### Ternary

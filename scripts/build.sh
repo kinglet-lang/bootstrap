@@ -87,7 +87,7 @@ if [[ -n "$GN_EXTRA" ]]; then
   GN_ARGS="$GN_ARGS $GN_EXTRA"
 fi
 
-# Resolve version from the nearest git tag (v0.1.6 -> 0.1.6).
+# Resolve version from the nearest git tag (v0.1.0 -> 0.1.0).
 # Respect an explicit kinglet_version= from --gn; if absent,
 # auto-detect so local dev builds show the correct version.
 if [[ "$GN_ARGS" != *kinglet_version=* ]]; then

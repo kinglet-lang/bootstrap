@@ -4,7 +4,7 @@
 #   curl -fsSL https://kinglet-lang.org/install.sh | sh
 #
 # Environment overrides:
-#   KINGLET_VERSION       Tag to install (e.g. v0.1.0-rc.3). Default: latest
+#   KINGLET_VERSION       Tag to install (e.g. v0.1.0). Default: latest
 #                         stable (non-prerelease) release.
 #   KINGLET_INSTALL_DIR   Install prefix. Default: $HOME/.kinglet
 #   KINGLET_REPO          GitHub owner/repo. Default: kinglet-lang/bootstrap
@@ -131,21 +131,21 @@ resolve_version() {
 
 Or skip the API call by specifying a version directly:
 
-  KINGLET_VERSION=v0.1.4 curl -fsSL https://kinglet-lang.org/install.sh | sh"
+  KINGLET_VERSION=v0.1.0 curl -fsSL https://kinglet-lang.org/install.sh | sh"
       ;;
     403)
       rm -f "$tmp"
-      warn "GitHub API rate-limited — wait a minute and retry, or set KINGLET_VERSION=v0.1.4"
+      warn "GitHub API rate-limited — wait a minute and retry, or set KINGLET_VERSION=v0.1.0"
       err "Set KINGLET_VERSION=<tag> to install a specific version without hitting the API."
       ;;
     404)
       rm -f "$tmp"
       note "No stable (non-prerelease) release found on $REPO yet."
-      err "Set KINGLET_VERSION=<tag> to install a prerelease, e.g. KINGLET_VERSION=v0.1.0-rc.3"
+      err "Set KINGLET_VERSION=<tag> to install a specific published release."
       ;;
     *)
       rm -f "$tmp"
-      err "unexpected HTTP $http_code from $api — retry or set KINGLET_VERSION=v0.1.4"
+      err "unexpected HTTP $http_code from $api — retry or set KINGLET_VERSION=v0.1.0"
       ;;
   esac
   tag="$(sed -n 's/.*"tag_name"[ ]*:[ ]*"\([^"]*\)".*/\1/p' "$tmp" | head -n1)"
