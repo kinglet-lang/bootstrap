@@ -1,4 +1,5 @@
 // RUN: run
+// RUN-ARGS: $HARNESS_TMP
 // CHECK: 16
 // CHECK: 1
 // CHECK: 0
@@ -7,10 +8,16 @@
 
 using io;
 using fs;
+using sys;
 
 int main() {
+  string[] args = sys::args();
+  string tmp = args[0];
+  string input_path = tmp + "/kinglet_fs_file_test.txt";
+  string output_path = tmp + "/kinglet_fs_file_test2.txt";
+
   // Create a test file using fs::file directly.
-  fs::file seed = fs::create("/tmp/kinglet_fs_file_test.txt");
+  fs::file seed = fs::create(input_path);
   byte[] hello = [byte(72), byte(101), byte(108), byte(108), byte(111), byte(44),
                   byte(32), byte(102), byte(115), byte(58), byte(58), byte(102),
                   byte(105), byte(108), byte(101), byte(33)];
@@ -18,30 +25,30 @@ int main() {
   seed.sync();
   seed.close();
 
-  // D2: fs::open(path) -> fs::file
-  fs::file input = fs::open("/tmp/kinglet_fs_file_test.txt");
+  // Open an existing path as fs::file.
+  fs::file input = fs::open(input_path);
 
-  // D1: file.size() -> u64
+  // Query the file size.
   int sz = input.size();
   io::out.line("{}", sz);
 
-  // D1: file.open() -> bool (handle is open before close)
+  // The handle reports open before close.
   io::out.line("{}", input.open());
 
-  // D1: file.close()
+  // Close the input handle.
   input.close();
 
-  // D2: fs::create(path) -> fs::file (write mode)
-  fs::file output = fs::create("/tmp/kinglet_fs_file_test2.txt");
+  // Create a second file in write mode.
+  fs::file output = fs::create(output_path);
 
-  // D1: file.close()
+  // Close the output handle.
   output.close();
 
-  // D1: file.open() -> bool (handle is closed)
+  // The handle reports closed after close.
   io::out.line("{}", output.open());
 
-  // Verify content using fs::read byte[] API.
-  byte[] content = fs::read("/tmp/kinglet_fs_file_test.txt");
+  // Verify content using the whole-file byte-array API.
+  byte[] content = fs::read(input_path);
   io::out.line("{}", content.len());
   io::out.line("{}", content[0]);
 

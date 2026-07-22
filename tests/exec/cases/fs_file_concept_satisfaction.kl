@@ -1,18 +1,16 @@
 // RUN: run
+// RUN-ARGS: $HARNESS_TMP
 // CHECK: 5
 // CHECK: 5
 // CHECK: 87
 // CHECK: 1
-// Platform note: test uses POSIX /tmp paths. Kinglet currently targets
-// POSIX systems (Linux/macOS). Windows support is future work (ADR 0027).
 
 using io;
 using fs;
+using sys;
 
 // Generic function accepting io::reader.
 // fs::file satisfies io::reader because it has read(byte[]).
-// File handles are auto-closed by GC (kl_release) when the parameter
-// goes out of scope - close() is a resource op, not a capability op (0026 D3).
 int read_all(io::reader input) {
   byte[] buffer;
   buffer.resize(16, byte(0));
@@ -22,16 +20,19 @@ int read_all(io::reader input) {
 }
 
 // Generic function accepting io::writer.
-// fs::file satisfies io::writer because it has write(byte[]).
-// The caller transfers ownership: fs::file is passed by value (moved),
-// so the concept function consumes it. The GC closes the fd when the
-// parameter goes out of scope inside the function body.
+// Passing fs::file by value transfers ownership to this function.
 int emit(io::writer output, byte[] data) {
   output.write(data);
   return 0;
 }
 
 int main() {
+  string[] args = sys::args();
+  string tmp = args[0];
+  string reader_path = tmp + "/kinglet_concept_test.txt";
+  string writer_path = tmp + "/kinglet_concept_write.txt";
+  string concept_writer_path = tmp + "/kinglet_concept_writer_concept.txt";
+
   byte[] data;
   data.resize(5, byte(0));
   data[0] = byte(87);  // W
@@ -40,35 +41,28 @@ int main() {
   data[3] = byte(108); // l
   data[4] = byte(100); // d
 
-  // --- Reader path: write a file, then read it via io::reader concept ---
-  fs::file rf_seed = fs::create("/tmp/kinglet_concept_test.txt");
+  // Write a file, then read it through io::reader.
+  fs::file rf_seed = fs::create(reader_path);
   rf_seed.write(data);
   rf_seed.sync();
   rf_seed.close();
+  read_all(fs::open(reader_path));
 
-  read_all(fs::open("/tmp/kinglet_concept_test.txt"));
-
-  // --- Writer path: write a file via concrete fs::file ---
-  fs::file wf = fs::create("/tmp/kinglet_concept_write.txt");
+  // Write a file through the concrete fs::file interface.
+  fs::file wf = fs::create(writer_path);
   wf.write(data);
   wf.sync();
   wf.close();
 
-  // Verify the written content by reading it back through byte[] API.
-  byte[] content = fs::read("/tmp/kinglet_concept_write.txt");
+  byte[] content = fs::read(writer_path);
   io::out.line("{}", content.len());
   io::out.line("{}", content[0]);
 
-  // Also verify the writer concept works (compile-time check that
-  // fs::file satisfies io::writer). We call emit but don't need to
-  // verify the output since we already tested the concrete path above.
-  // The file is auto-closed by GC when emit's parameter goes out of scope.
-  emit(fs::create("/tmp/kinglet_concept_writer_concept.txt"), data);
+  // Confirm that fs::file also satisfies io::writer.
+  emit(fs::create(concept_writer_path), data);
 
-  // Verify open() works on a file handle obtained from fs::open.
-  fs::file f = fs::open("/tmp/kinglet_concept_test.txt");
+  fs::file f = fs::open(reader_path);
   io::out.line("{}", f.open());
-  // f is auto-closed by GC (kl_release) when it goes out of scope.
 
   return 0;
 }
