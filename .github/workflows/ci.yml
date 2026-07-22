@@ -247,6 +247,7 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
+            diffutils
             unzip
             mingw-w64-x86_64-ca-certificates
             mingw-w64-x86_64-clang
@@ -287,8 +288,8 @@ jobs:
           gn gen out/Debug --script-executable="$PYW" \
             --args="is_debug=true clang_base_path=\"$CLANG_BASE\""
 
-      - name: Build (kinglet + kinglet_rt; runtime is always compiled)
-        run: ninja -C out/Debug kinglet kinglet_rt
+      - name: Build compiler, runtime, and test support
+        run: ninja -C out/Debug kinglet kinglet_rt nest_parser_test
 
       - name: Run full test suite (incl. native execution)
         if: steps.cache-llvm.outputs.cache-hit == 'true'

@@ -1,16 +1,21 @@
 // RUN: run
+// RUN-ARGS: $HARNESS_TMP
 // CHECK: 5
 // CHECK: 5
 // CHECK: 87
 
 using io;
 using fs;
+using sys;
 
 int main() {
-  // D2: fs::create(path) -> fs::file (write mode)
-  fs::file output = fs::create("/tmp/kinglet_fs_write_test.txt");
+  string[] args = sys::args();
+  string path = args[0] + "/kinglet_fs_write_test.txt";
 
-  // Build a byte[] buffer with "World" (5 bytes)
+  // Create the file in write mode.
+  fs::file output = fs::create(path);
+
+  // Build a byte-array buffer with "World".
   byte[] data;
   data.resize(5, byte(0));
   data[0] = byte(87);  // W
@@ -19,16 +24,16 @@ int main() {
   data[3] = byte(108); // l
   data[4] = byte(100); // d
 
-  // D1: file.write(byte[] data) -> usize (bytes written)
+  // write returns the number of bytes written.
   int n = output.write(data);
   io::out.line("{}", n);
 
-  // D1: file.sync()
+  // Flush and close before reading the file back.
   output.sync();
   output.close();
 
-  // Read back and verify through the byte[] whole-file API.
-  byte[] content = fs::read("/tmp/kinglet_fs_write_test.txt");
+  // Read back and verify through the whole-file byte-array API.
+  byte[] content = fs::read(path);
   io::out.line("{}", content.len());
   io::out.line("{}", content[0]);
 
