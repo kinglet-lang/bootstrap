@@ -1,0 +1,8 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+int main() {
+  char value = char(true);
+  return int(value);
+}

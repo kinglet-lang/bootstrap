@@ -1,0 +1,8 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+int main() {
+  int32 value = 1 + 2;
+  return int(value);
+}
