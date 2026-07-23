@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+
+int classify(string input) {
+  int? value = int(input) ?: let err => err match {
+    CastError::Empty => -1,
+    CastError::NotANumber(let text) => -text.len(),
+    CastError::Overflow(let text) => -text.len(),
+  };
+  return value ?: 0;
+}
+
+int main() {
+  io::out.line("{} {} {}", classify(""), classify("bad"), classify("999999999999999999999999"));
+  return 0;
+}

@@ -1,0 +1,10 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+enum Suit { Hearts, Spades }
+
+int main() {
+  string value = string(Suit::Hearts);
+  return value.len();
+}
