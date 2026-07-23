@@ -1,0 +1,10 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+// CHECK-ERR: Use '?:' for null/error coalescing
+
+int main() {
+  int? a = null;
+  int? b = a ?? -1;   // '??' is not an operator; lexer rejects it
+  return 0;
+}

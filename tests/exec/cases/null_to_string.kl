@@ -1,0 +1,11 @@
+// RUN: run
+
+using io;
+
+int main() {
+  // null is assignable to string; it formats as the literal "null".
+  string s = null;
+  io::out("{}\n", s);
+  io::out("{}\n", string(null));
+  return 0;
+}

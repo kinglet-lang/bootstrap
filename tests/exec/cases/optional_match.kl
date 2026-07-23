@@ -1,0 +1,17 @@
+// RUN: run
+
+using io;
+
+// Match on an Optional: a `null` arm (required for exhaustiveness when
+// the scrutinee is nullable) plus a `let x => x` value-binding arm.
+int classify(int? v) {
+  return v match {
+    null => -1,
+    let x => x,
+  };
+}
+
+int main() {
+  io::out("{} {}\n", classify(0), classify(42));
+  return 0;
+}

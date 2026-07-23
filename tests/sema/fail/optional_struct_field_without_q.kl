@@ -1,0 +1,15 @@
+// RUN: check
+// COMPILE-FAIL
+// EXPECT-EXIT: 65
+
+struct Node {
+  int value;
+  Node? next;
+}
+
+int main() {
+  Node n { 1, null };
+  // next is Node?, an Optional — must use field? to unwrap before .value.
+  int? v = n.next.value;
+  return 0;
+}
