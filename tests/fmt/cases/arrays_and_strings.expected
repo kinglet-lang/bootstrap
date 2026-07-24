@@ -1,0 +1,9 @@
+using io;
+int sum10(int[10] a, int[] b) {
+  return a[0];
+}
+
+int main() {
+  io::out("tab\there\nquote\"and\\slash");
+  return 0;
+}
