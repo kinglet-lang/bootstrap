@@ -235,10 +235,24 @@ void Emitter::emit_top_level_decl(const ast::Decl &decl) {
 
 std::string Emitter::emit_type(const ast::TypeExpr &type) {
   if (type.name == "Array" && type.type_args.size() == 1) {
-    return emit_type(type.type_args[0]) + "[]";
+    // Fixed-size arrays keep their dimension (T[N]); dynamic arrays are T[].
+    // `array_size > 0` => fixed T[array_size]; `-1` (default) => dynamic T[].
+    std::string inner = emit_type(type.type_args[0]);
+    if (type.array_size > 0) {
+      return inner + "[" + std::to_string(type.array_size) + "]";
+    }
+    return inner + "[]";
   }
   if (type.name == "Nullable" && type.type_args.size() == 1) {
     return emit_type(type.type_args[0]) + "?";
+  }
+  if (type.name == "&" && type.type_args.size() == 1) {
+    // Shared (const) borrow: the parser encodes `const T&` as {"&", [T]}.
+    return "const " + emit_type(type.type_args[0]) + "&";
+  }
+  if (type.name == "&mut" && type.type_args.size() == 1) {
+    // Exclusive (mutable) borrow: the parser encodes `T&` as {"&mut", [T]}.
+    return emit_type(type.type_args[0]) + "&";
   }
   if (type.type_args.empty()) {
     return type.name;
@@ -252,31 +266,12 @@ std::string Emitter::emit_type(const ast::TypeExpr &type) {
 }
 
 std::string Emitter::emit_string_literal(const std::string &value) {
-  std::string out = "\"";
-  for (char c : value) {
-    switch (c) {
-    case '\\':
-      out += "\\\\";
-      break;
-    case '"':
-      out += "\\\"";
-      break;
-    case '\n':
-      out += "\\n";
-      break;
-    case '\r':
-      out += "\\r";
-      break;
-    case '\t':
-      out += "\\t";
-      break;
-    default:
-      out.push_back(c);
-      break;
-    }
-  }
-  out.push_back('"');
-  return out;
+  // The parser stores the raw interior of the literal (surrounding quotes
+  // stripped, escape sequences NOT decoded). Decoding happens later, at
+  // codegen (Compiler::compile_string_literal). Re-escaping here would
+  // double the backslashes on every formatting pass, so emit the interior
+  // verbatim — only re-adding the surrounding quotes.
+  return "\"" + value + "\"";
 }
 
 std::string Emitter::emit_char_literal(int8_t value) {
@@ -734,6 +729,13 @@ std::string Emitter::emit_decl(const ast::Decl &decl, bool top_level) {
       } else {
         out << type_text << " " << field.name << ";\n";
       }
+    }
+    if (st->init_decl) {
+      out << indent_str() << "@init(" << emit_parameters(st->init_decl->params) << ") "
+          << emit_stmt(*st->init_decl->body, true) << "\n";
+    }
+    if (st->destroy_decl) {
+      out << indent_str() << "@destroy " << emit_stmt(*st->destroy_decl->body, true) << "\n";
     }
     indent_level_ = saved;
     out << indent_str() << "}";

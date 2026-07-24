@@ -1,0 +1,22 @@
+using io;
+void bump(int& x) {
+  x = x + 1;
+}
+
+void read_ref(const int& x) {
+  return;
+}
+
+string& first(string& s) {
+  return s;
+}
+
+struct File {
+  int fd;
+  @init(int fd) {
+    self.fd = fd;
+  }
+  @destroy {
+    self.fd = 0;
+  }
+}

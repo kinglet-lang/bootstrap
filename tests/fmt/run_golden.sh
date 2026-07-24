@@ -81,6 +81,8 @@ run_stdin_case leading_comment
 run_stdin_case control_flow
 run_stdin_case pipe
 run_stdin_case inline_comments
+run_stdin_case refs_and_resources
+run_stdin_case arrays_and_strings
 run_project_case "$CASES_DIR/group_using_project"
 run_project_case "$CASES_DIR/align_imports"
 run_project_case "$CASES_DIR/align_struct_fields"
