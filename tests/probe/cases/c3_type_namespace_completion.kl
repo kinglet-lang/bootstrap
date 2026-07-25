@@ -1,0 +1,14 @@
+using io;
+using fs;
+
+int emit(io:: output, byte[] data) {
+  return 0;
+}
+
+int read(Box<io::> box) {
+  return 0;
+}
+
+int write(fs::& output) {
+  return 0;
+}

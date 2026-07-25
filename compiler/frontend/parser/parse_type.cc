@@ -141,6 +141,14 @@ ast::TypeExpr Parser::parse_type_expr() {
   } else {
     std::string name = token_text(advance());
     while (match(TokenType::COLON_COLON)) {
+      if (at_completion()) {
+        // Completion immediately after `io::` / `fs::` in a type position
+        // (parameters, type arguments, refs) should reuse namespace-access
+        // completion rather than leaving the parser without a context.
+        set_completion(
+            {lsp::CompletionPosition::NamespaceAccess, {}, {}, name, {}, {}, active_type_params_});
+        return ast::TypeExpr{"<error>", {}};
+      }
       const Token &part =
           consume(TokenType::IDENTIFIER, "Expected identifier after '::' in type name.");
       name += "::";
