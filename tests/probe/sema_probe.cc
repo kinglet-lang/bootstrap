@@ -67,7 +67,8 @@ int main(int argc, char **argv) {
 
   std::cout << "=== parse errors (" << resp.parse_errors.size() << ") ===\n";
   for (const auto &err : resp.parse_errors) {
-    std::cout << err.line << ":" << err.column << ": " << err.message << "\n";
+    const auto span = err.labels.empty() ? kinglet::SourceSpan{} : err.labels.front().span;
+    std::cout << span.line << ":" << span.column << ": " << err.message << "\n";
   }
 
   if (!resp.program) {
